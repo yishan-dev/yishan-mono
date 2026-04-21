@@ -1,5 +1,6 @@
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  jsonb,
   index,
   pgTable,
   text,
@@ -105,6 +106,30 @@ export const organizationMembers = pgTable(
   ]
 );
 
+export const nodes = pgTable(
+  "nodes",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    scope: text("scope").notNull(),
+    endpoint: text("endpoint"),
+    metadata: jsonb("metadata"),
+    ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    index("nodes_scope_idx").on(table.scope),
+    index("nodes_owner_user_id_idx").on(table.ownerUserId),
+    index("nodes_organization_id_idx").on(table.organizationId),
+    index("nodes_created_by_user_id_idx").on(table.createdByUserId)
+  ]
+);
+
 export type User = InferSelectModel<typeof users>;
 export type NewUser = InferInsertModel<typeof users>;
 
@@ -122,3 +147,6 @@ export type NewOrganization = InferInsertModel<typeof organizations>;
 
 export type OrganizationMember = InferSelectModel<typeof organizationMembers>;
 export type NewOrganizationMember = InferInsertModel<typeof organizationMembers>;
+
+export type Node = InferSelectModel<typeof nodes>;
+export type NewNode = InferInsertModel<typeof nodes>;

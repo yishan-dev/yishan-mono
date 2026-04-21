@@ -126,3 +126,65 @@ export class ValidationError extends AppError {
     this.name = "ValidationError";
   }
 }
+
+export class NodeNotFoundError extends AppError {
+  constructor(nodeId: string) {
+    super("Node not found", StatusCodes.NOT_FOUND, "NODE_NOT_FOUND", { nodeId });
+    this.name = "NodeNotFoundError";
+  }
+}
+
+export class RemoteNodeOrganizationRequiredError extends AppError {
+  constructor() {
+    super(
+      "remote nodes require an organization",
+      StatusCodes.BAD_REQUEST,
+      "REMOTE_NODE_ORGANIZATION_REQUIRED"
+    );
+    this.name = "RemoteNodeOrganizationRequiredError";
+  }
+}
+
+export class LocalNodeOrganizationNotAllowedError extends AppError {
+  constructor() {
+    super(
+      "local nodes cannot be attached to an organization",
+      StatusCodes.BAD_REQUEST,
+      "LOCAL_NODE_ORGANIZATION_NOT_ALLOWED"
+    );
+    this.name = "LocalNodeOrganizationNotAllowedError";
+  }
+}
+
+export class OrganizationNodePermissionRequiredError extends AppError {
+  constructor() {
+    super(
+      "Only organization owners or admins can manage remote nodes",
+      StatusCodes.FORBIDDEN,
+      "ORGANIZATION_NODE_PERMISSION_REQUIRED"
+    );
+    this.name = "OrganizationNodePermissionRequiredError";
+  }
+}
+
+export class NodeDeletePermissionRequiredError extends AppError {
+  constructor() {
+    super(
+      "You do not have permission to delete this node",
+      StatusCodes.FORBIDDEN,
+      "NODE_DELETE_PERMISSION_REQUIRED"
+    );
+    this.name = "NodeDeletePermissionRequiredError";
+  }
+}
+
+export class OrganizationMembershipRequiredError extends AppError {
+  constructor() {
+    super(
+      "You are not a member of this organization",
+      StatusCodes.FORBIDDEN,
+      "ORGANIZATION_MEMBERSHIP_REQUIRED"
+    );
+    this.name = "OrganizationMembershipRequiredError";
+  }
+}

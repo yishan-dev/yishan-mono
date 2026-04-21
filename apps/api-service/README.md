@@ -56,6 +56,9 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `DELETE /orgs/:orgId`
 - `POST /orgs/:orgId/members`
 - `DELETE /orgs/:orgId/members/:userId`
+- `GET /orgs/:orgId/nodes`
+- `POST /orgs/:orgId/nodes`
+- `DELETE /orgs/:orgId/nodes/:nodeId`
 
 Notes:
 
@@ -65,3 +68,7 @@ Notes:
 - `DELETE /orgs/:orgId` is owner-only and removes the org with cascading memberships.
 - `POST /orgs/:orgId/members` accepts `{ "userId": string, "role"?: "member" | "admin" }` and is allowed for org owners/admins.
 - `DELETE /orgs/:orgId/members/:userId` is allowed for org owners/admins, but owner members cannot be removed.
+- `POST /orgs/:orgId/nodes` accepts `{ "name": string, "scope": "local" | "remote", "endpoint"?: string, "metadata"?: { "os"?: string, "version"?: string, ... } }`.
+- Local nodes are user-owned (`organizationId = null`) even when created in org context; remote nodes are org-shared by default.
+- `GET /orgs/:orgId/nodes` returns both org remote nodes and local nodes owned by org members; listing visibility does not imply usage permission (`canUse` indicates direct usability).
+- Org-scoped resources reject access when the authenticated user is not a member of that org.

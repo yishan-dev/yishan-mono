@@ -11,6 +11,8 @@ export type AppEnv = {
     services: AppServices;
     oauthProvider: OAuthProvider;
     sessionUser: SessionUser;
+    organizationId: string;
+    organizationRole: "owner" | "admin" | "member";
   };
 };
 

@@ -1,6 +1,7 @@
 import type { AppDb } from "../db/client";
 import type { ServiceConfig } from "../types";
 import { AuthService } from "./auth-service";
+import { NodeService } from "./node-service";
 import { OrganizationService } from "./organization-service";
 import { UserService } from "./user-service";
 
@@ -8,6 +9,7 @@ export type AppServices = {
   user: UserService;
   auth: AuthService;
   organization: OrganizationService;
+  node: NodeService;
 };
 
 export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppServices {
@@ -16,6 +18,7 @@ export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppS
   return {
     user,
     auth: new AuthService(deps.db, deps.config, user),
-    organization: new OrganizationService(deps.db)
+    organization: new OrganizationService(deps.db),
+    node: new NodeService(deps.db)
   };
 }

@@ -41,6 +41,29 @@ type OrganizationView = {
 export class OrganizationService {
   constructor(private readonly db: AppDb) {}
 
+  async getMembershipRole(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberRole | null> {
+    const rows = await this.db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, input.organizationId),
+          eq(organizationMembers.userId, input.userId)
+        )
+      )
+      .limit(1);
+
+    const role = rows[0]?.role;
+    if (role === "owner" || role === "admin" || role === "member") {
+      return role;
+    }
+
+    return null;
+  }
+
   async addOrganizationMember(input: {
     organizationId: string;
     actorUserId: string;
