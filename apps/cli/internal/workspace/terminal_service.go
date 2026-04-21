@@ -3,12 +3,15 @@ package workspace
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"sync/atomic"
+
+	"github.com/creack/pty"
 )
 
 type TerminalStartRequest struct {
@@ -49,20 +52,62 @@ type TerminalStopResponse struct {
 	Stopped bool `json:"stopped"`
 }
 
+type TerminalResizeRequest struct {
+	SessionID string `json:"sessionId"`
+	Cols      uint16 `json:"cols"`
+	Rows      uint16 `json:"rows"`
+}
+
+type TerminalResizeResponse struct {
+	Resized bool `json:"resized"`
+}
+
+type TerminalSubscribeRequest struct {
+	SessionID string `json:"sessionId"`
+}
+
+type TerminalSubscribeResponse struct {
+	Subscribed bool `json:"subscribed"`
+}
+
+type TerminalUnsubscribeRequest struct {
+	SessionID      string `json:"sessionId"`
+	SubscriptionID uint64 `json:"subscriptionId"`
+}
+
+type TerminalUnsubscribeResponse struct {
+	Unsubscribed bool `json:"unsubscribed"`
+}
+
+type TerminalEvent struct {
+	SessionID string `json:"sessionId"`
+	Type      string `json:"type"`
+	Chunk     string `json:"chunk,omitempty"`
+	ExitCode  *int   `json:"exitCode,omitempty"`
+}
+
+type TerminalSubscription struct {
+	ID     uint64
+	Events <-chan TerminalEvent
+}
+
 type TerminalManager struct {
-	mu       sync.RWMutex
-	nextID   atomic.Uint64
-	sessions map[string]*terminalSession
+	mu        sync.RWMutex
+	nextID    atomic.Uint64
+	nextSubID atomic.Uint64
+	sessions  map[string]*terminalSession
 }
 
 type terminalSession struct {
 	id       string
 	cmd      *exec.Cmd
-	stdin    io.WriteCloser
+	pty      *os.File
 	output   bytes.Buffer
 	outputMu sync.Mutex
 	running  atomic.Bool
 	exitCode atomic.Int32
+	subsMu   sync.Mutex
+	subs     map[uint64]chan TerminalEvent
 }
 
 func NewTerminalManager() *TerminalManager {
@@ -78,34 +123,21 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), req.Env...)
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return TerminalStartResponse{}, err
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return TerminalStartResponse{}, err
-	}
-	stderr, err := cmd.StderrPipe()
+	ptyFile, err := pty.Start(cmd)
 	if err != nil {
 		return TerminalStartResponse{}, err
 	}
 
 	id := fmt.Sprintf("term-%d", m.nextID.Add(1))
-	s := &terminalSession{id: id, cmd: cmd, stdin: stdin}
+	s := &terminalSession{id: id, cmd: cmd, pty: ptyFile, subs: make(map[uint64]chan TerminalEvent)}
 	s.running.Store(true)
 	s.exitCode.Store(-1)
-
-	if err := cmd.Start(); err != nil {
-		return TerminalStartResponse{}, err
-	}
 
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
 
-	go s.capture(stdout)
-	go s.capture(stderr)
+	go s.capture()
 	go func() {
 		err := cmd.Wait()
 		code := int32(0)
@@ -118,7 +150,11 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 		}
 		s.exitCode.Store(code)
 		s.running.Store(false)
-		_ = s.stdin.Close()
+		_ = s.pty.Close()
+
+		exit := int(code)
+		s.broadcast(TerminalEvent{SessionID: s.id, Type: "exit", ExitCode: &exit})
+		s.closeSubscribers()
 	}()
 
 	return TerminalStartResponse{SessionID: id}, nil
@@ -134,7 +170,7 @@ func (m *TerminalManager) Send(req TerminalSendRequest) (TerminalSendResponse, e
 		return TerminalSendResponse{}, NewRPCError(-32005, "terminal session not running")
 	}
 
-	n, err := io.WriteString(s.stdin, req.Input)
+	n, err := io.WriteString(s.pty, req.Input)
 	if err != nil {
 		return TerminalSendResponse{}, err
 	}
@@ -173,12 +209,68 @@ func (m *TerminalManager) Stop(req TerminalStopRequest) (TerminalStopResponse, e
 		}
 		s.running.Store(false)
 	}
+	_ = s.pty.Close()
+	s.closeSubscribers()
 
 	m.mu.Lock()
 	delete(m.sessions, s.id)
 	m.mu.Unlock()
 
 	return TerminalStopResponse{Stopped: true}, nil
+}
+
+func (m *TerminalManager) Resize(req TerminalResizeRequest) (TerminalResizeResponse, error) {
+	s, err := m.session(req.SessionID)
+	if err != nil {
+		return TerminalResizeResponse{}, err
+	}
+
+	if req.Cols == 0 || req.Rows == 0 {
+		return TerminalResizeResponse{}, NewRPCError(-32602, "cols and rows are required")
+	}
+
+	if err := pty.Setsize(s.pty, &pty.Winsize{Cols: req.Cols, Rows: req.Rows}); err != nil {
+		return TerminalResizeResponse{}, err
+	}
+
+	return TerminalResizeResponse{Resized: true}, nil
+}
+
+func (m *TerminalManager) Subscribe(req TerminalSubscribeRequest) (TerminalSubscription, error) {
+	s, err := m.session(req.SessionID)
+	if err != nil {
+		return TerminalSubscription{}, err
+	}
+
+	id := m.nextSubID.Add(1)
+	ch := make(chan TerminalEvent, 64)
+
+	s.subsMu.Lock()
+	s.subs[id] = ch
+	s.subsMu.Unlock()
+
+	return TerminalSubscription{ID: id, Events: ch}, nil
+}
+
+func (m *TerminalManager) Unsubscribe(req TerminalUnsubscribeRequest) (TerminalUnsubscribeResponse, error) {
+	s, err := m.session(req.SessionID)
+	if err != nil {
+		return TerminalUnsubscribeResponse{}, err
+	}
+
+	s.subsMu.Lock()
+	ch, ok := s.subs[req.SubscriptionID]
+	if ok {
+		delete(s.subs, req.SubscriptionID)
+		close(ch)
+	}
+	s.subsMu.Unlock()
+
+	if !ok {
+		return TerminalUnsubscribeResponse{}, NewRPCError(-32004, "terminal subscription not found")
+	}
+
+	return TerminalUnsubscribeResponse{Unsubscribed: true}, nil
 }
 
 func (m *TerminalManager) session(id string) (*terminalSession, error) {
@@ -195,16 +287,44 @@ func (m *TerminalManager) session(id string) (*terminalSession, error) {
 	return s, nil
 }
 
-func (s *terminalSession) capture(r io.Reader) {
-	_, _ = io.Copy(sessionBufferWriter{s: s}, r)
+func (s *terminalSession) capture() {
+	buf := make([]byte, 4096)
+	for {
+		n, err := s.pty.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			s.outputMu.Lock()
+			_, _ = s.output.WriteString(chunk)
+			s.outputMu.Unlock()
+			s.broadcast(TerminalEvent{SessionID: s.id, Type: "output", Chunk: chunk})
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			return
+		}
+	}
 }
 
-type sessionBufferWriter struct {
-	s *terminalSession
+func (s *terminalSession) broadcast(event TerminalEvent) {
+	s.subsMu.Lock()
+	defer s.subsMu.Unlock()
+
+	for _, ch := range s.subs {
+		select {
+		case ch <- event:
+		default:
+		}
+	}
 }
 
-func (w sessionBufferWriter) Write(p []byte) (int, error) {
-	w.s.outputMu.Lock()
-	defer w.s.outputMu.Unlock()
-	return w.s.output.Write(p)
+func (s *terminalSession) closeSubscribers() {
+	s.subsMu.Lock()
+	defer s.subsMu.Unlock()
+
+	for id, ch := range s.subs {
+		delete(s.subs, id)
+		close(ch)
+	}
 }

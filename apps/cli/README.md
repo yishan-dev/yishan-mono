@@ -35,7 +35,15 @@ Supported JSON-RPC methods:
 - `workspace.terminal.start`
 - `workspace.terminal.send`
 - `workspace.terminal.read`
+- `workspace.terminal.resize`
 - `workspace.terminal.stop`
+- `workspace.terminal.subscribe`
+- `workspace.terminal.unsubscribe`
+
+Terminal subscriptions stream server notifications:
+
+- `workspace.terminal.output`
+- `workspace.terminal.exit`
 
 ## Environment Variables
 

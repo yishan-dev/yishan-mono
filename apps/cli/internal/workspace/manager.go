@@ -106,3 +106,15 @@ func (m *Manager) TerminalRead(req TerminalReadRequest) (TerminalReadResponse, e
 func (m *Manager) TerminalStop(req TerminalStopRequest) (TerminalStopResponse, error) {
 	return m.terminals.Stop(req)
 }
+
+func (m *Manager) TerminalResize(req TerminalResizeRequest) (TerminalResizeResponse, error) {
+	return m.terminals.Resize(req)
+}
+
+func (m *Manager) TerminalSubscribe(req TerminalSubscribeRequest) (TerminalSubscription, error) {
+	return m.terminals.Subscribe(req)
+}
+
+func (m *Manager) TerminalUnsubscribe(req TerminalUnsubscribeRequest) (TerminalUnsubscribeResponse, error) {
+	return m.terminals.Unsubscribe(req)
+}
