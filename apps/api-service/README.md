@@ -54,6 +54,8 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `GET /orgs`
 - `POST /orgs`
 - `DELETE /orgs/:orgId`
+- `POST /orgs/:orgId/members`
+- `DELETE /orgs/:orgId/members/:userId`
 
 Notes:
 
@@ -61,3 +63,5 @@ Notes:
 - Account resolution order is: provider account link first, then local user by email.
 - `POST /orgs` accepts `{ "name": string, "memberUserIds"?: string[] }` and always includes the authenticated user as an `owner` member.
 - `DELETE /orgs/:orgId` is owner-only and removes the org with cascading memberships.
+- `POST /orgs/:orgId/members` accepts `{ "userId": string, "role"?: "member" | "admin" }` and is allowed for org owners/admins.
+- `DELETE /orgs/:orgId/members/:userId` is allowed for org owners/admins, but owner members cannot be removed.

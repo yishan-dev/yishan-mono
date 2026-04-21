@@ -1,59 +1,15 @@
 import { StatusCodes } from "http-status-codes";
 
 import type { AppContext } from "../hono";
+import type {
+  AddOrganizationMemberBodyInput,
+  CreateOrganizationBodyInput,
+  OrganizationParamsInput,
+  RemoveOrganizationMemberParamsInput
+} from "../validation/organization";
 
-type CreateOrganizationBody = {
-  name?: string;
-  memberUserIds?: string[];
-};
-
-function parseMemberUserIds(raw: unknown): string[] | null {
-  if (raw === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(raw)) {
-    return null;
-  }
-
-  const values: string[] = [];
-  for (const value of raw) {
-    if (typeof value !== "string") {
-      return null;
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    values.push(trimmed);
-  }
-
-  return values;
-}
-
-export async function createOrganizationHandler(c: AppContext) {
-  let body: CreateOrganizationBody;
-
-  try {
-    body = await c.req.json<CreateOrganizationBody>();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, StatusCodes.BAD_REQUEST);
-  }
-
-  const name = body.name?.trim();
-  if (!name) {
-    return c.json({ error: "name is required" }, StatusCodes.BAD_REQUEST);
-  }
-
-  const memberUserIds = parseMemberUserIds(body.memberUserIds);
-  if (memberUserIds === null) {
-    return c.json(
-      { error: "memberUserIds must be an array of non-empty strings" },
-      StatusCodes.BAD_REQUEST
-    );
-  }
+export async function createOrganizationHandler(c: AppContext, body: CreateOrganizationBodyInput) {
+  const { name, memberUserIds } = body;
 
   const actorUser = c.get("sessionUser");
   const organizationService = c.get("services").organization;
@@ -73,16 +29,48 @@ export async function listOrganizationsHandler(c: AppContext) {
   return c.json({ organizations });
 }
 
-export async function deleteOrganizationHandler(c: AppContext) {
-  const organizationId = c.req.param("orgId")?.trim();
-  if (!organizationId) {
-    return c.json({ error: "orgId is required" }, StatusCodes.BAD_REQUEST);
-  }
+export async function deleteOrganizationHandler(c: AppContext, params: OrganizationParamsInput) {
+  const { orgId: organizationId } = params;
 
   const actorUser = c.get("sessionUser");
   await c.get("services").organization.deleteOrganization({
     organizationId,
     actorUserId: actorUser.id
+  });
+
+  return c.json({ ok: true });
+}
+
+export async function addOrganizationMemberHandler(
+  c: AppContext,
+  params: OrganizationParamsInput,
+  body: AddOrganizationMemberBodyInput
+) {
+  const { orgId: organizationId } = params;
+  const { userId, role } = body;
+
+  const actorUser = c.get("sessionUser");
+  const member = await c.get("services").organization.addOrganizationMember({
+    organizationId,
+    actorUserId: actorUser.id,
+    memberUserId: userId,
+    role
+  });
+
+  return c.json({ member }, StatusCodes.CREATED);
+}
+
+export async function removeOrganizationMemberHandler(
+  c: AppContext,
+  params: RemoveOrganizationMemberParamsInput
+) {
+  const { orgId: organizationId, userId: memberUserId } = params;
+
+  const actorUser = c.get("sessionUser");
+  await c.get("services").organization.removeOrganizationMember({
+    organizationId,
+    actorUserId: actorUser.id,
+    memberUserId
   });
 
   return c.json({ ok: true });

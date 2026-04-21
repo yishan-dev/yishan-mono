@@ -3,8 +3,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { AppDb } from "../db/client";
 import { organizationMembers, organizations, users } from "../db/schema";
 import {
+  InvalidOrganizationMemberRoleError,
   InvalidOrganizationMembersError,
+  OrganizationManageMembersPermissionRequiredError,
+  OrganizationMemberAlreadyExistsError,
+  OrganizationMemberNotFoundError,
   OrganizationNotFoundError,
+  OrganizationOwnerRemovalNotAllowedError,
   OrganizationOwnerRequiredError
 } from "../errors";
 import { newId } from "../lib/id";
@@ -14,6 +19,8 @@ type CreateOrganizationInput = {
   actorUserId: string;
   memberUserIds: string[];
 };
+
+type OrganizationMemberRole = "owner" | "admin" | "member";
 
 type OrganizationMemberView = {
   userId: string;
@@ -33,6 +40,165 @@ type OrganizationView = {
 
 export class OrganizationService {
   constructor(private readonly db: AppDb) {}
+
+  async addOrganizationMember(input: {
+    organizationId: string;
+    actorUserId: string;
+    memberUserId: string;
+    role: "member" | "admin";
+  }): Promise<OrganizationMemberView> {
+    return this.db.transaction(async (tx) => {
+      const existingOrganizationRows = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.id, input.organizationId))
+        .limit(1);
+
+      if (existingOrganizationRows.length === 0) {
+        throw new OrganizationNotFoundError(input.organizationId);
+      }
+
+      const actorMembershipRows = await tx
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.actorUserId)
+          )
+        )
+        .limit(1);
+
+      const actorRole = actorMembershipRows[0]?.role;
+      if (actorRole !== "owner" && actorRole !== "admin") {
+        throw new OrganizationManageMembersPermissionRequiredError();
+      }
+
+      if (input.role !== "member" && input.role !== "admin") {
+        throw new InvalidOrganizationMemberRoleError(input.role);
+      }
+
+      const targetUserRows = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, input.memberUserId))
+        .limit(1);
+
+      if (targetUserRows.length === 0) {
+        throw new InvalidOrganizationMembersError([input.memberUserId]);
+      }
+
+      const existingMembershipRows = await tx
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.memberUserId)
+          )
+        )
+        .limit(1);
+
+      if (existingMembershipRows.length > 0) {
+        throw new OrganizationMemberAlreadyExistsError(input.memberUserId);
+      }
+
+      await tx.insert(organizationMembers).values({
+        id: newId(),
+        organizationId: input.organizationId,
+        userId: input.memberUserId,
+        role: input.role
+      });
+
+      const insertedMemberRows = await tx
+        .select({
+          userId: organizationMembers.userId,
+          role: organizationMembers.role,
+          email: users.email,
+          name: users.name,
+          avatarUrl: users.avatarUrl
+        })
+        .from(organizationMembers)
+        .innerJoin(users, eq(users.id, organizationMembers.userId))
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.memberUserId)
+          )
+        )
+        .limit(1);
+
+      const insertedMember = insertedMemberRows[0];
+      if (!insertedMember) {
+        throw new Error("Failed to add organization member");
+      }
+
+      return insertedMember;
+    });
+  }
+
+  async removeOrganizationMember(input: {
+    organizationId: string;
+    actorUserId: string;
+    memberUserId: string;
+  }): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const existingOrganizationRows = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.id, input.organizationId))
+        .limit(1);
+
+      if (existingOrganizationRows.length === 0) {
+        throw new OrganizationNotFoundError(input.organizationId);
+      }
+
+      const actorMembershipRows = await tx
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.actorUserId)
+          )
+        )
+        .limit(1);
+
+      const actorRole = actorMembershipRows[0]?.role;
+      if (actorRole !== "owner" && actorRole !== "admin") {
+        throw new OrganizationManageMembersPermissionRequiredError();
+      }
+
+      const targetMembershipRows = await tx
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.memberUserId)
+          )
+        )
+        .limit(1);
+
+      const targetRole = targetMembershipRows[0]?.role as OrganizationMemberRole | undefined;
+      if (!targetRole) {
+        throw new OrganizationMemberNotFoundError(input.memberUserId);
+      }
+
+      if (targetRole === "owner") {
+        throw new OrganizationOwnerRemovalNotAllowedError();
+      }
+
+      await tx
+        .delete(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, input.organizationId),
+            eq(organizationMembers.userId, input.memberUserId)
+          )
+        );
+    });
+  }
 
   async deleteOrganization(input: { organizationId: string; actorUserId: string }): Promise<void> {
     await this.db.transaction(async (tx) => {

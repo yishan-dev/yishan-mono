@@ -1,15 +1,48 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 
 import {
+  addOrganizationMemberHandler,
   createOrganizationHandler,
   deleteOrganizationHandler,
-  listOrganizationsHandler
+  listOrganizationsHandler,
+  removeOrganizationMemberHandler
 } from "../handlers/organization";
 import type { AppEnv } from "../hono";
 import { requireAuthUser } from "../middlewares/auth";
+import {
+  addOrganizationMemberBodySchema,
+  createOrganizationBodySchema,
+  organizationParamsSchema,
+  removeOrganizationMemberParamsSchema
+} from "../validation/organization";
+import { validationErrorResponse } from "../validation/error-response";
 
 export const organizationRouter = new Hono<AppEnv>();
 
 organizationRouter.get("/orgs", requireAuthUser, listOrganizationsHandler);
-organizationRouter.post("/orgs", requireAuthUser, createOrganizationHandler);
-organizationRouter.delete("/orgs/:orgId", requireAuthUser, deleteOrganizationHandler);
+organizationRouter.post(
+  "/orgs",
+  requireAuthUser,
+  zValidator("json", createOrganizationBodySchema, validationErrorResponse),
+  (c) => createOrganizationHandler(c, c.req.valid("json"))
+);
+organizationRouter.delete(
+  "/orgs/:orgId",
+  requireAuthUser,
+  zValidator("param", organizationParamsSchema, validationErrorResponse),
+  (c) => deleteOrganizationHandler(c, c.req.valid("param"))
+);
+organizationRouter.post(
+  "/orgs/:orgId/members",
+  requireAuthUser,
+  zValidator("param", organizationParamsSchema, validationErrorResponse),
+  zValidator("json", addOrganizationMemberBodySchema, validationErrorResponse),
+  (c) => addOrganizationMemberHandler(c, c.req.valid("param"), c.req.valid("json"))
+);
+organizationRouter.delete(
+  "/orgs/:orgId/members/:userId",
+  requireAuthUser,
+  zValidator("param", removeOrganizationMemberParamsSchema, validationErrorResponse),
+  (c) => removeOrganizationMemberHandler(c, c.req.valid("param"))
+);

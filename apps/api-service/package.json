@@ -12,11 +12,13 @@
     "deploy:worker": "wrangler deploy"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
     "@neondatabase/serverless": "^1.0.1",
     "drizzle-orm": "^0.44.6",
     "hono": "^4.10.1",
     "http-status-codes": "^2.3.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260417.0",
