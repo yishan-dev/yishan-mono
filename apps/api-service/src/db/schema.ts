@@ -74,6 +74,37 @@ export const refreshTokens = pgTable(
   ]
 );
 
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [index("organizations_created_at_idx").on(table.createdAt)]
+);
+
+export const organizationMembers = pgTable(
+  "organization_members",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    uniqueIndex("organization_members_org_id_user_id_uq").on(table.organizationId, table.userId),
+    index("organization_members_org_id_idx").on(table.organizationId),
+    index("organization_members_user_id_idx").on(table.userId)
+  ]
+);
+
 export type User = InferSelectModel<typeof users>;
 export type NewUser = InferInsertModel<typeof users>;
 
@@ -85,3 +116,9 @@ export type NewSession = InferInsertModel<typeof sessions>;
 
 export type RefreshToken = InferSelectModel<typeof refreshTokens>;
 export type NewRefreshToken = InferInsertModel<typeof refreshTokens>;
+
+export type Organization = InferSelectModel<typeof organizations>;
+export type NewOrganization = InferInsertModel<typeof organizations>;
+
+export type OrganizationMember = InferSelectModel<typeof organizationMembers>;
+export type NewOrganizationMember = InferInsertModel<typeof organizationMembers>;
