@@ -1,0 +1,36 @@
+APP_NAME := yishan
+BUILD_DIR := bin
+
+.PHONY: help fmt test build run daemon clean release-snapshot
+
+help:
+	@printf "Common targets:\n"
+	@printf "  make fmt              Format Go code\n"
+	@printf "  make test             Run Go tests\n"
+	@printf "  make build            Build CLI binary\n"
+	@printf "  make run              Run CLI\n"
+	@printf "  make daemon           Run daemon command\n"
+	@printf "  make clean            Remove build artifacts\n"
+	@printf "  make release-snapshot Run GoReleaser snapshot\n"
+
+fmt:
+	go fmt ./...
+
+test:
+	go test ./...
+
+build:
+	mkdir -p $(BUILD_DIR)
+	go build -o $(BUILD_DIR)/$(APP_NAME) .
+
+run:
+	go run .
+
+daemon:
+	go run . daemon
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+release-snapshot:
+	goreleaser release --snapshot --clean --config .goreleaser.yaml

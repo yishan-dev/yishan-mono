@@ -8,6 +8,14 @@ Go-based CLI built with Cobra, Viper, and Zerolog.
 go run .
 ```
 
+Common development commands via Makefile:
+
+- `make fmt`
+- `make test`
+- `make build`
+- `make run`
+- `make daemon`
+
 Run daemon mode:
 
 ```bash
