@@ -1,0 +1,42 @@
+version: 2
+
+project_name: yishan-cli
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: yishan
+    main: .
+    binary: yishan
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X yishan/apps/cli/cmd.version={{.Version}}
+
+archives:
+  - id: yishan-archive
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+
+release:
+  name_template: "Yishan CLI {{.Tag}}"

@@ -81,3 +81,10 @@ The CLI reads env vars with the `YISHAN_` prefix.
 - `YISHAN_DAEMON_JWT_REQUIRED` (default: `true`)
 
 You can also set `--log-level` on any command.
+
+## Release
+
+The CLI is released with GoReleaser using tags like `v1.0.0`.
+
+- Local dry run: `goreleaser release --snapshot --clean --config .goreleaser.yaml`
+- CI release workflow: `.github/workflows/cli-goreleaser.yml`
