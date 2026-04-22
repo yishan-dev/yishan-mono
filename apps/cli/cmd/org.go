@@ -1,16 +1,18 @@
 package cmd
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var orgListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organizations",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return doAPIJSON(http.MethodGet, "/orgs", nil)
+		return apiClient().DoJSON(http.MethodGet, "/orgs", nil)
 	},
 }
 
@@ -27,7 +29,7 @@ var orgCreateCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodPost, "/orgs", map[string]any{
+		return apiClient().DoJSON(http.MethodPost, "/orgs", map[string]any{
 			"name":          name,
 			"memberUserIds": memberUserIDs,
 		})
@@ -38,12 +40,12 @@ var orgDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete organization",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
 
-		return doAPIJSON(http.MethodDelete, "/orgs/"+orgID, nil)
+		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID, nil)
 	},
 }
 
@@ -51,7 +53,7 @@ var orgMemberAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add organization member",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -64,7 +66,7 @@ var orgMemberAddCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodPost, "/orgs/"+orgID+"/members", map[string]string{
+		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/members", map[string]string{
 			"userId": userID,
 			"role":   role,
 		})
@@ -75,7 +77,7 @@ var orgMemberRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove organization member",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -84,12 +86,59 @@ var orgMemberRemoveCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodDelete, "/orgs/"+orgID+"/members/"+userID, nil)
+		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID+"/members/"+userID, nil)
 	},
 }
 
 var orgCmd = &cobra.Command{Use: "org", Short: "Organization operations"}
 var orgMemberCmd = &cobra.Command{Use: "member", Short: "Organization member operations"}
+
+var orgUseCmd = &cobra.Command{
+	Use:   "use <org-id>",
+	Short: "Set current organization",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		orgID := args[0]
+		if err := updateConfigFile(func(cfg *viper.Viper) {
+			cfg.Set("current_org_id", orgID)
+		}); err != nil {
+			return err
+		}
+
+		appConfig.CurrentOrgID = orgID
+		fmt.Printf("Current org set to %s\n", orgID)
+		return nil
+	},
+}
+
+var orgCurrentCmd = &cobra.Command{
+	Use:   "current",
+	Short: "Show current organization",
+	RunE: func(_ *cobra.Command, _ []string) error {
+		if appConfig.CurrentOrgID == "" {
+			return fmt.Errorf("no active org: run `yishan org use <org-id>`")
+		}
+
+		fmt.Println(appConfig.CurrentOrgID)
+		return nil
+	},
+}
+
+var orgClearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Clear current organization",
+	RunE: func(_ *cobra.Command, _ []string) error {
+		if err := updateConfigFile(func(cfg *viper.Viper) {
+			cfg.Set("current_org_id", "")
+		}); err != nil {
+			return err
+		}
+
+		appConfig.CurrentOrgID = ""
+		fmt.Println("Current org cleared")
+		return nil
+	},
+}
 
 func init() {
 	rootCmd.AddCommand(orgCmd)
@@ -97,6 +146,9 @@ func init() {
 	orgCmd.AddCommand(orgListCmd)
 	orgCmd.AddCommand(orgCreateCmd)
 	orgCmd.AddCommand(orgDeleteCmd)
+	orgCmd.AddCommand(orgUseCmd)
+	orgCmd.AddCommand(orgCurrentCmd)
+	orgCmd.AddCommand(orgClearCmd)
 	orgCmd.AddCommand(orgMemberCmd)
 	orgMemberCmd.AddCommand(orgMemberAddCmd)
 	orgMemberCmd.AddCommand(orgMemberRemoveCmd)
@@ -106,16 +158,13 @@ func init() {
 	cobra.CheckErr(orgCreateCmd.MarkFlagRequired("name"))
 
 	orgDeleteCmd.Flags().String("org-id", "", "organization ID")
-	cobra.CheckErr(orgDeleteCmd.MarkFlagRequired("org-id"))
 
 	orgMemberAddCmd.Flags().String("org-id", "", "organization ID")
 	orgMemberAddCmd.Flags().String("user-id", "", "member user ID")
 	orgMemberAddCmd.Flags().String("role", "member", "member role (member|admin)")
-	cobra.CheckErr(orgMemberAddCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(orgMemberAddCmd.MarkFlagRequired("user-id"))
 
 	orgMemberRemoveCmd.Flags().String("org-id", "", "organization ID")
 	orgMemberRemoveCmd.Flags().String("user-id", "", "member user ID")
-	cobra.CheckErr(orgMemberRemoveCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(orgMemberRemoveCmd.MarkFlagRequired("user-id"))
 }

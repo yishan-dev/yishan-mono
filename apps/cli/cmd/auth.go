@@ -15,7 +15,7 @@ var refreshCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodPost, "/auth/refresh", map[string]string{
+		return apiClient().DoJSON(http.MethodPost, "/auth/refresh", map[string]string{
 			"refreshToken": refreshToken,
 		})
 	},
@@ -30,7 +30,7 @@ var revokeCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodPost, "/auth/revoke", map[string]string{
+		return apiClient().DoJSON(http.MethodPost, "/auth/revoke", map[string]string{
 			"refreshToken": refreshToken,
 		})
 	},

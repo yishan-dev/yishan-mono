@@ -10,12 +10,12 @@ var projectListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organization projects",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
 
-		return doAPIJSON(http.MethodGet, "/orgs/"+orgID+"/projects", nil)
+		return apiClient().DoJSON(http.MethodGet, "/orgs/"+orgID+"/projects", nil)
 	},
 }
 
@@ -23,7 +23,7 @@ var projectCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create organization project",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ var projectCreateCmd = &cobra.Command{
 			payload["localPath"] = localPath
 		}
 
-		return doAPIJSON(http.MethodPost, "/orgs/"+orgID+"/projects", payload)
+		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/projects", payload)
 	},
 }
 
@@ -76,7 +76,6 @@ func init() {
 	projectCmd.AddCommand(projectCreateCmd)
 
 	projectListCmd.Flags().String("org-id", "", "organization ID")
-	cobra.CheckErr(projectListCmd.MarkFlagRequired("org-id"))
 
 	projectCreateCmd.Flags().String("org-id", "", "organization ID")
 	projectCreateCmd.Flags().String("name", "", "project name")
@@ -84,6 +83,5 @@ func init() {
 	projectCreateCmd.Flags().String("repo-url", "", "repository URL")
 	projectCreateCmd.Flags().String("node-id", "", "node ID")
 	projectCreateCmd.Flags().String("local-path", "", "local path")
-	cobra.CheckErr(projectCreateCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(projectCreateCmd.MarkFlagRequired("name"))
 }

@@ -10,7 +10,7 @@ var workspaceListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List project workspaces",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -20,7 +20,7 @@ var workspaceListCmd = &cobra.Command{
 		}
 
 		path := "/orgs/" + orgID + "/projects/" + projectID + "/workspaces"
-		return doAPIJSON(http.MethodGet, path, nil)
+		return apiClient().DoJSON(http.MethodGet, path, nil)
 	},
 }
 
@@ -28,7 +28,7 @@ var workspaceCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create project workspace",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ var workspaceCreateCmd = &cobra.Command{
 		}
 
 		path := "/orgs/" + orgID + "/projects/" + projectID + "/workspaces"
-		return doAPIJSON(http.MethodPost, path, payload)
+		return apiClient().DoJSON(http.MethodPost, path, payload)
 	},
 }
 
@@ -76,7 +76,6 @@ func init() {
 
 	workspaceListCmd.Flags().String("org-id", "", "organization ID")
 	workspaceListCmd.Flags().String("project-id", "", "project ID")
-	cobra.CheckErr(workspaceListCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(workspaceListCmd.MarkFlagRequired("project-id"))
 
 	workspaceCreateCmd.Flags().String("org-id", "", "organization ID")
@@ -85,7 +84,6 @@ func init() {
 	workspaceCreateCmd.Flags().String("local-path", "", "local path")
 	workspaceCreateCmd.Flags().String("kind", "primary", "workspace kind (primary|worktree)")
 	workspaceCreateCmd.Flags().String("branch", "", "branch name for worktree")
-	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("project-id"))
 	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("node-id"))
 	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("local-path"))

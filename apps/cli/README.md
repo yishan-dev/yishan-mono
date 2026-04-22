@@ -75,14 +75,21 @@ API-backed subcommands:
 
 - `login --provider google|github`
 - `health`
-- `me`
+- `whoami` (alias: `me`)
 - `auth refresh --refresh-token <token>`
 - `auth revoke --refresh-token <token>`
-- `org list|create|delete`
+- `org list|create|delete|use|current|clear`
 - `org member add|remove`
 - `node list|create|delete`
 - `project list|create`
 - `workspace list|create`
+
+Organization context:
+
+- Set active org: `yishan org use <org-id>`
+- Show active org: `yishan org current`
+- Clear active org: `yishan org clear`
+- Commands with `--org-id` fall back to active org when flag is omitted.
 
 Terminal subscriptions stream server notifications:
 

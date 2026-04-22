@@ -22,12 +22,12 @@ var daemonCmd = &cobra.Command{
 	Short: "Run workspace daemon service",
 	Long:  "Run the daemon in background mode and serve workspace operations over WebSocket JSON-RPC.",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		host := viper.GetString("daemon_host")
-		port := viper.GetInt("daemon_port")
-		jwtSecret := viper.GetString("daemon_jwt_secret")
-		jwtIssuer := viper.GetString("daemon_jwt_issuer")
-		jwtAudience := viper.GetString("daemon_jwt_audience")
-		jwtRequired := viper.GetBool("daemon_jwt_required")
+		host := appConfig.Daemon.Host
+		port := appConfig.Daemon.Port
+		jwtSecret := appConfig.Daemon.JWTSecret
+		jwtIssuer := appConfig.Daemon.JWTIssuer
+		jwtAudience := appConfig.Daemon.JWTAudience
+		jwtRequired := appConfig.Daemon.JWTRequired
 		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 
 		workspaceManager := workspace.NewManager()

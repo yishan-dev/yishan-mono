@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"yishan/apps/cli/internal/config"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -57,16 +58,19 @@ func initConfig() {
 		viper.SetConfigName(".yishan")
 	}
 
-	if err := configureLogger(viper.GetString("log_level")); err != nil {
+	if err := viper.ReadInConfig(); err == nil {
+		log.Info().Str("file", viper.ConfigFileUsed()).Msg("using config file")
+	} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 		cobra.CheckErr(err)
 	}
 
-	if err := viper.ReadInConfig(); err == nil {
-		log.Info().Str("file", viper.ConfigFileUsed()).Msg("using config file")
-		if err := configureLogger(viper.GetString("log_level")); err != nil {
-			cobra.CheckErr(err)
-		}
-	} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+	loaded, err := config.Load(viper.GetViper(), cfgFile)
+	if err != nil {
+		cobra.CheckErr(err)
+	}
+	appConfig = loaded
+
+	if err := configureLogger(appConfig.LogLevel); err != nil {
 		cobra.CheckErr(err)
 	}
 }

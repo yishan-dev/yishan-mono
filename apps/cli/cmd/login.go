@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -19,12 +18,12 @@ import (
 )
 
 type loginCallbackResult struct {
-	state                string
-	accessToken          string
-	accessTokenExpiresAt string
-	refreshToken         string
+	state                 string
+	accessToken           string
+	accessTokenExpiresAt  string
+	refreshToken          string
 	refreshTokenExpiresAt string
-	err                  error
+	err                   error
 }
 
 var loginCmd = &cobra.Command{
@@ -89,8 +88,7 @@ var loginCmd = &cobra.Command{
 			_ = server.Serve(listener)
 		}()
 
-		apiBaseURL := viper.GetString("api_base_url")
-		loginURL, err := buildLoginURL(apiBaseURL, provider, callbackURL, state)
+		loginURL, err := buildLoginURL(appConfig.API.BaseURL, provider, callbackURL, state)
 		if err != nil {
 			return err
 		}
@@ -159,45 +157,17 @@ func generateState(bytesLen int) (string, error) {
 }
 
 func persistAPITokens(result loginCallbackResult) error {
-	configPath := viper.ConfigFileUsed()
-	if configPath == "" {
-		if cfgFile != "" {
-			configPath = cfgFile
-		} else {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("resolve user home dir: %w", err)
-			}
-			configPath = home + "/.yishan.yaml"
-		}
+	if err := updateConfigFile(func(cfg *viper.Viper) {
+		cfg.Set("api_base_url", appConfig.API.BaseURL)
+		cfg.Set("api_token", result.accessToken)
+		cfg.Set("api_refresh_token", result.refreshToken)
+		cfg.Set("api_access_token_expires_at", result.accessTokenExpiresAt)
+		cfg.Set("api_refresh_token_expires_at", result.refreshTokenExpiresAt)
+	}); err != nil {
+		return err
 	}
 
-	cfg := viper.New()
-	cfg.SetConfigFile(configPath)
-	cfg.SetConfigType("yaml")
-	if _, err := os.Stat(configPath); err == nil {
-		if err := cfg.ReadInConfig(); err != nil {
-			return fmt.Errorf("read existing config file %q: %w", configPath, err)
-		}
-	}
-
-	cfg.Set("api_base_url", viper.GetString("api_base_url"))
-	cfg.Set("api_token", result.accessToken)
-	cfg.Set("api_refresh_token", result.refreshToken)
-	cfg.Set("api_access_token_expires_at", result.accessTokenExpiresAt)
-	cfg.Set("api_refresh_token_expires_at", result.refreshTokenExpiresAt)
-
-	if _, err := os.Stat(configPath); err == nil {
-		if err := cfg.WriteConfigAs(configPath); err != nil {
-			return fmt.Errorf("write config file %q: %w", configPath, err)
-		}
-	} else {
-		if err := cfg.SafeWriteConfigAs(configPath); err != nil {
-			return fmt.Errorf("create config file %q: %w", configPath, err)
-		}
-	}
-
-	viper.Set("api_token", result.accessToken)
+	appConfig.API.Token = result.accessToken
 	return nil
 }
 

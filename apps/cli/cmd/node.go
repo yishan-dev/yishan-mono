@@ -10,12 +10,12 @@ var nodeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organization nodes",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
 
-		return doAPIJSON(http.MethodGet, "/orgs/"+orgID+"/nodes", nil)
+		return apiClient().DoJSON(http.MethodGet, "/orgs/"+orgID+"/nodes", nil)
 	},
 }
 
@@ -23,7 +23,7 @@ var nodeCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create organization node",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ var nodeCreateCmd = &cobra.Command{
 			payload["metadata"] = metadata
 		}
 
-		return doAPIJSON(http.MethodPost, "/orgs/"+orgID+"/nodes", payload)
+		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/nodes", payload)
 	},
 }
 
@@ -74,7 +74,7 @@ var nodeDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete organization node",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		orgID, err := cmd.Flags().GetString("org-id")
+		orgID, err := resolveOrgID(cmd)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ var nodeDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		return doAPIJSON(http.MethodDelete, "/orgs/"+orgID+"/nodes/"+nodeID, nil)
+		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID+"/nodes/"+nodeID, nil)
 	},
 }
 
@@ -96,7 +96,6 @@ func init() {
 	nodeCmd.AddCommand(nodeDeleteCmd)
 
 	nodeListCmd.Flags().String("org-id", "", "organization ID")
-	cobra.CheckErr(nodeListCmd.MarkFlagRequired("org-id"))
 
 	nodeCreateCmd.Flags().String("org-id", "", "organization ID")
 	nodeCreateCmd.Flags().String("name", "", "node name")
@@ -104,11 +103,9 @@ func init() {
 	nodeCreateCmd.Flags().String("endpoint", "", "node endpoint URL")
 	nodeCreateCmd.Flags().String("metadata-os", "", "node OS metadata")
 	nodeCreateCmd.Flags().String("metadata-version", "", "node version metadata")
-	cobra.CheckErr(nodeCreateCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(nodeCreateCmd.MarkFlagRequired("name"))
 
 	nodeDeleteCmd.Flags().String("org-id", "", "organization ID")
 	nodeDeleteCmd.Flags().String("node-id", "", "node ID")
-	cobra.CheckErr(nodeDeleteCmd.MarkFlagRequired("org-id"))
 	cobra.CheckErr(nodeDeleteCmd.MarkFlagRequired("node-id"))
 }
