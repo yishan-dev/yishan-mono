@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import type { AppDb } from "@/db/client";
+import type { AppDb, AppDbWs } from "@/db/client";
 import { nodes, organizationMembers, projects, workspaces } from "@/db/schema";
 import {
   OrganizationMembershipRequiredError,
@@ -67,6 +67,7 @@ type CreateWorkspaceInput = {
 export class ProjectService {
   constructor(
     private readonly db: AppDb,
+    private readonly dbWs: AppDbWs,
     private readonly organizationService: OrganizationService,
     private readonly workspaceProvisioner: WorkspaceProvisioner
   ) {}
@@ -96,7 +97,7 @@ export class ProjectService {
       repoKey = inferred.repoKey;
     }
 
-    return this.db.transaction(async (tx) => {
+    return this.dbWs.transaction(async (tx) => {
       const insertedRows = await tx
         .insert(projects)
         .values({
@@ -174,7 +175,7 @@ export class ProjectService {
   }
 
   async createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceView> {
-    const workspace = await this.db.transaction(async (tx) => {
+    const workspace = await this.dbWs.transaction(async (tx) => {
       const role = await this.organizationService.getMembershipRole({
         organizationId: input.organizationId,
         userId: input.actorUserId

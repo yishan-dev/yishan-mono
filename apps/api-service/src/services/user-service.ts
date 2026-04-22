@@ -1,12 +1,15 @@
 import { and, eq } from "drizzle-orm";
 
-import type { AppDb } from "@/db/client";
+import type { AppDb, AppDbWs } from "@/db/client";
 import { oauthAccounts, users } from "@/db/schema";
 import { newId } from "@/lib/id";
 import type { OAuthProfile } from "@/types";
 
 export class UserService {
-  constructor(private readonly db: AppDb) {}
+  constructor(
+    private readonly db: AppDb,
+    private readonly dbWs: AppDbWs
+  ) {}
 
   async getById(userId: string) {
     const rows = await this.db
@@ -24,7 +27,7 @@ export class UserService {
   }
 
   async resolveUserIdForOAuthProfile(profile: OAuthProfile): Promise<string> {
-    return this.db.transaction(async (tx) => {
+    return this.dbWs.transaction(async (tx) => {
       let userId: string | null = null;
 
       const existingAccountRows = await tx
