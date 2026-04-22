@@ -33,7 +33,11 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.yishan.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "", "log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().String("api-base-url", "http://127.0.0.1:3001", "API service base URL")
+	rootCmd.PersistentFlags().String("api-token", "", "API access token (Bearer)")
 	cobra.CheckErr(viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level")))
+	cobra.CheckErr(viper.BindPFlag("api_base_url", rootCmd.PersistentFlags().Lookup("api-base-url")))
+	cobra.CheckErr(viper.BindPFlag("api_token", rootCmd.PersistentFlags().Lookup("api-token")))
 }
 
 func initConfig() {

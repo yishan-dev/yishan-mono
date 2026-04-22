@@ -71,6 +71,18 @@ Supported JSON-RPC methods:
 - `workspace.terminal.subscribe`
 - `workspace.terminal.unsubscribe`
 
+API-backed subcommands:
+
+- `health`
+- `me`
+- `auth refresh --refresh-token <token>`
+- `auth revoke --refresh-token <token>`
+- `org list|create|delete`
+- `org member add|remove`
+- `node list|create|delete`
+- `project list|create`
+- `workspace list|create`
+
 Terminal subscriptions stream server notifications:
 
 - `workspace.terminal.output`
@@ -87,6 +99,8 @@ The CLI reads env vars with the `YISHAN_` prefix.
 - `YISHAN_DAEMON_JWT_ISSUER` (optional)
 - `YISHAN_DAEMON_JWT_AUDIENCE` (optional)
 - `YISHAN_DAEMON_JWT_REQUIRED` (default: `true`)
+- `YISHAN_API_BASE_URL` (default: `http://127.0.0.1:3001`)
+- `YISHAN_API_TOKEN` (optional Bearer token for protected API routes)
 
 You can also set `--log-level` on any command.
 
