@@ -110,6 +110,7 @@ The CLI reads env vars with the `YISHAN_` prefix.
 
 - `YISHAN_PROFILE` (default: `default`; config path: `~/.yishan/profiles/<profile>/credential.yaml`)
 - `YISHAN_LOG_LEVEL` (default: `info`)
+- `YISHAN_LOG_FORMAT` (default: `pretty`; options: `pretty`, `json`)
 - `YISHAN_DAEMON_HOST` (default: `127.0.0.1`)
 - `YISHAN_DAEMON_PORT` (default: `0`, random)
 - `YISHAN_DAEMON_JWT_SECRET` (required when `YISHAN_DAEMON_JWT_REQUIRED=true`)

@@ -26,6 +26,7 @@ type DaemonConfig struct {
 
 type Config struct {
 	LogLevel     string
+	LogFormat    string
 	ConfigPath   string
 	CurrentOrgID string
 	API          APIConfig
@@ -44,6 +45,7 @@ func Load(v *viper.Viper, explicitConfigPath string) (Config, error) {
 
 	return Config{
 		LogLevel:     v.GetString("log_level"),
+		LogFormat:    v.GetString("log_format"),
 		ConfigPath:   configPath,
 		CurrentOrgID: v.GetString("current_org_id"),
 		API: APIConfig{

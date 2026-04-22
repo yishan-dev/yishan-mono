@@ -67,7 +67,7 @@ func stopDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Info().Int("pid", state.PID).Msg("daemon stopped")
+	log.Debug().Int("pid", state.PID).Msg("daemon stopped")
 	return nil
 
 }
@@ -99,7 +99,7 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon restarted")
+	log.Debug().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon restarted")
 	return nil
 
 }

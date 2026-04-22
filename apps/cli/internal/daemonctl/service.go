@@ -118,13 +118,13 @@ func Run(cfg RunConfig, statePath string) error {
 		}
 	}()
 
-	log.Info().Str("address", actualAddr).Bool("jwt_required", cfg.JWTRequired).Msg("daemon server started")
+	log.Debug().Str("address", actualAddr).Bool("jwt_required", cfg.JWTRequired).Msg("daemon server started")
 	err = server.Serve(listener)
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("daemon server failed: %w", err)
 	}
 
-	log.Info().Msg("daemon server stopped")
+	log.Debug().Msg("daemon server stopped")
 	return nil
 }
 
