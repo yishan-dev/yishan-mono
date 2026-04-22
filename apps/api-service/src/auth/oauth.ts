@@ -12,8 +12,10 @@ export type OAuthStart = {
 
 export async function buildAuthorizationUrl(
   provider: OAuthProvider,
-  config: ServiceConfig
+  config: ServiceConfig,
+  callbackBaseUrl?: string
 ): Promise<OAuthStart> {
+  const baseUrl = callbackBaseUrl ?? config.appBaseUrl;
   const state = randomToken(24);
   const codeVerifier = randomToken(48);
   const codeChallenge = await sha256Base64Url(codeVerifier);
@@ -22,7 +24,7 @@ export async function buildAuthorizationUrl(
     const params = new URLSearchParams({
       response_type: "code",
       client_id: config.googleClientId,
-      redirect_uri: buildCallbackUrl(config.appBaseUrl, provider),
+      redirect_uri: buildCallbackUrl(baseUrl, provider),
       scope: GOOGLE_SCOPES.join(" "),
       state,
       code_challenge: codeChallenge,
@@ -41,7 +43,7 @@ export async function buildAuthorizationUrl(
   const params = new URLSearchParams({
     response_type: "code",
     client_id: config.githubClientId,
-    redirect_uri: buildCallbackUrl(config.appBaseUrl, provider),
+    redirect_uri: buildCallbackUrl(baseUrl, provider),
     scope: GITHUB_SCOPES.join(" "),
     state,
     code_challenge: codeChallenge,
@@ -68,21 +70,24 @@ export async function exchangeCodeForProfile(
   provider: OAuthProvider,
   code: string,
   codeVerifier: string,
-  config: ServiceConfig
+  config: ServiceConfig,
+  callbackBaseUrl?: string
 ): Promise<OAuthProfile> {
+  const baseUrl = callbackBaseUrl ?? config.appBaseUrl;
   if (provider === "google") {
-    const token = await exchangeGoogleToken(code, codeVerifier, config);
+    const token = await exchangeGoogleToken(code, codeVerifier, config, baseUrl);
     return getGoogleProfile(token.access_token);
   }
 
-  const token = await exchangeGithubToken(code, codeVerifier, config);
+  const token = await exchangeGithubToken(code, codeVerifier, config, baseUrl);
   return getGithubProfile(token.access_token);
 }
 
 async function exchangeGoogleToken(
   code: string,
   codeVerifier: string,
-  config: ServiceConfig
+  config: ServiceConfig,
+  callbackBaseUrl: string
 ): Promise<TokenResponse> {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -94,7 +99,7 @@ async function exchangeGoogleToken(
       client_id: config.googleClientId,
       client_secret: config.googleClientSecret,
       code,
-      redirect_uri: buildCallbackUrl(config.appBaseUrl, "google"),
+      redirect_uri: buildCallbackUrl(callbackBaseUrl, "google"),
       code_verifier: codeVerifier
     })
   });
@@ -148,7 +153,8 @@ async function getGoogleProfile(accessToken: string): Promise<OAuthProfile> {
 async function exchangeGithubToken(
   code: string,
   codeVerifier: string,
-  config: ServiceConfig
+  config: ServiceConfig,
+  callbackBaseUrl: string
 ): Promise<TokenResponse> {
   const response = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
@@ -160,7 +166,7 @@ async function exchangeGithubToken(
       client_id: config.githubClientId,
       client_secret: config.githubClientSecret,
       code,
-      redirect_uri: buildCallbackUrl(config.appBaseUrl, "github"),
+      redirect_uri: buildCallbackUrl(callbackBaseUrl, "github"),
       code_verifier: codeVerifier
     })
   });

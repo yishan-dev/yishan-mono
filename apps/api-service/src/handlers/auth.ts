@@ -44,9 +44,11 @@ function parseCliRedirectUri(value: string | undefined): string | null {
 export async function startOAuthHandler(c: AppContext) {
   const providerParam = c.get("oauthProvider");
   const config = c.get("config");
+  const requestOrigin = new URL(c.req.url).origin;
   const { authorizationUrl, state, codeVerifier } = await buildAuthorizationUrl(
     providerParam,
-    config
+    config,
+    requestOrigin
   );
 
   const responseModeParam = c.req.query("mode");
@@ -66,6 +68,7 @@ export async function startOAuthHandler(c: AppContext) {
     state,
     codeVerifier,
     createdAt: Date.now(),
+    callbackBaseUrl: requestOrigin,
     responseMode,
     cliRedirectUri: responseMode === "cli" ? cliRedirectUri ?? undefined : undefined,
     cliState: responseMode === "cli" ? cliState ?? undefined : undefined
@@ -115,7 +118,8 @@ export async function callbackOAuthHandler(c: AppContext) {
     providerParam,
     code,
     oauthContext.codeVerifier,
-    config
+    config,
+    oauthContext.callbackBaseUrl
   );
 
   if (!profile.emailVerified) {

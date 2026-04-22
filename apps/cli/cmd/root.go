@@ -32,10 +32,12 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.yishan.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.yishan/profiles/<profile>/credential.yaml)")
+	rootCmd.PersistentFlags().String("profile", "default", "runtime profile name (default, dev, ...)")
 	rootCmd.PersistentFlags().String("log-level", "", "log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().String("api-base-url", "http://127.0.0.1:3001", "API service base URL")
+	rootCmd.PersistentFlags().String("api-base-url", "http://localhost:8787", "API service base URL")
 	rootCmd.PersistentFlags().String("api-token", "", "API access token (Bearer)")
+	cobra.CheckErr(viper.BindPFlag("profile", rootCmd.PersistentFlags().Lookup("profile")))
 	cobra.CheckErr(viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level")))
 	cobra.CheckErr(viper.BindPFlag("api_base_url", rootCmd.PersistentFlags().Lookup("api-base-url")))
 	cobra.CheckErr(viper.BindPFlag("api_token", rootCmd.PersistentFlags().Lookup("api-token")))
@@ -45,17 +47,15 @@ func initConfig() {
 	viper.SetEnvPrefix("YISHAN")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
+	viper.SetDefault("profile", "default")
 	viper.SetDefault("log_level", "info")
 
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		home, err := os.UserHomeDir()
+		resolvedConfigPath, err := config.ResolveConfigPath(viper.GetViper(), cfgFile)
 		cobra.CheckErr(err)
-
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".yishan")
+		viper.SetConfigFile(resolvedConfigPath)
 	}
 
 	if err := viper.ReadInConfig(); err == nil {

@@ -3,6 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -27,6 +30,10 @@ type Config struct {
 	CurrentOrgID string
 	API          APIConfig
 	Daemon       DaemonConfig
+}
+
+func ResolveConfigPath(v *viper.Viper, explicitConfigPath string) (string, error) {
+	return resolveConfigPath(v, explicitConfigPath)
 }
 
 func Load(v *viper.Viper, explicitConfigPath string) (Config, error) {
@@ -62,10 +69,46 @@ func resolveConfigPath(v *viper.Viper, explicitConfigPath string) (string, error
 		return explicitConfigPath, nil
 	}
 
+	profile, err := resolveProfile(v)
+	if err != nil {
+		return "", err
+	}
+
+	configPath, err := defaultConfigPath(profile)
+	if err != nil {
+		return "", err
+	}
+
+	return configPath, nil
+}
+
+var profileNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func resolveProfile(v *viper.Viper) (string, error) {
+	raw := strings.TrimSpace(v.GetString("profile"))
+	if raw == "" {
+		return "default", nil
+	}
+	if !profileNamePattern.MatchString(raw) {
+		return "", fmt.Errorf("invalid profile %q: use letters, numbers, dash, or underscore", raw)
+	}
+
+	return strings.ToLower(raw), nil
+}
+
+func defaultConfigPath(profile string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user home dir: %w", err)
 	}
 
-	return home + "/.yishan.yaml", nil
+	return filepath.Join(home, ".yishan", "profiles", profile, "credential.yaml"), nil
+}
+
+func DefaultConfigPathForProfile(profile string) (string, error) {
+	if !profileNamePattern.MatchString(profile) {
+		return "", fmt.Errorf("invalid profile %q: use letters, numbers, dash, or underscore", profile)
+	}
+
+	return defaultConfigPath(strings.ToLower(profile))
 }

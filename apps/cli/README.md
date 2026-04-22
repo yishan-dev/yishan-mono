@@ -108,6 +108,7 @@ Terminal subscriptions stream server notifications:
 
 The CLI reads env vars with the `YISHAN_` prefix.
 
+- `YISHAN_PROFILE` (default: `default`; config path: `~/.yishan/profiles/<profile>/credential.yaml`)
 - `YISHAN_LOG_LEVEL` (default: `info`)
 - `YISHAN_DAEMON_HOST` (default: `127.0.0.1`)
 - `YISHAN_DAEMON_PORT` (default: `0`, random)
@@ -115,7 +116,7 @@ The CLI reads env vars with the `YISHAN_` prefix.
 - `YISHAN_DAEMON_JWT_ISSUER` (optional)
 - `YISHAN_DAEMON_JWT_AUDIENCE` (optional)
 - `YISHAN_DAEMON_JWT_REQUIRED` (default: `true`)
-- `YISHAN_API_BASE_URL` (default: `http://127.0.0.1:3001`)
+- `YISHAN_API_BASE_URL` (default: `http://127.0.0.1:8787`)
 - `YISHAN_API_TOKEN` (optional Bearer token for protected API routes)
 
 You can also set `--log-level` on any command.

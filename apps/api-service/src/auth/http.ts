@@ -8,6 +8,7 @@ export type OAuthCookiePayload = {
   state: string;
   codeVerifier: string;
   createdAt: number;
+  callbackBaseUrl?: string;
   responseMode?: "token" | "cli";
   cliRedirectUri?: string;
   cliState?: string;

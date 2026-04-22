@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -10,6 +11,9 @@ import (
 
 func updateConfigFile(update func(cfg *viper.Viper)) error {
 	configPath := appConfig.ConfigPath
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return fmt.Errorf("create config directory for %q: %w", configPath, err)
+	}
 
 	cfg := viper.New()
 	cfg.SetConfigFile(configPath)
