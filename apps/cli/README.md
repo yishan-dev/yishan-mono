@@ -19,8 +19,15 @@ Common development commands via Makefile:
 Run daemon mode:
 
 ```bash
-go run . daemon --host 127.0.0.1 --port 7788 --jwt-secret dev-secret
+go run . daemon --host 127.0.0.1 --port 0 --jwt-secret dev-secret
 ```
+
+Use `--port 0` to allocate a random free port (default). Runtime daemon address is written to `.yishan-daemon.json` next to your config file and used by CLI commands.
+
+Daemon lifecycle commands:
+
+- `yishan daemon stop`
+- `yishan daemon restart`
 
 JWT auth is enabled for `/ws` by default. Provide the token via:
 
@@ -103,7 +110,7 @@ The CLI reads env vars with the `YISHAN_` prefix.
 
 - `YISHAN_LOG_LEVEL` (default: `info`)
 - `YISHAN_DAEMON_HOST` (default: `127.0.0.1`)
-- `YISHAN_DAEMON_PORT` (default: `7788`)
+- `YISHAN_DAEMON_PORT` (default: `0`, random)
 - `YISHAN_DAEMON_JWT_SECRET` (required when `YISHAN_DAEMON_JWT_REQUIRED=true`)
 - `YISHAN_DAEMON_JWT_ISSUER` (optional)
 - `YISHAN_DAEMON_JWT_AUDIENCE` (optional)

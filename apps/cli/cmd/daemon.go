@@ -1,97 +1,126 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
+	"errors"
 	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"yishan/apps/cli/internal/daemon"
-	"yishan/apps/cli/internal/workspace"
+	"yishan/apps/cli/internal/daemonctl"
 )
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
 	Short: "Run workspace daemon service",
 	Long:  "Run the daemon in background mode and serve workspace operations over WebSocket JSON-RPC.",
-	RunE: func(_ *cobra.Command, _ []string) error {
-		host := appConfig.Daemon.Host
-		port := appConfig.Daemon.Port
-		jwtSecret := appConfig.Daemon.JWTSecret
-		jwtIssuer := appConfig.Daemon.JWTIssuer
-		jwtAudience := appConfig.Daemon.JWTAudience
-		jwtRequired := appConfig.Daemon.JWTRequired
-		addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
+	RunE:  runDaemon,
+}
 
-		workspaceManager := workspace.NewManager()
-		handler := daemon.NewJSONRPCHandler(workspaceManager)
-		auth := daemon.NewJWTAuth(daemon.JWTAuthConfig{
-			Secret:   jwtSecret,
-			Issuer:   jwtIssuer,
-			Audience: jwtAudience,
-			Required: jwtRequired,
-		})
-		if err := auth.ValidateConfig(); err != nil {
-			return err
+var daemonRunCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run workspace daemon service",
+	RunE:  runDaemon,
+}
+
+var daemonStopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop running daemon",
+	RunE:  stopDaemon,
+}
+
+var daemonRestartCmd = &cobra.Command{
+	Use:   "restart",
+	Short: "Restart daemon in background",
+	RunE:  restartDaemon,
+}
+
+func runDaemon(_ *cobra.Command, _ []string) error {
+	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	if err != nil {
+		return err
+	}
+
+	return daemonctl.Run(daemonctl.RunConfig{
+		Host:        appConfig.Daemon.Host,
+		Port:        appConfig.Daemon.Port,
+		JWTSecret:   appConfig.Daemon.JWTSecret,
+		JWTIssuer:   appConfig.Daemon.JWTIssuer,
+		JWTAudience: appConfig.Daemon.JWTAudience,
+		JWTRequired: appConfig.Daemon.JWTRequired,
+	}, statePath)
+}
+
+func stopDaemon(_ *cobra.Command, _ []string) error {
+	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	if err != nil {
+		return err
+	}
+
+	state, err := daemonctl.Stop(statePath, 10*time.Second)
+	if err != nil {
+		if errors.Is(err, daemonctl.ErrNotRunning) {
+			return errors.New("daemon is not running")
 		}
+		return err
+	}
 
-		mux := http.NewServeMux()
-		mux.Handle("/ws", auth.Middleware(handler))
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("ok"))
-		})
+	log.Info().Int("pid", state.PID).Msg("daemon stopped")
+	return nil
 
-		server := &http.Server{
-			Addr:              addr,
-			Handler:           mux,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
+}
 
-		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+func restartDaemon(_ *cobra.Command, _ []string) error {
+	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	if err != nil {
+		return err
+	}
 
-		go func() {
-			<-stop
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := server.Shutdown(ctx); err != nil {
-				log.Error().Err(err).Msg("failed to shutdown daemon server")
-			}
-		}()
+	state, err := daemonctl.Restart(
+		daemonctl.StartConfig{
+			Run: daemonctl.RunConfig{
+				Host:        appConfig.Daemon.Host,
+				Port:        appConfig.Daemon.Port,
+				JWTSecret:   appConfig.Daemon.JWTSecret,
+				JWTIssuer:   appConfig.Daemon.JWTIssuer,
+				JWTAudience: appConfig.Daemon.JWTAudience,
+				JWTRequired: appConfig.Daemon.JWTRequired,
+			},
+			ConfigPath: cfgFile,
+			LogLevel:   appConfig.LogLevel,
+		},
+		statePath,
+		10*time.Second,
+		5*time.Second,
+	)
+	if err != nil {
+		return err
+	}
 
-		log.Info().Str("address", addr).Bool("jwt_required", jwtRequired).Msg("daemon server started")
-		err := server.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			return fmt.Errorf("daemon server failed: %w", err)
-		}
+	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon restarted")
+	return nil
 
-		log.Info().Msg("daemon server stopped")
-		return nil
-	},
 }
 
 func init() {
 	rootCmd.AddCommand(daemonCmd)
+	daemonCmd.AddCommand(daemonRunCmd)
+	daemonCmd.AddCommand(daemonStopCmd)
+	daemonCmd.AddCommand(daemonRestartCmd)
 
-	daemonCmd.Flags().String("host", "127.0.0.1", "daemon listen host")
-	daemonCmd.Flags().Int("port", 7788, "daemon listen port")
-	daemonCmd.Flags().String("jwt-secret", "", "JWT HMAC secret for daemon access")
-	daemonCmd.Flags().String("jwt-issuer", "", "required JWT issuer")
-	daemonCmd.Flags().String("jwt-audience", "", "required JWT audience")
-	daemonCmd.Flags().Bool("jwt-required", true, "require JWT token for /ws access")
+	daemonCmd.PersistentFlags().String("host", "127.0.0.1", "daemon listen host")
+	daemonCmd.PersistentFlags().Int("port", 0, "daemon listen port (0 = random)")
+	daemonCmd.PersistentFlags().String("jwt-secret", "", "JWT HMAC secret for daemon access")
+	daemonCmd.PersistentFlags().String("jwt-issuer", "", "required JWT issuer")
+	daemonCmd.PersistentFlags().String("jwt-audience", "", "required JWT audience")
+	daemonCmd.PersistentFlags().Bool("jwt-required", true, "require JWT token for /ws access")
 
-	cobra.CheckErr(viper.BindPFlag("daemon_host", daemonCmd.Flags().Lookup("host")))
-	cobra.CheckErr(viper.BindPFlag("daemon_port", daemonCmd.Flags().Lookup("port")))
-	cobra.CheckErr(viper.BindPFlag("daemon_jwt_secret", daemonCmd.Flags().Lookup("jwt-secret")))
-	cobra.CheckErr(viper.BindPFlag("daemon_jwt_issuer", daemonCmd.Flags().Lookup("jwt-issuer")))
-	cobra.CheckErr(viper.BindPFlag("daemon_jwt_audience", daemonCmd.Flags().Lookup("jwt-audience")))
-	cobra.CheckErr(viper.BindPFlag("daemon_jwt_required", daemonCmd.Flags().Lookup("jwt-required")))
+	cobra.CheckErr(viper.BindPFlag("daemon_host", daemonCmd.PersistentFlags().Lookup("host")))
+	cobra.CheckErr(viper.BindPFlag("daemon_port", daemonCmd.PersistentFlags().Lookup("port")))
+	cobra.CheckErr(viper.BindPFlag("daemon_jwt_secret", daemonCmd.PersistentFlags().Lookup("jwt-secret")))
+	cobra.CheckErr(viper.BindPFlag("daemon_jwt_issuer", daemonCmd.PersistentFlags().Lookup("jwt-issuer")))
+	cobra.CheckErr(viper.BindPFlag("daemon_jwt_audience", daemonCmd.PersistentFlags().Lookup("jwt-audience")))
+	cobra.CheckErr(viper.BindPFlag("daemon_jwt_required", daemonCmd.PersistentFlags().Lookup("jwt-required")))
 }
