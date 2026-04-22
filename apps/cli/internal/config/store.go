@@ -1,16 +1,14 @@
-package cmd
+package config
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func updateConfigFile(update func(cfg *viper.Viper)) error {
-	configPath := appConfig.ConfigPath
+func UpdateFile(configPath string, update func(cfg *viper.Viper)) error {
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		return fmt.Errorf("create config directory for %q: %w", configPath, err)
 	}
@@ -38,19 +36,4 @@ func updateConfigFile(update func(cfg *viper.Viper)) error {
 	}
 
 	return nil
-}
-
-func resolveOrgID(cmd *cobra.Command) (string, error) {
-	orgID, err := cmd.Flags().GetString("org-id")
-	if err != nil {
-		return "", err
-	}
-	if orgID != "" {
-		return orgID, nil
-	}
-	if appConfig.CurrentOrgID != "" {
-		return appConfig.CurrentOrgID, nil
-	}
-
-	return "", fmt.Errorf("no active org: run `yishan org use <org-id>` or pass --org-id")
 }

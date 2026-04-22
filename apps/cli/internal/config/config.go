@@ -11,8 +11,11 @@ import (
 )
 
 type APIConfig struct {
-	BaseURL string
-	Token   string
+	BaseURL               string
+	Token                 string
+	RefreshToken          string
+	AccessTokenExpiresAt  string
+	RefreshTokenExpiresAt string
 }
 
 type DaemonConfig struct {
@@ -49,8 +52,11 @@ func Load(v *viper.Viper, explicitConfigPath string) (Config, error) {
 		ConfigPath:   configPath,
 		CurrentOrgID: v.GetString("current_org_id"),
 		API: APIConfig{
-			BaseURL: v.GetString("api_base_url"),
-			Token:   v.GetString("api_token"),
+			BaseURL:               v.GetString("api_base_url"),
+			Token:                 v.GetString("api_token"),
+			RefreshToken:          v.GetString("api_refresh_token"),
+			AccessTokenExpiresAt:  v.GetString("api_access_token_expires_at"),
+			RefreshTokenExpiresAt: v.GetString("api_refresh_token_expires_at"),
 		},
 		Daemon: DaemonConfig{
 			Host:        v.GetString("daemon_host"),

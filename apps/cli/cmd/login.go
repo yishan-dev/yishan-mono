@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"yishan/apps/cli/internal/config"
 )
 
 type loginCallbackResult struct {
@@ -157,7 +158,7 @@ func generateState(bytesLen int) (string, error) {
 }
 
 func persistAPITokens(result loginCallbackResult) error {
-	if err := updateConfigFile(func(cfg *viper.Viper) {
+	if err := config.UpdateFile(appConfig.ConfigPath, func(cfg *viper.Viper) {
 		cfg.Set("api_base_url", appConfig.API.BaseURL)
 		cfg.Set("api_token", result.accessToken)
 		cfg.Set("api_refresh_token", result.refreshToken)

@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"net/http"
-
 	"github.com/spf13/cobra"
+	"yishan/apps/cli/internal/api"
 )
 
 var nodeListCmd = &cobra.Command{
@@ -15,7 +14,7 @@ var nodeListCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodGet, "/orgs/"+orgID+"/nodes", nil)
+		return apiClient().ListNodes(orgID)
 	},
 }
 
@@ -48,12 +47,10 @@ var nodeCreateCmd = &cobra.Command{
 			return err
 		}
 
-		payload := map[string]any{
-			"name":  name,
-			"scope": scope,
-		}
-		if endpoint != "" {
-			payload["endpoint"] = endpoint
+		input := api.CreateNodeInput{
+			Name:     name,
+			Scope:    scope,
+			Endpoint: endpoint,
 		}
 		if metadataOS != "" || metadataVersion != "" {
 			metadata := map[string]string{}
@@ -63,10 +60,10 @@ var nodeCreateCmd = &cobra.Command{
 			if metadataVersion != "" {
 				metadata["version"] = metadataVersion
 			}
-			payload["metadata"] = metadata
+			input.Metadata = metadata
 		}
 
-		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/nodes", payload)
+		return apiClient().CreateNode(orgID, input)
 	},
 }
 
@@ -83,7 +80,7 @@ var nodeDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID+"/nodes/"+nodeID, nil)
+		return apiClient().DeleteNode(orgID, nodeID)
 	},
 }
 

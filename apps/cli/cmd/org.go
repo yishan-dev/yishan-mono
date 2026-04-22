@@ -2,17 +2,18 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"yishan/apps/cli/internal/api"
+	"yishan/apps/cli/internal/config"
 )
 
 var orgListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organizations",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return apiClient().DoJSON(http.MethodGet, "/orgs", nil)
+		return apiClient().ListOrganizations()
 	},
 }
 
@@ -29,9 +30,9 @@ var orgCreateCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodPost, "/orgs", map[string]any{
-			"name":          name,
-			"memberUserIds": memberUserIDs,
+		return apiClient().CreateOrganization(api.CreateOrganizationInput{
+			Name:          name,
+			MemberUserIDs: memberUserIDs,
 		})
 	},
 }
@@ -45,7 +46,7 @@ var orgDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID, nil)
+		return apiClient().DeleteOrganization(orgID)
 	},
 }
 
@@ -66,10 +67,7 @@ var orgMemberAddCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/members", map[string]string{
-			"userId": userID,
-			"role":   role,
-		})
+		return apiClient().AddOrganizationMember(orgID, userID, role)
 	},
 }
 
@@ -86,7 +84,7 @@ var orgMemberRemoveCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodDelete, "/orgs/"+orgID+"/members/"+userID, nil)
+		return apiClient().RemoveOrganizationMember(orgID, userID)
 	},
 }
 
@@ -99,7 +97,7 @@ var orgUseCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		orgID := args[0]
-		if err := updateConfigFile(func(cfg *viper.Viper) {
+		if err := config.UpdateFile(appConfig.ConfigPath, func(cfg *viper.Viper) {
 			cfg.Set("current_org_id", orgID)
 		}); err != nil {
 			return err
@@ -128,7 +126,7 @@ var orgClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear current organization",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		if err := updateConfigFile(func(cfg *viper.Viper) {
+		if err := config.UpdateFile(appConfig.ConfigPath, func(cfg *viper.Viper) {
 			cfg.Set("current_org_id", "")
 		}); err != nil {
 			return err

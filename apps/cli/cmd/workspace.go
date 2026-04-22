@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
+	"yishan/apps/cli/internal/output"
 	"yishan/apps/cli/internal/provision"
 
 	"github.com/spf13/cobra"
@@ -22,8 +20,7 @@ var workspaceListCmd = &cobra.Command{
 			return err
 		}
 
-		path := "/orgs/" + orgID + "/projects/" + projectID + "/workspaces"
-		return apiClient().DoJSON(http.MethodGet, path, nil)
+		return apiClient().ListWorkspaces(orgID, projectID)
 	},
 }
 
@@ -56,16 +53,19 @@ var workspaceCreateCmd = &cobra.Command{
 			return err
 		}
 
-		payload := map[string]string{
-			"nodeId":    nodeID,
-			"localPath": localPath,
-			"kind":      kind,
-		}
-		if branch != "" {
-			payload["branch"] = branch
-		}
+		service := provision.NewForRuntime(apiClient(), provision.RuntimeConfig{
+			ConfigPath: appConfig.ConfigPath,
+			Daemon: provision.DaemonAuthConfig{
+				Host:        appConfig.Daemon.Host,
+				Port:        appConfig.Daemon.Port,
+				JWTSecret:   appConfig.Daemon.JWTSecret,
+				JWTIssuer:   appConfig.Daemon.JWTIssuer,
+				JWTAudience: appConfig.Daemon.JWTAudience,
+				JWTRequired: appConfig.Daemon.JWTRequired,
+			},
+		})
 
-		body, err := workspaceProvisionService().Create(cmd.Context(), provision.CreateRequest{
+		body, err := service.Create(cmd.Context(), provision.CreateRequest{
 			OrganizationID: orgID,
 			ProjectID:      projectID,
 			NodeID:         nodeID,
@@ -77,30 +77,8 @@ var workspaceCreateCmd = &cobra.Command{
 			return err
 		}
 
-		printJSON(body)
-		return nil
+		return output.PrintResponse(body)
 	},
-}
-
-func printJSON(body []byte) {
-	if len(body) == 0 {
-		fmt.Println("{}")
-		return
-	}
-
-	var decoded any
-	if err := json.Unmarshal(body, &decoded); err != nil {
-		fmt.Println(string(body))
-		return
-	}
-
-	pretty, err := json.MarshalIndent(decoded, "", "  ")
-	if err != nil {
-		fmt.Println(string(body))
-		return
-	}
-
-	fmt.Println(string(pretty))
 }
 
 var workspaceCmd = &cobra.Command{Use: "workspace", Short: "Workspace operations"}

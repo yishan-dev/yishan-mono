@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"net/http"
-
 	"github.com/spf13/cobra"
+	"yishan/apps/cli/internal/api"
 )
 
 var projectListCmd = &cobra.Command{
@@ -15,7 +14,7 @@ var projectListCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodGet, "/orgs/"+orgID+"/projects", nil)
+		return apiClient().ListProjects(orgID)
 	},
 }
 
@@ -48,23 +47,13 @@ var projectCreateCmd = &cobra.Command{
 			return err
 		}
 
-		payload := map[string]string{
-			"name": name,
-		}
-		if sourceTypeHint != "" {
-			payload["sourceTypeHint"] = sourceTypeHint
-		}
-		if repoURL != "" {
-			payload["repoUrl"] = repoURL
-		}
-		if nodeID != "" {
-			payload["nodeId"] = nodeID
-		}
-		if localPath != "" {
-			payload["localPath"] = localPath
-		}
-
-		return apiClient().DoJSON(http.MethodPost, "/orgs/"+orgID+"/projects", payload)
+		return apiClient().CreateProject(orgID, api.CreateProjectInput{
+			Name:           name,
+			SourceTypeHint: sourceTypeHint,
+			RepoURL:        repoURL,
+			NodeID:         nodeID,
+			LocalPath:      localPath,
+		})
 	},
 }
 

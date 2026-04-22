@@ -1,10 +1,6 @@
 package cmd
 
-import (
-	"net/http"
-
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 var refreshCmd = &cobra.Command{
 	Use:   "refresh",
@@ -15,9 +11,7 @@ var refreshCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodPost, "/auth/refresh", map[string]string{
-			"refreshToken": refreshToken,
-		})
+		return apiClient().RefreshToken(refreshToken)
 	},
 }
 
@@ -30,9 +24,7 @@ var revokeCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DoJSON(http.MethodPost, "/auth/revoke", map[string]string{
-			"refreshToken": refreshToken,
-		})
+		return apiClient().RevokeToken(refreshToken)
 	},
 }
 

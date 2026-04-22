@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"yishan/apps/cli/internal/apiclient"
 	"yishan/apps/cli/internal/daemonrpc"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -32,11 +31,15 @@ type CreateRequest struct {
 }
 
 type Service struct {
-	apiClient  *apiclient.Client
+	apiClient  rawClient
 	daemonAuth DaemonAuthConfig
 }
 
-func New(apiClient *apiclient.Client, daemonAuth DaemonAuthConfig) *Service {
+type rawClient interface {
+	DoRaw(method string, path string, body any) ([]byte, error)
+}
+
+func New(apiClient rawClient, daemonAuth DaemonAuthConfig) *Service {
 	return &Service{apiClient: apiClient, daemonAuth: daemonAuth}
 }
 

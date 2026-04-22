@@ -1,16 +1,12 @@
 package cmd
 
-import (
-	"net/http"
-
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 var healthCmd = &cobra.Command{
 	Use:   "health",
 	Short: "Check API health",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return apiClient().DoJSON(http.MethodGet, "/health", nil)
+		return apiClient().Health()
 	},
 }
 
@@ -19,7 +15,7 @@ var whoamiCmd = &cobra.Command{
 	Aliases: []string{"me"},
 	Short:   "Show current authenticated user",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return apiClient().DoJSON(http.MethodGet, "/me", nil)
+		return apiClient().WhoAmI()
 	},
 }
 
