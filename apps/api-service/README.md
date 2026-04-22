@@ -72,4 +72,5 @@ Notes:
 - `POST /orgs/:orgId/nodes` accepts `{ "name": string, "scope": "local" | "remote", "endpoint"?: string, "metadata"?: { "os"?: string, "version"?: string, ... } }`.
 - Local nodes are user-owned (`organizationId = null`) even when created in org context; remote nodes are org-shared by default.
 - `GET /orgs/:orgId/nodes` returns both org remote nodes and local nodes owned by org members; listing visibility does not imply usage permission (`canUse` indicates direct usability).
+- `POST /orgs/:orgId/projects/:projectId/workspaces` creates workspace records via API first; node provisioning is handled as a backend orchestration concern.
 - Org-scoped resources reject access when the authenticated user is not a member of that org.

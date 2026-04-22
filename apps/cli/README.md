@@ -90,6 +90,7 @@ Organization context:
 - Show active org: `yishan org current`
 - Clear active org: `yishan org clear`
 - Commands with `--org-id` fall back to active org when flag is omitted.
+- `workspace create` creates workspace metadata via API first; for local nodes it then provisions via local daemon using the returned workspace id.
 
 Terminal subscriptions stream server notifications:
 

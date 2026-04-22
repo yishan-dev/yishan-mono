@@ -13,6 +13,7 @@ import {
 import { newId } from "@/lib/id";
 import { inferRepoSource } from "@/lib/repo";
 import type { OrganizationService } from "@/services/organization-service";
+import type { WorkspaceProvisioner } from "@/services/workspace-provisioner";
 
 type ProjectSourceType = "git" | "git-local" | "unknown";
 type WorkspaceKind = "primary" | "worktree";
@@ -66,7 +67,8 @@ type CreateWorkspaceInput = {
 export class ProjectService {
   constructor(
     private readonly db: AppDb,
-    private readonly organizationService: OrganizationService
+    private readonly organizationService: OrganizationService,
+    private readonly workspaceProvisioner: WorkspaceProvisioner
   ) {}
 
   async createProject(input: CreateProjectInput): Promise<ProjectView> {
@@ -172,7 +174,7 @@ export class ProjectService {
   }
 
   async createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceView> {
-    return this.db.transaction(async (tx) => {
+    const workspace = await this.db.transaction(async (tx) => {
       const role = await this.organizationService.getMembershipRole({
         organizationId: input.organizationId,
         userId: input.actorUserId
@@ -255,6 +257,13 @@ export class ProjectService {
         kind: workspace.kind as WorkspaceKind
       };
     });
+
+    await this.workspaceProvisioner.enqueueWorkspaceProvision({
+      workspace,
+      actorUserId: input.actorUserId
+    });
+
+    return workspace;
   }
 
   async listWorkspaces(input: {

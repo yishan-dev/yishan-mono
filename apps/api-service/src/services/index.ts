@@ -5,6 +5,7 @@ import { NodeService } from "@/services/node-service";
 import { OrganizationService } from "@/services/organization-service";
 import { ProjectService } from "@/services/project-service";
 import { UserService } from "@/services/user-service";
+import { NoopWorkspaceProvisioner } from "@/services/workspace-provisioner";
 
 export type AppServices = {
   user: UserService;
@@ -17,12 +18,13 @@ export type AppServices = {
 export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppServices {
   const user = new UserService(deps.db);
   const organization = new OrganizationService(deps.db);
+  const workspaceProvisioner = new NoopWorkspaceProvisioner();
 
   return {
     user,
     auth: new AuthService(deps.db, deps.config, user),
     organization,
     node: new NodeService(deps.db, organization),
-    project: new ProjectService(deps.db, organization)
+    project: new ProjectService(deps.db, organization, workspaceProvisioner)
   };
 }

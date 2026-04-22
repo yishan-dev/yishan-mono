@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"yishan/apps/cli/internal/provision"
 
 	"github.com/spf13/cobra"
 )
@@ -62,9 +65,42 @@ var workspaceCreateCmd = &cobra.Command{
 			payload["branch"] = branch
 		}
 
-		path := "/orgs/" + orgID + "/projects/" + projectID + "/workspaces"
-		return apiClient().DoJSON(http.MethodPost, path, payload)
+		body, err := workspaceProvisionService().Create(cmd.Context(), provision.CreateRequest{
+			OrganizationID: orgID,
+			ProjectID:      projectID,
+			NodeID:         nodeID,
+			LocalPath:      localPath,
+			Kind:           kind,
+			Branch:         branch,
+		})
+		if err != nil {
+			return err
+		}
+
+		printJSON(body)
+		return nil
 	},
+}
+
+func printJSON(body []byte) {
+	if len(body) == 0 {
+		fmt.Println("{}")
+		return
+	}
+
+	var decoded any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		fmt.Println(string(body))
+		return
+	}
+
+	pretty, err := json.MarshalIndent(decoded, "", "  ")
+	if err != nil {
+		fmt.Println(string(body))
+		return
+	}
+
+	fmt.Println(string(pretty))
 }
 
 var workspaceCmd = &cobra.Command{Use: "workspace", Short: "Workspace operations"}
