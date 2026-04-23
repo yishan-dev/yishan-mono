@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"resty.dev/v3"
-	"yishan/apps/cli/internal/output"
 )
 
 type TokenUpdate struct {
@@ -60,13 +59,19 @@ func (c *Client) DoRaw(method string, path string, body any) ([]byte, error) {
 	return responseBody, err
 }
 
-func (c *Client) DoJSON(method string, path string, body any) error {
+func (c *Client) DoDecode(method string, path string, body any, out any) error {
 	responseBody, err := c.DoRaw(method, path, body)
 	if err != nil {
 		return err
 	}
+	if len(responseBody) == 0 {
+		responseBody = []byte("{}")
+	}
+	if err := json.Unmarshal(responseBody, out); err != nil {
+		return fmt.Errorf("parse json response for %s %s: %w", method, path, err)
+	}
 
-	return output.PrintResponse(responseBody)
+	return nil
 }
 
 func isRefreshRequest(path string) bool {

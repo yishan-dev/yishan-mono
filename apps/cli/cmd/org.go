@@ -7,13 +7,24 @@ import (
 	"github.com/spf13/viper"
 	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/config"
+	"yishan/apps/cli/internal/output"
 )
 
 var orgListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organizations",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		return apiClient().ListOrganizations()
+		response, err := apiClient().ListOrganizations()
+		if err != nil {
+			return err
+		}
+
+		renderData, err := toOrgListRenderData(response)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintRenderData(renderData)
 	},
 }
 
@@ -30,10 +41,15 @@ var orgCreateCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().CreateOrganization(api.CreateOrganizationInput{
+		response, err := apiClient().CreateOrganization(api.CreateOrganizationInput{
 			Name:          name,
 			MemberUserIDs: memberUserIDs,
 		})
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 
@@ -46,7 +62,12 @@ var orgDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().DeleteOrganization(orgID)
+		response, err := apiClient().DeleteOrganization(orgID)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 
@@ -67,7 +88,12 @@ var orgMemberAddCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().AddOrganizationMember(orgID, userID, role)
+		response, err := apiClient().AddOrganizationMember(orgID, userID, role)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 
@@ -84,7 +110,12 @@ var orgMemberRemoveCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().RemoveOrganizationMember(orgID, userID)
+		response, err := apiClient().RemoveOrganizationMember(orgID, userID)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 

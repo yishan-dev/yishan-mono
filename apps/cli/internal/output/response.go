@@ -9,38 +9,47 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-func PrintResponse(body []byte) error {
-	if len(body) == 0 {
-		fmt.Println("{}")
-		return nil
-	}
+type RenderData struct {
+	Title   string
+	Columns []string
+	Rows    []map[string]any
+	Object  any
+}
 
-	var decoded any
-	if err := json.Unmarshal(body, &decoded); err != nil {
+func PrintResponse(body []byte) error {
+	decoded, ok := decodeJSONResponse(body)
+	if !ok {
 		fmt.Println(string(body))
 		return nil
 	}
 
-	if rows, ok := decoded.([]any); ok {
-		if printed, err := printTable(rows); err != nil {
-			return err
-		} else if printed {
-			return nil
-		}
+	return PrintAny(decoded)
+}
+
+func PrintAny(decoded any) error {
+	normalized, ok := normalizeDecoded(decoded)
+	if !ok {
+		return PrintRenderData(RenderData{Object: decoded})
 	}
 
-	if envelope, ok := decoded.(map[string]any); ok {
-		if key, rows, ok := extractSingleArrayEnvelope(envelope); ok {
-			fmt.Printf("%s:\n", key)
-			if printed, err := printTable(rows); err != nil {
-				return err
-			} else if printed {
-				return nil
-			}
-		}
+	return PrintRenderData(inferRenderData(normalized))
+}
+
+func PrintRenderData(data RenderData) error {
+	if data.Title != "" {
+		fmt.Printf("%s:\n", data.Title)
 	}
 
-	pretty, err := json.MarshalIndent(decoded, "", "  ")
+	if data.Rows != nil {
+		return printTableRows(data.Rows, data.Columns)
+	}
+
+	if data.Object == nil {
+		fmt.Println("{}")
+		return nil
+	}
+
+	pretty, err := json.MarshalIndent(data.Object, "", "  ")
 	if err != nil {
 		return fmt.Errorf("format response body: %w", err)
 	}
@@ -49,35 +58,95 @@ func PrintResponse(body []byte) error {
 	return nil
 }
 
-func printTable(rows []any) (bool, error) {
-	if len(rows) == 0 {
-		fmt.Println("(no results)")
-		return true, nil
+func decodeJSONResponse(body []byte) (any, bool) {
+	if len(body) == 0 {
+		return map[string]any{}, true
 	}
 
+	var decoded any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		return nil, false
+	}
+
+	return decoded, true
+}
+
+func normalizeDecoded(decoded any) (any, bool) {
+	switch decoded.(type) {
+	case map[string]any, []any:
+		return decoded, true
+	}
+
+	encoded, err := json.Marshal(decoded)
+	if err != nil {
+		return nil, false
+	}
+
+	var normalized any
+	if err := json.Unmarshal(encoded, &normalized); err != nil {
+		return nil, false
+	}
+
+	return normalized, true
+}
+
+func inferRenderData(decoded any) RenderData {
+	if rows, ok := decoded.([]any); ok {
+		if mapped, ok := mapRows(rows); ok {
+			return RenderData{Rows: mapped}
+		}
+	}
+
+	if envelope, ok := decoded.(map[string]any); ok {
+		if key, rows, ok := extractSingleArrayEnvelope(envelope); ok {
+			if mapped, ok := mapRows(rows); ok {
+				return RenderData{Title: key, Rows: mapped}
+			}
+		}
+	}
+
+	return RenderData{Object: decoded}
+}
+
+func mapRows(rows []any) ([]map[string]any, bool) {
 	converted := make([]map[string]any, 0, len(rows))
-	columnSet := map[string]struct{}{}
 	for _, row := range rows {
 		object, ok := row.(map[string]any)
 		if !ok {
-			return false, nil
+			return nil, false
 		}
 		converted = append(converted, object)
-		for key := range object {
+	}
+
+	return converted, true
+}
+
+func printTableRows(rows []map[string]any, preferredColumns []string) error {
+	if len(rows) == 0 {
+		fmt.Println("(no results)")
+		return nil
+	}
+
+	columnSet := map[string]struct{}{}
+	for _, row := range rows {
+		for key := range row {
 			columnSet[key] = struct{}{}
 		}
 	}
 
-	columns := orderedColumns(columnSet)
+	columns := preferredColumns
+	if len(columns) == 0 {
+		columns = orderedColumns(columnSet)
+	}
 	if len(columns) == 0 {
 		fmt.Println("(no results)")
-		return true, nil
+		return nil
 	}
 
 	writer := table.NewWriter()
 	writer.SetStyle(table.StyleLight)
 	writer.AppendHeader(toTableRow(columns))
-	for _, row := range converted {
+	for _, row := range rows {
 		values := make([]string, 0, len(columns))
 		for _, column := range columns {
 			values = append(values, formatCell(row[column]))
@@ -87,7 +156,7 @@ func printTable(rows []any) (bool, error) {
 
 	fmt.Println(writer.Render())
 
-	return true, nil
+	return nil
 }
 
 func toTableRow(values []string) table.Row {
@@ -119,6 +188,7 @@ func orderedColumns(columns map[string]struct{}) []string {
 	preferred := []string{
 		"id",
 		"name",
+		"memberCount",
 		"email",
 		"role",
 		"scope",

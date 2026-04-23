@@ -20,45 +20,61 @@ type CreateProjectInput struct {
 	LocalPath      string
 }
 
-func (c *Client) Health() error {
-	return c.DoJSON("GET", "/health", nil)
+func (c *Client) Health() (HealthResponse, error) {
+	var response HealthResponse
+	err := c.DoDecode("GET", "/health", nil, &response)
+	return response, err
 }
 
-func (c *Client) WhoAmI() error {
-	return c.DoJSON("GET", "/me", nil)
+func (c *Client) WhoAmI() (MeResponse, error) {
+	var response MeResponse
+	err := c.DoDecode("GET", "/me", nil, &response)
+	return response, err
 }
 
-func (c *Client) ListOrganizations() error {
-	return c.DoJSON("GET", "/orgs", nil)
+func (c *Client) ListOrganizations() (ListOrganizationsResponse, error) {
+	var response ListOrganizationsResponse
+	err := c.DoDecode("GET", "/orgs", nil, &response)
+	return response, err
 }
 
-func (c *Client) CreateOrganization(input CreateOrganizationInput) error {
-	return c.DoJSON("POST", "/orgs", map[string]any{
+func (c *Client) CreateOrganization(input CreateOrganizationInput) (CreateOrganizationResponse, error) {
+	var response CreateOrganizationResponse
+	err := c.DoDecode("POST", "/orgs", map[string]any{
 		"name":          input.Name,
 		"memberUserIds": input.MemberUserIDs,
-	})
+	}, &response)
+	return response, err
 }
 
-func (c *Client) DeleteOrganization(orgID string) error {
-	return c.DoJSON("DELETE", "/orgs/"+orgID, nil)
+func (c *Client) DeleteOrganization(orgID string) (OKResponse, error) {
+	var response OKResponse
+	err := c.DoDecode("DELETE", "/orgs/"+orgID, nil, &response)
+	return response, err
 }
 
-func (c *Client) AddOrganizationMember(orgID string, userID string, role string) error {
-	return c.DoJSON("POST", "/orgs/"+orgID+"/members", map[string]string{
+func (c *Client) AddOrganizationMember(orgID string, userID string, role string) (AddOrganizationMemberResponse, error) {
+	var response AddOrganizationMemberResponse
+	err := c.DoDecode("POST", "/orgs/"+orgID+"/members", map[string]string{
 		"userId": userID,
 		"role":   role,
-	})
+	}, &response)
+	return response, err
 }
 
-func (c *Client) RemoveOrganizationMember(orgID string, userID string) error {
-	return c.DoJSON("DELETE", "/orgs/"+orgID+"/members/"+userID, nil)
+func (c *Client) RemoveOrganizationMember(orgID string, userID string) (OKResponse, error) {
+	var response OKResponse
+	err := c.DoDecode("DELETE", "/orgs/"+orgID+"/members/"+userID, nil, &response)
+	return response, err
 }
 
-func (c *Client) ListNodes(orgID string) error {
-	return c.DoJSON("GET", "/orgs/"+orgID+"/nodes", nil)
+func (c *Client) ListNodes(orgID string) (ListNodesResponse, error) {
+	var response ListNodesResponse
+	err := c.DoDecode("GET", "/orgs/"+orgID+"/nodes", nil, &response)
+	return response, err
 }
 
-func (c *Client) CreateNode(orgID string, input CreateNodeInput) error {
+func (c *Client) CreateNode(orgID string, input CreateNodeInput) (CreateNodeResponse, error) {
 	payload := map[string]any{
 		"name":  input.Name,
 		"scope": input.Scope,
@@ -70,18 +86,24 @@ func (c *Client) CreateNode(orgID string, input CreateNodeInput) error {
 		payload["metadata"] = input.Metadata
 	}
 
-	return c.DoJSON("POST", "/orgs/"+orgID+"/nodes", payload)
+	var response CreateNodeResponse
+	err := c.DoDecode("POST", "/orgs/"+orgID+"/nodes", payload, &response)
+	return response, err
 }
 
-func (c *Client) DeleteNode(orgID string, nodeID string) error {
-	return c.DoJSON("DELETE", "/orgs/"+orgID+"/nodes/"+nodeID, nil)
+func (c *Client) DeleteNode(orgID string, nodeID string) (OKResponse, error) {
+	var response OKResponse
+	err := c.DoDecode("DELETE", "/orgs/"+orgID+"/nodes/"+nodeID, nil, &response)
+	return response, err
 }
 
-func (c *Client) ListProjects(orgID string) error {
-	return c.DoJSON("GET", "/orgs/"+orgID+"/projects", nil)
+func (c *Client) ListProjects(orgID string) (ListProjectsResponse, error) {
+	var response ListProjectsResponse
+	err := c.DoDecode("GET", "/orgs/"+orgID+"/projects", nil, &response)
+	return response, err
 }
 
-func (c *Client) CreateProject(orgID string, input CreateProjectInput) error {
+func (c *Client) CreateProject(orgID string, input CreateProjectInput) (CreateProjectResponse, error) {
 	payload := map[string]string{
 		"name": input.Name,
 	}
@@ -98,21 +120,29 @@ func (c *Client) CreateProject(orgID string, input CreateProjectInput) error {
 		payload["localPath"] = input.LocalPath
 	}
 
-	return c.DoJSON("POST", "/orgs/"+orgID+"/projects", payload)
+	var response CreateProjectResponse
+	err := c.DoDecode("POST", "/orgs/"+orgID+"/projects", payload, &response)
+	return response, err
 }
 
-func (c *Client) ListWorkspaces(orgID string, projectID string) error {
-	return c.DoJSON("GET", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces", nil)
+func (c *Client) ListWorkspaces(orgID string, projectID string) (ListWorkspacesResponse, error) {
+	var response ListWorkspacesResponse
+	err := c.DoDecode("GET", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces", nil, &response)
+	return response, err
 }
 
-func (c *Client) RefreshToken(refreshToken string) error {
-	return c.DoJSON("POST", "/auth/refresh", map[string]string{
+func (c *Client) RefreshToken(refreshToken string) (RefreshTokenResponse, error) {
+	var response RefreshTokenResponse
+	err := c.DoDecode("POST", "/auth/refresh", map[string]string{
 		"refreshToken": refreshToken,
-	})
+	}, &response)
+	return response, err
 }
 
-func (c *Client) RevokeToken(refreshToken string) error {
-	return c.DoJSON("POST", "/auth/revoke", map[string]string{
+func (c *Client) RevokeToken(refreshToken string) (OKResponse, error) {
+	var response OKResponse
+	err := c.DoDecode("POST", "/auth/revoke", map[string]string{
 		"refreshToken": refreshToken,
-	})
+	}, &response)
+	return response, err
 }

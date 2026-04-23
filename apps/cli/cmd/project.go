@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"yishan/apps/cli/internal/api"
+	"yishan/apps/cli/internal/output"
 )
 
 var projectListCmd = &cobra.Command{
@@ -14,7 +15,12 @@ var projectListCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().ListProjects(orgID)
+		response, err := apiClient().ListProjects(orgID)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 
@@ -47,13 +53,18 @@ var projectCreateCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().CreateProject(orgID, api.CreateProjectInput{
+		response, err := apiClient().CreateProject(orgID, api.CreateProjectInput{
 			Name:           name,
 			SourceTypeHint: sourceTypeHint,
 			RepoURL:        repoURL,
 			NodeID:         nodeID,
 			LocalPath:      localPath,
 		})
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 

@@ -20,7 +20,12 @@ var workspaceListCmd = &cobra.Command{
 			return err
 		}
 
-		return apiClient().ListWorkspaces(orgID, projectID)
+		response, err := apiClient().ListWorkspaces(orgID, projectID)
+		if err != nil {
+			return err
+		}
+
+		return output.PrintAny(response)
 	},
 }
 
