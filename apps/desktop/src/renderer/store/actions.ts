@@ -1,4 +1,4 @@
-import { createWorkspaceRepoActions } from "./actions.repos";
+import { createWorkspaceRepoActions } from "./actions.projects";
 import { createWorkspaceSelectionActions } from "./actions.selection";
 import { createWorkspaceActions } from "./actions.workspaces";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";

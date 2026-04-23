@@ -1,16 +1,19 @@
 import { buildWorkspaceStateFromData } from "../store/state";
 import { getFileName } from "../store/tabs";
 import type { Repo, RepoWorkspaceItem, WorkspaceStoreState } from "../store/types";
-import type { CreateRepoResult, RepoSnapshot } from "../types/repoTypes";
+import type { CreateRepoResult, RepoSnapshot } from "../types/projectTypes";
 
 type RepoStoreSlice = Pick<
   WorkspaceStoreState,
+  | "projects"
   | "repos"
   | "workspaces"
   | "gitChangesCountByWorkspaceId"
   | "gitChangeTotalsByWorkspaceId"
+  | "selectedProjectId"
   | "selectedRepoId"
   | "selectedWorkspaceId"
+  | "displayProjectIds"
   | "displayRepoIds"
 >;
 
@@ -36,6 +39,7 @@ function buildLocalWorkspaceItem(repo: Repo): RepoWorkspaceItem | null {
   const localWorkspaceLabel = getDefaultLocalWorkspaceLabel();
   return {
     id: workspaceId,
+    projectId: repo.id,
     repoId: repo.id,
     name: localWorkspaceLabel,
     title: localWorkspaceLabel,
@@ -66,10 +70,11 @@ export function readPersistedDisplayRepoIds(storage: Storage | undefined): strin
 
     const parsed = JSON.parse(raw) as {
       state?: {
+        displayProjectIds?: unknown;
         displayRepoIds?: unknown;
       };
     };
-    const candidate = parsed.state?.displayRepoIds;
+    const candidate = parsed.state?.displayProjectIds ?? parsed.state?.displayRepoIds;
     return Array.isArray(candidate) ? candidate.filter((item): item is string => typeof item === "string") : undefined;
   } catch {
     return undefined;
@@ -87,16 +92,17 @@ function filterWorkspaceScopedRecord<T>(record: Record<string, T>, workspaceIdSe
 function mapSnapshot(snapshot: RepoSnapshot): { repos: Repo[]; workspaces: RepoWorkspaceItem[] } {
   const repos = snapshot.repos.map((repo) => {
     const path = repo.localPath ?? "";
+    const displayName = repo.name?.trim() || (path ? getFileName(path) : repo.id);
     return {
       id: repo.id,
       key: repo.key ?? repo.id,
-      name: path ? getFileName(path) : repo.id,
+      name: displayName,
       path,
       missing: !path,
-      gitUrl: repo.gitUrl ?? "",
+      gitUrl: repo.gitUrl ?? repo.repoUrl ?? "",
       localPath: path,
       worktreePath: repo.worktreePath ?? path,
-      privateContextEnabled: repo.privateContextEnabled ?? true,
+      privateContextEnabled: repo.privateContextEnabled ?? repo.contextEnabled ?? true,
       defaultBranch: repo.defaultBranch ?? "",
       icon: repo.icon ?? "folder",
       iconBgColor: repo.color ?? "#1E66F5",
@@ -107,18 +113,24 @@ function mapSnapshot(snapshot: RepoSnapshot): { repos: Repo[]; workspaces: RepoW
 
   const repoIdSet = new Set(repos.map((repo) => repo.id));
   const managedWorkspaces = snapshot.workspaces
-    .filter((workspace) => repoIdSet.has(workspace.repoId) && workspace.status !== "closed")
+    .filter((workspace) => {
+      const parentId = workspace.projectId ?? workspace.repoId ?? "";
+      const status = workspace.status ?? "open";
+      return repoIdSet.has(parentId) && status !== "closed";
+    })
     .map(
       (workspace) =>
         ({
           id: workspace.workspaceId,
-          repoId: workspace.repoId,
-          name: workspace.name,
-          title: workspace.name || getFileName(workspace.worktreePath) || workspace.branch,
-          sourceBranch: workspace.sourceBranch,
-          branch: workspace.branch,
+          projectId: workspace.projectId ?? workspace.repoId ?? "",
+          repoId: workspace.projectId ?? workspace.repoId ?? "",
+          name: workspace.name ?? workspace.branch ?? "workspace",
+          title:
+            workspace.name || getFileName(workspace.worktreePath ?? workspace.localPath ?? "") || workspace.branch || "workspace",
+          sourceBranch: workspace.sourceBranch ?? workspace.branch ?? "main",
+          branch: workspace.branch ?? workspace.sourceBranch ?? "main",
           summaryId: workspace.workspaceId,
-          worktreePath: workspace.worktreePath,
+          worktreePath: workspace.worktreePath ?? workspace.localPath,
           kind: "managed",
         }) satisfies RepoWorkspaceItem,
     );
@@ -149,7 +161,7 @@ export function buildHydratedStateFromSnapshot(
     preferredWorkspaceId: state.selectedWorkspaceId,
   });
   const nextRepoIdSet = new Set(repos.map((repo) => repo.id));
-  const baseDisplayRepoIds = persistedDisplayRepoIds ?? state.displayRepoIds;
+  const baseDisplayRepoIds = persistedDisplayRepoIds ?? state.displayProjectIds ?? state.displayRepoIds;
   const nextDisplayRepoIds =
     persistedDisplayRepoIds === undefined && baseDisplayRepoIds.length === 0
       ? repos.map((repo) => repo.id)
@@ -158,6 +170,7 @@ export function buildHydratedStateFromSnapshot(
 
   return {
     ...nextBaseState,
+    displayProjectIds: nextDisplayRepoIds,
     displayRepoIds: nextDisplayRepoIds,
     gitChangesCountByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangesCountByWorkspaceId, nextWorkspaceIdSet),
     gitChangeTotalsByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangeTotalsByWorkspaceId, nextWorkspaceIdSet),
@@ -191,38 +204,43 @@ export function buildCreatedRepoState(
     backendRepo: CreateRepoResult;
   },
 ): Partial<RepoStoreSlice> {
+  const currentProjects = state.projects ?? state.repos;
+  const currentDisplayProjectIds = state.displayProjectIds ?? state.displayRepoIds;
   const nextRepoId = input.backendRepo.id;
   const repoPath = input.backendRepo.localPath ?? input.resolvedPath;
+  const nextProject = {
+    id: nextRepoId,
+    key: input.backendRepo.key ?? nextRepoId,
+    name: input.name.trim(),
+    path: repoPath,
+    missing: false,
+    gitUrl: input.backendRepo.gitUrl ?? (input.source === "remote" ? input.normalizedGitUrl : ""),
+    localPath: input.source === "local" ? repoPath : "",
+    worktreePath: input.backendRepo.worktreePath ?? (input.source === "local" ? repoPath : ""),
+    privateContextEnabled: input.backendRepo.privateContextEnabled ?? true,
+    defaultBranch: input.backendRepo.defaultBranch ?? "",
+    icon: "folder",
+    iconBgColor: "#1E66F5",
+    setupScript: input.backendRepo.setupScript ?? "",
+    postScript: input.backendRepo.postScript ?? "",
+  } satisfies Repo;
   const localWorkspaceId = buildLocalWorkspaceId(nextRepoId);
   const hasLocalWorkspace = input.source === "local" && repoPath.trim().length > 0;
   const defaultBranch = input.backendRepo.defaultBranch ?? "main";
   const localWorkspaceLabel = getDefaultLocalWorkspaceLabel();
 
   return {
+    projects: [...currentProjects, nextProject],
     repos: [
       ...state.repos,
-      {
-        id: nextRepoId,
-        key: input.backendRepo.key ?? nextRepoId,
-        name: input.name.trim(),
-        path: repoPath,
-        missing: false,
-        gitUrl: input.backendRepo.gitUrl ?? (input.source === "remote" ? input.normalizedGitUrl : ""),
-        localPath: input.source === "local" ? repoPath : "",
-        worktreePath: input.backendRepo.worktreePath ?? (input.source === "local" ? repoPath : ""),
-        privateContextEnabled: input.backendRepo.privateContextEnabled ?? true,
-        defaultBranch: input.backendRepo.defaultBranch ?? "",
-        icon: "folder",
-        iconBgColor: "#1E66F5",
-        setupScript: input.backendRepo.setupScript ?? "",
-        postScript: input.backendRepo.postScript ?? "",
-      },
+      nextProject,
     ],
     workspaces: hasLocalWorkspace
       ? [
           ...state.workspaces,
           {
             id: localWorkspaceId,
+            projectId: nextRepoId,
             repoId: nextRepoId,
             name: localWorkspaceLabel,
             title: localWorkspaceLabel,
@@ -236,6 +254,11 @@ export function buildCreatedRepoState(
       : state.workspaces,
     displayRepoIds:
       state.displayRepoIds.length === state.repos.length ? [...state.displayRepoIds, nextRepoId] : state.displayRepoIds,
+    displayProjectIds:
+      currentDisplayProjectIds.length === currentProjects.length
+        ? [...currentDisplayProjectIds, nextRepoId]
+        : currentDisplayProjectIds,
+    selectedProjectId: nextRepoId,
     selectedRepoId: nextRepoId,
     selectedWorkspaceId: hasLocalWorkspace ? localWorkspaceId : "",
   };
@@ -243,11 +266,14 @@ export function buildCreatedRepoState(
 
 /** Removes a repo and all workspace-scoped UI state derived from that repo. */
 export function buildDeletedRepoState(state: RepoStoreSlice, repoId: string): Partial<RepoStoreSlice> {
+  const currentDisplayProjectIds = state.displayProjectIds ?? state.displayRepoIds;
   const nextRepos = state.repos.filter((repo) => repo.id !== repoId);
   const deletedWorkspaceIdSet = new Set(
-    state.workspaces.filter((workspace) => workspace.repoId === repoId).map((workspace) => workspace.id),
+    state.workspaces
+      .filter((workspace) => (workspace.projectId ?? workspace.repoId) === repoId)
+      .map((workspace) => workspace.id),
   );
-  const nextWorkspaces = state.workspaces.filter((workspace) => workspace.repoId !== repoId);
+  const nextWorkspaces = state.workspaces.filter((workspace) => (workspace.projectId ?? workspace.repoId) !== repoId);
   const nextGitChangesCountByWorkspaceId = { ...state.gitChangesCountByWorkspaceId };
   const nextGitChangeTotalsByWorkspaceId = { ...state.gitChangeTotalsByWorkspaceId };
   for (const workspaceId of deletedWorkspaceIdSet) {
@@ -258,12 +284,17 @@ export function buildDeletedRepoState(state: RepoStoreSlice, repoId: string): Pa
   const nextSelectedRepoId = state.selectedRepoId === repoId ? (nextRepos[0]?.id ?? "") : state.selectedRepoId;
   const nextSelectedWorkspaceId = nextWorkspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)
     ? state.selectedWorkspaceId
-    : (nextWorkspaces.find((workspace) => workspace.repoId === nextSelectedRepoId)?.id ?? nextWorkspaces[0]?.id ?? "");
+    : (nextWorkspaces.find((workspace) => (workspace.projectId ?? workspace.repoId) === nextSelectedRepoId)?.id ??
+      nextWorkspaces[0]?.id ??
+      "");
 
   return {
+    projects: nextRepos,
     repos: nextRepos,
     workspaces: nextWorkspaces,
+    displayProjectIds: currentDisplayProjectIds.filter((id) => id !== repoId),
     displayRepoIds: state.displayRepoIds.filter((id) => id !== repoId),
+    selectedProjectId: nextSelectedRepoId,
     selectedRepoId: nextSelectedRepoId,
     selectedWorkspaceId: nextSelectedWorkspaceId,
     gitChangesCountByWorkspaceId: nextGitChangesCountByWorkspaceId,

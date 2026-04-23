@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCreateRepoInput, readPersistedDisplayRepoIds } from "./repoHelpers";
+import { normalizeCreateRepoInput, readPersistedDisplayRepoIds } from "./projectHelpers";
 
-describe("repoHelpers", () => {
+describe("projectHelpers", () => {
   it("normalizes create-repo input based on source", () => {
     expect(
       normalizeCreateRepoInput({

@@ -4,11 +4,16 @@ type WorkspaceStoreSlice = Pick<
   WorkspaceStoreState,
   | "repos"
   | "workspaces"
+  | "selectedProjectId"
   | "selectedRepoId"
   | "selectedWorkspaceId"
   | "gitChangesCountByWorkspaceId"
   | "gitChangeTotalsByWorkspaceId"
 >;
+
+function resolveWorkspaceProjectId(workspace: { projectId?: string; repoId: string }): string {
+  return workspace.projectId ?? workspace.repoId;
+}
 
 /** Returns normalized workspace naming and branch values. */
 export function normalizeCreateWorkspaceInput(input: {
@@ -30,7 +35,7 @@ export function normalizeCreateWorkspaceInput(input: {
 export function buildCreatedWorkspaceState(
   state: WorkspaceStoreSlice,
   input: {
-    repoId: string;
+    projectId: string;
     normalizedName: string;
     normalizedTitle: string;
     normalizedBranch: string;
@@ -50,7 +55,8 @@ export function buildCreatedWorkspaceState(
       ...state.workspaces,
       {
         id: nextWorkspaceId,
-        repoId: input.repoId,
+        projectId: input.projectId,
+        repoId: input.projectId,
         name: input.backendWorkspace.name || input.normalizedName,
         title: input.normalizedTitle,
         sourceBranch: input.backendWorkspace.sourceBranch || input.normalizedBranch,
@@ -59,7 +65,8 @@ export function buildCreatedWorkspaceState(
         worktreePath: input.backendWorkspace.worktreePath,
       },
     ],
-    selectedRepoId: input.repoId,
+    selectedProjectId: input.projectId,
+    selectedRepoId: input.projectId,
     selectedWorkspaceId: nextWorkspaceId,
   };
 }
@@ -67,7 +74,7 @@ export function buildCreatedWorkspaceState(
 /** Removes one workspace and recalculates selection and tab state. */
 export function buildDeletedWorkspaceState(
   state: WorkspaceStoreSlice,
-  input: { repoId: string; workspaceId: string },
+  input: { projectId: string; workspaceId: string },
 ): Partial<WorkspaceStoreSlice> {
   const nextWorkspaces = state.workspaces.filter((workspace) => workspace.id !== input.workspaceId);
   const nextGitChangesCountByWorkspaceId = {
@@ -85,11 +92,14 @@ export function buildDeletedWorkspaceState(
 
   const nextSelectedWorkspaceId =
     state.selectedWorkspaceId === input.workspaceId
-      ? (nextWorkspaces.find((workspace) => workspace.repoId === input.repoId)?.id ?? nextWorkspaces[0]?.id ?? "")
+      ? (nextWorkspaces.find((workspace) => resolveWorkspaceProjectId(workspace) === input.projectId)?.id ??
+        nextWorkspaces[0]?.id ??
+        "")
       : state.selectedWorkspaceId;
 
   return {
     workspaces: nextWorkspaces,
+    selectedProjectId: nextSelectedRepoId,
     selectedRepoId: nextSelectedRepoId,
     selectedWorkspaceId: nextSelectedWorkspaceId,
     gitChangesCountByWorkspaceId: nextGitChangesCountByWorkspaceId,
@@ -100,11 +110,11 @@ export function buildDeletedWorkspaceState(
 /** Applies a workspace rename when repo and workspace ids both match. */
 export function buildRenamedWorkspaceState(
   state: Pick<WorkspaceStoreState, "workspaces">,
-  input: { repoId: string; workspaceId: string; normalizedName: string },
+  input: { projectId: string; workspaceId: string; normalizedName: string },
 ): Pick<WorkspaceStoreState, "workspaces"> {
   return {
     workspaces: state.workspaces.map((workspace) => {
-      if (workspace.id !== input.workspaceId || workspace.repoId !== input.repoId) {
+      if (workspace.id !== input.workspaceId || resolveWorkspaceProjectId(workspace) !== input.projectId) {
         return workspace;
       }
 
@@ -120,11 +130,11 @@ export function buildRenamedWorkspaceState(
 /** Applies a workspace branch rename when repo and workspace ids both match. */
 export function buildRenamedWorkspaceBranchState(
   state: Pick<WorkspaceStoreState, "workspaces">,
-  input: { repoId: string; workspaceId: string; normalizedBranch: string },
+  input: { projectId: string; workspaceId: string; normalizedBranch: string },
 ): Pick<WorkspaceStoreState, "workspaces"> {
   return {
     workspaces: state.workspaces.map((workspace) => {
-      if (workspace.id !== input.workspaceId || workspace.repoId !== input.repoId) {
+      if (workspace.id !== input.workspaceId || resolveWorkspaceProjectId(workspace) !== input.projectId) {
         return workspace;
       }
 

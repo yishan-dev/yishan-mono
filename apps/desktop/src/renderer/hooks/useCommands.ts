@@ -59,7 +59,7 @@ import {
   deleteRepo as deleteRepoCommand,
   loadWorkspaceFromBackend as loadWorkspaceFromBackendCommand,
   updateRepoConfig as updateRepoConfigCommand,
-} from "../commands/repoCommands";
+} from "../commands/projectCommands";
 import { setSelectedRepo, setSelectedWorkspace } from "../commands/selectionCommands";
 import {
   closeAllTabs as closeAllTabsCommand,

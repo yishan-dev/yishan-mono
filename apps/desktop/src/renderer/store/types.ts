@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { ExternalAppId } from "../../shared/contracts/externalApps";
-import type { CreateRepoResult, RepoSnapshot } from "../types/repoTypes";
+import type { CreateRepoResult, RepoSnapshot } from "../types/projectTypes";
 
 export type ChatMessage = {
   id: string;
@@ -38,6 +38,7 @@ export type Repo = {
 
 export type RepoWorkspaceItem = {
   id: string;
+  projectId?: string;
   repoId: string;
   name: string;
   title: string;
@@ -127,22 +128,34 @@ export type OpenWorkspaceTabInput =
     };
 
 export type WorkspaceStoreState = {
+  projects: Repo[];
   repos: Repo[];
   workspaces: RepoWorkspaceItem[];
   gitChangesCountByWorkspaceId: Record<string, number>;
   gitChangeTotalsByWorkspaceId: Record<string, WorkspaceGitChangeTotals>;
   gitRefreshVersionByWorktreePath: Record<string, number>;
   fileTreeChangedRelativePathsByWorktreePath: Record<string, string[]>;
+  selectedProjectId: string;
   selectedRepoId: string;
   selectedWorkspaceId: string;
+  displayProjectIds: string[];
   displayRepoIds: string[];
   lastUsedExternalAppId?: ExternalAppId;
   fileTreeRefreshVersion: number;
+  setSelectedProjectId: (projectId: string) => void;
   setSelectedRepoId: (repoId: string) => void;
   setSelectedWorkspaceId: (workspaceId: string) => void;
+  setDisplayProjectIds: (projectIds: string[]) => void;
   setDisplayRepoIds: (repoIds: string[]) => void;
   setLastUsedExternalAppId: (appId: ExternalAppId) => void;
   loadWorkspaceFromBackend: (snapshot: RepoSnapshot, persistedDisplayRepoIds?: string[]) => void;
+  createProject: (input: {
+    name: string;
+    source: "local" | "remote";
+    path?: string;
+    gitUrl?: string;
+    backendRepo: CreateRepoResult;
+  }) => void;
   createRepo: (input: {
     name: string;
     source: "local" | "remote";
@@ -150,7 +163,15 @@ export type WorkspaceStoreState = {
     gitUrl?: string;
     backendRepo: CreateRepoResult;
   }) => void;
+  deleteProject: (projectId: string) => void;
   deleteRepo: (repoId: string) => void;
+  updateProjectConfig: (
+    projectId: string,
+    config: Pick<
+      Repo,
+      "name" | "worktreePath" | "privateContextEnabled" | "icon" | "iconBgColor" | "setupScript" | "postScript"
+    >,
+  ) => void;
   updateRepoConfig: (
     repoId: string,
     config: Pick<
@@ -160,7 +181,8 @@ export type WorkspaceStoreState = {
   ) => void;
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   addWorkspace: (input: {
-    repoId: string;
+    projectId?: string;
+    repoId?: string;
     name: string;
     sourceBranch: string;
     branch: string;
@@ -168,16 +190,19 @@ export type WorkspaceStoreState = {
     workspaceId: string;
   }) => void;
   deleteWorkspace: (input: {
-    repoId: string;
+    projectId?: string;
+    repoId?: string;
     workspaceId: string;
   }) => void;
   renameWorkspace: (input: {
-    repoId: string;
+    projectId?: string;
+    repoId?: string;
     workspaceId: string;
     name: string;
   }) => void;
   renameWorkspaceBranch: (input: {
-    repoId: string;
+    projectId?: string;
+    repoId?: string;
     workspaceId: string;
     branch: string;
   }) => void;
@@ -186,17 +211,25 @@ export type WorkspaceStoreState = {
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
 };
 
-export type WorkspaceStorePersistedState = Pick<WorkspaceStoreState, "displayRepoIds" | "lastUsedExternalAppId">;
+export type WorkspaceStorePersistedState = Pick<
+  WorkspaceStoreState,
+  "displayProjectIds" | "displayRepoIds" | "lastUsedExternalAppId"
+>;
 
 export type WorkspaceStoreActions = Pick<
   WorkspaceStoreState,
+  | "setSelectedProjectId"
   | "setSelectedRepoId"
   | "setSelectedWorkspaceId"
+  | "setDisplayProjectIds"
   | "setDisplayRepoIds"
   | "setLastUsedExternalAppId"
   | "loadWorkspaceFromBackend"
+  | "createProject"
   | "createRepo"
+  | "deleteProject"
   | "deleteRepo"
+  | "updateProjectConfig"
   | "updateRepoConfig"
   | "incrementFileTreeRefreshVersion"
   | "addWorkspace"

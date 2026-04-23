@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspaceRepoActions } from "./actions.repos";
+import { createWorkspaceRepoActions } from "./actions.projects";
 
 type TestState = {
   repos: Array<{

@@ -19,15 +19,24 @@ type WorkspaceActions = Pick<
 
 /** Creates, renames, and deletes workspaces while keeping selection state in sync. */
 export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: WorkspaceStoreGetState): WorkspaceActions {
+  const resolveProjectId = (input: { projectId?: string; repoId?: string }): string => {
+    return input.projectId ?? input.repoId ?? "";
+  };
+
   return {
-    addWorkspace: ({ repoId, name, sourceBranch, branch, worktreePath, workspaceId }) => {
+    addWorkspace: ({ projectId, repoId, name, sourceBranch, branch, worktreePath, workspaceId }) => {
       if (!workspaceId) {
+        return;
+      }
+
+      const resolvedProjectId = resolveProjectId({ projectId, repoId });
+      if (!resolvedProjectId) {
         return;
       }
 
       set((state) => ({
         ...buildCreatedWorkspaceState(state, {
-          repoId,
+          projectId: resolvedProjectId,
           normalizedName: name,
           normalizedTitle: name,
           normalizedBranch: branch,
@@ -41,41 +50,44 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         }),
       }));
     },
-    deleteWorkspace: ({ repoId, workspaceId }) => {
-      if (!repoId || !workspaceId) {
+    deleteWorkspace: ({ projectId, repoId, workspaceId }) => {
+      const resolvedProjectId = resolveProjectId({ projectId, repoId });
+      if (!resolvedProjectId || !workspaceId) {
         return;
       }
 
       set((state) =>
         buildDeletedWorkspaceState(state, {
-          repoId,
+          projectId: resolvedProjectId,
           workspaceId,
         }),
       );
     },
-    renameWorkspace: ({ repoId, workspaceId, name }) => {
+    renameWorkspace: ({ projectId, repoId, workspaceId, name }) => {
       const normalizedName = name.trim();
-      if (!repoId || !workspaceId || !normalizedName) {
+      const resolvedProjectId = resolveProjectId({ projectId, repoId });
+      if (!resolvedProjectId || !workspaceId || !normalizedName) {
         return;
       }
 
       set((state) => ({
         ...buildRenamedWorkspaceState(state, {
-          repoId,
+          projectId: resolvedProjectId,
           workspaceId,
           normalizedName,
         }),
       }));
     },
-    renameWorkspaceBranch: ({ repoId, workspaceId, branch }) => {
+    renameWorkspaceBranch: ({ projectId, repoId, workspaceId, branch }) => {
       const normalizedBranch = branch.trim();
-      if (!repoId || !workspaceId || !normalizedBranch) {
+      const resolvedProjectId = resolveProjectId({ projectId, repoId });
+      if (!resolvedProjectId || !workspaceId || !normalizedBranch) {
         return;
       }
 
       set((state) => ({
         ...buildRenamedWorkspaceBranchState(state, {
-          repoId,
+          projectId: resolvedProjectId,
           workspaceId,
           normalizedBranch,
         }),

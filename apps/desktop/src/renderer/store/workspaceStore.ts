@@ -16,14 +16,17 @@ export type {
 export const workspaceStore = create<WorkspaceStoreState>()(
   persist(
     (set, get) => ({
+      projects: initialWorkspaceState.projects,
       repos: initialWorkspaceState.repos,
       workspaces: initialWorkspaceState.workspaces,
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       gitRefreshVersionByWorktreePath: {},
       fileTreeChangedRelativePathsByWorktreePath: {},
+      selectedProjectId: initialWorkspaceState.selectedProjectId,
       selectedRepoId: initialWorkspaceState.selectedRepoId,
       selectedWorkspaceId: initialWorkspaceState.selectedWorkspaceId,
+      displayProjectIds: [],
       displayRepoIds: [],
       lastUsedExternalAppId: undefined,
       fileTreeRefreshVersion: 0,

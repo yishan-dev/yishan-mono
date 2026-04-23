@@ -18,7 +18,8 @@ import { workspaceStore } from "../store/workspaceStore";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 type CreateWorkspaceInput = {
-  repoId: string;
+  projectId?: string;
+  repoId?: string;
   name: string;
   sourceBranch?: string;
   targetBranch?: string;
@@ -26,7 +27,7 @@ type CreateWorkspaceInput = {
 
 type BackendWorkspace = {
   id: string;
-  repoId: string;
+  projectId: string;
   name: string;
   sourceBranch: string;
   branch: string;
@@ -35,9 +36,12 @@ type BackendWorkspace = {
 
 type WorkspaceListResponse = Array<{
   id: string;
+  projectId?: string | null;
+  repositoryId?: string | null;
   instance: {
     workspaceId: string;
     repoId: string;
+    projectId?: string;
     name: string;
     sourceBranch: string;
     branch: string;
@@ -51,6 +55,7 @@ type CreateWorkspaceResponse = {
   workspaceInstance: {
     workspaceId: string;
     repoId: string;
+    projectId?: string;
     name: string;
     sourceBranch: string;
     branch: string;
@@ -123,7 +128,10 @@ async function closeWorkspaceInBackground(input: {
   const closed = (await client.workspace.closeExecution.mutate({
     workspaceId: backendWorkspaceId,
     removeBranch: input.removeBranch,
-  })) as CloseWorkspaceResponse;
+  })) as CloseWorkspaceResponse | undefined;
+  if (!closed) {
+    return;
+  }
   notifyLifecycleScriptWarnings(input.workspaceName, closed.lifecycleScriptWarnings);
 }
 
@@ -134,7 +142,8 @@ type WorkspaceStoreFacade = typeof workspaceStore & {
 export const OPEN_CREATE_WORKSPACE_DIALOG_EVENT = "workspace:open-create-workspace-dialog";
 
 type OpenCreateWorkspaceDialogDetail = {
-  repoId: string;
+  projectId: string;
+  repoId?: string;
 };
 
 /** Reads workspace store state for both real Zustand stores and selector-only test doubles. */
@@ -153,25 +162,26 @@ function readWorkspaceStoreState(): WorkspaceStoreState {
 export async function createWorkspace(input: CreateWorkspaceInput): Promise<void> {
   const store = readWorkspaceStoreState();
   const { normalizedName } = normalizeCreateWorkspaceInput(input);
+  const projectId = input.projectId ?? input.repoId ?? "";
 
-  if (!input.repoId || !normalizedName) {
+  if (!projectId || !normalizedName) {
     return;
   }
 
-  const repo = store.repos.find((item) => item.id === input.repoId);
+  const project = store.projects.find((item) => item.id === projectId) ?? store.repos.find((item) => item.id === projectId);
 
   let backendWorkspace: BackendWorkspace | undefined;
 
-  if (repo?.localPath) {
+  if (project?.localPath) {
     const client = await getApiServiceClient();
     try {
       const created = (await client.workspace.create.mutate({
         orgId: "default",
-        repositoryId: input.repoId,
+        repositoryId: projectId,
         workspaceName: normalizedName,
         sourceBranch: input.sourceBranch?.trim() || undefined,
         targetBranch: input.targetBranch?.trim() || undefined,
-        workspaceWorktreePath: repo.worktreePath,
+        workspaceWorktreePath: project.worktreePath,
       })) as CreateWorkspaceResponse;
       notifyLifecycleScriptWarnings(normalizedName, created.lifecycleScriptWarnings);
 
@@ -179,7 +189,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
       if (linkedWorkspace) {
         backendWorkspace = {
           id: linkedWorkspace.workspaceId,
-          repoId: linkedWorkspace.repoId,
+          projectId: linkedWorkspace.projectId ?? linkedWorkspace.repoId,
           name: linkedWorkspace.name,
           sourceBranch: linkedWorkspace.sourceBranch,
           branch: linkedWorkspace.branch,
@@ -196,7 +206,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
   }
 
   store.addWorkspace({
-    repoId: backendWorkspace.repoId,
+    repoId: backendWorkspace.projectId,
     name: backendWorkspace.name,
     sourceBranch: backendWorkspace.sourceBranch,
     branch: backendWorkspace.branch,
@@ -217,7 +227,7 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
   }
 
   store.deleteWorkspace({
-    repoId: workspace.repoId,
+    repoId: workspace.projectId ?? workspace.repoId,
     workspaceId,
   });
   syncTabStoreWithWorkspace(previousWorkspaces);
@@ -294,27 +304,30 @@ export function activateWorkspacePane(pane: "repo" | WorkspaceRightPaneTab) {
   workspacePaneStore.getState().setRightPaneTab(pane);
 }
 
-/** Requests opening the create-workspace dialog for the currently selected repository context. */
+/** Requests opening the create-workspace dialog for the currently selected project context. */
 export function openCreateWorkspaceDialog() {
   if (typeof window === "undefined") {
     return;
   }
 
   const state = readWorkspaceStoreState();
-  const selectedRepoId = state.selectedRepoId.trim();
-  const selectedWorkspaceRepoId = state.workspaces.find(
+  const selectedProjectId = state.selectedProjectId.trim() || state.selectedRepoId.trim();
+  const selectedWorkspaceProjectId = state.workspaces.find(
     (workspace) => workspace.id === state.selectedWorkspaceId,
-  )?.repoId;
-  const fallbackRepoId = state.repos.find((repo) => state.displayRepoIds.includes(repo.id))?.id;
-  const repoId = selectedRepoId || selectedWorkspaceRepoId || fallbackRepoId;
+  )?.projectId;
+  const selectedWorkspaceRepoId = state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.repoId;
+  const fallbackProjectId =
+    (state.projects ?? state.repos).find((project) => (state.displayProjectIds ?? state.displayRepoIds).includes(project.id))
+      ?.id;
+  const projectId = selectedProjectId || selectedWorkspaceProjectId || selectedWorkspaceRepoId || fallbackProjectId;
 
-  if (!repoId) {
+  if (!projectId) {
     return;
   }
 
   window.dispatchEvent(
     new CustomEvent<OpenCreateWorkspaceDialogDetail>(OPEN_CREATE_WORKSPACE_DIALOG_EVENT, {
-      detail: { repoId },
+      detail: { projectId, repoId: projectId },
     }),
   );
 }
@@ -372,20 +385,44 @@ export function undoFileTreeOperation() {
 }
 
 /** Renames one workspace in renderer store state. */
-export function renameWorkspace(input: { repoId: string; workspaceId: string; name: string }) {
-  readWorkspaceStoreState().renameWorkspace(input);
+export function renameWorkspace(input: { projectId?: string; repoId?: string; workspaceId: string; name: string }) {
+  const projectId = input.projectId ?? input.repoId ?? "";
+  if (!projectId) {
+    return;
+  }
+
+  if (input.projectId) {
+    readWorkspaceStoreState().renameWorkspace({
+      ...input,
+      projectId,
+      repoId: projectId,
+    });
+    return;
+  }
+
+  readWorkspaceStoreState().renameWorkspace({
+    repoId: projectId,
+    workspaceId: input.workspaceId,
+    name: input.name,
+  });
 }
 
 /** Renames one managed workspace branch in git and mirrors the new branch in renderer store state. */
-export async function renameWorkspaceBranch(input: { repoId: string; workspaceId: string; branch: string }) {
+export async function renameWorkspaceBranch(input: {
+  projectId?: string;
+  repoId?: string;
+  workspaceId: string;
+  branch: string;
+}) {
   const normalizedBranch = input.branch.trim();
-  if (!input.repoId || !input.workspaceId || !normalizedBranch) {
+  const projectId = input.projectId ?? input.repoId ?? "";
+  if (!projectId || !input.workspaceId || !normalizedBranch) {
     return;
   }
 
   const store = readWorkspaceStoreState();
   const workspace = store.workspaces.find(
-    (item) => item.id === input.workspaceId && item.repoId === input.repoId && item.kind !== "local",
+    (item) => item.id === input.workspaceId && (item.projectId ?? item.repoId) === projectId && item.kind !== "local",
   );
   if (!workspace) {
     return;
@@ -403,7 +440,7 @@ export async function renameWorkspaceBranch(input: { repoId: string; workspaceId
       nextBranch: normalizedBranch,
     });
     store.renameWorkspaceBranch({
-      repoId: input.repoId,
+      repoId: projectId,
       workspaceId: input.workspaceId,
       branch: normalizedBranch,
     });

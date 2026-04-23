@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { chatStore } from "../store/chatStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
-import { createRepo, deleteRepo, loadWorkspaceFromBackend, updateRepoConfig } from "./repoCommands";
+import { createRepo, deleteRepo, loadWorkspaceFromBackend, updateRepoConfig } from "./projectCommands";
 
 const rpcMocks = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
@@ -46,7 +46,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("repoCommands", () => {
+describe("projectCommands", () => {
   it("loads backend snapshot and hydrates store", async () => {
     const hydrate = vi.fn();
     const retainWorkspaceTabs = vi.fn().mockReturnValue([]);

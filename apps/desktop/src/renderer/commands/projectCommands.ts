@@ -1,32 +1,40 @@
-import { readPersistedDisplayRepoIds } from "../helpers/repoHelpers";
+import { readPersistedDisplayRepoIds } from "../helpers/projectHelpers";
 import { getApiServiceClient } from "../rpc/rpcTransport";
 import { workspaceStore } from "../store/workspaceStore";
-import type { RepoSnapshot } from "../types/repoTypes";
+import type { RepoSnapshot } from "../types/projectTypes";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 /**
  * Maps api-service repository and workspace rows into the legacy snapshot shape used by workspace store hydration.
  */
 function mapBackendSnapshotToStore(
-  repositoriesList: Array<{
+  projectsList: Array<{
     id: string;
-    key: string;
-    localPath: string | null;
-    worktreePath: string | null;
-    contextEnabled: boolean;
+    key?: string | null;
+    name?: string | null;
+    localPath?: string | null;
+    worktreePath?: string | null;
+    contextEnabled?: boolean;
     icon: string | null;
     color: string | null;
-    defaultBranch: string | null;
+    defaultBranch?: string | null;
     setupScript: string | null;
     postScript: string | null;
-    gitUrl: string | null;
+    gitUrl?: string | null;
+    repoUrl?: string | null;
+    repoKey?: string | null;
   }>,
   workspacesList: Array<{
     id: string;
-    repositoryId: string | null;
+    repositoryId?: string | null;
+    projectId?: string | null;
+    branch?: string | null;
+    localPath?: string | null;
+    status?: string | null;
     instance: {
       workspaceId: string;
       repoId: string;
+      projectId?: string;
       name: string;
       sourceBranch: string;
       branch: string;
@@ -53,32 +61,33 @@ function mapBackendSnapshotToStore(
   >();
   const workspaces: RepoSnapshot["workspaces"] = [];
 
-  for (const repository of repositoriesList) {
-    repoById.set(repository.id, {
-      id: repository.id,
-      key: repository.key,
-      localPath: repository.localPath ?? "",
-      gitUrl: repository.gitUrl ?? "",
-      worktreePath: repository.worktreePath ?? repository.localPath ?? "",
-      privateContextEnabled: repository.contextEnabled,
-      defaultBranch: repository.defaultBranch ?? "main",
-      icon: repository.icon ?? "folder",
-      color: repository.color ?? "#1E66F5",
-      setupScript: repository.setupScript ?? "",
-      postScript: repository.postScript ?? "",
+  for (const project of projectsList) {
+    repoById.set(project.id, {
+      id: project.id,
+      key: project.key ?? project.repoKey ?? project.id,
+      ...(project.name ? { name: project.name } : {}),
+      localPath: project.localPath ?? "",
+      gitUrl: project.gitUrl ?? project.repoUrl ?? "",
+      worktreePath: project.worktreePath ?? project.localPath ?? "",
+      privateContextEnabled: project.contextEnabled ?? true,
+      defaultBranch: project.defaultBranch ?? "main",
+      icon: project.icon ?? "folder",
+      color: project.color ?? "#1E66F5",
+      setupScript: project.setupScript ?? "",
+      postScript: project.postScript ?? "",
     });
   }
 
   for (const item of workspacesList) {
-    const repositoryId = item.instance?.repoId ?? item.repositoryId ?? "";
-    if (!repositoryId) {
+    const parentId = item.instance?.projectId ?? item.instance?.repoId ?? item.projectId ?? item.repositoryId ?? "";
+    if (!parentId) {
       continue;
     }
 
-    if (!repoById.has(repositoryId)) {
-      repoById.set(repositoryId, {
-        id: repositoryId,
-        key: repositoryId,
+    if (!repoById.has(parentId)) {
+      repoById.set(parentId, {
+        id: parentId,
+        key: parentId,
         localPath: item.instance?.worktreePath ?? "",
         gitUrl: "",
         worktreePath: item.instance?.worktreePath ?? "",
@@ -94,14 +103,26 @@ function mapBackendSnapshotToStore(
     if (item.instance) {
       workspaces.push({
         workspaceId: item.instance.workspaceId,
-        repoId: item.instance.repoId,
+        repoId: item.instance.projectId ?? item.instance.repoId,
+        projectId: item.instance.projectId,
         name: item.instance.name,
         sourceBranch: item.instance.sourceBranch,
         branch: item.instance.branch,
         worktreePath: item.instance.worktreePath,
         status: item.instance.status,
       });
+      continue;
     }
+
+    workspaces.push({
+      workspaceId: item.id,
+      repoId: parentId,
+      projectId: item.projectId ?? undefined,
+      sourceBranch: item.branch ?? "main",
+      branch: item.branch ?? "main",
+      worktreePath: item.localPath ?? "",
+      status: item.status ?? "open",
+    });
   }
 
   return {
@@ -207,7 +228,9 @@ export async function updateRepoConfig(
     postScript?: string;
   },
 ): Promise<void> {
-  const repo = workspaceStore.getState().repos.find((item) => item.id === repoId);
+  const repo =
+    workspaceStore.getState().projects.find((item) => item.id === repoId) ??
+    workspaceStore.getState().repos.find((item) => item.id === repoId);
   if (!repo) {
     return;
   }
