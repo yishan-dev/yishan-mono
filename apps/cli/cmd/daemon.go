@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"yishan/apps/cli/internal/daemonctl"
+	"yishan/apps/cli/internal/daemon"
 )
 
 var daemonCmd = &cobra.Command{
@@ -38,12 +38,12 @@ var daemonRestartCmd = &cobra.Command{
 }
 
 func runDaemon(_ *cobra.Command, _ []string) error {
-	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
 	if err != nil {
 		return err
 	}
 
-	return daemonctl.Run(daemonctl.RunConfig{
+	return daemon.Run(daemon.RunConfig{
 		Host:        appConfig.Daemon.Host,
 		Port:        appConfig.Daemon.Port,
 		JWTSecret:   appConfig.Daemon.JWTSecret,
@@ -54,14 +54,14 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 }
 
 func stopDaemon(_ *cobra.Command, _ []string) error {
-	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
 	if err != nil {
 		return err
 	}
 
-	state, err := daemonctl.Stop(statePath, 10*time.Second)
+	state, err := daemon.Stop(statePath, 10*time.Second)
 	if err != nil {
-		if errors.Is(err, daemonctl.ErrNotRunning) {
+		if errors.Is(err, daemon.ErrNotRunning) {
 			return errors.New("daemon is not running")
 		}
 		return err
@@ -73,14 +73,14 @@ func stopDaemon(_ *cobra.Command, _ []string) error {
 }
 
 func restartDaemon(_ *cobra.Command, _ []string) error {
-	statePath, err := daemonctl.ResolveStateFilePath(appConfig.ConfigPath)
+	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
 	if err != nil {
 		return err
 	}
 
-	state, err := daemonctl.Restart(
-		daemonctl.StartConfig{
-			Run: daemonctl.RunConfig{
+	state, err := daemon.Restart(
+		daemon.StartConfig{
+			Run: daemon.RunConfig{
 				Host:        appConfig.Daemon.Host,
 				Port:        appConfig.Daemon.Port,
 				JWTSecret:   appConfig.Daemon.JWTSecret,

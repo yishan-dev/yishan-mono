@@ -22,7 +22,7 @@ Run daemon mode:
 go run . daemon --host 127.0.0.1 --port 0 --jwt-secret dev-secret
 ```
 
-Use `--port 0` to allocate a random free port (default). Runtime daemon address is written to `.yishan-daemon.json` next to your config file and used by CLI commands.
+Use `--port 0` to allocate a random free port (default). Runtime daemon address is written to `daemon.state.json` next to your config file and used by CLI commands.
 
 Daemon lifecycle commands:
 

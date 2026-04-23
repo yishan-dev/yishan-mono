@@ -12,6 +12,7 @@ import (
 )
 
 var cfgFile string
+var appConfig config.Config
 
 var rootCmd = &cobra.Command{
 	Use:   "yishan",

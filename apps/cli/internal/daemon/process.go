@@ -1,4 +1,4 @@
-package daemonctl
+package daemon
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"yishan/apps/cli/internal/daemon"
 	"yishan/apps/cli/internal/workspace"
 )
 
@@ -68,8 +67,8 @@ func Run(cfg RunConfig, statePath string) error {
 	actualAddr := net.JoinHostPort(cfg.Host, strconv.Itoa(tcpAddr.Port))
 
 	workspaceManager := workspace.NewManager()
-	handler := daemon.NewJSONRPCHandler(workspaceManager)
-	auth := daemon.NewJWTAuth(daemon.JWTAuthConfig{
+	handler := NewJSONRPCHandler(workspaceManager)
+	auth := NewJWTAuth(JWTAuthConfig{
 		Secret:   cfg.JWTSecret,
 		Issuer:   cfg.JWTIssuer,
 		Audience: cfg.JWTAudience,

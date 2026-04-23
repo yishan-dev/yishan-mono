@@ -1,4 +1,4 @@
-package daemonctl
+package daemon
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const StateFileName = ".yishan-daemon.json"
+const StateFileName = "daemon.state.json"
 
 type RuntimeState struct {
 	PID       int       `json:"pid"`
