@@ -1,0 +1,41 @@
+import type { AgentKind } from "@yishan/agent-runtime";
+import { getApiServiceClient, getDesktopHostBridge } from "../rpc/rpcTransport";
+
+/** Opens one native folder picker and returns a selected directory path when available. */
+export async function openLocalFolderDialog(startingFolder?: string) {
+  return await getDesktopHostBridge().openLocalFolderDialog({ startingFolder });
+}
+
+/** Reads default workspace worktree location from backend app settings. */
+export async function getDefaultWorktreeLocation() {
+  const client = await getApiServiceClient();
+  const response = await client.app.getDefaultWorktreeLocation.query(undefined);
+  return response.worktreePath;
+}
+
+/** Checks whether one agent global config grants external directory access. */
+export async function checkAgentGlobalConfigExternalDirectoryPermission(params?: { agentKind?: AgentKind }) {
+  const client = await getApiServiceClient();
+  return client.app.checkAgentGlobalConfigExternalDirectoryPermission.query(params ?? {});
+}
+
+/** Ensures one agent global config grants external directory access. */
+export async function ensureAgentGlobalConfigExternalDirectoryPermission(params?: { agentKind?: AgentKind }) {
+  const client = await getApiServiceClient();
+  return client.app.ensureAgentGlobalConfigExternalDirectoryPermission.mutate(params ?? {});
+}
+
+/** Toggles the main desktop window maximized state. */
+export async function toggleMainWindowMaximized() {
+  return await getDesktopHostBridge().toggleMainWindowMaximized();
+}
+
+/** Returns whether the main desktop window currently runs in fullscreen mode. */
+export async function getMainWindowFullscreenState() {
+  return await getDesktopHostBridge().getMainWindowFullscreenState();
+}
+
+/** Opens one URL through the Electron main-process host bridge. */
+export async function openExternalUrl(url: string) {
+  return await getDesktopHostBridge().openExternalUrl({ url });
+}

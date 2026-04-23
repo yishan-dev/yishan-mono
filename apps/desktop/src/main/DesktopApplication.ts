@@ -10,10 +10,10 @@ export class DesktopApplication {
   /**
    * Starts the desktop app and exits on startup failure.
    */
-  static run(): void {
+  static run() {
     const desktopApplication = new DesktopApplication();
 
-    void desktopApplication.start().catch((error: unknown) => {
+    desktopApplication.start().catch((error: unknown) => {
       console.error("Failed to start desktop application", error);
       app.exit(1);
     });
@@ -42,12 +42,13 @@ export class DesktopApplication {
   /**
    * Creates and initializes the main BrowserWindow instance.
    */
-  private createMainWindow(): void {
+  private createMainWindow() {
     const mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       minWidth: 900,
       minHeight: 600,
+      titleBarStyle: "hiddenInset",
       webPreferences: {
         preload: join(__dirname, "preload.js"),
         contextIsolation: true,

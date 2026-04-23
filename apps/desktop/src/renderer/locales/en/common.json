@@ -1,6 +1,483 @@
 {
   "app": {
-    "title": "Yishan",
-    "subtitle": "Legacy-style Electron app scaffold is running with React."
+    "title": "Yishan"
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "searchPlaceholder": "Search settings...",
+    "searchNoResults": "No matching settings.",
+    "sections": {
+      "personal": "Personal",
+      "git": "Git"
+    },
+    "items": {
+      "account": "Account",
+      "agents": "Agents",
+      "appearance": "Appearance",
+      "notifications": "Notifications",
+      "terminal": "Terminal",
+      "workspace": "Workspace"
+    },
+    "git": {
+      "workspace": {
+        "title": "Workspace branch naming",
+        "description": "Configure one global branch naming rule for workspace creation.",
+        "prefixModeLabel": "Branch prefix",
+        "prefix": {
+          "none": "No prefix",
+          "user": "Git author",
+          "custom": "Custom"
+        },
+        "customPrefixLabel": "Custom prefix",
+        "previewLabel": "Preview"
+      }
+    },
+    "agents": {
+      "title": "Agents",
+      "description": "Manage which agents are available in tab creation and verify local CLI detection.",
+      "loadError": "Failed to load agent detection statuses.",
+      "inUse": "In use",
+      "actions": {
+        "recheckAll": "Recheck All"
+      },
+      "status": {
+        "checking": "Checking...",
+        "detected": "Detected",
+        "notDetected": "Not detected"
+      },
+      "items": {
+        "opencode": "OpenCode",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    },
+    "appearance": {
+      "theme": {
+        "title": "Theme",
+        "description": "Choose how Yishan looks across the app.",
+        "options": {
+          "light": "Light",
+          "dark": "Dark",
+          "system": "System theme"
+        }
+      }
+    },
+    "terminal": {
+      "title": "Terminal sessions",
+      "description": "Review all running terminals and stop sessions from one place.",
+      "loadError": "Failed to load terminal sessions.",
+      "empty": "No terminal sessions found.",
+      "noRunningSessions": "No running sessions right now.",
+      "columns": {
+        "session": "Session",
+        "workspace": "Workspace",
+        "repo": "Repository",
+        "pid": "PID",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "unknownWorkspace": "Unknown workspace",
+      "unknownRepo": "Unknown repository",
+      "status": {
+        "running": "Running",
+        "exited": "Exited"
+      },
+      "actions": {
+        "kill": "Kill",
+        "killing": "Killing..."
+      }
+    },
+    "comingSoon": "This settings page is coming soon."
+  },
+  "org": {
+    "menu": {
+      "trigger": "Org",
+      "settings": "Settings",
+      "documentation": "Documentation",
+      "shortcutMap": "Shortcut map",
+      "contactUs": "Contact us",
+      "search": {
+        "repo": "Search repositories",
+        "workspace": "Search workspaces"
+      },
+      "theme": {
+        "groupAria": "Theme preference",
+        "system": "System theme",
+        "light": "Light theme",
+        "dark": "Dark theme",
+        "systemAria": "Use system theme",
+        "lightAria": "Use light theme",
+        "darkAria": "Use dark theme"
+      }
+    },
+    "settings": {
+      "title": "Organization settings",
+      "notifications": {
+        "title": "Notifications",
+        "subtitle": "Manage notifications and in-app sound behavior.",
+        "enabled": "Enable notifications",
+        "osEnabled": "Enable OS notifications",
+        "general": {
+          "title": "General",
+          "hint": "Manage notification preview and focus behavior."
+        },
+        "sound": {
+          "title": "Sound",
+          "hint": "Configure sound playback and per-event sound choices."
+        },
+        "soundEnabled": "Play notification sound",
+        "soundSelection": "sound",
+        "sounds": {
+          "chime": "Ding-dong",
+          "ping": "Three-note",
+          "pop": "Piano",
+          "zip": "Zip",
+          "alert": "Bleep descending"
+        },
+        "volume": "Notification volume",
+        "focusOnClick": "Focus app when notification is clicked",
+        "runTypes": {
+          "title": "Run types",
+          "hint": "Choose which run categories can trigger completion notifications.",
+          "items": {
+            "ai-task": "AI tasks"
+          }
+        },
+        "events": {
+          "title": "Trigger events",
+          "hint": "Choose which events can trigger notifications.",
+          "runFinished": "Run finished",
+          "runFailed": "Run failed"
+        },
+        "errors": {
+          "loadFailed": "Failed to load notification settings.",
+          "saveFailed": "Failed to save notification settings.",
+          "previewFailed": "Failed to preview notification.",
+          "previewSoundFailed": "Failed to preview notification sound."
+        },
+        "preview": {
+          "button": "Show Notification Example",
+          "soundButton": "Preview Sound",
+          "status": {
+            "inProgress": "Sending notification preview",
+            "success": "Notification preview sent",
+            "failed": "Notification preview failed"
+          }
+        },
+        "searchKeywords": {
+          "enabled": "notifications mute disable notification",
+          "osEnabled": "os notification system notification notification center banner",
+          "focusOnClick": "focus app click notification bring to front open app",
+          "soundEnabled": "sound mute sound play sound",
+          "volume": "volume notification volume sound level",
+          "soundRunFinished": "sound run finished sound success sound",
+          "soundRunFailed": "sound run failed sound failure sound",
+          "runTypeAiTask": "run type ai task ai",
+          "eventRunFinished": "trigger event event filter run finished",
+          "eventRunFailed": "trigger event event filter run failed"
+        },
+        "saved": "Notification settings saved."
+      }
+    },
+    "defaultWorkspaceName": "Default organization"
+  },
+  "workspace": {
+    "panelTitle": "Organization",
+    "dashboardTitle": "Workspace Dashboard",
+    "notifications": {
+      "title": "Notifications",
+      "empty": "No recent notifications.",
+      "unreadIndicator": "Unread notification",
+      "runningIndicator": "Task running",
+      "waitingInputIndicator": "Waiting for your input",
+      "doneIndicator": "Task completed",
+      "failedIndicator": "Task failed"
+    },
+    "actions": {
+      "create": "Create workspace",
+      "add": "Add workspace",
+      "rename": "Rename",
+      "openInFinder": "Open Workspace in Finder",
+      "openInExplorer": "Open Workspace in Explorer",
+      "openInExternalAppQuick": "Open Workspace in {{app}}",
+      "openInExternalApp": "Open Workspace in...",
+      "delete": "Close workspace",
+      "close": "Close"
+    },
+    "title": "Workspace title",
+    "column": "Workspace",
+    "emptySelection": "No workspace selected.",
+    "create": {
+      "title": "New workspace",
+      "nameLabel": "Workspace name",
+      "branchLabel": "Branch name",
+      "namePlaceholder": "Workspace name",
+      "branchNameLabel": "Branch name (optional)"
+    },
+    "rename": {
+      "title": "Rename workspace",
+      "branchNameLabel": "Branch name"
+    },
+    "delete": {
+      "confirm": "Close workspace '{{name}}'?",
+      "removeBranch": "Also remove workspace branch"
+    },
+    "info": {
+      "branch": "Branch",
+      "sourceBranch": "Source",
+      "path": "Path",
+      "unavailable": "Unavailable"
+    }
+  },
+  "repo": {
+    "list": {
+      "title": "Repositories",
+      "workspaces": "Projects",
+      "globalWorkspaces": "Global workspaces"
+    },
+    "form": {
+      "name": "Repository name",
+      "key": "Repository key",
+      "keyHelp": "Used in workspace folder paths. Allowed: a-z, 0-9, -",
+      "keyInvalid": "Use only lowercase letters, numbers, and '-'.",
+      "path": "Repository path",
+      "newPath": "New repository path",
+      "source": {
+        "label": "Source",
+        "local": "Local",
+        "remote": "Remote"
+      },
+      "gitUrl": "Git URL",
+      "chooseFolder": "Choose folder",
+      "create": "Create"
+    },
+    "actions": {
+      "addRepository": "Add repository",
+      "filter": "Filter",
+      "config": "Config",
+      "collapse": "Collapse repository",
+      "expand": "Expand repository",
+      "delete": "Delete repository",
+      "register": "Register repository"
+    },
+    "delete": {
+      "confirm": "Delete repository '{{name}}' and all child workspaces?"
+    },
+    "filter": {
+      "placeholder": "Filter by repository, path, workspace, or branch",
+      "clear": "Clear repository filter",
+      "empty": "No repositories match the current filter.",
+      "searchPlaceholder": "Quick search repositories",
+      "searchAriaLabel": "Quick search repositories",
+      "actions": {
+        "all": "All",
+        "clear": "Clear"
+      }
+    },
+    "registered": "Registered repositories",
+    "selected": "Selected repository",
+    "unknown": "Unknown repository",
+    "missing": "Path unavailable",
+    "missingHint": "Repository path is unavailable. Re-link to continue workspace actions.",
+    "relink": "Re-link"
+  },
+  "layout": {
+    "sidebarTitle": "Sidebar",
+    "fileExplorerTitle": "File explorer",
+    "toggleSidebar": "Sidebar",
+    "toggleLeftSidebar": "Toggle left sidebar",
+    "toggleRightSidebar": "Toggle right sidebar",
+    "toggleWithShortcut": "{{label}} ({{shortcut}})",
+    "resize": {
+      "left": "Resize left sidebar",
+      "right": "Resize right sidebar"
+    },
+    "shortcuts": "Shortcuts: Ctrl/Cmd+B toggles left sidebar, Ctrl/Cmd+L toggles right sidebar.",
+    "rightTabs": {
+      "details": "Details",
+      "integrations": "Integrations"
+    },
+    "unavailable": "Unavailable"
+  },
+  "nativeMenu": {
+    "deleteSelectedFile": "Delete Selected File"
+  },
+  "files": {
+    "files": "Files",
+    "all": "All files",
+    "changes": "Changes {{count}}",
+    "checks": "Checks",
+    "actions": {
+      "createFile": "Create File",
+      "createFolder": "Create Folder",
+      "rename": "Rename",
+      "delete": "Delete",
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "copyPath": "Copy Path",
+      "copyRelativePath": "Copy Relative Path",
+      "openInFinder": "Open in Finder",
+      "openInExplorer": "Open in Explorer",
+      "openInExternalAppQuick": "Open in {{app}}",
+      "openInExternalApp": "Open in...",
+      "refresh": "Refresh"
+    },
+    "createFile": {
+      "prompt": "New file name"
+    },
+    "createFolder": {
+      "prompt": "New folder name"
+    },
+    "delete": {
+      "confirmFile": "Delete file '{{path}}'?",
+      "confirmDirectory": "Delete folder '{{path}}' and all contents?"
+    },
+    "search": {
+      "title": "Search files",
+      "inputPlaceholder": "Search files",
+      "placeholder": "Search files...",
+      "empty": "No matching files."
+    },
+    "git": {
+      "unstaged": "Unstaged",
+      "staged": "Staged",
+      "untracked": "Untracked",
+      "commitPlaceholder": "Enter commit message",
+      "commitTracked": "Commit Tracked",
+      "commit": "Commit",
+      "push": "Push",
+      "publishBranch": "Publish Branch",
+      "commitOptions": "Commit options",
+      "amend": "Amend",
+      "amendShortcut": "⌘↩",
+      "signoff": "Signoff",
+      "targetBranch": "Target branch",
+      "changeScope": "Change scope",
+      "commitListTitle": "Commits to {{targetBranch}}",
+      "commitListCompare": "{{currentBranch}} -> {{targetBranch}}"
+    },
+    "operations": {
+      "failed": "File operation failed.",
+      "modes": {
+        "copy": "Copying",
+        "move": "Moving",
+        "import": "Importing"
+      },
+      "progress": "{{mode}} {{processed}} / {{total}}",
+      "progressWithPath": "{{mode}} {{processed}} / {{total}} · {{path}}"
+    }
+  },
+  "terminal": {
+    "title": "Terminal",
+    "resourceUsage": {
+      "summary": "CPU: {{cpu}} · MEM: {{memory}}",
+      "leftPaneSummary": "MEM: {{memory}}",
+      "toggleLabel": "Show resource usage",
+      "empty": "No active subprocesses",
+      "columns": {
+        "repo": "Repo",
+        "process": "Process",
+        "pid": "PID",
+        "cpu": "CPU",
+        "memory": "Memory"
+      }
+    },
+    "ports": {
+      "summary": "{{count}} ports",
+      "toggleLabel": "Show detected ports",
+      "columns": {
+        "addressPort": "Address:Port",
+        "pid": "PID",
+        "processName": "Process"
+      }
+    }
+  },
+  "tabs": {
+    "untitled": "Untitled",
+    "new": "New tab",
+    "createMenu": {
+      "label": "Create",
+      "chat": "Chat",
+      "opencode": "OpenCode",
+      "codex": "Codex",
+      "claude": "Claude"
+    },
+    "renameA11y": "Rename tab",
+    "actions": {
+      "rename": "Rename",
+      "pin": "Pin Tab",
+      "unpin": "Unpin Tab",
+      "close": "Close",
+      "closeOthers": "Close Others",
+      "closeAll": "Close All"
+    }
+  },
+  "chat": {
+    "newPrompt": "New chat in {{agent}}. Add chat summaries:",
+    "defaultSummary": "Discuss 123123",
+    "composerPlaceholder": "Ask to make changes, @mention files, run /commands",
+    "modelQuality": {
+      "medium": "Medium"
+    }
+  },
+  "launch": {
+    "title": "No tabs open",
+    "hint": "Choose an action to get started.",
+    "actions": {
+      "openTerminal": "Open terminal",
+      "openChat": "Open chat",
+      "searchFiles": "Search files"
+    }
+  },
+  "composer": {
+    "placeholder": "Type a message...",
+    "send": "Send"
+  },
+  "keybindings": {
+    "title": "Keyboard shortcuts",
+    "subtitle": "All supported key bindings in the desktop workspace.",
+    "back": "Back to workspace",
+    "columns": {
+      "action": "Action",
+      "current": "Shortcut",
+      "mac": "macOS",
+      "windows": "Windows/Linux"
+    },
+    "scope": {
+      "global": "Global",
+      "workspace": "Workspace"
+    },
+    "actions": {
+      "openKeybindings": "Open keyboard shortcuts",
+      "backToWorkspace": "Return to organization view from shortcuts",
+      "newTab": "Create a new chat tab",
+      "createWorkspace": "Create a new workspace",
+      "closeTab": "Close selected tab",
+      "closeWorkspace": "Close selected workspace",
+      "openTerminal": "Open terminal tab",
+      "activateRepoPane": "Activate repository pane",
+      "activateFilesPane": "Activate files pane",
+      "activateChangesPane": "Activate changes pane",
+      "toggleLeftPane": "Toggle left sidebar",
+      "toggleRightPane": "Toggle right sidebar",
+      "openFileSearch": "Open file search",
+      "deleteSelectedFileTreeEntry": "Delete selected file tree entry",
+      "undoFileTreeOperation": "Undo last file tree operation",
+      "selectTabByIndex": "Switch to tab by index"
+    }
+  },
+  "routing": {
+    "notFound": {
+      "title": "Route not found",
+      "description": "This page is unavailable. Return to the workspace dashboard to continue.",
+      "backToWorkspace": "Back to workspace"
+    }
+  },
+  "common": {
+    "actions": {
+      "cancel": "Cancel"
+    }
   }
 }

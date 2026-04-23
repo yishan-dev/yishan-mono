@@ -1,0 +1,51 @@
+import type { AppActionPayload } from "./actions";
+
+export type RpcSchema = {
+  toFrontend: {
+    messages: {
+      appAction: AppActionPayload;
+      chatEvent: {
+        workspaceId: string;
+        sessionId: string;
+        event: {
+          type: string;
+          text?: string;
+          message?: string;
+          code?: string;
+          exitCode?: number;
+          [key: string]: unknown;
+        };
+      };
+      notificationEvent: {
+        id: string;
+        title: string;
+        body?: string;
+        tone: "success" | "error";
+        createdAt: string;
+        workspaceId?: string;
+        sessionId?: string;
+        navigationPath?: string;
+        silent?: boolean;
+        showSystemNotification?: boolean;
+        soundToPlay?: {
+          soundId: "chime" | "ping" | "pop" | "zip" | "alert";
+          volume: number;
+        };
+        observerStatus?: {
+          normalizedEventType: "start" | "wait_input" | "stop" | "unknown";
+          sessionKey: string;
+        };
+      };
+      gitChanged: {
+        workspaceWorktreePath: string;
+      };
+      workspaceFilesChanged: {
+        workspaceWorktreePath: string;
+        changedRelativePaths?: string[];
+      };
+    };
+  };
+};
+
+export type RpcFrontendMessageKey = keyof RpcSchema["toFrontend"]["messages"];
+export type RpcFrontendMessagePayload<Key extends RpcFrontendMessageKey> = RpcSchema["toFrontend"]["messages"][Key];

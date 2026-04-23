@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
 import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../helpers/agentSettings";
-import { getRendererPlatform } from "../mod/platform";
+import { getRendererPlatform } from "../helpers/platform";
 import { getShortcutDisplayLabelById } from "../shortcuts/shortcutDisplay";
 import { AgentIcon } from "./AgentIcon";
 

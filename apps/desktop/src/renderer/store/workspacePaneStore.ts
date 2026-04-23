@@ -1,0 +1,24 @@
+import { create } from "zustand";
+
+export type WorkspaceRightPaneTab = "files" | "changes";
+
+type WorkspacePaneStoreState = {
+  rightPaneTab: WorkspaceRightPaneTab;
+  fileSearchRequestKey: number;
+  setRightPaneTab: (tab: WorkspaceRightPaneTab) => void;
+  requestFileSearch: () => void;
+};
+
+/** Stores workspace pane UI state shared between shortcuts, commands, and pane views. */
+export const workspacePaneStore = create<WorkspacePaneStoreState>((set) => ({
+  rightPaneTab: "files",
+  fileSearchRequestKey: 0,
+  setRightPaneTab: (rightPaneTab) => {
+    set({ rightPaneTab });
+  },
+  requestFileSearch: () => {
+    set((state) => ({
+      fileSearchRequestKey: state.fileSearchRequestKey + 1,
+    }));
+  },
+}));

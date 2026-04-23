@@ -1,31 +1,41 @@
 :root {
-  color-scheme: light;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  line-height: 1.5;
+  font-family: "Manrope", "SF Pro Text", "Segoe UI", sans-serif;
 }
 
-body {
+html,
+body,
+#root {
   margin: 0;
-  min-height: 100vh;
-  background: radial-gradient(circle at top, #f6fbff, #edf3f8 60%, #e5ebf1);
-  color: #1b2635;
+  padding: 0;
+  min-height: 100%;
+  height: 100%;
+  overscroll-behavior: none;
 }
 
-.container {
-  display: grid;
-  gap: 0.5rem;
-  place-content: center;
-  min-height: 100vh;
-  text-align: center;
+html[data-app-theme-mode="dark"],
+html[data-app-theme-mode="dark"] body {
+  background-color: #23262e;
+  color: #d2d6de;
 }
 
-h1 {
-  margin: 0;
-  font-size: 2rem;
-  letter-spacing: 0.02em;
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[data-selected],
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[data-selected][data-focused],
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[aria-selected="true"] {
+  background-color: #363d4a !important;
+  background-image: none !important;
 }
 
-p {
-  margin: 0;
-  color: #4b596b;
+.electron-webkit-app-region-drag {
+  -webkit-app-region: drag;
+}
+
+.electron-webkit-app-region-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[data-selected]:hover,
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[data-focused]:hover,
+html[data-app-theme-mode="dark"] .MuiTreeItem-content[aria-selected="true"]:hover {
+  background-color: #313745 !important;
+  background-image: none !important;
 }

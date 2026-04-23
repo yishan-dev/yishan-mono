@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+
+import { describe, expect, it, vi } from "vitest";
+import {
+  checkAgentGlobalConfigExternalDirectoryPermission,
+  ensureAgentGlobalConfigExternalDirectoryPermission,
+  getDefaultWorktreeLocation,
+  getMainWindowFullscreenState,
+  openExternalUrl,
+  openLocalFolderDialog,
+  toggleMainWindowMaximized,
+} from "./appCommands";
+
+const mocks = vi.hoisted(() => ({
+  checkAgentGlobalConfigExternalDirectoryPermission: vi.fn(),
+  ensureAgentGlobalConfigExternalDirectoryPermission: vi.fn(),
+  getDefaultWorktreeLocation: vi.fn(),
+  openLocalFolderDialog: vi.fn(),
+  openExternalUrl: vi.fn(),
+  toggleMainWindowMaximized: vi.fn(),
+  getMainWindowFullscreenState: vi.fn(),
+}));
+
+vi.mock("../rpc/rpcTransport", () => ({
+  getApiServiceClient: vi.fn(async () => ({
+    app: {
+      checkAgentGlobalConfigExternalDirectoryPermission: {
+        query: mocks.checkAgentGlobalConfigExternalDirectoryPermission,
+      },
+      ensureAgentGlobalConfigExternalDirectoryPermission: {
+        mutate: mocks.ensureAgentGlobalConfigExternalDirectoryPermission,
+      },
+      getDefaultWorktreeLocation: {
+        query: mocks.getDefaultWorktreeLocation,
+      },
+      openLocalFolderDialog: {
+        mutate: mocks.openLocalFolderDialog,
+      },
+      toggleMainWindowMaximized: {
+        mutate: mocks.toggleMainWindowMaximized,
+      },
+    },
+  })),
+  getDesktopHostBridge: vi.fn(() => ({
+    openLocalFolderDialog: mocks.openLocalFolderDialog,
+    openExternalUrl: mocks.openExternalUrl,
+    toggleMainWindowMaximized: mocks.toggleMainWindowMaximized,
+    getMainWindowFullscreenState: mocks.getMainWindowFullscreenState,
+  })),
+}));
+
+describe("appCommands", () => {
+  it("delegates shell commands to app shell service", async () => {
+    mocks.getDefaultWorktreeLocation.mockResolvedValueOnce({ worktreePath: "/tmp/worktrees" });
+
+    await openLocalFolderDialog("/tmp");
+    await getDefaultWorktreeLocation();
+    await checkAgentGlobalConfigExternalDirectoryPermission({ agentKind: "opencode" });
+    await ensureAgentGlobalConfigExternalDirectoryPermission({ agentKind: "claude" });
+    await toggleMainWindowMaximized();
+    await getMainWindowFullscreenState();
+    await openExternalUrl("https://vestin.io/docs");
+
+    expect(mocks.openLocalFolderDialog).toHaveBeenCalledWith({ startingFolder: "/tmp" });
+    expect(mocks.getDefaultWorktreeLocation).toHaveBeenCalledWith(undefined);
+    expect(mocks.checkAgentGlobalConfigExternalDirectoryPermission).toHaveBeenCalledWith({ agentKind: "opencode" });
+    expect(mocks.ensureAgentGlobalConfigExternalDirectoryPermission).toHaveBeenCalledWith({ agentKind: "claude" });
+    expect(mocks.toggleMainWindowMaximized).toHaveBeenCalledWith();
+    expect(mocks.getMainWindowFullscreenState).toHaveBeenCalledWith();
+    expect(mocks.openExternalUrl).toHaveBeenCalledWith({ url: "https://vestin.io/docs" });
+  });
+});

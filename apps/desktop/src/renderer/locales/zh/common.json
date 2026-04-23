@@ -1,6 +1,483 @@
 {
   "app": {
-    "title": "Yishan",
-    "subtitle": "基于 React 的传统风格 Electron 应用脚手架已运行。"
+    "title": "Yishan"
+  },
+  "settings": {
+    "title": "设置",
+    "back": "返回",
+    "searchPlaceholder": "搜索设置...",
+    "searchNoResults": "没有匹配的设置项。",
+    "sections": {
+      "personal": "个人",
+      "git": "Git"
+    },
+    "items": {
+      "account": "账号",
+      "agents": "智能体",
+      "appearance": "外观",
+      "notifications": "通知",
+      "terminal": "终端",
+      "workspace": "工作区"
+    },
+    "git": {
+      "workspace": {
+        "title": "工作区分支命名",
+        "description": "为工作区创建配置全局分支命名规则。",
+        "prefixModeLabel": "分支前缀",
+        "prefix": {
+          "none": "无前缀",
+          "user": "Git 作者",
+          "custom": "自定义"
+        },
+        "customPrefixLabel": "自定义前缀",
+        "previewLabel": "预览"
+      }
+    },
+    "agents": {
+      "title": "智能体",
+      "description": "管理哪些智能体显示在新建标签菜单，并检查本地 CLI 检测状态。",
+      "loadError": "加载智能体检测状态失败。",
+      "inUse": "使用中",
+      "actions": {
+        "recheckAll": "全部重新检测"
+      },
+      "status": {
+        "checking": "检测中...",
+        "detected": "已检测",
+        "notDetected": "未检测到"
+      },
+      "items": {
+        "opencode": "OpenCode",
+        "codex": "Codex",
+        "claude": "Claude"
+      }
+    },
+    "appearance": {
+      "theme": {
+        "title": "主题",
+        "description": "选择 Yishan 的界面外观。",
+        "options": {
+          "light": "浅色",
+          "dark": "深色",
+          "system": "系统主题"
+        }
+      }
+    },
+    "terminal": {
+      "title": "终端会话",
+      "description": "在一个位置查看所有运行中的终端并停止会话。",
+      "loadError": "加载终端会话失败。",
+      "empty": "未找到终端会话。",
+      "noRunningSessions": "当前没有运行中的会话。",
+      "columns": {
+        "session": "会话",
+        "workspace": "工作区",
+        "repo": "仓库",
+        "pid": "PID",
+        "status": "状态",
+        "actions": "操作"
+      },
+      "unknownWorkspace": "未知工作区",
+      "unknownRepo": "未知仓库",
+      "status": {
+        "running": "运行中",
+        "exited": "已退出"
+      },
+      "actions": {
+        "kill": "结束",
+        "killing": "结束中..."
+      }
+    },
+    "comingSoon": "该设置项即将上线。"
+  },
+  "org": {
+    "menu": {
+      "trigger": "组织",
+      "settings": "设置",
+      "documentation": "文档",
+      "shortcutMap": "快捷键映射",
+      "contactUs": "联系我们",
+      "search": {
+        "repo": "搜索仓库",
+        "workspace": "搜索工作区"
+      },
+      "theme": {
+        "groupAria": "主题偏好",
+        "system": "系统主题",
+        "light": "浅色主题",
+        "dark": "深色主题",
+        "systemAria": "使用系统主题",
+        "lightAria": "使用浅色主题",
+        "darkAria": "使用深色主题"
+      }
+    },
+    "settings": {
+      "title": "组织设置",
+      "notifications": {
+        "title": "通知",
+        "subtitle": "管理通知与应用内声音行为。",
+        "enabled": "启用通知",
+        "osEnabled": "启用系统通知",
+        "general": {
+          "title": "通用",
+          "hint": "管理通知预览与点击聚焦行为。"
+        },
+        "sound": {
+          "title": "声音",
+          "hint": "配置声音播放与按事件的声音选择。"
+        },
+        "soundEnabled": "播放通知声音",
+        "soundSelection": "声音",
+        "sounds": {
+          "chime": "叮咚",
+          "ping": "三音",
+          "pop": "钢琴",
+          "zip": "Zip",
+          "alert": "下降提示音"
+        },
+        "volume": "通知音量",
+        "focusOnClick": "点击通知时聚焦应用",
+        "runTypes": {
+          "title": "运行类型",
+          "hint": "选择哪些运行类别会触发完成通知。",
+          "items": {
+            "ai-task": "AI 任务"
+          }
+        },
+        "events": {
+          "title": "触发事件",
+          "hint": "选择哪些事件会触发通知。",
+          "runFinished": "运行完成",
+          "runFailed": "运行失败"
+        },
+        "errors": {
+          "loadFailed": "加载通知设置失败。",
+          "saveFailed": "保存通知设置失败。",
+          "previewFailed": "通知预览失败。",
+          "previewSoundFailed": "声音预览失败。"
+        },
+        "preview": {
+          "button": "显示通知示例",
+          "soundButton": "预览声音",
+          "status": {
+            "inProgress": "正在发送通知示例",
+            "success": "通知示例已发送",
+            "failed": "通知示例发送失败"
+          }
+        },
+        "searchKeywords": {
+          "enabled": "通知 关闭通知 静音 notifications mute",
+          "osEnabled": "系统通知 os 通知中心 横幅 notification center banner",
+          "focusOnClick": "点击通知 聚焦应用 前台 打开应用 focus app click notification",
+          "soundEnabled": "声音 播放声音 静音 sound mute",
+          "volume": "音量 通知音量 声音大小 volume",
+          "soundRunFinished": "完成声音 成功声音 run finished success sound",
+          "soundRunFailed": "失败声音 错误声音 run failed failure sound",
+          "runTypeAiTask": "运行类型 ai任务 ai run type",
+          "eventRunFinished": "触发事件 完成事件 run finished",
+          "eventRunFailed": "触发事件 失败事件 run failed"
+        },
+        "saved": "通知设置已保存。"
+      }
+    },
+    "defaultWorkspaceName": "默认组织"
+  },
+  "workspace": {
+    "panelTitle": "组织",
+    "dashboardTitle": "工作区看板",
+    "notifications": {
+      "title": "通知",
+      "empty": "暂无通知。",
+      "unreadIndicator": "未读通知",
+      "runningIndicator": "任务进行中",
+      "waitingInputIndicator": "等待你的输入",
+      "doneIndicator": "任务已完成",
+      "failedIndicator": "任务失败"
+    },
+    "actions": {
+      "create": "创建工作区",
+      "add": "添加工作区",
+      "rename": "重命名",
+      "openInFinder": "在 Finder 中打开工作区",
+      "openInExplorer": "在资源管理器中打开工作区",
+      "openInExternalAppQuick": "在 {{app}} 中打开工作区",
+      "openInExternalApp": "在其他应用中打开工作区...",
+      "delete": "关闭工作区",
+      "close": "关闭"
+    },
+    "title": "工作区标题",
+    "column": "工作区",
+    "emptySelection": "未选择工作区。",
+    "create": {
+      "title": "新建工作区",
+      "nameLabel": "工作区名称",
+      "branchLabel": "分支名称",
+      "namePlaceholder": "工作区名称",
+      "branchNameLabel": "分支名（可选）"
+    },
+    "rename": {
+      "title": "重命名工作区",
+      "branchNameLabel": "分支名称"
+    },
+    "delete": {
+      "confirm": "确认关闭工作区 '{{name}}'？",
+      "removeBranch": "同时删除工作区分支"
+    },
+    "info": {
+      "branch": "分支",
+      "sourceBranch": "来源",
+      "path": "路径",
+      "unavailable": "不可用"
+    }
+  },
+  "repo": {
+    "list": {
+      "title": "仓库",
+      "workspaces": "项目",
+      "globalWorkspaces": "全局工作区"
+    },
+    "form": {
+      "name": "仓库名称",
+      "key": "仓库 Key",
+      "keyHelp": "用于工作区目录路径。允许：a-z、0-9、-",
+      "keyInvalid": "仅允许小写字母、数字和 '-'。",
+      "path": "仓库路径",
+      "newPath": "新的仓库路径",
+      "source": {
+        "label": "来源",
+        "local": "本地",
+        "remote": "远程"
+      },
+      "gitUrl": "Git 地址",
+      "chooseFolder": "选择文件夹",
+      "create": "创建"
+    },
+    "actions": {
+      "addRepository": "添加仓库",
+      "filter": "筛选",
+      "config": "配置",
+      "collapse": "折叠仓库",
+      "expand": "展开仓库",
+      "delete": "删除仓库",
+      "register": "注册仓库"
+    },
+    "delete": {
+      "confirm": "确认删除仓库 '{{name}}' 及其所有子工作区？"
+    },
+    "filter": {
+      "placeholder": "按仓库、路径、工作区或分支筛选",
+      "clear": "清除仓库筛选",
+      "empty": "当前筛选条件下没有匹配的仓库。",
+      "searchPlaceholder": "快速搜索仓库",
+      "searchAriaLabel": "快速搜索仓库",
+      "actions": {
+        "all": "全部",
+        "clear": "清空"
+      }
+    },
+    "registered": "已注册仓库",
+    "selected": "当前仓库",
+    "unknown": "未知仓库",
+    "missing": "路径不可用",
+    "missingHint": "仓库路径不可用，请重新关联后继续工作区操作。",
+    "relink": "重新关联"
+  },
+  "layout": {
+    "sidebarTitle": "侧边栏",
+    "fileExplorerTitle": "文件浏览器",
+    "toggleSidebar": "侧边栏",
+    "toggleLeftSidebar": "切换左侧边栏",
+    "toggleRightSidebar": "切换右侧边栏",
+    "toggleWithShortcut": "{{label}}（{{shortcut}}）",
+    "resize": {
+      "left": "调整左侧边栏",
+      "right": "调整右侧边栏"
+    },
+    "shortcuts": "快捷键：Ctrl/Cmd+B 切换左侧边栏，Ctrl/Cmd+L 切换右侧边栏。",
+    "rightTabs": {
+      "details": "详情",
+      "integrations": "集成"
+    },
+    "unavailable": "不可用"
+  },
+  "nativeMenu": {
+    "deleteSelectedFile": "删除所选文件"
+  },
+  "files": {
+    "files": "文件",
+    "all": "全部文件",
+    "changes": "变更 {{count}}",
+    "checks": "检查",
+    "actions": {
+      "createFile": "创建文件",
+      "createFolder": "创建文件夹",
+      "rename": "重命名",
+      "delete": "删除",
+      "copy": "复制",
+      "cut": "剪切",
+      "paste": "粘贴",
+      "copyPath": "复制路径",
+      "copyRelativePath": "复制相对路径",
+      "openInFinder": "在 Finder 中打开",
+      "openInExplorer": "在资源管理器中打开",
+      "openInExternalAppQuick": "在 {{app}} 中打开",
+      "openInExternalApp": "在其他应用中打开...",
+      "refresh": "刷新"
+    },
+    "createFile": {
+      "prompt": "新文件名"
+    },
+    "createFolder": {
+      "prompt": "新文件夹名"
+    },
+    "delete": {
+      "confirmFile": "删除文件 '{{path}}'？",
+      "confirmDirectory": "删除文件夹 '{{path}}' 及其所有内容？"
+    },
+    "search": {
+      "title": "搜索文件",
+      "inputPlaceholder": "搜索文件",
+      "placeholder": "按文件名或路径搜索",
+      "empty": "没有匹配的文件。"
+    },
+    "git": {
+      "unstaged": "未暂存",
+      "staged": "已暂存",
+      "untracked": "未跟踪",
+      "commitPlaceholder": "输入提交信息",
+      "commitTracked": "提交已跟踪",
+      "commit": "提交",
+      "push": "推送",
+      "publishBranch": "发布分支",
+      "commitOptions": "提交选项",
+      "amend": "修订",
+      "amendShortcut": "⌘↩",
+      "signoff": "签名",
+      "targetBranch": "目标分支",
+      "changeScope": "更改范围",
+      "commitListTitle": "提交到 {{targetBranch}}",
+      "commitListCompare": "{{currentBranch}} -> {{targetBranch}}"
+    },
+    "operations": {
+      "failed": "文件操作失败。",
+      "modes": {
+        "copy": "复制中",
+        "move": "移动中",
+        "import": "导入中"
+      },
+      "progress": "{{mode}} {{processed}} / {{total}}",
+      "progressWithPath": "{{mode}} {{processed}} / {{total}} · {{path}}"
+    }
+  },
+  "terminal": {
+    "title": "终端",
+    "resourceUsage": {
+      "summary": "CPU: {{cpu}} · 内存: {{memory}}",
+      "leftPaneSummary": "内存: {{memory}}",
+      "toggleLabel": "显示资源使用情况",
+      "empty": "暂无活跃子进程",
+      "columns": {
+        "repo": "仓库",
+        "process": "进程",
+        "pid": "PID",
+        "cpu": "CPU",
+        "memory": "内存"
+      }
+    },
+    "ports": {
+      "summary": "{{count}} 个端口",
+      "toggleLabel": "显示检测到的端口",
+      "columns": {
+        "addressPort": "地址:端口",
+        "pid": "PID",
+        "processName": "进程"
+      }
+    }
+  },
+  "tabs": {
+    "untitled": "未命名",
+    "new": "新建标签",
+    "createMenu": {
+      "label": "创建",
+      "chat": "聊天",
+      "opencode": "OpenCode",
+      "codex": "Codex",
+      "claude": "Claude"
+    },
+    "renameA11y": "重命名标签",
+    "actions": {
+      "rename": "重命名",
+      "pin": "固定标签",
+      "unpin": "取消固定标签",
+      "close": "关闭",
+      "closeOthers": "关闭其他标签",
+      "closeAll": "关闭全部标签"
+    }
+  },
+  "chat": {
+    "newPrompt": "在 {{agent}} 中开始新聊天。添加聊天摘要：",
+    "defaultSummary": "讨论 123123",
+    "composerPlaceholder": "请描述要修改的内容，@提及文件，或运行 /commands",
+    "modelQuality": {
+      "medium": "中等"
+    }
+  },
+  "launch": {
+    "title": "当前没有打开标签",
+    "hint": "选择一个操作以开始。",
+    "actions": {
+      "openTerminal": "打开终端",
+      "openChat": "打开聊天",
+      "searchFiles": "搜索文件"
+    }
+  },
+  "composer": {
+    "placeholder": "输入消息...",
+    "send": "发送"
+  },
+  "keybindings": {
+    "title": "键盘快捷键",
+    "subtitle": "桌面工作区当前支持的全部快捷键。",
+    "back": "返回工作区",
+    "columns": {
+      "action": "操作",
+      "current": "快捷键",
+      "mac": "macOS",
+      "windows": "Windows/Linux"
+    },
+    "scope": {
+      "global": "全局",
+      "workspace": "组织"
+    },
+    "actions": {
+      "openKeybindings": "打开快捷键说明",
+      "backToWorkspace": "在快捷键页面返回组织视图",
+      "newTab": "新建聊天标签",
+      "createWorkspace": "新建工作区",
+      "closeTab": "关闭当前标签",
+      "closeWorkspace": "关闭当前工作区",
+      "openTerminal": "打开终端标签",
+      "activateRepoPane": "激活仓库面板",
+      "activateFilesPane": "激活文件面板",
+      "activateChangesPane": "激活变更面板",
+      "toggleLeftPane": "切换左侧边栏",
+      "toggleRightPane": "切换右侧边栏",
+      "openFileSearch": "打开文件搜索",
+      "deleteSelectedFileTreeEntry": "删除当前选中文件树条目",
+      "undoFileTreeOperation": "撤销最近一次文件树操作",
+      "selectTabByIndex": "按序号切换标签"
+    }
+  },
+  "routing": {
+    "notFound": {
+      "title": "路由不存在",
+      "description": "该页面不可用。请返回工作区看板继续操作。",
+      "backToWorkspace": "返回工作区"
+    }
+  },
+  "common": {
+    "actions": {
+      "cancel": "取消"
+    }
   }
 }
