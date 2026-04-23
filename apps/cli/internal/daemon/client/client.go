@@ -1,4 +1,4 @@
-package daemonrpc
+package client
 
 import (
 	"context"

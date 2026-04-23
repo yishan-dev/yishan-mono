@@ -5,47 +5,46 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"yishan/apps/cli/internal/daemonrpc"
 	"yishan/apps/cli/internal/workspace"
 )
 
-func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method string, params json.RawMessage) (any, error) {
+func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, method string, params json.RawMessage) (any, error) {
 	switch method {
-	case daemonrpc.MethodDaemonPing:
+	case MethodDaemonPing:
 		return map[string]string{"status": "ok"}, nil
-	case daemonrpc.MethodWorkspaceOpen:
+	case MethodWorkspaceOpen:
 		var req workspace.OpenRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.Open(req)
-	case daemonrpc.MethodWorkspaceList:
+	case MethodWorkspaceList:
 		return h.manager.List(), nil
-	case daemonrpc.MethodWorkspaceFileRead:
+	case MethodWorkspaceFileRead:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileRead(req.WorkspaceID, req.Path)
-	case daemonrpc.MethodWorkspaceFileList:
+	case MethodWorkspaceFileList:
 		var req fileListParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileList(req.WorkspaceID, req.Path)
-	case daemonrpc.MethodWorkspaceFileStat:
+	case MethodWorkspaceFileStat:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileStat(req.WorkspaceID, req.Path)
-	case daemonrpc.MethodWorkspaceFileWrite:
+	case MethodWorkspaceFileWrite:
 		var req fileWriteParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileWrite(req.WorkspaceID, req.Path, req.Content, req.Mode)
-	case daemonrpc.MethodWorkspaceFileDelete:
+	case MethodWorkspaceFileDelete:
 		var req fileDeleteParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -54,7 +53,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"deleted": true}, nil
-	case daemonrpc.MethodWorkspaceFileMove:
+	case MethodWorkspaceFileMove:
 		var req fileMoveParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -63,7 +62,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"moved": true}, nil
-	case daemonrpc.MethodWorkspaceFileMkdir:
+	case MethodWorkspaceFileMkdir:
 		var req fileMkdirParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -72,25 +71,25 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"created": true}, nil
-	case daemonrpc.MethodWorkspaceFileDiff:
+	case MethodWorkspaceFileDiff:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileReadDiff(ctx, req.WorkspaceID, req.Path)
-	case daemonrpc.MethodWorkspaceGitStatus:
+	case MethodWorkspaceGitStatus:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitStatus(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitListChanges:
+	case MethodWorkspaceGitListChanges:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListChanges(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitTrack:
+	case MethodWorkspaceGitTrack:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -99,7 +98,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"tracked": true}, nil
-	case daemonrpc.MethodWorkspaceGitUnstage:
+	case MethodWorkspaceGitUnstage:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -108,7 +107,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"unstaged": true}, nil
-	case daemonrpc.MethodWorkspaceGitRevert:
+	case MethodWorkspaceGitRevert:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -117,55 +116,55 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"reverted": true}, nil
-	case daemonrpc.MethodWorkspaceGitCommit:
+	case MethodWorkspaceGitCommit:
 		var req gitCommitParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitCommitChanges(ctx, req.WorkspaceID, req.Message, req.Amend, req.Signoff)
-	case daemonrpc.MethodWorkspaceGitBranchStatus:
+	case MethodWorkspaceGitBranchStatus:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitBranchStatus(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitCommitsToTarget:
+	case MethodWorkspaceGitCommitsToTarget:
 		var req gitTargetBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListCommitsToTarget(ctx, req.WorkspaceID, req.TargetBranch)
-	case daemonrpc.MethodWorkspaceGitCommitDiff:
+	case MethodWorkspaceGitCommitDiff:
 		var req gitCommitDiffParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitReadCommitDiff(ctx, req.WorkspaceID, req.CommitHash, req.Path)
-	case daemonrpc.MethodWorkspaceGitBranchDiff:
+	case MethodWorkspaceGitBranchDiff:
 		var req gitBranchDiffParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitReadBranchComparisonDiff(ctx, req.WorkspaceID, req.TargetBranch, req.Path)
-	case daemonrpc.MethodWorkspaceGitBranches:
+	case MethodWorkspaceGitBranches:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListBranches(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitPush:
+	case MethodWorkspaceGitPush:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitPushBranch(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitPublish:
+	case MethodWorkspaceGitPublish:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitPublishBranch(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceGitRenameBranch:
+	case MethodWorkspaceGitRenameBranch:
 		var req gitRenameBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -174,7 +173,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"renamed": true}, nil
-	case daemonrpc.MethodWorkspaceGitRemoveBranch:
+	case MethodWorkspaceGitRemoveBranch:
 		var req gitRemoveBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -183,7 +182,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"removed": true}, nil
-	case daemonrpc.MethodWorkspaceGitWorktreeCreate:
+	case MethodWorkspaceGitWorktreeCreate:
 		var req gitCreateWorktreeParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -192,7 +191,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"created": true}, nil
-	case daemonrpc.MethodWorkspaceGitWorktreeRemove:
+	case MethodWorkspaceGitWorktreeRemove:
 		var req gitRemoveWorktreeParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -201,43 +200,43 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 			return nil, err
 		}
 		return map[string]bool{"removed": true}, nil
-	case daemonrpc.MethodWorkspaceGitAuthorName:
+	case MethodWorkspaceGitAuthorName:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitAuthorName(ctx, req.WorkspaceID)
-	case daemonrpc.MethodWorkspaceTerminalStart:
+	case MethodWorkspaceTerminalStart:
 		var req workspace.TerminalStartRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalStart(ctx, req)
-	case daemonrpc.MethodWorkspaceTerminalSend:
+	case MethodWorkspaceTerminalSend:
 		var req workspace.TerminalSendRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalSend(req)
-	case daemonrpc.MethodWorkspaceTerminalRead:
+	case MethodWorkspaceTerminalRead:
 		var req workspace.TerminalReadRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalRead(req)
-	case daemonrpc.MethodWorkspaceTerminalStop:
+	case MethodWorkspaceTerminalStop:
 		var req workspace.TerminalStopRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalStop(req)
-	case daemonrpc.MethodWorkspaceTerminalResize:
+	case MethodWorkspaceTerminalResize:
 		var req workspace.TerminalResizeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalResize(req)
-	case daemonrpc.MethodWorkspaceTerminalSubscribe:
+	case MethodWorkspaceTerminalSubscribe:
 		var req workspace.TerminalSubscribeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -246,16 +245,16 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, client *wsClient, method 
 		if err != nil {
 			return nil, err
 		}
-		client.AttachSubscription(req.SessionID, subscription.ID, subscription.Events, func(sessionID string, subscriptionID uint64) {
+		connState.AttachSubscription(req.SessionID, subscription.ID, subscription.Events, func(sessionID string, subscriptionID uint64) {
 			_, _ = h.manager.TerminalUnsubscribe(workspace.TerminalUnsubscribeRequest{SessionID: sessionID, SubscriptionID: subscriptionID})
 		})
 		return workspace.TerminalSubscribeResponse{Subscribed: true}, nil
-	case daemonrpc.MethodWorkspaceTerminalUnsubscribe:
+	case MethodWorkspaceTerminalUnsubscribe:
 		var req workspace.TerminalUnsubscribeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
-		client.DetachSubscription(req.SessionID)
+		connState.DetachSubscription(req.SessionID)
 		return workspace.TerminalUnsubscribeResponse{Unsubscribed: true}, nil
 	default:
 		return nil, workspace.NewRPCError(-32601, fmt.Sprintf("method not found: %s", method))

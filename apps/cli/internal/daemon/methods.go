@@ -1,4 +1,4 @@
-package daemonrpc
+package daemon
 
 const (
 	MethodDaemonPing = "daemon.ping"

@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"yishan/apps/cli/internal/daemonrpc"
+	"yishan/apps/cli/internal/daemon"
+	daemonclient "yishan/apps/cli/internal/daemon/client"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -100,11 +101,11 @@ func (s *Service) ensureWorkspaceProvisionedOnLocalDaemon(
 		return err
 	}
 
-	rpc := daemonrpc.New(daemonURL, jwtToken)
+	rpc := daemonclient.New(daemonURL, jwtToken)
 
 	if workspace.Kind == "primary" {
 		var opened daemonWorkspaceOpenResult
-		if err := rpc.Call(ctx, daemonrpc.MethodWorkspaceOpen, map[string]string{
+		if err := rpc.Call(ctx, daemon.MethodWorkspaceOpen, map[string]string{
 			"id":   workspace.ID,
 			"path": workspace.LocalPath,
 		}, &opened); err != nil {
@@ -124,14 +125,14 @@ func (s *Service) ensureWorkspaceProvisionedOnLocalDaemon(
 		}
 
 		var opened daemonWorkspaceOpenResult
-		if err := rpc.Call(ctx, daemonrpc.MethodWorkspaceOpen, map[string]string{
+		if err := rpc.Call(ctx, daemon.MethodWorkspaceOpen, map[string]string{
 			"id":   baseWorkspace.ID,
 			"path": baseWorkspace.LocalPath,
 		}, &opened); err != nil {
 			return fmt.Errorf("open base workspace on local daemon: %w", err)
 		}
 
-		if err := rpc.Call(ctx, daemonrpc.MethodWorkspaceGitWorktreeCreate, map[string]any{
+		if err := rpc.Call(ctx, daemon.MethodWorkspaceGitWorktreeCreate, map[string]any{
 			"workspaceId":  baseWorkspace.ID,
 			"branch":       workspace.Branch,
 			"worktreePath": workspace.LocalPath,

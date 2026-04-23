@@ -30,8 +30,8 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Error().Err(err).Msg("websocket upgrade failed")
 		return
 	}
-	client := newWSClient(conn)
-	defer client.Close()
+	connState := newWSConnState(conn)
+	defer connState.Close()
 
 	for {
 		_, payload, err := conn.ReadMessage()
@@ -42,19 +42,19 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		resp := h.handleRequest(r.Context(), client, payload)
+		resp := h.handleRequest(r.Context(), connState, payload)
 		if resp == nil {
 			continue
 		}
 
-		if err := client.WriteJSON(resp); err != nil {
+		if err := connState.WriteJSON(resp); err != nil {
 			log.Error().Err(err).Msg("websocket write failed")
 			return
 		}
 	}
 }
 
-func (h *JSONRPCHandler) handleRequest(ctx context.Context, client *wsClient, payload []byte) *response {
+func (h *JSONRPCHandler) handleRequest(ctx context.Context, connState *wsConnState, payload []byte) *response {
 	var req request
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return &response{JSONRPC: "2.0", Error: &rpcError{Code: -32700, Message: "parse error"}}
@@ -64,7 +64,7 @@ func (h *JSONRPCHandler) handleRequest(ctx context.Context, client *wsClient, pa
 		return &response{JSONRPC: "2.0", ID: asJSONID(req.ID), Error: &rpcError{Code: -32600, Message: "invalid request"}}
 	}
 
-	result, err := h.dispatch(ctx, client, req.Method, req.Params)
+	result, err := h.dispatch(ctx, connState, req.Method, req.Params)
 	if err != nil {
 		return &response{JSONRPC: "2.0", ID: asJSONID(req.ID), Error: mapRPCError(err)}
 	}

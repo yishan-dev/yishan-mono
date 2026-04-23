@@ -7,7 +7,7 @@ import (
 	"yishan/apps/cli/internal/workspace"
 )
 
-type wsClient struct {
+type wsConnState struct {
 	conn          *websocket.Conn
 	writeMu       sync.Mutex
 	closeOnce     sync.Once
@@ -21,21 +21,21 @@ type subscriptionHandle struct {
 	cancel         func(sessionID string, subscriptionID uint64)
 }
 
-func newWSClient(conn *websocket.Conn) *wsClient {
-	return &wsClient{conn: conn, subscriptions: make(map[string]subscriptionHandle)}
+func newWSConnState(conn *websocket.Conn) *wsConnState {
+	return &wsConnState{conn: conn, subscriptions: make(map[string]subscriptionHandle)}
 }
 
-func (c *wsClient) WriteJSON(v any) error {
+func (c *wsConnState) WriteJSON(v any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	return c.conn.WriteJSON(v)
 }
 
-func (c *wsClient) Notify(method string, params any) error {
+func (c *wsConnState) Notify(method string, params any) error {
 	return c.WriteJSON(notification{JSONRPC: "2.0", Method: method, Params: params})
 }
 
-func (c *wsClient) Close() {
+func (c *wsConnState) Close() {
 	c.closeOnce.Do(func() {
 		c.subsMu.Lock()
 		handles := make([]subscriptionHandle, 0, len(c.subscriptions))
@@ -52,7 +52,7 @@ func (c *wsClient) Close() {
 	})
 }
 
-func (c *wsClient) AttachSubscription(sessionID string, subscriptionID uint64, events <-chan workspace.TerminalEvent, cancel func(sessionID string, subscriptionID uint64)) {
+func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64, events <-chan workspace.TerminalEvent, cancel func(sessionID string, subscriptionID uint64)) {
 	c.subsMu.Lock()
 	if current, ok := c.subscriptions[sessionID]; ok {
 		delete(c.subscriptions, sessionID)
@@ -85,7 +85,7 @@ func (c *wsClient) AttachSubscription(sessionID string, subscriptionID uint64, e
 	}()
 }
 
-func (c *wsClient) DetachSubscription(sessionID string) {
+func (c *wsConnState) DetachSubscription(sessionID string) {
 	c.subsMu.Lock()
 	handle, ok := c.subscriptions[sessionID]
 	if ok {
