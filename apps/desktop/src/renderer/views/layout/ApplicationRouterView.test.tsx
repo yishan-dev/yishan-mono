@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authStore } from "../../store/authStore";
 import { ApplicationRouterView, NotFoundRouteView } from "./ApplicationRouterView";
 
 vi.mock("react-i18next", () => ({
@@ -35,6 +36,10 @@ vi.mock("../WorkspaceView", async () => {
     },
   };
 });
+
+vi.mock("../LoginView", () => ({
+  LoginView: () => <div data-testid="login-view">login-view</div>,
+}));
 
 /** Exposes lightweight route controls for testing route transitions within one router instance. */
 function RouterControls() {
@@ -78,13 +83,23 @@ function renderApplicationRouter(initialEntry = "/") {
 describe("ApplicationRouterView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    authStore.setState({ isAuthenticated: false });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("renders workspace view on / route", () => {
+  it("renders login view on / route while user is not authenticated", () => {
+    renderApplicationRouter("/");
+
+    expect(screen.getByTestId("login-view")).toBeTruthy();
+    expect(screen.queryByTestId("workspace-input")).toBeNull();
+  });
+
+  it("renders workspace view on / route after user is authenticated", () => {
+    authStore.setState({ isAuthenticated: true });
     renderApplicationRouter("/");
 
     expect(screen.getByTestId("workspace-input")).toBeTruthy();
@@ -93,6 +108,7 @@ describe("ApplicationRouterView", () => {
   });
 
   it("keeps workspace mounted while showing settings overlay", () => {
+    authStore.setState({ isAuthenticated: true });
     renderApplicationRouter("/");
 
     const input = screen.getByTestId("workspace-input") as HTMLInputElement;
@@ -109,6 +125,7 @@ describe("ApplicationRouterView", () => {
   });
 
   it("shows keybindings as overlay while preserving workspace state", () => {
+    authStore.setState({ isAuthenticated: true });
     renderApplicationRouter("/");
 
     const input = screen.getByTestId("workspace-input") as HTMLInputElement;
@@ -120,6 +137,7 @@ describe("ApplicationRouterView", () => {
   });
 
   it("shows not-found state for unknown routes and allows returning", () => {
+    authStore.setState({ isAuthenticated: true });
     renderApplicationRouter("/unknown");
 
     expect(screen.getByText("routing.notFound.title")).toBeTruthy();

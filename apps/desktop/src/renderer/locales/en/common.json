@@ -2,6 +2,18 @@
   "app": {
     "title": "Yishan"
   },
+  "auth": {
+    "login": {
+      "title": "Welcome to Yishan",
+      "description": "Sign in with Google to continue to your desktop workspace.",
+      "googleCta": "Continue with Google",
+      "signingIn": "Signing in...",
+      "errors": {
+        "openGoogleFailed": "Unable to open Google sign-in in your browser.",
+        "unexpected": "Something went wrong while signing in."
+      }
+    }
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",

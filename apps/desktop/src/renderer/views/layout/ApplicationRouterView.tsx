@@ -1,6 +1,8 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate } from "react-router-dom";
+import { authStore } from "../../store/authStore";
+import { LoginView } from "../LoginView";
 import { WorkspaceView } from "../WorkspaceView";
 
 const WORKSPACE_ROUTE = "/";
@@ -42,6 +44,12 @@ export function NotFoundRouteView() {
  * Renders the workspace view with an outlet slot for route overlays.
  */
 export function ApplicationRouterView() {
+  const isAuthenticated = authStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <LoginView />;
+  }
+
   return (
     <Box sx={{ height: "100%", position: "relative" }}>
       <WorkspaceView />
