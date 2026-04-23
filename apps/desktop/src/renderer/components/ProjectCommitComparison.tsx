@@ -218,11 +218,13 @@ export function ProjectCommitComparison({
         getOptionLabel={(option) => option.label}
         isOptionEqualToValue={(option, value) => option.value === value.value}
         onChange={handleSelectComparisonScope}
-        ListboxProps={{
-          sx: {
-            "& .MuiAutocomplete-option": {
-              minHeight: 28,
-              fontSize: 12,
+        slotProps={{
+          listbox: {
+            sx: {
+              "& .MuiAutocomplete-option": {
+                minHeight: 28,
+                fontSize: 12,
+              },
             },
           },
         }}
