@@ -1,0 +1,25 @@
+{
+  "name": "@yishan/design-tokens",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./v1": "./src/v1/index.ts",
+    "./v1/mui": "./src/v1/mui.ts",
+    "./v1/react-native": "./src/v1/reactNative.ts",
+    "./mui": "./src/v1/mui.ts",
+    "./react-native": "./src/v1/reactNative.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check src"
+  },
+  "peerDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^7.0.2"
+  },
+  "license": "Elastic-2.0"
+}

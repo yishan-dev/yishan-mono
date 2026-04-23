@@ -21,6 +21,9 @@
     "check": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.4",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -30,11 +33,15 @@
     "electron": "^41.3.0",
     "electron-builder": "^26.8.1",
     "esbuild": "^0.28.0",
+    "@yishan/design-tokens": "workspace:*",
+    "i18next": "^26.0.6",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.4",
     "typescript": "^6.0.3",
     "vite": "^8.0.10",
-    "wait-on": "^9.0.5"
+    "wait-on": "^9.0.5",
+    "zustand": "^5.0.12"
   },
   "build": {
     "appId": "dev.yishan.desktop",
