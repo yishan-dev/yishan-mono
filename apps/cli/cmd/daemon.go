@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
@@ -10,31 +11,50 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"yishan/apps/cli/internal/daemon"
+	"yishan/apps/cli/internal/output"
 )
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
-	Short: "Run workspace daemon service",
-	Long:  "Run the daemon in background mode and serve workspace operations over WebSocket JSON-RPC.",
-	RunE:  runDaemon,
+	Short: "Manage workspace daemon service",
+	Long:  "Manage the workspace daemon service that serves operations over WebSocket JSON-RPC.",
+	Args:  cobra.NoArgs,
+	RunE:  startDaemon,
+}
+
+var daemonStartCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start daemon in background",
+	Args:  cobra.NoArgs,
+	RunE:  startDaemon,
 }
 
 var daemonRunCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run workspace daemon service",
+	Short: "Run daemon in foreground",
+	Args:  cobra.NoArgs,
 	RunE:  runDaemon,
 }
 
 var daemonStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop running daemon",
+	Args:  cobra.NoArgs,
 	RunE:  stopDaemon,
 }
 
 var daemonRestartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Restart daemon in background",
+	Args:  cobra.NoArgs,
 	RunE:  restartDaemon,
+}
+
+var daemonStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show daemon status",
+	Args:  cobra.NoArgs,
+	RunE:  statusDaemon,
 }
 
 func runDaemon(_ *cobra.Command, _ []string) error {
@@ -53,6 +73,50 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 	}, statePath)
 }
 
+func startDaemon(_ *cobra.Command, _ []string) error {
+	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
+	if err != nil {
+		return err
+	}
+
+	state, err := daemon.LoadState(statePath)
+	if err == nil {
+		if daemon.IsProcessRunning(state.PID) {
+			log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon already running")
+			return nil
+		}
+
+		if err := daemon.RemoveState(statePath); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	if _, err := daemon.StartDetached(daemon.StartConfig{
+		Run: daemon.RunConfig{
+			Host:        appConfig.Daemon.Host,
+			Port:        appConfig.Daemon.Port,
+			JWTSecret:   appConfig.Daemon.JWTSecret,
+			JWTIssuer:   appConfig.Daemon.JWTIssuer,
+			JWTAudience: appConfig.Daemon.JWTAudience,
+			JWTRequired: appConfig.Daemon.JWTRequired,
+		},
+		ConfigPath: appConfig.ConfigPath,
+		LogLevel:   appConfig.LogLevel,
+	}); err != nil {
+		return err
+	}
+
+	state, err = daemon.WaitForReady(statePath, 5*time.Second)
+	if err != nil {
+		return err
+	}
+
+	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon started")
+	return nil
+}
+
 func stopDaemon(_ *cobra.Command, _ []string) error {
 	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
 	if err != nil {
@@ -67,7 +131,7 @@ func stopDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Debug().Int("pid", state.PID).Msg("daemon stopped")
+	log.Info().Int("pid", state.PID).Msg("daemon stopped")
 	return nil
 
 }
@@ -88,7 +152,7 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 				JWTAudience: appConfig.Daemon.JWTAudience,
 				JWTRequired: appConfig.Daemon.JWTRequired,
 			},
-			ConfigPath: cfgFile,
+			ConfigPath: appConfig.ConfigPath,
 			LogLevel:   appConfig.LogLevel,
 		},
 		statePath,
@@ -99,16 +163,69 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Debug().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon restarted")
+	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon restarted")
 	return nil
 
 }
 
+func statusDaemon(_ *cobra.Command, _ []string) error {
+	statePath, err := daemon.ResolveStateFilePath(appConfig.ConfigPath)
+	if err != nil {
+		return err
+	}
+
+	state, err := daemon.LoadState(statePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return output.PrintRenderData(output.RenderData{
+				Title:   "daemon",
+				Columns: []string{"running", "statePath"},
+				Rows: []map[string]any{{
+					"running":   false,
+					"statePath": statePath,
+				}},
+			})
+		}
+		return err
+	}
+
+	if !daemon.IsProcessRunning(state.PID) {
+		if removeErr := daemon.RemoveState(statePath); removeErr != nil {
+			log.Warn().Err(removeErr).Str("state_path", statePath).Msg("failed to remove stale daemon state file")
+		}
+
+		return output.PrintRenderData(output.RenderData{
+			Title:   "daemon",
+			Columns: []string{"running", "pid", "statePath"},
+			Rows: []map[string]any{{
+				"running":   false,
+				"pid":       state.PID,
+				"statePath": statePath,
+			}},
+		})
+	}
+
+	return output.PrintRenderData(output.RenderData{
+		Title:   "daemon",
+		Columns: []string{"running", "pid", "address", "startedAt", "uptime", "statePath"},
+		Rows: []map[string]any{{
+			"running":   true,
+			"pid":       state.PID,
+			"address":   net.JoinHostPort(state.Host, strconv.Itoa(state.Port)),
+			"startedAt": state.StartedAt.UTC().Format(time.RFC3339),
+			"uptime":    time.Since(state.StartedAt).Round(time.Second).String(),
+			"statePath": statePath,
+		}},
+	})
+}
+
 func init() {
 	rootCmd.AddCommand(daemonCmd)
+	daemonCmd.AddCommand(daemonStartCmd)
 	daemonCmd.AddCommand(daemonRunCmd)
 	daemonCmd.AddCommand(daemonStopCmd)
 	daemonCmd.AddCommand(daemonRestartCmd)
+	daemonCmd.AddCommand(daemonStatusCmd)
 
 	daemonCmd.PersistentFlags().String("host", "127.0.0.1", "daemon listen host")
 	daemonCmd.PersistentFlags().Int("port", 0, "daemon listen port (0 = random)")

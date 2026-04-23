@@ -14,8 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"yishan/apps/cli/internal/workspace"
+
+	"github.com/rs/zerolog/log"
 )
 
 var ErrNotRunning = errors.New("daemon is not running")
@@ -56,6 +57,9 @@ func Run(cfg RunConfig, statePath string) error {
 	}
 	defer func() {
 		if closeErr := listener.Close(); closeErr != nil {
+			if errors.Is(closeErr, net.ErrClosed) {
+				return
+			}
 			log.Warn().Err(closeErr).Msg("failed to close daemon listener")
 		}
 	}()
@@ -117,13 +121,13 @@ func Run(cfg RunConfig, statePath string) error {
 		}
 	}()
 
-	log.Debug().Str("address", actualAddr).Bool("jwt_required", cfg.JWTRequired).Msg("daemon server started")
+	log.Info().Str("address", actualAddr).Bool("jwt_required", cfg.JWTRequired).Msg("daemon server started")
 	err = server.Serve(listener)
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("daemon server failed: %w", err)
 	}
 
-	log.Debug().Msg("daemon server stopped")
+	log.Info().Msg("daemon server stopped")
 	return nil
 }
 
@@ -174,7 +178,7 @@ func StartDetached(cfg StartConfig) (int, error) {
 	args := []string{"daemon", "run"}
 	args = append(args, "--host", cfg.Run.Host)
 	args = append(args, "--port", strconv.Itoa(cfg.Run.Port))
-	args = append(args, "--jwt-required", strconv.FormatBool(cfg.Run.JWTRequired))
+	args = append(args, "--jwt-required="+strconv.FormatBool(cfg.Run.JWTRequired))
 	if cfg.Run.JWTSecret != "" {
 		args = append(args, "--jwt-secret", cfg.Run.JWTSecret)
 	}
