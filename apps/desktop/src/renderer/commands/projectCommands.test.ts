@@ -5,16 +5,18 @@ import { chatStore } from "../store/chatStore";
 import { sessionStore } from "../store/sessionStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
-import { createRepo, deleteRepo, loadWorkspaceFromBackend, updateRepoConfig } from "./projectCommands";
+import { createProject, deleteProject, loadWorkspaceFromBackend, updateProjectConfig } from "./projectCommands";
 
 const apiMocks = vi.hoisted(() => ({
   createProject: vi.fn(),
+  deleteProject: vi.fn(),
   fetchOrgProjectSnapshot: vi.fn(),
   queryClientFetchQuery: vi.fn(),
 }));
 
 vi.mock("../api/orgProjectApi", () => ({
   createProject: apiMocks.createProject,
+  deleteProject: apiMocks.deleteProject,
 }));
 
 vi.mock("../api/orgProjectQueries", () => ({
@@ -28,8 +30,6 @@ vi.mock("../queryClient", () => ({
 }));
 
 const rpcMocks = vi.hoisted(() => ({
-  createRepo: vi.fn(),
-  deleteRepo: vi.fn(),
   gitInspect: vi.fn(),
 }));
 
@@ -37,10 +37,6 @@ vi.mock("../rpc/rpcTransport", () => ({
   getApiServiceClient: vi.fn(async () => ({
     git: {
       inspect: rpcMocks.gitInspect,
-    },
-    repo: {
-      createRepo: rpcMocks.createRepo,
-      deleteRepo: rpcMocks.deleteRepo,
     },
   })),
 }));
@@ -126,7 +122,7 @@ describe("projectCommands", () => {
       repoKey: "repo-1",
     });
 
-    await createRepo({
+    await createProject({
       name: "Repo 1",
       key: "repo-1",
       source: "local",
@@ -159,15 +155,12 @@ describe("projectCommands", () => {
     tabStore.setState({ retainWorkspaceTabs, setSelectedWorkspaceId });
     chatStore.setState({ removeTabData, removeWorkspaceTaskCounts });
     workspaceStore.setState({ deleteRepo: removeRepo });
-    rpcMocks.deleteRepo.mockResolvedValueOnce({
-      repoId: "repo-1",
-      deletedWorkspaceIds: ["workspace-1"],
-      repoDeleted: true,
-    });
+    sessionStore.setState({ selectedOrganizationId: "org-1" });
+    apiMocks.deleteProject.mockResolvedValueOnce(undefined);
 
-    await deleteRepo("repo-1");
+    await deleteProject("repo-1");
 
-    expect(rpcMocks.deleteRepo).toHaveBeenCalledWith({ repoId: "repo-1" });
+    expect(apiMocks.deleteProject).toHaveBeenCalledWith("org-1", "repo-1");
     expect(removeRepo).toHaveBeenCalledWith("repo-1");
     expect(retainWorkspaceTabs).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
@@ -194,21 +187,7 @@ describe("projectCommands", () => {
       updateRepoConfig: applyRepoConfig,
       incrementFileTreeRefreshVersion: bumpRefreshVersion,
     });
-    rpcMocks.createRepo.mockResolvedValueOnce({
-      id: "repo-1",
-      key: "repo-1",
-      localPath: "/tmp/repo-1",
-      worktreePath: "/tmp/repo-1",
-      gitUrl: "",
-      contextEnabled: true,
-      icon: null,
-      color: null,
-      setupScript: "",
-      postScript: "",
-      defaultBranch: null,
-    });
-
-    await updateRepoConfig("repo-1", {
+    await updateProjectConfig("repo-1", {
       name: "Repo 1",
       worktreePath: "/tmp/repo-1",
       privateContextEnabled: true,
@@ -218,13 +197,6 @@ describe("projectCommands", () => {
       postScript: "rm -rf node_modules",
     });
 
-    expect(rpcMocks.createRepo).toHaveBeenCalledTimes(1);
-    expect(rpcMocks.createRepo.mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({
-        key: "repo-1",
-        worktreePath: "/tmp/repo-1",
-      }),
-    );
     expect(applyRepoConfig).toHaveBeenCalledTimes(1);
     expect(bumpRefreshVersion).toHaveBeenCalledTimes(1);
   });

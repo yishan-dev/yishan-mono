@@ -37,6 +37,17 @@ export async function createProjectHandler(
   return c.json({ project }, StatusCodes.CREATED);
 }
 
+export async function deleteProjectHandler(c: AppContext, params: ProjectWorkspaceParamsInput) {
+  const actorUser = c.get("sessionUser");
+  await c.get("services").project.deleteProject({
+    actorUserId: actorUser.id,
+    organizationId: params.orgId,
+    projectId: params.projectId
+  });
+
+  return c.json({ ok: true });
+}
+
 export async function listWorkspacesHandler(c: AppContext, params: ProjectWorkspaceParamsInput) {
   const actorUser = c.get("sessionUser");
   const workspaces = await c.get("services").project.listWorkspaces({

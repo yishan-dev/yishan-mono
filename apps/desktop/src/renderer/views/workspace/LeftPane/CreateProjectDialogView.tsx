@@ -51,7 +51,7 @@ function isValidRepoKey(value: string): boolean {
 
 export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogViewProps) {
   const { t } = useTranslation();
-  const { createRepo, openLocalFolderDialog } = useCommands();
+  const { createProject, openLocalFolderDialog } = useCommands();
   const [repoDraft, setRepoDraft] = useState({
     name: "",
     key: "",
@@ -93,7 +93,7 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
       return;
     }
 
-    createRepo({
+    createProject({
       name,
       key: normalizedKey,
       source: repoDraft.source,

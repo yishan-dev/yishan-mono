@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 
 import {
   createProjectHandler,
+  deleteProjectHandler,
   createWorkspaceHandler,
   listProjectsHandler,
   listWorkspacesHandler
@@ -34,6 +35,12 @@ organizationProjectsRouter.post(
   zValidator("param", organizationProjectParamsSchema, validationErrorResponse),
   zValidator("json", createProjectBodySchema, validationErrorResponse),
   (c) => createProjectHandler(c, c.req.valid("param"), c.req.valid("json"))
+);
+
+organizationProjectsRouter.delete(
+  "/:projectId",
+  zValidator("param", projectWorkspaceParamsSchema, validationErrorResponse),
+  (c) => deleteProjectHandler(c, c.req.valid("param"))
 );
 
 projectWorkspacesRouter.use("/*", requireOrganizationMemberFromParam);

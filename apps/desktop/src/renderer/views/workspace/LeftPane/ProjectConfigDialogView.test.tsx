@@ -6,7 +6,7 @@ import { workspaceStore } from "../../../store/workspaceStore";
 import { ProjectConfigDialogView } from "./ProjectConfigDialogView";
 
 const mocked = vi.hoisted(() => ({
-  updateRepoConfig: vi.fn(),
+  updateProjectConfig: vi.fn(),
   getDefaultWorktreeLocation: vi.fn(async () => "/tmp/worktrees"),
   openEntryInExternalApp: vi.fn(),
   openLocalFolderDialog: vi.fn(),
@@ -14,7 +14,7 @@ const mocked = vi.hoisted(() => ({
 
 vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
-    updateRepoConfig: mocked.updateRepoConfig,
+    updateProjectConfig: mocked.updateProjectConfig,
     getDefaultWorktreeLocation: mocked.getDefaultWorktreeLocation,
     openEntryInExternalApp: mocked.openEntryInExternalApp,
     openLocalFolderDialog: mocked.openLocalFolderDialog,

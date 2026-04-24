@@ -82,7 +82,7 @@ export function ProjectListView() {
     setSelectedRepoId,
     setSelectedWorkspaceId,
     closeWorkspace,
-    deleteRepo,
+    deleteProject,
     openEntryInExternalApp,
     setLastUsedExternalAppId,
   } = useCommands();
@@ -295,7 +295,7 @@ export function ProjectListView() {
 
     setIsDeletingRepo(true);
     try {
-      await deleteRepo(pendingRepoDeletion.repoId);
+      await deleteProject(pendingRepoDeletion.repoId);
       setPendingRepoDeletion(null);
     } finally {
       setIsDeletingRepo(false);

@@ -58,7 +58,7 @@ function getDefaultDraft(): ProjectConfigDraft {
 
 export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfigDialogViewProps) {
   const repos = workspaceStore((state) => state.repos);
-  const { updateRepoConfig, getDefaultWorktreeLocation, openEntryInExternalApp, openLocalFolderDialog } = useCommands();
+  const { updateProjectConfig, getDefaultWorktreeLocation, openEntryInExternalApp, openLocalFolderDialog } = useCommands();
   const repo = repos.find((item) => item.id === repoId);
   const [draft, setDraft] = useState<ProjectConfigDraft>(getDefaultDraft);
   const [iconAnchorEl, setIconAnchorEl] = useState<HTMLElement | null>(null);
@@ -136,7 +136,7 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
       ? draft.iconBgColor
       : DEFAULT_ICON_BG_COLOR;
 
-    updateRepoConfig(repo.id, {
+    updateProjectConfig(repo.id, {
       name: draft.name.trim() || repo.name,
       worktreePath: draft.worktreePath.trim(),
       privateContextEnabled: draft.privateContextEnabled,

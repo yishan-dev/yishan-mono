@@ -1,7 +1,8 @@
 import { readPersistedDisplayRepoIds } from "../helpers/projectHelpers";
-import { createProject as createRemoteProject } from "../api/orgProjectApi";
+import { createProject as createRemoteProject, deleteProject as deleteRemoteProject } from "../api/orgProjectApi";
 import { getOrgProjectSnapshot } from "../api/orgProjectQueries";
 import { rendererQueryClient } from "../queryClient";
+import { RestApiError } from "../api/restClient";
 import { getApiServiceClient } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
 import { workspaceStore } from "../store/workspaceStore";
@@ -224,9 +225,6 @@ export async function createProject(input: {
   });
 }
 
-/** @deprecated use createProject; kept for legacy call sites during migration. */
-export const createRepo = createProject;
-
 /** Deletes one project in backend and then removes it from local store state. */
 export async function deleteProject(projectId: string): Promise<void> {
   if (!projectId) {
@@ -234,21 +232,21 @@ export async function deleteProject(projectId: string): Promise<void> {
   }
 
   const previousWorkspaces = workspaceStore.getState().workspaces;
-  const client = await getApiServiceClient();
-
-  try {
-    await client.repo.deleteRepo({ repoId: projectId });
-  } catch (error) {
-    console.error("Failed to delete backend project and workspaces", error);
-    return;
+  const selectedOrganizationId = sessionStore.getState().selectedOrganizationId?.trim();
+  if (selectedOrganizationId) {
+    try {
+      await deleteRemoteProject(selectedOrganizationId, projectId);
+    } catch (error) {
+      if (!(error instanceof RestApiError && error.status === 404)) {
+        console.error("Failed to delete backend project and workspaces", error);
+        return;
+      }
+    }
   }
 
   workspaceStore.getState().deleteRepo(projectId);
   syncTabStoreWithWorkspace(previousWorkspaces);
 }
-
-/** @deprecated use deleteProject; kept for legacy call sites during migration. */
-export const deleteRepo = deleteProject;
 
 /** Persists project config to backend and updates local config state when successful. */
 export async function updateProjectConfig(
@@ -270,28 +268,7 @@ export async function updateProjectConfig(
     return;
   }
 
-  const client = await getApiServiceClient();
-  try {
-    await client.repo.createRepo({
-      key: project.key,
-      localPath: project.localPath || undefined,
-      remoteUrl: project.gitUrl || undefined,
-      worktreePath: config.worktreePath,
-      contextEnabled: config.privateContextEnabled,
-      icon: config.icon,
-      color: config.iconBgColor,
-      setupScript: config.setupScript,
-      postScript: config.postScript,
-    });
-  } catch (error) {
-    console.error("Failed to persist project config", error);
-    return;
-  }
-
   const store = workspaceStore.getState();
   store.updateRepoConfig(projectId, config);
   store.incrementFileTreeRefreshVersion();
 }
-
-/** @deprecated use updateProjectConfig; kept for legacy call sites during migration. */
-export const updateRepoConfig = updateProjectConfig;

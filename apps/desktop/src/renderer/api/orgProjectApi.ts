@@ -71,3 +71,10 @@ export async function createProject(
   });
   return response.project;
 }
+
+/** Deletes one project from one organization. */
+export async function deleteProject(orgId: string, projectId: string): Promise<void> {
+  await requestJson<{ ok?: boolean }>(`/orgs/${orgId}/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}

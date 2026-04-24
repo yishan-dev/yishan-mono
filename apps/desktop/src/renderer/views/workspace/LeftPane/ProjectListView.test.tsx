@@ -9,7 +9,7 @@ const mocked = vi.hoisted(() => {
   const renameWorkspace = vi.fn();
   const renameWorkspaceBranch = vi.fn();
   const deleteWorkspace = vi.fn();
-  const deleteRepo = vi.fn();
+  const deleteProject = vi.fn();
   const setSelectedRepoId = vi.fn();
   const setSelectedWorkspaceId = vi.fn();
   const setLastUsedExternalAppId = vi.fn();
@@ -49,7 +49,7 @@ const mocked = vi.hoisted(() => {
       renameWorkspace: (input: { repoId: string; workspaceId: string; name: string }) => Promise<void>;
       renameWorkspaceBranch: (input: { repoId: string; workspaceId: string; branch: string }) => Promise<void>;
       deleteWorkspace: (input: { repoId: string; workspaceId: string }) => Promise<void>;
-      deleteRepo: (input: { repoId: string }) => Promise<void>;
+      deleteProject: (input: { repoId: string }) => Promise<void>;
       workspaceAgentStatusByWorkspaceId: Record<string, "running" | "waiting_input">;
       workspaceUnreadToneByWorkspaceId: Record<string, "success" | "error">;
       markWorkspaceNotificationsRead: (workspaceId: string) => void;
@@ -69,7 +69,7 @@ const mocked = vi.hoisted(() => {
       renameWorkspace: async () => undefined,
       renameWorkspaceBranch: async () => undefined,
       deleteWorkspace: async () => undefined,
-      deleteRepo: async () => undefined,
+      deleteProject: async () => undefined,
       workspaceAgentStatusByWorkspaceId: {},
       workspaceUnreadToneByWorkspaceId: {},
       markWorkspaceNotificationsRead: () => {},
@@ -93,7 +93,7 @@ const mocked = vi.hoisted(() => {
     renameWorkspace,
     renameWorkspaceBranch,
     deleteWorkspace,
-    deleteRepo,
+    deleteProject,
     setSelectedRepoId,
     setSelectedWorkspaceId,
     setLastUsedExternalAppId,
@@ -160,7 +160,7 @@ vi.mock("../../../hooks/useCommands", () => ({
     renameWorkspace: mocked.renameWorkspace,
     renameWorkspaceBranch: mocked.renameWorkspaceBranch,
     closeWorkspace: mocked.deleteWorkspace,
-    deleteRepo: mocked.deleteRepo,
+    deleteProject: mocked.deleteProject,
     openEntryInExternalApp: mocked.openEntryInExternalApp,
     setLastUsedExternalAppId: mocked.setLastUsedExternalAppId,
   }),
@@ -188,7 +188,7 @@ function renderRepoList(
   mocked.renameWorkspace.mockResolvedValue(undefined);
   mocked.renameWorkspaceBranch.mockResolvedValue(undefined);
   mocked.deleteWorkspace.mockResolvedValue(undefined);
-  mocked.deleteRepo.mockResolvedValue(undefined);
+  mocked.deleteProject.mockResolvedValue(undefined);
   mocked.openEntryInExternalApp.mockResolvedValue({ ok: true });
   mocked.stateRef.current = {
     repos: [
@@ -227,7 +227,7 @@ function renderRepoList(
     renameWorkspace: mocked.renameWorkspace,
     renameWorkspaceBranch: mocked.renameWorkspaceBranch,
     deleteWorkspace: mocked.deleteWorkspace,
-    deleteRepo: mocked.deleteRepo,
+    deleteProject: mocked.deleteProject,
     workspaceAgentStatusByWorkspaceId: {},
     workspaceUnreadToneByWorkspaceId: {},
     markWorkspaceNotificationsRead: mocked.markWorkspaceNotificationsRead,
@@ -369,7 +369,7 @@ describe("ProjectListView", () => {
       renameWorkspace: mocked.renameWorkspace,
       renameWorkspaceBranch: mocked.renameWorkspaceBranch,
       deleteWorkspace: mocked.deleteWorkspace,
-      deleteRepo: mocked.deleteRepo,
+      deleteProject: mocked.deleteProject,
       workspaceAgentStatusByWorkspaceId: {},
       workspaceUnreadToneByWorkspaceId: {},
       markWorkspaceNotificationsRead: mocked.markWorkspaceNotificationsRead,
@@ -409,7 +409,7 @@ describe("ProjectListView", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "project.actions.delete" }));
     fireEvent.click(screen.getByRole("button", { name: "project.actions.delete" }));
 
-    expect(mocked.deleteRepo).toHaveBeenCalledWith("repo-1");
+    expect(mocked.deleteProject).toHaveBeenCalledWith("repo-1");
   });
 
   it("opens context menu on right click and opens repo config from menu action", () => {

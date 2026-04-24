@@ -174,6 +174,26 @@ export class ProjectService {
     }));
   }
 
+  async deleteProject(input: { organizationId: string; projectId: string; actorUserId: string }): Promise<void> {
+    const role = await this.organizationService.getMembershipRole({
+      organizationId: input.organizationId,
+      userId: input.actorUserId
+    });
+
+    if (!role) {
+      throw new OrganizationMembershipRequiredError();
+    }
+
+    const deletedRows = await this.dbWs
+      .delete(projects)
+      .where(and(eq(projects.id, input.projectId), eq(projects.organizationId, input.organizationId)))
+      .returning({ id: projects.id });
+
+    if (deletedRows.length === 0) {
+      throw new ProjectNotFoundError(input.projectId);
+    }
+  }
+
   async createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceView> {
     const workspace = await this.dbWs.transaction(async (tx) => {
       const role = await this.organizationService.getMembershipRole({

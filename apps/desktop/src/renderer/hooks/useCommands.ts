@@ -55,10 +55,10 @@ import {
   updateNotificationPreferences as updateNotificationPreferencesCommand,
 } from "../commands/notificationCommands";
 import {
-  createRepo as createRepoCommand,
-  deleteRepo as deleteRepoCommand,
+  createProject as createProjectCommand,
+  deleteProject as deleteProjectCommand,
   loadWorkspaceFromBackend as loadWorkspaceFromBackendCommand,
-  updateRepoConfig as updateRepoConfigCommand,
+  updateProjectConfig as updateProjectConfigCommand,
 } from "../commands/projectCommands";
 import { setSelectedRepo, setSelectedWorkspace } from "../commands/selectionCommands";
 import {
@@ -180,15 +180,15 @@ export type Commands = {
   previewNotification: typeof previewNotificationCommand;
   playNotificationSound: typeof playNotificationSoundCommand;
   loadWorkspaceFromBackend: () => Promise<void>;
-  createRepo: (input: {
+  createProject: (input: {
     name: string;
     key?: string;
     source: "local" | "remote";
     path?: string;
     gitUrl?: string;
   }) => Promise<void>;
-  deleteRepo: (repoId: string) => Promise<void>;
-  updateRepoConfig: (
+  deleteProject: (repoId: string) => Promise<void>;
+  updateProjectConfig: (
     repoId: string,
     config: Pick<
       Repo,
@@ -293,9 +293,9 @@ export function useCommands(): Commands {
       playNotificationSound: playNotificationSoundCommand,
       setSelectedTabId: setSelectedTabCommand,
       loadWorkspaceFromBackend: loadWorkspaceFromBackendCommand,
-      createRepo: createRepoCommand,
-      deleteRepo: deleteRepoCommand,
-      updateRepoConfig: updateRepoConfigCommand,
+      createProject: createProjectCommand,
+      deleteProject: deleteProjectCommand,
+      updateProjectConfig: updateProjectConfigCommand,
       createWorkspace: createWorkspaceCommand,
       closeWorkspace: closeWorkspaceCommand,
       createTab: createTabCommand,
