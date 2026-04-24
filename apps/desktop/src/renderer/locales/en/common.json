@@ -112,6 +112,8 @@
       "trigger": "Org",
       "organizations": "Organizations",
       "noOrganizations": "No organizations",
+      "newOrganization": "New organization",
+      "newOrganizationPrompt": "Organization name",
       "settings": "Settings",
       "documentation": "Documentation",
       "shortcutMap": "Shortcut map",

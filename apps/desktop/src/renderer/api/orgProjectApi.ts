@@ -33,6 +33,16 @@ export async function listOrganizations(): Promise<OrganizationRecord[]> {
   return response.organizations;
 }
 
+/** Creates one organization. */
+export async function createOrganization(name: string): Promise<OrganizationRecord> {
+  const response = await requestJson<{ organization: OrganizationRecord }>("/orgs", {
+    method: "POST",
+    body: { name },
+  });
+
+  return response.organization;
+}
+
 /** Lists projects for one organization. */
 export async function listProjects(orgId: string): Promise<ProjectRecord[]> {
   const response = await requestJson<{ projects: ProjectRecord[] }>(`/orgs/${orgId}/projects`);

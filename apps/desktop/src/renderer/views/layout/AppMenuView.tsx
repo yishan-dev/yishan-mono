@@ -13,7 +13,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { IconType } from "react-icons";
 import {
@@ -26,10 +26,12 @@ import {
   LuMail,
   LuMenu,
   LuMoon,
+  LuPlus,
   LuSettings,
   LuSun,
 } from "react-icons/lu";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { createOrganization, listOrganizations } from "../../api/orgProjectApi";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
 import { useThemePreference } from "../../hooks/useThemePreference";
 import { getRendererPlatform } from "../../helpers/platform";
@@ -96,6 +98,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
   const { themePreference, setThemePreference } = useThemePreference();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const currentUser = sessionStore((state) => state.currentUser);
   const organizations = sessionStore((state) => state.organizations);
   const selectedOrganizationId = sessionStore((state) => state.selectedOrganizationId);
@@ -114,6 +117,11 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
       .join("")
       .slice(0, 2)
       .toUpperCase() || "U";
+
+  useEffect(() => {
+    setMenuAnchor(null);
+    setOrganizationMenuAnchor(null);
+  }, [location.pathname]);
 
   return (
     <>
@@ -316,7 +324,13 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
         disablePortal
         sx={{ zIndex: 1301, ml: 0.5 }}
       >
-        <Paper elevation={3} sx={{ p: 0.75, minWidth: 220 }}>
+        <Paper
+          elevation={3}
+          sx={{ p: 0.75, minWidth: 220 }}
+          onMouseLeave={() => {
+            setOrganizationMenuAnchor(null);
+          }}
+        >
           <Stack spacing={0.25}>
             {organizations.length === 0 ? (
               <Typography variant="caption" color="text.secondary" sx={{ px: 1, py: 0.75 }}>
@@ -355,6 +369,45 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                 );
               })
             )}
+            <Divider sx={{ my: 0.5 }} />
+            <Button
+              size="small"
+              fullWidth
+              startIcon={<LuPlus size={14} />}
+              sx={{
+                justifyContent: "flex-start",
+                textTransform: "none",
+                color: "text.secondary",
+              }}
+              onClick={() => {
+                const organizationName = window.prompt(t("org.menu.newOrganizationPrompt"), "");
+                const normalizedOrganizationName = organizationName?.trim() || "";
+                if (!normalizedOrganizationName) {
+                  return;
+                }
+
+                void (async () => {
+                  try {
+                    const createdOrganization = await createOrganization(normalizedOrganizationName);
+                    const nextOrganizations = await listOrganizations();
+                    const currentUser = sessionStore.getState().currentUser;
+                    sessionStore.getState().setSessionData({
+                      currentUser,
+                      organizations: nextOrganizations,
+                      selectedOrganizationId: createdOrganization.id,
+                    });
+                    setOrganizationMenuAnchor(null);
+                    setMenuAnchor(null);
+                    void rendererQueryClient.invalidateQueries({ queryKey: ["org-project-snapshot"] });
+                    void loadWorkspaceFromBackend();
+                  } catch {
+                    // keep menu open on error to allow retry
+                  }
+                })();
+              }}
+            >
+              {t("org.menu.newOrganization")}
+            </Button>
           </Stack>
         </Paper>
       </Popper>
