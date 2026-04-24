@@ -10,14 +10,18 @@ export type DesktopRpcEventEnvelope = {
 
 export type ApiProcedureKind = "query" | "mutation";
 
+export type DesktopApiNamespace = "workspace" | "file" | "git" | "terminal";
+
 export type InvokeApiProcedureInput = {
-  path: string;
+  namespace: DesktopApiNamespace;
+  method: string;
   procedureKind: ApiProcedureKind;
   input?: unknown;
 };
 
 export type StartApiSubscriptionInput = {
-  path: string;
+  namespace: DesktopApiNamespace;
+  method: string;
   input?: unknown;
 };
 
@@ -26,7 +30,7 @@ export type StopApiSubscriptionInput = {
 };
 
 export type DesktopApiBridge = {
-  invokeProcedure: (input: InvokeApiProcedureInput) => Promise<unknown>;
+  invoke: (input: InvokeApiProcedureInput) => Promise<unknown>;
   startSubscription: (input: StartApiSubscriptionInput) => Promise<{ subscriptionId: string }>;
   stopSubscription: (input: StopApiSubscriptionInput) => Promise<{ stopped: true }>;
 };
@@ -127,7 +131,7 @@ export const DESKTOP_RPC_IPC_CHANNELS = {
 } as const;
 
 export const API_RPC_IPC_CHANNELS = {
-  invokeProcedure: "desktop:api/invoke-procedure",
+  invoke: "desktop:api/invoke",
   startSubscription: "desktop:api/start-subscription",
   stopSubscription: "desktop:api/stop-subscription",
 } as const;

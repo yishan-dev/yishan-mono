@@ -1,6 +1,7 @@
 import type { DesktopBridge, DesktopHostBridge, DesktopRpcEventEnvelope } from "../../main/ipc";
 
 type DesktopRpcEventListener = (envelope: DesktopRpcEventEnvelope) => void;
+type ApiNamespace = "workspace" | "file" | "git" | "terminal";
 type ApiSubscriptionHandlers = {
   onData: (event: unknown) => void;
   onError?: (error: unknown) => void;
@@ -104,8 +105,14 @@ async function invokeApiProcedure(
     throw new Error("Desktop api-service bridge is unavailable");
   }
 
-  return await apiBridge.invokeProcedure({
-    path,
+  const parsed = parseProcedurePath(path);
+  if (!parsed) {
+    throw new Error(`Unsupported API procedure path: ${path}`);
+  }
+
+  return await apiBridge.invoke({
+    namespace: parsed.namespace,
+    method: parsed.method,
     procedureKind,
     input,
   });
@@ -122,8 +129,18 @@ async function subscribeApiProcedure(
     throw new Error("Desktop api-service bridge is unavailable");
   }
 
+  if (path === "events.stream") {
+    return () => {};
+  }
+
+  const parsed = parseProcedurePath(path);
+  if (!parsed) {
+    throw new Error(`Unsupported API subscription path: ${path}`);
+  }
+
   const { subscriptionId } = await apiBridge.startSubscription({
-    path,
+    namespace: parsed.namespace,
+    method: parsed.method,
     input,
   });
   apiSubscriptionHandlersById.set(subscriptionId, handlers);
@@ -133,6 +150,27 @@ async function subscribeApiProcedure(
     void apiBridge.stopSubscription({
       subscriptionId,
     });
+  };
+}
+
+function parseProcedurePath(path: string): { namespace: ApiNamespace; method: string } | null {
+  const segments = path
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments.length < 2) {
+    return null;
+  }
+
+  const namespace = segments[0];
+  if (namespace !== "workspace" && namespace !== "file" && namespace !== "git" && namespace !== "terminal") {
+    return null;
+  }
+
+  return {
+    namespace,
+    method: segments.slice(1).join("."),
   };
 }
 

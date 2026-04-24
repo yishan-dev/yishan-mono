@@ -1,184 +1,153 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { isDevMode } from "../runtime/environment";
-
-type JsonRpcRequest = {
-  jsonrpc: "2.0";
-  id: string;
-  method: string;
-  params?: unknown;
-};
-
-type JsonRpcResponse = {
-  jsonrpc: "2.0";
-  id?: string;
-  result?: unknown;
-  error?: {
-    code: number;
-    message: string;
-  };
-};
-
-type JsonRpcNotification = {
-  jsonrpc: "2.0";
-  method: string;
-  params?: unknown;
-};
-
-type DaemonState = {
-  host: string;
-  port: number;
-};
-
-type DaemonNotification = {
-  method: string;
-  payload: unknown;
-};
-
-type StartSubscriptionOptions = {
-  method: string;
-  params?: unknown;
-  onNotification: (event: DaemonNotification) => void;
-};
+import { basename } from "node:path";
+import type {
+  DaemonWorkspace,
+  FileDiffResponse,
+  FileCreateFolderInput,
+  FileDeleteInput,
+  FileListBatchInput,
+  FileListBatchResponse,
+  FileListInput,
+  FileListResponse,
+  FileReadInput,
+  FileReadResponse,
+  FileRenameInput,
+  FileMutationOkResponse,
+  FileWriteInput,
+  FileWriteResponse,
+  GitBranchListResponse,
+  GitBranchStatusResponse,
+  GitBranchDiffInput,
+  GitChangesBySection,
+  GitCommitComparisonResponse,
+  GitDiffContentResponse,
+  GitStatusOperationResponse,
+  GitCommitDiffInput,
+  GitCommitInput,
+  GitPathsInput,
+  GitRenameBranchInput,
+  GitTargetBranchInput,
+  GitWorktreeInput,
+  JsonRpcNotification,
+  JsonRpcResponse,
+  ProcedureSubscriptionOptions,
+  StartSubscriptionOptions,
+  TerminalCreateSessionResponse,
+  TerminalDetectedPort,
+  TerminalMutationOkResponse,
+  TerminalReadOutputResponse,
+  TerminalResourceUsageSnapshot,
+  TerminalSessionSummary,
+  TerminalCloseInput,
+  TerminalCreateSessionInput,
+  TerminalListSessionsInput,
+  TerminalReadOutputInput,
+  TerminalResizeInput,
+  TerminalWriteInput,
+  WorkspaceCloseExecutionResponse,
+  WorkspaceCloseExecutionInput,
+  WorkspaceCreateResponse,
+  WorkspaceCreateInput,
+  WorkspaceListResponse,
+} from "./jsonRpcTypes";
+import {
+  asRecord,
+  buildRequest,
+  buildUnsupportedMethodError,
+  normalizeWorktreePath,
+  openSocket,
+  parseJsonRpcMessage,
+  readOptionalBoolean,
+  readOptionalNumber,
+  readOptionalString,
+  readOptionalStringArray,
+} from "./jsonRpcHelpers";
 
 const RPC_REQUEST_TIMEOUT_MS = 30_000;
-const DAEMON_STATE_FILE_NAME = "daemon.state.json";
-
-function resolveCliProfileName(): string {
-  if (isDevMode()) {
-    return "dev";
-  }
-
-  return process.env.YISHAN_PROFILE?.trim() || "default";
-}
-
-function resolveDaemonStateFilePath(): string {
-  return resolve(homedir(), ".yishan", "profiles", resolveCliProfileName(), DAEMON_STATE_FILE_NAME);
-}
-
-function ensureDaemonState(candidate: unknown): DaemonState {
-  if (!candidate || typeof candidate !== "object") {
-    throw new Error("daemon state is invalid");
-  }
-
-  const state = candidate as {
-    host?: unknown;
-    port?: unknown;
-  };
-
-  if (typeof state.host !== "string" || state.host.trim() === "") {
-    throw new Error("daemon state host is invalid");
-  }
-
-  if (typeof state.port !== "number" || state.port <= 0) {
-    throw new Error("daemon state port is invalid");
-  }
-
-  return {
-    host: state.host,
-    port: state.port,
-  };
-}
-
-function toWebSocketPayload(data: unknown): string {
-  if (typeof data === "string") {
-    return data;
-  }
-
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
-  }
-
-  if (ArrayBuffer.isView(data)) {
-    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
-  }
-
-  throw new Error("unsupported websocket payload");
-}
-
-function parseJsonRpcMessage(data: unknown): JsonRpcResponse | JsonRpcNotification {
-  const payload = toWebSocketPayload(data);
-  const parsed = JSON.parse(payload) as JsonRpcResponse | JsonRpcNotification;
-
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("daemon websocket payload is invalid");
-  }
-
-  if ((parsed as { jsonrpc?: unknown }).jsonrpc !== "2.0") {
-    throw new Error("daemon websocket payload is not JSON-RPC 2.0");
-  }
-
-  return parsed;
-}
-
-async function resolveDaemonWebSocketUrl(): Promise<string> {
-  const explicitUrl = process.env.YISHAN_DAEMON_WS_URL?.trim();
-  if (explicitUrl) {
-    return explicitUrl;
-  }
-
-  const stateRaw = await readFile(resolveDaemonStateFilePath(), "utf8");
-  const state = ensureDaemonState(JSON.parse(stateRaw));
-  return `ws://${state.host}:${state.port}/ws`;
-}
-
-async function openSocket(): Promise<WebSocket> {
-  const url = await resolveDaemonWebSocketUrl();
-
-  return await new Promise<WebSocket>((resolvePromise, rejectPromise) => {
-    const socket = new WebSocket(url);
-    let settled = false;
-
-    const resolveOnce = (value: WebSocket) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolvePromise(value);
-    };
-
-    const rejectOnce = (error: Error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      rejectPromise(error);
-    };
-
-    socket.addEventListener("open", () => {
-      resolveOnce(socket);
-    });
-
-    socket.addEventListener("error", () => {
-      rejectOnce(new Error("failed to connect to daemon websocket"));
-    });
-
-    socket.addEventListener("close", () => {
-      rejectOnce(new Error("daemon websocket closed before opening"));
-    });
-  });
-}
-
-function buildRequest(method: string, params?: unknown): JsonRpcRequest {
-  return {
-    jsonrpc: "2.0",
-    id: randomUUID(),
-    method,
-    params,
-  };
-}
 
 export class DaemonJsonRpcClient {
-  private readonly subscriptionSockets = new Map<string, WebSocket>();
+  private readonly subscriptionSockets = new Map<string, WebSocket | null>();
+  private readonly workspaceIdByWorktreePath = new Map<string, string>();
+  private readonly terminalNextIndexBySessionId = new Map<string, number>();
 
-  async invoke(method: string, params?: unknown): Promise<unknown> {
+  readonly workspace = {
+    list: async (): Promise<WorkspaceListResponse> => await this.listWorkspaces(),
+    create: async (input: WorkspaceCreateInput): Promise<WorkspaceCreateResponse> => await this.createWorkspace(input),
+    close: async (input: WorkspaceCloseExecutionInput): Promise<WorkspaceCloseExecutionResponse> =>
+      await this.closeWorkspace(input),
+  };
+
+  readonly file = {
+    listFiles: async (input: FileListInput): Promise<FileListResponse> => await this.listFiles(input),
+    listFilesBatch: async (input: FileListBatchInput): Promise<FileListBatchResponse> => await this.listFilesBatch(input),
+    readFile: async (input: FileReadInput): Promise<FileReadResponse> => await this.readFile(input),
+    writeFile: async (input: FileWriteInput): Promise<FileWriteResponse> => await this.writeFile(input),
+    createFile: async (input: FileWriteInput): Promise<FileWriteResponse> => await this.createFile(input),
+    createFolder: async (input: FileCreateFolderInput): Promise<FileMutationOkResponse> => await this.createFolder(input),
+    renameEntry: async (input: FileRenameInput): Promise<FileMutationOkResponse> => await this.renameEntry(input),
+    deleteEntry: async (input: FileDeleteInput): Promise<FileMutationOkResponse> => await this.deleteEntry(input),
+    readDiff: async (input: FileReadInput): Promise<FileDiffResponse> => await this.readFileDiff(input),
+  };
+
+  readonly git = {
+    listChanges: async (input: GitWorktreeInput): Promise<GitChangesBySection> => await this.listGitChanges(input),
+    trackChanges: async (input: GitPathsInput): Promise<GitStatusOperationResponse> => await this.trackGitChanges(input),
+    unstageChanges: async (input: GitPathsInput): Promise<GitStatusOperationResponse> => await this.unstageGitChanges(input),
+    revertChanges: async (input: GitPathsInput): Promise<GitStatusOperationResponse> => await this.revertGitChanges(input),
+    commitChanges: async (input: GitCommitInput): Promise<string> => await this.commitGitChanges(input),
+    getBranchStatus: async (input: GitWorktreeInput): Promise<GitBranchStatusResponse> =>
+      await this.getGitBranchStatus(input),
+    listCommitsToTarget: async (input: GitTargetBranchInput): Promise<GitCommitComparisonResponse> =>
+      await this.listGitCommitsToTarget(input),
+    readCommitDiff: async (input: GitCommitDiffInput): Promise<GitDiffContentResponse> => await this.readGitCommitDiff(input),
+    readBranchComparisonDiff: async (input: GitBranchDiffInput): Promise<GitDiffContentResponse> =>
+      await this.readGitBranchComparisonDiff(input),
+    listBranches: async (input: GitWorktreeInput): Promise<GitBranchListResponse> => await this.listGitBranches(input),
+    pushBranch: async (input: GitWorktreeInput): Promise<string> => await this.pushGitBranch(input),
+    publishBranch: async (input: GitWorktreeInput): Promise<string> => await this.publishGitBranch(input),
+    renameBranch: async (input: GitRenameBranchInput): Promise<GitStatusOperationResponse> =>
+      await this.renameGitBranch(input),
+    getAuthorName: async (input: GitWorktreeInput): Promise<string> => await this.getGitAuthorName(input),
+  };
+
+  readonly terminal = {
+    createSession: async (input: TerminalCreateSessionInput): Promise<TerminalCreateSessionResponse> =>
+      await this.createTerminalSession(input),
+    writeInput: async (input: TerminalWriteInput): Promise<TerminalMutationOkResponse> => await this.writeTerminalInput(input),
+    resize: async (input: TerminalResizeInput): Promise<TerminalMutationOkResponse> => await this.resizeTerminal(input),
+    closeSession: async (input: TerminalCloseInput): Promise<TerminalMutationOkResponse> => await this.closeTerminalSession(input),
+    readOutput: async (input: TerminalReadOutputInput): Promise<TerminalReadOutputResponse> =>
+      await this.readTerminalOutput(input),
+    listDetectedPorts: async (): Promise<TerminalDetectedPort[]> => await this.listDetectedTerminalPorts(),
+    getResourceUsage: async (): Promise<TerminalResourceUsageSnapshot> => await this.getTerminalResourceUsage(),
+    listSessions: async (input?: TerminalListSessionsInput): Promise<TerminalSessionSummary[]> =>
+      await this.listTerminalSessions(input),
+  };
+
+  private resolveNamespaceHandler(
+    namespace: "workspace" | "file" | "git" | "terminal",
+    method: string,
+  ): ((input?: unknown) => Promise<unknown>) | null {
+    const namespaceNode = (this as Record<string, unknown>)[namespace];
+    if (!namespaceNode || typeof namespaceNode !== "object") {
+      return null;
+    }
+
+    const handler = (namespaceNode as Record<string, unknown>)[method];
+    if (typeof handler !== "function") {
+      return null;
+    }
+
+    return handler as (input?: unknown) => Promise<unknown>;
+  }
+
+  private async invoke(method: string, params?: unknown): Promise<unknown> {
     const socket = await openSocket();
 
     return await new Promise<unknown>((resolvePromise, rejectPromise) => {
       const request = buildRequest(method, params);
       let settled = false;
+
       const timeout = setTimeout(() => {
         if (settled) {
           return;
@@ -245,13 +214,14 @@ export class DaemonJsonRpcClient {
     });
   }
 
-  async startSubscription(options: StartSubscriptionOptions): Promise<string> {
+  private async startRawSubscription(options: StartSubscriptionOptions): Promise<string> {
     const socket = await openSocket();
     const request = buildRequest(options.method, options.params);
-
     const subscriptionId = randomUUID();
+
     await new Promise<void>((resolvePromise, rejectPromise) => {
       let settled = false;
+
       const timeout = setTimeout(() => {
         if (settled) {
           return;
@@ -291,14 +261,10 @@ export class DaemonJsonRpcClient {
 
         if ((message as JsonRpcNotification).method) {
           const notification = message as JsonRpcNotification;
-          try {
-            options.onNotification({
-              method: notification.method,
-              payload: notification.params,
-            });
-          } catch {
-            // Ignore listener errors to keep daemon stream alive.
-          }
+          options.onNotification({
+            method: notification.method,
+            payload: notification.params,
+          });
           return;
         }
 
@@ -322,6 +288,7 @@ export class DaemonJsonRpcClient {
           rejectOnce(new Error(`daemon websocket closed while subscribing to method \"${options.method}\"`));
           return;
         }
+
         this.subscriptionSockets.delete(subscriptionId);
       });
 
@@ -338,14 +305,511 @@ export class DaemonJsonRpcClient {
     return subscriptionId;
   }
 
+  private async listWorkspaces(): Promise<DaemonWorkspace[]> {
+    const result = await this.invoke("list");
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    const workspaces: DaemonWorkspace[] = [];
+    for (const candidate of result) {
+      const record = asRecord(candidate);
+      if (!record) {
+        continue;
+      }
+
+      const id = readOptionalString(record.id);
+      const path = readOptionalString(record.path);
+      if (!id || !path) {
+        continue;
+      }
+
+      workspaces.push({
+        id,
+        path: normalizeWorktreePath(path),
+      });
+    }
+
+    return workspaces;
+  }
+
+  private async ensureWorkspaceIdByWorktreePath(worktreePath: string): Promise<string> {
+    const normalizedWorktreePath = normalizeWorktreePath(worktreePath);
+    const cachedWorkspaceId = this.workspaceIdByWorktreePath.get(normalizedWorktreePath);
+    if (cachedWorkspaceId) {
+      return cachedWorkspaceId;
+    }
+
+    const workspaces = await this.listWorkspaces();
+    for (const workspace of workspaces) {
+      this.workspaceIdByWorktreePath.set(workspace.path, workspace.id);
+    }
+
+    const existingWorkspace = workspaces.find((workspace) => workspace.path === normalizedWorktreePath);
+    if (existingWorkspace) {
+      return existingWorkspace.id;
+    }
+
+    const workspaceId = `desktop-${randomUUID()}`;
+    await this.invoke("open", {
+      id: workspaceId,
+      path: normalizedWorktreePath,
+    });
+    this.workspaceIdByWorktreePath.set(normalizedWorktreePath, workspaceId);
+    return workspaceId;
+  }
+
+  private async resolveWorkspaceId(input: unknown): Promise<string> {
+    const record = asRecord(input);
+    if (!record) {
+      throw new Error("workspace input is required");
+    }
+
+    const workspaceWorktreePath = readOptionalString(record.workspaceWorktreePath);
+    if (workspaceWorktreePath) {
+      return await this.ensureWorkspaceIdByWorktreePath(workspaceWorktreePath);
+    }
+
+    const cwd = readOptionalString(record.cwd);
+    if (cwd) {
+      return await this.ensureWorkspaceIdByWorktreePath(cwd);
+    }
+
+    const workspaceId = readOptionalString(record.workspaceId);
+    if (workspaceId) {
+      return workspaceId;
+    }
+
+    throw new Error("workspaceId or workspaceWorktreePath is required");
+  }
+
+  private toTerminalCreateCommand(input: unknown): { command: string; args?: string[]; env?: string[] } {
+    const record = asRecord(input) ?? {};
+    const explicitCommand = readOptionalString(record.command);
+    const args = readOptionalStringArray(record.args);
+    const env = readOptionalStringArray(record.env);
+
+    if (explicitCommand) {
+      return {
+        command: explicitCommand,
+        args,
+        env,
+      };
+    }
+
+    if (process.platform === "win32") {
+      return {
+        command: "cmd.exe",
+      };
+    }
+
+    return {
+      command: process.env.SHELL?.trim() || "/bin/bash",
+      args: ["-l"],
+    };
+  }
+
+  private async createWorkspace(input: WorkspaceCreateInput): Promise<WorkspaceCreateResponse> {
+    const record = asRecord(input);
+    const workspaceWorktreePath = readOptionalString(record?.workspaceWorktreePath);
+    if (!workspaceWorktreePath) {
+      throw new Error("workspaceWorktreePath is required");
+    }
+
+    const workspaceId = `desktop-${randomUUID()}`;
+    const normalizedWorktreePath = normalizeWorktreePath(workspaceWorktreePath);
+    await this.invoke("open", {
+      id: workspaceId,
+      path: normalizedWorktreePath,
+    });
+    this.workspaceIdByWorktreePath.set(normalizedWorktreePath, workspaceId);
+
+    const sourceBranch = readOptionalString(record?.sourceBranch) || "";
+    const targetBranch = readOptionalString(record?.targetBranch) || sourceBranch;
+    const workspaceName = readOptionalString(record?.workspaceName) || basename(normalizedWorktreePath) || workspaceId;
+
+    return {
+      workspace: { id: workspaceId },
+      workspaceInstance: {
+        workspaceId,
+        repoId: readOptionalString(record?.repositoryId) || workspaceId,
+        projectId: readOptionalString(record?.repositoryId) || workspaceId,
+        name: workspaceName,
+        sourceBranch,
+        branch: targetBranch,
+        worktreePath: normalizedWorktreePath,
+        status: "active",
+      },
+      lifecycleScriptWarnings: [],
+    };
+  }
+
+  private async closeWorkspace(input: WorkspaceCloseExecutionInput): Promise<WorkspaceCloseExecutionResponse> {
+    const record = asRecord(input);
+    const workspaceId = readOptionalString(record?.workspaceId) || "";
+    return {
+      workspace: { id: workspaceId, status: "closed" },
+      workspaceId,
+      lifecycleScriptWarnings: [],
+    };
+  }
+
+  private async listFiles(input: FileListInput): Promise<FileListResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath) || "";
+    const files = await this.invoke("file.list", { workspaceId, path: relativePath });
+    return { files: Array.isArray(files) ? (files as FileListResponse["files"]) : [] };
+  }
+
+  private async listFilesBatch(input: FileListBatchInput): Promise<FileListBatchResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const requests = Array.isArray(record?.requests) ? record.requests : [];
+    const results = await Promise.all(
+      requests.map(async (request) => {
+        const requestRecord = asRecord(request) ?? {};
+        const relativePath = readOptionalString(requestRecord.relativePath) || "";
+        try {
+          const files = await this.invoke("file.list", { workspaceId, path: relativePath });
+          return {
+            request: { relativePath, recursive: readOptionalBoolean(requestRecord.recursive) ?? false },
+            files: Array.isArray(files) ? (files as FileListResponse["files"]) : [],
+          };
+        } catch (error) {
+          return {
+            request: { relativePath, recursive: readOptionalBoolean(requestRecord.recursive) ?? false },
+            files: [],
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    );
+    return { results };
+  }
+
+  private async readFile(input: FileReadInput): Promise<FileReadResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!relativePath) {
+      throw new Error("relativePath is required");
+    }
+    const content = await this.invoke("file.read", { workspaceId, path: relativePath });
+    return { content: typeof content === "string" ? content : "" };
+  }
+
+  private async writeFile(input: FileWriteInput): Promise<FileWriteResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!relativePath) {
+      throw new Error("relativePath is required");
+    }
+    const content = typeof record?.content === "string" ? record.content : "";
+    const written = await this.invoke("file.write", { workspaceId, path: relativePath, content });
+    return { ok: true, written: typeof written === "number" ? written : 0 };
+  }
+
+  private async createFile(input: FileWriteInput): Promise<FileWriteResponse> {
+    return await this.writeFile(input);
+  }
+
+  private async createFolder(input: FileCreateFolderInput): Promise<FileMutationOkResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!relativePath) {
+      throw new Error("relativePath is required");
+    }
+    await this.invoke("file.mkdir", { workspaceId, path: relativePath, parents: true });
+    return { ok: true };
+  }
+
+  private async renameEntry(input: FileRenameInput): Promise<FileMutationOkResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const fromRelativePath = readOptionalString(record?.fromRelativePath);
+    const toRelativePath = readOptionalString(record?.toRelativePath);
+    if (!fromRelativePath || !toRelativePath) {
+      throw new Error("fromRelativePath and toRelativePath are required");
+    }
+    await this.invoke("file.move", { workspaceId, fromPath: fromRelativePath, toPath: toRelativePath });
+    return { ok: true };
+  }
+
+  private async deleteEntry(input: FileDeleteInput): Promise<FileMutationOkResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!relativePath) {
+      throw new Error("relativePath is required");
+    }
+    await this.invoke("file.delete", { workspaceId, path: relativePath, recursive: true });
+    return { ok: true };
+  }
+
+  private async readFileDiff(input: FileReadInput): Promise<FileDiffResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!relativePath) {
+      throw new Error("relativePath is required");
+    }
+    const diffText = await this.invoke("file.diff", { workspaceId, path: relativePath });
+    return { oldContent: "", newContent: typeof diffText === "string" ? diffText : "" };
+  }
+
+  private async listGitChanges(input: GitWorktreeInput): Promise<GitChangesBySection> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.listChanges", { workspaceId })) as GitChangesBySection;
+  }
+
+  private async trackGitChanges(input: GitPathsInput): Promise<GitStatusOperationResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.track", {
+      workspaceId,
+      paths: readOptionalStringArray(record?.relativePaths) ?? [],
+    })) as GitStatusOperationResponse;
+  }
+
+  private async unstageGitChanges(input: GitPathsInput): Promise<GitStatusOperationResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.unstage", {
+      workspaceId,
+      paths: readOptionalStringArray(record?.relativePaths) ?? [],
+    })) as GitStatusOperationResponse;
+  }
+
+  private async revertGitChanges(input: GitPathsInput): Promise<GitStatusOperationResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.revert", {
+      workspaceId,
+      paths: readOptionalStringArray(record?.relativePaths) ?? [],
+    })) as GitStatusOperationResponse;
+  }
+
+  private async commitGitChanges(input: GitCommitInput): Promise<string> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.commit", {
+      workspaceId,
+      message: readOptionalString(record?.message) || "",
+      amend: readOptionalBoolean(record?.amend),
+      signoff: readOptionalBoolean(record?.signoff),
+    })) as string;
+  }
+
+  private async getGitBranchStatus(input: GitWorktreeInput): Promise<GitBranchStatusResponse> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.branchStatus", { workspaceId })) as GitBranchStatusResponse;
+  }
+
+  private async listGitCommitsToTarget(input: GitTargetBranchInput): Promise<GitCommitComparisonResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const targetBranch = readOptionalString(record?.targetBranch);
+    if (!targetBranch) {
+      throw new Error("targetBranch is required");
+    }
+    return (await this.invoke("git.commitsToTarget", { workspaceId, targetBranch })) as GitCommitComparisonResponse;
+  }
+
+  private async readGitCommitDiff(input: GitCommitDiffInput): Promise<GitDiffContentResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const commitHash = readOptionalString(record?.commitHash);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!commitHash || !relativePath) {
+      throw new Error("commitHash and relativePath are required");
+    }
+    return (await this.invoke("git.commitDiff", {
+      workspaceId,
+      commitHash,
+      path: relativePath,
+    })) as GitDiffContentResponse;
+  }
+
+  private async readGitBranchComparisonDiff(input: GitBranchDiffInput): Promise<GitDiffContentResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const targetBranch = readOptionalString(record?.targetBranch);
+    const relativePath = readOptionalString(record?.relativePath);
+    if (!targetBranch || !relativePath) {
+      throw new Error("targetBranch and relativePath are required");
+    }
+    return (await this.invoke("git.branchDiff", {
+      workspaceId,
+      targetBranch,
+      path: relativePath,
+    })) as GitDiffContentResponse;
+  }
+
+  private async listGitBranches(input: GitWorktreeInput): Promise<GitBranchListResponse> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.branches", { workspaceId })) as GitBranchListResponse;
+  }
+
+  private async pushGitBranch(input: GitWorktreeInput): Promise<string> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.push", { workspaceId })) as string;
+  }
+
+  private async publishGitBranch(input: GitWorktreeInput): Promise<string> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.publish", { workspaceId })) as string;
+  }
+
+  private async renameGitBranch(input: GitRenameBranchInput): Promise<GitStatusOperationResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const nextBranch = readOptionalString(record?.nextBranch);
+    if (!nextBranch) {
+      throw new Error("nextBranch is required");
+    }
+    return (await this.invoke("git.renameBranch", { workspaceId, nextBranch })) as GitStatusOperationResponse;
+  }
+
+  private async getGitAuthorName(input: GitWorktreeInput): Promise<string> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    return (await this.invoke("git.authorName", { workspaceId })) as string;
+  }
+
+  private async createTerminalSession(input: TerminalCreateSessionInput): Promise<TerminalCreateSessionResponse> {
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const { command, args, env } = this.toTerminalCreateCommand(input);
+    return (await this.invoke("terminal.start", { workspaceId, command, args, env })) as TerminalCreateSessionResponse;
+  }
+
+  private async writeTerminalInput(input: TerminalWriteInput): Promise<TerminalMutationOkResponse> {
+    const record = asRecord(input);
+    await this.invoke("terminal.send", {
+      sessionId: readOptionalString(record?.sessionId) || "",
+      input: readOptionalString(record?.data) || "",
+    });
+    return { ok: true };
+  }
+
+  private async resizeTerminal(input: TerminalResizeInput): Promise<TerminalMutationOkResponse> {
+    const record = asRecord(input);
+    await this.invoke("terminal.resize", {
+      sessionId: readOptionalString(record?.sessionId) || "",
+      cols: Math.max(1, Math.floor(readOptionalNumber(record?.cols) ?? 80)),
+      rows: Math.max(1, Math.floor(readOptionalNumber(record?.rows) ?? 24)),
+    });
+    return { ok: true };
+  }
+
+  private async closeTerminalSession(input: TerminalCloseInput): Promise<TerminalMutationOkResponse> {
+    const record = asRecord(input);
+    const sessionId = readOptionalString(record?.sessionId) || "";
+    await this.invoke("terminal.stop", { sessionId });
+    this.terminalNextIndexBySessionId.delete(sessionId);
+    return { ok: true };
+  }
+
+  private async readTerminalOutput(input: TerminalReadOutputInput): Promise<TerminalReadOutputResponse> {
+    const record = asRecord(input);
+    const sessionId = readOptionalString(record?.sessionId) || "";
+    const fromIndex = Math.max(0, Math.floor(readOptionalNumber(record?.fromIndex) ?? 0));
+    const daemonSnapshot = asRecord(await this.invoke("terminal.read", { sessionId })) ?? {};
+    const output = typeof daemonSnapshot.output === "string" ? daemonSnapshot.output : "";
+    const running = daemonSnapshot.running === true;
+    const chunks = output ? [output] : [];
+    const currentIndex = Math.max(this.terminalNextIndexBySessionId.get(sessionId) ?? 0, fromIndex);
+    const nextIndex = currentIndex + chunks.length;
+    this.terminalNextIndexBySessionId.set(sessionId, nextIndex);
+    return { nextIndex, chunks, exited: !running };
+  }
+
+  private async listDetectedTerminalPorts(): Promise<TerminalDetectedPort[]> {
+    return [];
+  }
+
+  private async getTerminalResourceUsage(): Promise<TerminalResourceUsageSnapshot> {
+    return { processes: [] };
+  }
+
+  private async listTerminalSessions(_input?: TerminalListSessionsInput): Promise<TerminalSessionSummary[]> {
+    return [];
+  }
+
+  async invokeApi(options: {
+    namespace: "workspace" | "file" | "git" | "terminal";
+    method: string;
+    input?: unknown;
+  }): Promise<unknown> {
+    const handler = this.resolveNamespaceHandler(options.namespace, options.method);
+    if (!handler) {
+      throw buildUnsupportedMethodError(`${options.namespace}.${options.method}`);
+    }
+
+    return await handler(options.input);
+  }
+
+  async startSubscription(options: ProcedureSubscriptionOptions): Promise<string> {
+    const path = `${options.namespace}.${options.method}`;
+    const record = asRecord(options.input);
+
+    if (options.namespace === "terminal" && options.method === "subscribeOutput") {
+      const sessionId = readOptionalString(record?.sessionId) || "";
+      return await this.startRawSubscription({
+        method: "terminal.subscribe",
+        params: { sessionId },
+        onNotification: (event) => {
+          if (event.method === "terminal.output") {
+            const payload = asRecord(event.payload) ?? {};
+            const eventSessionId = readOptionalString(payload.sessionId) || sessionId;
+            const chunk = typeof payload.chunk === "string" ? payload.chunk : "";
+            const nextIndex = (this.terminalNextIndexBySessionId.get(eventSessionId) ?? 0) + 1;
+            this.terminalNextIndexBySessionId.set(eventSessionId, nextIndex);
+            options.onNotification({
+              method: event.method,
+              payload: {
+                sessionId: eventSessionId,
+                chunk,
+                nextIndex,
+              },
+            });
+            return;
+          }
+
+          options.onNotification({
+            method: event.method,
+            payload: event.payload,
+          });
+        },
+      });
+    }
+
+    if (options.namespace === "terminal" && options.method === "subscribeSessions") {
+      const subscriptionId = randomUUID();
+      this.subscriptionSockets.set(subscriptionId, null);
+      return subscriptionId;
+    }
+
+    if (options.namespace === "terminal" || options.namespace === "git" || options.namespace === "file") {
+      return await this.startRawSubscription({
+        method: path,
+        params: options.input,
+        onNotification: options.onNotification,
+      });
+    }
+
+    throw buildUnsupportedMethodError(path);
+  }
+
   stopSubscription(subscriptionId: string): void {
     const socket = this.subscriptionSockets.get(subscriptionId);
-    if (!socket) {
+    if (socket === undefined) {
       return;
     }
 
     this.subscriptionSockets.delete(subscriptionId);
-    socket.close();
+    socket?.close();
   }
 
   dispose(): void {

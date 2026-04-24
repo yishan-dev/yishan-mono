@@ -79,14 +79,14 @@ export class DesktopApplication {
   }
 
   private formatSubscriptionEventData(method: string, payload: unknown): unknown {
-    if (method === "workspace.terminal.output" && payload && typeof payload === "object") {
+    if (method === "terminal.output" && payload && typeof payload === "object") {
       return {
         type: "output",
         ...(payload as Record<string, unknown>),
       };
     }
 
-    if (method === "workspace.terminal.exit" && payload && typeof payload === "object") {
+    if (method === "terminal.exit" && payload && typeof payload === "object") {
       return {
         type: "exit",
         ...(payload as Record<string, unknown>),
@@ -110,15 +110,20 @@ export class DesktopApplication {
   }
 
   private registerApiIpcHandlers() {
-    ipcMain.handle(API_RPC_IPC_CHANNELS.invokeProcedure, async (_event, input) => {
-      return await this.daemonJsonRpcClient.invoke(input.path, input.input);
+    ipcMain.handle(API_RPC_IPC_CHANNELS.invoke, async (_event, input) => {
+      return await this.daemonJsonRpcClient.invokeApi({
+        namespace: input.namespace,
+        method: input.method,
+        input: input.input,
+      });
     });
 
     ipcMain.handle(API_RPC_IPC_CHANNELS.startSubscription, async (event, input) => {
       const webContentsId = event.sender.id;
       const subscriptionId = await this.daemonJsonRpcClient.startSubscription({
-        method: input.path,
-        params: input.input,
+        namespace: input.namespace,
+        method: input.method,
+        input: input.input,
         onNotification: (notification) => {
           if (event.sender.isDestroyed()) {
             return;

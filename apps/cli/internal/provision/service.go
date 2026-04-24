@@ -105,7 +105,7 @@ func (s *Service) ensureWorkspaceProvisionedOnLocalDaemon(
 
 	if workspace.Kind == "primary" {
 		var opened daemonWorkspaceOpenResult
-		if err := rpc.Call(ctx, daemon.MethodWorkspaceOpen, map[string]string{
+		if err := rpc.Call(ctx, daemon.MethodOpen, map[string]string{
 			"id":   workspace.ID,
 			"path": workspace.LocalPath,
 		}, &opened); err != nil {
@@ -125,14 +125,14 @@ func (s *Service) ensureWorkspaceProvisionedOnLocalDaemon(
 		}
 
 		var opened daemonWorkspaceOpenResult
-		if err := rpc.Call(ctx, daemon.MethodWorkspaceOpen, map[string]string{
+		if err := rpc.Call(ctx, daemon.MethodOpen, map[string]string{
 			"id":   baseWorkspace.ID,
 			"path": baseWorkspace.LocalPath,
 		}, &opened); err != nil {
 			return fmt.Errorf("open base workspace on local daemon: %w", err)
 		}
 
-		if err := rpc.Call(ctx, daemon.MethodWorkspaceGitWorktreeCreate, map[string]any{
+		if err := rpc.Call(ctx, daemon.MethodGitWorktreeCreate, map[string]any{
 			"workspaceId":  baseWorkspace.ID,
 			"branch":       workspace.Branch,
 			"worktreePath": workspace.LocalPath,

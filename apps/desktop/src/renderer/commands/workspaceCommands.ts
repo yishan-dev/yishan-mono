@@ -125,7 +125,7 @@ async function closeWorkspaceInBackground(input: {
     return;
   }
 
-  const closed = (await client.workspace.closeExecution.mutate({
+  const closed = (await client.workspace.close.mutate({
     workspaceId: backendWorkspaceId,
     removeBranch: input.removeBranch,
   })) as CloseWorkspaceResponse | undefined;

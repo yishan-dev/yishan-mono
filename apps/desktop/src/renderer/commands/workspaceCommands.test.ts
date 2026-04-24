@@ -38,7 +38,7 @@ type WorkspaceListResponse = Array<{
 const rpcMocks = vi.hoisted(() => ({
   createWorkspace: vi.fn(),
   list: vi.fn(),
-  closeExecution: vi.fn(),
+  closeWorkspace: vi.fn(),
   listGitChanges: vi.fn(),
   renameGitBranch: vi.fn(),
   enqueueWorkspaceLifecycleWarnings: vi.fn(),
@@ -65,8 +65,8 @@ vi.mock("../rpc/rpcTransport", () => ({
       list: {
         query: rpcMocks.list,
       },
-      closeExecution: {
-        mutate: rpcMocks.closeExecution,
+      close: {
+        mutate: rpcMocks.closeWorkspace,
       },
     },
   })),
@@ -284,7 +284,7 @@ describe("workspaceCommands", () => {
     expect(removeWorkspaceTaskCounts).not.toHaveBeenCalled();
 
     await vi.waitFor(() => {
-      expect(rpcMocks.closeExecution).toHaveBeenCalledWith({
+      expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-entity-1",
         removeBranch: undefined,
       });
@@ -323,7 +323,7 @@ describe("workspaceCommands", () => {
         },
       },
     ]);
-    rpcMocks.closeExecution.mockResolvedValueOnce({
+    rpcMocks.closeWorkspace.mockResolvedValueOnce({
       workspace: { id: "workspace-entity-1", status: "archived" },
       workspaceId: "workspace-1",
       lifecycleScriptWarnings: [
@@ -396,7 +396,7 @@ describe("workspaceCommands", () => {
     ]);
     await closeWorkspace("workspace-1", { removeBranch: true });
     await vi.waitFor(() => {
-      expect(rpcMocks.closeExecution).toHaveBeenCalledWith({
+      expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-entity-1",
         removeBranch: true,
       });
@@ -413,7 +413,7 @@ describe("workspaceCommands", () => {
 
     await closeWorkspace("workspace-404");
 
-    expect(rpcMocks.closeExecution).not.toHaveBeenCalled();
+    expect(rpcMocks.closeWorkspace).not.toHaveBeenCalled();
     expect(deleteWorkspace).not.toHaveBeenCalled();
   });
 
@@ -444,7 +444,7 @@ describe("workspaceCommands", () => {
     await closeWorkspace("workspace-1");
 
     expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
-    expect(rpcMocks.closeExecution).not.toHaveBeenCalled();
+    expect(rpcMocks.closeWorkspace).not.toHaveBeenCalled();
 
     resolveList?.([
       {
@@ -461,7 +461,7 @@ describe("workspaceCommands", () => {
       },
     ]);
     await vi.waitFor(() => {
-      expect(rpcMocks.closeExecution).toHaveBeenCalledWith({
+      expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-entity-1",
         removeBranch: undefined,
       });

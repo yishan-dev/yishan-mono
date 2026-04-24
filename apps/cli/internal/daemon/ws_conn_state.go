@@ -65,7 +65,7 @@ func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64
 		for event := range events {
 			switch event.Type {
 			case "output":
-				if err := c.Notify("workspace.terminal.output", map[string]any{
+				if err := c.Notify("terminal.output", map[string]any{
 					"sessionId": event.SessionID,
 					"chunk":     event.Chunk,
 				}); err != nil {
@@ -73,7 +73,7 @@ func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64
 					return
 				}
 			case "exit":
-				if err := c.Notify("workspace.terminal.exit", map[string]any{
+				if err := c.Notify("terminal.exit", map[string]any{
 					"sessionId": event.SessionID,
 					"exitCode":  event.ExitCode,
 				}); err != nil {

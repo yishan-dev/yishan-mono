@@ -17,7 +17,7 @@ const bridge: DesktopBridge = {
     getAuthTokens: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthTokens),
   },
   api: {
-    invokeProcedure: (input) => ipcRenderer.invoke(API_RPC_IPC_CHANNELS.invokeProcedure, input),
+    invoke: (input) => ipcRenderer.invoke(API_RPC_IPC_CHANNELS.invoke, input),
     startSubscription: (input) => ipcRenderer.invoke(API_RPC_IPC_CHANNELS.startSubscription, input),
     stopSubscription: (input) => ipcRenderer.invoke(API_RPC_IPC_CHANNELS.stopSubscription, input),
   },

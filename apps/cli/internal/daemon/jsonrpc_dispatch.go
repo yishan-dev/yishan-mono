@@ -12,39 +12,39 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 	switch method {
 	case MethodDaemonPing:
 		return map[string]string{"status": "ok"}, nil
-	case MethodWorkspaceOpen:
+	case MethodOpen:
 		var req workspace.OpenRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.Open(req)
-	case MethodWorkspaceList:
+	case MethodList:
 		return h.manager.List(), nil
-	case MethodWorkspaceFileRead:
+	case MethodFileRead:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileRead(req.WorkspaceID, req.Path)
-	case MethodWorkspaceFileList:
+	case MethodFileList:
 		var req fileListParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileList(req.WorkspaceID, req.Path)
-	case MethodWorkspaceFileStat:
+	case MethodFileStat:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileStat(req.WorkspaceID, req.Path)
-	case MethodWorkspaceFileWrite:
+	case MethodFileWrite:
 		var req fileWriteParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileWrite(req.WorkspaceID, req.Path, req.Content, req.Mode)
-	case MethodWorkspaceFileDelete:
+	case MethodFileDelete:
 		var req fileDeleteParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -53,7 +53,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"deleted": true}, nil
-	case MethodWorkspaceFileMove:
+	case MethodFileMove:
 		var req fileMoveParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -62,7 +62,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"moved": true}, nil
-	case MethodWorkspaceFileMkdir:
+	case MethodFileMkdir:
 		var req fileMkdirParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -71,25 +71,25 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"created": true}, nil
-	case MethodWorkspaceFileDiff:
+	case MethodFileDiff:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.FileReadDiff(ctx, req.WorkspaceID, req.Path)
-	case MethodWorkspaceGitStatus:
+	case MethodGitStatus:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitStatus(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitListChanges:
+	case MethodGitListChanges:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListChanges(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitTrack:
+	case MethodGitTrack:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -98,7 +98,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"tracked": true}, nil
-	case MethodWorkspaceGitUnstage:
+	case MethodGitUnstage:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -107,7 +107,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"unstaged": true}, nil
-	case MethodWorkspaceGitRevert:
+	case MethodGitRevert:
 		var req gitPathsParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -116,55 +116,55 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"reverted": true}, nil
-	case MethodWorkspaceGitCommit:
+	case MethodGitCommit:
 		var req gitCommitParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitCommitChanges(ctx, req.WorkspaceID, req.Message, req.Amend, req.Signoff)
-	case MethodWorkspaceGitBranchStatus:
+	case MethodGitBranchStatus:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitBranchStatus(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitCommitsToTarget:
+	case MethodGitCommitsToTarget:
 		var req gitTargetBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListCommitsToTarget(ctx, req.WorkspaceID, req.TargetBranch)
-	case MethodWorkspaceGitCommitDiff:
+	case MethodGitCommitDiff:
 		var req gitCommitDiffParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitReadCommitDiff(ctx, req.WorkspaceID, req.CommitHash, req.Path)
-	case MethodWorkspaceGitBranchDiff:
+	case MethodGitBranchDiff:
 		var req gitBranchDiffParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitReadBranchComparisonDiff(ctx, req.WorkspaceID, req.TargetBranch, req.Path)
-	case MethodWorkspaceGitBranches:
+	case MethodGitBranches:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitListBranches(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitPush:
+	case MethodGitPush:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitPushBranch(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitPublish:
+	case MethodGitPublish:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitPublishBranch(ctx, req.WorkspaceID)
-	case MethodWorkspaceGitRenameBranch:
+	case MethodGitRenameBranch:
 		var req gitRenameBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -173,7 +173,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"renamed": true}, nil
-	case MethodWorkspaceGitRemoveBranch:
+	case MethodGitRemoveBranch:
 		var req gitRemoveBranchParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -182,7 +182,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"removed": true}, nil
-	case MethodWorkspaceGitWorktreeCreate:
+	case MethodGitWorktreeCreate:
 		var req gitCreateWorktreeParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -191,7 +191,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"created": true}, nil
-	case MethodWorkspaceGitWorktreeRemove:
+	case MethodGitWorktreeRemove:
 		var req gitRemoveWorktreeParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -200,43 +200,43 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"removed": true}, nil
-	case MethodWorkspaceGitAuthorName:
+	case MethodGitAuthorName:
 		var req gitStatusParams
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.GitAuthorName(ctx, req.WorkspaceID)
-	case MethodWorkspaceTerminalStart:
+	case MethodTerminalStart:
 		var req workspace.TerminalStartRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalStart(ctx, req)
-	case MethodWorkspaceTerminalSend:
+	case MethodTerminalSend:
 		var req workspace.TerminalSendRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalSend(req)
-	case MethodWorkspaceTerminalRead:
+	case MethodTerminalRead:
 		var req workspace.TerminalReadRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalRead(req)
-	case MethodWorkspaceTerminalStop:
+	case MethodTerminalStop:
 		var req workspace.TerminalStopRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalStop(req)
-	case MethodWorkspaceTerminalResize:
+	case MethodTerminalResize:
 		var req workspace.TerminalResizeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
 		return h.manager.TerminalResize(req)
-	case MethodWorkspaceTerminalSubscribe:
+	case MethodTerminalSubscribe:
 		var req workspace.TerminalSubscribeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
@@ -249,7 +249,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			_, _ = h.manager.TerminalUnsubscribe(workspace.TerminalUnsubscribeRequest{SessionID: sessionID, SubscriptionID: subscriptionID})
 		})
 		return workspace.TerminalSubscribeResponse{Subscribed: true}, nil
-	case MethodWorkspaceTerminalUnsubscribe:
+	case MethodTerminalUnsubscribe:
 		var req workspace.TerminalUnsubscribeRequest
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
