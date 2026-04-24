@@ -37,8 +37,6 @@ export function FileTreeToolbar({
         px: 0.5,
         pb: 0.5,
         mb: 0.5,
-        borderBottom: 1,
-        borderColor: "divider",
       }}
     >
       <Tooltip title={createFileActionLabel}>

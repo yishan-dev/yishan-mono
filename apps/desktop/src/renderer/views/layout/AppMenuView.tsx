@@ -150,7 +150,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
           <Avatar
             src={currentUser?.avatarUrl ?? undefined}
             alt={currentUser?.name ?? currentUser?.email ?? t("org.menu.trigger")}
-            sx={{ width: 22, height: 22, fontSize: 11 }}
+            sx={{ width: 30, height: 30, fontSize: 11 }}
           >
             {initials}
           </Avatar>
