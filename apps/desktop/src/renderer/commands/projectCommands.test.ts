@@ -6,9 +6,29 @@ import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { createRepo, deleteRepo, loadWorkspaceFromBackend, updateRepoConfig } from "./projectCommands";
 
+const apiMocks = vi.hoisted(() => ({
+  listOrganizations: vi.fn(),
+  createProject: vi.fn(),
+  fetchOrgProjectSnapshot: vi.fn(),
+  queryClientFetchQuery: vi.fn(),
+}));
+
+vi.mock("../api/orgProjectApi", () => ({
+  listOrganizations: apiMocks.listOrganizations,
+  createProject: apiMocks.createProject,
+}));
+
+vi.mock("../api/orgProjectQueries", () => ({
+  getOrgProjectSnapshot: apiMocks.fetchOrgProjectSnapshot,
+}));
+
+vi.mock("../queryClient", () => ({
+  rendererQueryClient: {
+    fetchQuery: apiMocks.queryClientFetchQuery,
+  },
+}));
+
 const rpcMocks = vi.hoisted(() => ({
-  listWorkspaces: vi.fn(),
-  listRepos: vi.fn(),
   createRepo: vi.fn(),
   deleteRepo: vi.fn(),
 }));
@@ -16,19 +36,11 @@ const rpcMocks = vi.hoisted(() => ({
 vi.mock("../rpc/rpcTransport", () => ({
   getApiServiceClient: vi.fn(async () => ({
     repo: {
-      list: {
-        query: rpcMocks.listRepos,
-      },
       createRepo: {
         mutate: rpcMocks.createRepo,
       },
       deleteRepo: {
         mutate: rpcMocks.deleteRepo,
-      },
-    },
-    workspace: {
-      list: {
-        query: rpcMocks.listWorkspaces,
       },
     },
   })),
@@ -53,36 +65,34 @@ describe("projectCommands", () => {
     const setSelectedWorkspaceId = vi.fn();
     tabStore.setState({ retainWorkspaceTabs, setSelectedWorkspaceId });
     workspaceStore.setState({ loadWorkspaceFromBackend: hydrate });
-    rpcMocks.listRepos.mockResolvedValueOnce([
-      {
-        id: "repo-1",
-        key: "repo-1",
-        localPath: "/tmp/repo-1",
-        worktreePath: "/tmp/repo-1",
-        contextEnabled: true,
-        icon: "folder",
-        color: "#1E66F5",
-        defaultBranch: "main",
-        setupScript: null,
-        postScript: null,
-        gitUrl: null,
-      },
-    ]);
-    rpcMocks.listWorkspaces.mockResolvedValueOnce([]);
+    apiMocks.queryClientFetchQuery.mockResolvedValueOnce({
+      organizationId: "org-1",
+      projects: [
+        {
+          id: "project-1",
+          name: "Project 1",
+          sourceType: "git",
+          repoProvider: "github",
+          repoUrl: "https://github.com/test/project-1.git",
+          repoKey: "project-1",
+        },
+      ],
+      workspaces: [],
+    });
 
     await loadWorkspaceFromBackend();
 
-    expect(rpcMocks.listRepos).toHaveBeenCalledWith();
-    expect(rpcMocks.listWorkspaces).toHaveBeenCalledWith(undefined);
+    expect(apiMocks.queryClientFetchQuery).toHaveBeenCalledTimes(1);
     expect(hydrate).toHaveBeenCalledTimes(1);
     expect(hydrate.mock.calls[0]?.[0]).toEqual({
       repos: [
         {
-          id: "repo-1",
-          key: "repo-1",
-          localPath: "/tmp/repo-1",
-          gitUrl: "",
-          worktreePath: "/tmp/repo-1",
+          id: "project-1",
+          key: "project-1",
+          name: "Project 1",
+          localPath: "",
+          gitUrl: "https://github.com/test/project-1.git",
+          worktreePath: "",
           privateContextEnabled: true,
           defaultBranch: "main",
           icon: "folder",
@@ -100,18 +110,14 @@ describe("projectCommands", () => {
   it("creates backend repo and then appends store state", async () => {
     const appendRepo = vi.fn();
     workspaceStore.setState({ createRepo: appendRepo });
-    rpcMocks.createRepo.mockResolvedValueOnce({
-      id: "repo-1",
-      key: "repo-1",
-      localPath: "/tmp/repo-1",
-      worktreePath: "/tmp/repo-1",
-      gitUrl: "",
-      contextEnabled: true,
-      icon: null,
-      color: null,
-      setupScript: "",
-      postScript: "",
-      defaultBranch: null,
+    apiMocks.listOrganizations.mockResolvedValueOnce([{ id: "org-1", name: "Default org" }]);
+    apiMocks.createProject.mockResolvedValueOnce({
+      id: "project-1",
+      name: "Repo 1",
+      sourceType: "git-local",
+      repoProvider: null,
+      repoUrl: null,
+      repoKey: "repo-1",
     });
 
     await createRepo({
@@ -121,13 +127,11 @@ describe("projectCommands", () => {
       path: "/tmp/repo-1",
     });
 
-    expect(rpcMocks.createRepo).toHaveBeenCalledWith({
-      key: "repo-1",
+    expect(apiMocks.createProject).toHaveBeenCalledWith("org-1", {
+      name: "Repo 1",
+      sourceTypeHint: "git-local",
+      repoUrl: undefined,
       localPath: "/tmp/repo-1",
-      remoteUrl: undefined,
-      contextEnabled: true,
-      icon: "folder",
-      color: "#1E66F5",
     });
     expect(appendRepo).toHaveBeenCalledTimes(1);
   });

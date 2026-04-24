@@ -6,6 +6,11 @@
     "login": {
       "title": "欢迎使用 Yishan",
       "description": "请先使用 Google 登录，再继续进入桌面工作区。",
+      "remoteStatus": {
+        "checking": "正在检查远程 API 状态...",
+        "online": "远程 API 连接正常。",
+        "unreachable": "无法连接远程 API，请检查 api-service 地址配置。"
+      },
       "googleCta": "使用 Google 继续",
       "signingIn": "登录中...",
       "errors": {

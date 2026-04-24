@@ -1,4 +1,5 @@
 import "./style.css";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import React, { useEffect, useMemo } from "react";
@@ -14,6 +15,7 @@ import { KeyBindingsView } from "./views/KeyBindingsView";
 import { SettingsView } from "./views/SettingsView";
 import { AppShell } from "./views/layout/AppShell";
 import { ApplicationRouterView, NotFoundRouteView } from "./views/layout/ApplicationRouterView";
+import { rendererQueryClient } from "./queryClient";
 
 /** Renders app routes with a shared theme-preference context. */
 function AppRoot() {
@@ -31,35 +33,37 @@ function AppRoot() {
   }, []);
 
   return (
-    <ThemeProvider theme={appTheme}>
-      <CssBaseline />
-      <HashRouter>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<ApplicationRouterView />}>
-              <Route index element={null} />
-              <Route
-                path="settings"
-                element={
-                  <WorkspaceOverlay>
-                    <SettingsView />
-                  </WorkspaceOverlay>
-                }
-              />
-              <Route
-                path="keybindings"
-                element={
-                  <WorkspaceOverlay>
-                    <KeyBindingsView />
-                  </WorkspaceOverlay>
-                }
-              />
+    <QueryClientProvider client={rendererQueryClient}>
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <HashRouter>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<ApplicationRouterView />}>
+                <Route index element={null} />
+                <Route
+                  path="settings"
+                  element={
+                    <WorkspaceOverlay>
+                      <SettingsView />
+                    </WorkspaceOverlay>
+                  }
+                />
+                <Route
+                  path="keybindings"
+                  element={
+                    <WorkspaceOverlay>
+                      <KeyBindingsView />
+                    </WorkspaceOverlay>
+                  }
+                />
+              </Route>
+              <Route path="*" element={<NotFoundRouteView />} />
             </Route>
-            <Route path="*" element={<NotFoundRouteView />} />
-          </Route>
-        </Routes>
-      </HashRouter>
-    </ThemeProvider>
+          </Routes>
+        </HashRouter>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

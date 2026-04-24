@@ -55,6 +55,15 @@ export type AuthLoginResult = {
   error?: string;
 };
 
+export type AuthTokensResult = {
+  authenticated: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
+  error?: string;
+};
+
 export type DesktopHostBridge = {
   openLocalFolderDialog: (input?: OpenLocalFolderDialogInput) => Promise<string | null>;
   toggleMainWindowMaximized: () => Promise<{ ok: true }>;
@@ -66,6 +75,7 @@ export type DesktopHostBridge = {
   playNotificationSound: (input: PlayNotificationSoundInput) => Promise<NotificationSoundPreviewResult>;
   getAuthStatus: () => Promise<AuthStatusResult>;
   login: () => Promise<AuthLoginResult>;
+  getAuthTokens: () => Promise<AuthTokensResult>;
 };
 
 export type DesktopBridge = {
@@ -84,6 +94,7 @@ export const HOST_IPC_CHANNELS = {
   playNotificationSound: "desktop:host/play-notification-sound",
   getAuthStatus: "desktop:host/get-auth-status",
   login: "desktop:host/login",
+  getAuthTokens: "desktop:host/get-auth-tokens",
 } as const;
 
 /** IPC channels used to forward normalized desktop RPC envelopes from main process to renderer. */

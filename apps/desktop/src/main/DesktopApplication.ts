@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { getAuthStatus, login } from "./auth/cliAuth";
+import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
 import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
 import { HOST_IPC_CHANNELS } from "./ipc";
@@ -55,6 +55,10 @@ export class DesktopApplication {
 
     ipcMain.handle(HOST_IPC_CHANNELS.login, async () => {
       return await login();
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.getAuthTokens, async () => {
+      return await getAuthTokens();
     });
   }
 

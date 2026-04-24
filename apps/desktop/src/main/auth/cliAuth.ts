@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
-import type { AuthLoginResult, AuthStatusResult } from "../ipc";
+import type { AuthLoginResult, AuthStatusResult, AuthTokensResult } from "../ipc";
 
 const CLI_WHOAMI_ARGS = ["whoami"];
 const CLI_LOGIN_ARGS = ["login"];
@@ -19,6 +21,13 @@ type CliInvocation = {
   executablePath: string;
   prefixArgs: string[];
   cwd?: string;
+};
+
+type ParsedCredentialTokens = {
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
 };
 
 /** Resolves one desktop auth CLI executable path. */
@@ -50,6 +59,68 @@ function resolveCliInvocation(): CliInvocation {
     executablePath: resolve(process.resourcesPath, bundledCliName),
     prefixArgs: [],
   };
+}
+
+/** Resolves active CLI profile name used for auth credential storage. */
+function resolveCliProfileName(): string {
+  const isDevMode = process.env.ELECTRON_CHANNEL === "dev" || process.env.NODE_ENV === "development";
+  if (isDevMode) {
+    return "dev";
+  }
+
+  return process.env.YISHAN_PROFILE?.trim() || "default";
+}
+
+/** Resolves CLI credential file path for the active profile. */
+function resolveCredentialFilePath(): string {
+  return resolve(homedir(), ".yishan", "profiles", resolveCliProfileName(), "credential.yaml");
+}
+
+/** Parses one YAML-like key-value credential file into auth token fields. */
+function parseCredentialTokens(credentialText: string): ParsedCredentialTokens {
+  const tokens: ParsedCredentialTokens = {};
+  for (const rawLine of credentialText.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf(":");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const rawValue = line.slice(separatorIndex + 1).trim();
+    const value = rawValue.replace(/^['\"]|['\"]$/g, "");
+    if (key === "api_token") {
+      tokens.accessToken = value;
+      continue;
+    }
+    if (key === "api_refresh_token") {
+      tokens.refreshToken = value;
+      continue;
+    }
+    if (key === "api_access_token_expires_at") {
+      tokens.accessTokenExpiresAt = value;
+      continue;
+    }
+    if (key === "api_refresh_token_expires_at") {
+      tokens.refreshTokenExpiresAt = value;
+    }
+  }
+
+  return tokens;
+}
+
+/** Reads auth tokens from CLI credential file for current profile. */
+async function readAuthTokensFromCredentialFile(): Promise<ParsedCredentialTokens> {
+  try {
+    const credentialText = await readFile(resolveCredentialFilePath(), "utf8");
+    return parseCredentialTokens(credentialText);
+  } catch {
+    return {};
+  }
 }
 
 /** Executes one CLI command and captures exit status and output streams. */
@@ -197,4 +268,31 @@ export async function getAuthStatus(options?: { run?: CliCommandRunner }): Promi
   }
 
   return parseAuthStatusPayload(result.stdout);
+}
+
+/** Returns auth tokens from CLI credential file after ensuring status/refresh is up to date. */
+export async function getAuthTokens(options?: { run?: CliCommandRunner }): Promise<AuthTokensResult> {
+  const status = await getAuthStatus(options);
+  if (!status.authenticated) {
+    return {
+      authenticated: false,
+      error: status.error,
+    };
+  }
+
+  const tokens = await readAuthTokensFromCredentialFile();
+  if (!tokens.accessToken || !tokens.refreshToken) {
+    return {
+      authenticated: false,
+      error: "Auth tokens are missing from CLI credential file",
+    };
+  }
+
+  return {
+    authenticated: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+    refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+  };
 }

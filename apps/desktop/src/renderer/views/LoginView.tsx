@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
 import { login } from "../commands/appCommands";
+import { useRemoteHealthQuery } from "../hooks/useRemoteHealthQuery";
 import { authStore } from "../store/authStore";
 
 /** Renders one pre-authentication entry screen with Google sign-in action. */
@@ -11,6 +12,7 @@ export function LoginView() {
   const setAuthState = authStore((state) => state.setAuthState);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const remoteHealthQuery = useRemoteHealthQuery();
 
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
@@ -56,6 +58,13 @@ export function LoginView() {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {t("auth.login.description")}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {remoteHealthQuery.isLoading
+              ? t("auth.login.remoteStatus.checking")
+              : remoteHealthQuery.isError
+                ? t("auth.login.remoteStatus.unreachable")
+                : t("auth.login.remoteStatus.online")}
           </Typography>
         </Stack>
 

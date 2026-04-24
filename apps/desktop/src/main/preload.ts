@@ -14,6 +14,7 @@ const bridge: DesktopBridge = {
     playNotificationSound: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.playNotificationSound, input),
     getAuthStatus: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthStatus),
     login: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.login),
+    getAuthTokens: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthTokens),
   },
   subscribeDesktopRpcEvent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, envelope: unknown) => {
