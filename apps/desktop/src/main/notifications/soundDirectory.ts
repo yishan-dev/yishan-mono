@@ -18,12 +18,9 @@ export function resolveDesktopSoundDirectory(input?: {
     platform === "darwin" ? resolve(executableDirectory, "../Resources") : resolve(executableDirectory, "resources");
 
   const candidates = [
-    resolve(resourceDirectory, "app", SOUNDS_DIRECTORY),
-    resolve(resourceDirectory, SOUNDS_DIRECTORY),
-    resolve(executableDirectory, "app", SOUNDS_DIRECTORY),
-    resolve(cwd, SOUNDS_DIRECTORY),
-    resolve(cwd, "assets", SOUNDS_DIRECTORY),
-    resolve(cwd, "apps", "desktop", "assets", SOUNDS_DIRECTORY),
+    resolve(resourceDirectory, "app", "src", "assets", SOUNDS_DIRECTORY),
+    resolve(cwd, "src", "assets", SOUNDS_DIRECTORY),
+    resolve(cwd, "apps", "desktop", "src", "assets", SOUNDS_DIRECTORY),
   ];
 
   for (const candidate of candidates) {

@@ -9,7 +9,13 @@ export async function runSoundCommand(command: string[]): Promise<void> {
 
   await new Promise<void>((resolve, reject) => {
     const processHandle = spawn(executable, args, {
-      stdio: "ignore",
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+
+    let stderr = "";
+    processHandle.stderr?.setEncoding("utf8");
+    processHandle.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
     });
 
     processHandle.once("error", (error) => {
@@ -22,7 +28,14 @@ export async function runSoundCommand(command: string[]): Promise<void> {
         return;
       }
 
-      reject(new Error(`sound command failed with exit code ${code ?? "unknown"}`));
+      const details = stderr.trim();
+      reject(
+        new Error(
+          details
+            ? `sound command failed with exit code ${code ?? "unknown"}: ${details}`
+            : `sound command failed with exit code ${code ?? "unknown"}`,
+        ),
+      );
     });
   });
 }
