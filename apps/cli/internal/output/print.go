@@ -12,10 +12,18 @@ func PrintResponse(body []byte) error {
 		return nil
 	}
 
+	if isJSONOutputEnabled() {
+		return printAsJSON(decoded)
+	}
+
 	return PrintAny(decoded)
 }
 
 func PrintAny(decoded any) error {
+	if isJSONOutputEnabled() {
+		return printAsJSON(decoded)
+	}
+
 	normalized, ok := normalizeDecoded(decoded)
 	if !ok {
 		return PrintRenderData(RenderData{Object: decoded})
@@ -25,6 +33,10 @@ func PrintAny(decoded any) error {
 }
 
 func PrintRenderData(data RenderData) error {
+	if isJSONOutputEnabled() {
+		return printAsJSON(renderDataToJSON(data))
+	}
+
 	if data.Title != "" {
 		fmt.Printf("%s:\n", data.Title)
 	}
@@ -45,4 +57,33 @@ func PrintRenderData(data RenderData) error {
 
 	fmt.Println(string(pretty))
 	return nil
+}
+
+func printAsJSON(value any) error {
+	pretty, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return fmt.Errorf("format response body: %w", err)
+	}
+
+	fmt.Println(string(pretty))
+	return nil
+}
+
+func renderDataToJSON(data RenderData) any {
+	if data.Object != nil {
+		return data.Object
+	}
+
+	if data.Rows != nil {
+		if data.Title != "" {
+			return map[string]any{data.Title: data.Rows}
+		}
+		return data.Rows
+	}
+
+	if data.Title != "" {
+		return map[string]string{"title": data.Title}
+	}
+
+	return map[string]any{}
 }

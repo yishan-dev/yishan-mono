@@ -5,6 +5,7 @@ import (
 	"strings"
 	"yishan/apps/cli/internal/config"
 	"yishan/apps/cli/internal/logx"
+	"yishan/apps/cli/internal/output"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -35,11 +36,13 @@ func init() {
 	rootCmd.PersistentFlags().String("profile", "default", "runtime profile name (default, dev, ...)")
 	rootCmd.PersistentFlags().String("log-level", "", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("log-format", "", "log format (pretty, json)")
+	rootCmd.PersistentFlags().String("output", "default", "output format (default, json)")
 	rootCmd.PersistentFlags().String("api-base-url", "http://localhost:8787", "API service base URL")
 	rootCmd.PersistentFlags().String("api-token", "", "API access token (Bearer)")
 	cobra.CheckErr(viper.BindPFlag("profile", rootCmd.PersistentFlags().Lookup("profile")))
 	cobra.CheckErr(viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level")))
 	cobra.CheckErr(viper.BindPFlag("log_format", rootCmd.PersistentFlags().Lookup("log-format")))
+	cobra.CheckErr(viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output")))
 	cobra.CheckErr(viper.BindPFlag("api_base_url", rootCmd.PersistentFlags().Lookup("api-base-url")))
 	cobra.CheckErr(viper.BindPFlag("api_token", rootCmd.PersistentFlags().Lookup("api-token")))
 }
@@ -51,6 +54,7 @@ func initConfig() {
 	viper.SetDefault("profile", "default")
 	viper.SetDefault("log_level", "info")
 	viper.SetDefault("log_format", logx.FormatPretty)
+	viper.SetDefault("output", "default")
 
 	if err := configureLogger(viper.GetString("log_level"), viper.GetString("log_format")); err != nil {
 		cobra.CheckErr(err)
@@ -76,6 +80,10 @@ func initConfig() {
 	appConfig = loaded
 
 	if err := configureLogger(appConfig.LogLevel, appConfig.LogFormat); err != nil {
+		cobra.CheckErr(err)
+	}
+
+	if err := output.SetFormat(viper.GetString("output")); err != nil {
 		cobra.CheckErr(err)
 	}
 
