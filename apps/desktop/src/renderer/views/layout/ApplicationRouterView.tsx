@@ -2,8 +2,11 @@ import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material"
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate } from "react-router-dom";
+import { getSessionBootstrapData } from "../../api/sessionApi";
 import { getAuthStatus } from "../../commands/appCommands";
+import { rendererQueryClient } from "../../queryClient";
 import { authStore } from "../../store/authStore";
+import { sessionStore } from "../../store/sessionStore";
 import { LoginView } from "../LoginView";
 import { WorkspaceView } from "../WorkspaceView";
 
@@ -79,6 +82,43 @@ export function ApplicationRouterView() {
       disposed = true;
     };
   }, [authStatusResolved, setAuthState]);
+
+  useEffect(() => {
+    if (!authStatusResolved || !isAuthenticated) {
+      return;
+    }
+
+    let disposed = false;
+    const bootstrapSession = async () => {
+      try {
+        const sessionData = await rendererQueryClient.fetchQuery({
+          queryKey: ["session-bootstrap"],
+          queryFn: getSessionBootstrapData,
+          staleTime: 30_000,
+        });
+        if (disposed) {
+          return;
+        }
+
+        const previousSelectedOrganizationId = sessionStore.getState().selectedOrganizationId;
+        sessionStore.getState().setSessionData({
+          currentUser: sessionData.currentUser,
+          organizations: sessionData.organizations,
+          selectedOrganizationId: previousSelectedOrganizationId,
+        });
+      } catch {
+        if (!disposed) {
+          sessionStore.getState().clearSessionData();
+        }
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      disposed = true;
+    };
+  }, [authStatusResolved, isAuthenticated]);
 
   if (!authStatusResolved) {
     return (
