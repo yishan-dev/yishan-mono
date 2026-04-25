@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate } from "react-router-dom";
@@ -56,6 +56,7 @@ export function ApplicationRouterView() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
   const authStatusResolved = authStore((state) => state.authStatusResolved);
   const setAuthState = authStore((state) => state.setAuthState);
+  const selectedOrganizationId = sessionStore((state) => state.selectedOrganizationId);
   const [appBootstrapReady, setAppBootstrapReady] = useState(false);
   const [appBootstrapError, setAppBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
@@ -99,25 +100,30 @@ export function ApplicationRouterView() {
 
     let disposed = false;
     const bootstrapSession = async () => {
+      let bootstrappedSessionData = false;
       try {
         setAppBootstrapReady(false);
         setAppBootstrapError(null);
 
-        const sessionData = await rendererQueryClient.fetchQuery({
-          queryKey: ["session-bootstrap"],
-          queryFn: getSessionBootstrapData,
-          staleTime: 30_000,
-        });
-        if (disposed) {
-          return;
-        }
+        const sessionState = sessionStore.getState();
+        if (!sessionState.loaded) {
+          const sessionData = await rendererQueryClient.fetchQuery({
+            queryKey: ["session-bootstrap"],
+            queryFn: getSessionBootstrapData,
+            staleTime: 30_000,
+          });
+          if (disposed) {
+            return;
+          }
 
-        const previousSelectedOrganizationId = sessionStore.getState().selectedOrganizationId;
-        sessionStore.getState().setSessionData({
-          currentUser: sessionData.currentUser,
-          organizations: sessionData.organizations,
-          selectedOrganizationId: previousSelectedOrganizationId,
-        });
+          const previousSelectedOrganizationId = sessionStore.getState().selectedOrganizationId;
+          sessionStore.getState().setSessionData({
+            currentUser: sessionData.currentUser,
+            organizations: sessionData.organizations,
+            selectedOrganizationId: previousSelectedOrganizationId,
+          });
+          bootstrappedSessionData = true;
+        }
 
         await loadWorkspaceFromBackend();
         if (disposed) {
@@ -139,7 +145,9 @@ export function ApplicationRouterView() {
         }
       } catch {
         if (!disposed) {
-          sessionStore.getState().clearSessionData();
+          if (bootstrappedSessionData) {
+            sessionStore.getState().clearSessionData();
+          }
           setAppBootstrapReady(false);
           setAppBootstrapError("failed");
         }
@@ -151,7 +159,7 @@ export function ApplicationRouterView() {
     return () => {
       disposed = true;
     };
-  }, [authStatusResolved, bootstrapAttempt, isAuthenticated]);
+  }, [authStatusResolved, bootstrapAttempt, isAuthenticated, selectedOrganizationId]);
 
   if (!authStatusResolved) {
     return (

@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { ExternalAppId } from "../../shared/contracts/externalApps";
-import type { CreateRepoResult, RepoSnapshot } from "../types/projectTypes";
+import type { CreateRepoResult, ProjectRecord, ProjectWorkspaceRecord } from "../api/types";
 
 export type ChatMessage = {
   id: string;
@@ -129,26 +129,25 @@ export type OpenWorkspaceTabInput =
 
 export type WorkspaceStoreState = {
   projects: Repo[];
-  repos: Repo[];
   workspaces: RepoWorkspaceItem[];
   gitChangesCountByWorkspaceId: Record<string, number>;
   gitChangeTotalsByWorkspaceId: Record<string, WorkspaceGitChangeTotals>;
   gitRefreshVersionByWorktreePath: Record<string, number>;
   fileTreeChangedRelativePathsByWorktreePath: Record<string, string[]>;
   selectedProjectId: string;
-  selectedRepoId: string;
   selectedWorkspaceId: string;
   displayProjectIds: string[];
-  displayRepoIds: string[];
   lastUsedExternalAppId?: ExternalAppId;
   fileTreeRefreshVersion: number;
   setSelectedProjectId: (projectId: string) => void;
-  setSelectedRepoId: (repoId: string) => void;
   setSelectedWorkspaceId: (workspaceId: string) => void;
   setDisplayProjectIds: (projectIds: string[]) => void;
-  setDisplayRepoIds: (repoIds: string[]) => void;
   setLastUsedExternalAppId: (appId: ExternalAppId) => void;
-  loadWorkspaceFromBackend: (snapshot: RepoSnapshot, persistedDisplayRepoIds?: string[]) => void;
+  loadWorkspaceFromBackend: (
+    projects: ProjectRecord[],
+    workspaces: ProjectWorkspaceRecord[],
+    persistedDisplayProjectIds?: string[],
+  ) => void;
   createProject: (input: {
     name: string;
     source: "local" | "remote";
@@ -156,24 +155,9 @@ export type WorkspaceStoreState = {
     gitUrl?: string;
     backendRepo: CreateRepoResult;
   }) => void;
-  createRepo: (input: {
-    name: string;
-    source: "local" | "remote";
-    path?: string;
-    gitUrl?: string;
-    backendRepo: CreateRepoResult;
-  }) => void;
   deleteProject: (projectId: string) => void;
-  deleteRepo: (repoId: string) => void;
   updateProjectConfig: (
     projectId: string,
-    config: Pick<
-      Repo,
-      "name" | "worktreePath" | "privateContextEnabled" | "icon" | "iconBgColor" | "setupScript" | "postScript"
-    >,
-  ) => void;
-  updateRepoConfig: (
-    repoId: string,
     config: Pick<
       Repo,
       "name" | "worktreePath" | "privateContextEnabled" | "icon" | "iconBgColor" | "setupScript" | "postScript"
@@ -213,24 +197,19 @@ export type WorkspaceStoreState = {
 
 export type WorkspaceStorePersistedState = Pick<
   WorkspaceStoreState,
-  "displayProjectIds" | "displayRepoIds" | "lastUsedExternalAppId"
+  "displayProjectIds" | "lastUsedExternalAppId"
 >;
 
 export type WorkspaceStoreActions = Pick<
   WorkspaceStoreState,
   | "setSelectedProjectId"
-  | "setSelectedRepoId"
   | "setSelectedWorkspaceId"
   | "setDisplayProjectIds"
-  | "setDisplayRepoIds"
   | "setLastUsedExternalAppId"
   | "loadWorkspaceFromBackend"
   | "createProject"
-  | "createRepo"
   | "deleteProject"
-  | "deleteRepo"
   | "updateProjectConfig"
-  | "updateRepoConfig"
   | "incrementFileTreeRefreshVersion"
   | "addWorkspace"
   | "deleteWorkspace"

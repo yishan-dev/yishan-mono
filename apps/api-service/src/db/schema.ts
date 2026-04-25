@@ -8,6 +8,10 @@ import {
   uniqueIndex
 } from "drizzle-orm/pg-core";
 
+export type NodeScope = "private" | "shared";
+export type ProjectSourceType = "git" | "git-local" | "unknown";
+export type WorkspaceKind = "primary" | "worktree";
+
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
@@ -111,7 +115,7 @@ export const nodes = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    scope: text("scope").notNull(),
+    scope: text("scope").$type<NodeScope>().notNull(),
     endpoint: text("endpoint"),
     metadata: jsonb("metadata"),
     ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -135,7 +139,7 @@ export const projects = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    sourceType: text("source_type").notNull(),
+    sourceType: text("source_type").$type<ProjectSourceType>().notNull(),
     repoProvider: text("repo_provider"),
     repoUrl: text("repo_url"),
     repoKey: text("repo_key"),
@@ -176,7 +180,7 @@ export const workspaces = pgTable(
     nodeId: text("node_id")
       .notNull()
       .references(() => nodes.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull().default("primary"),
+    kind: text("kind").$type<WorkspaceKind>().notNull().default("primary"),
     branch: text("branch"),
     localPath: text("local_path").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

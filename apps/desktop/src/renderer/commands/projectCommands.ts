@@ -2,14 +2,11 @@ import { readPersistedDisplayRepoIds } from "../helpers/projectHelpers";
 import {
   api,
 } from "../api";
-import type { ProjectRecord } from "../api";
-import { getOrgProjectSnapshot } from "../api/orgProjectQueries";
-import { rendererQueryClient } from "../queryClient";
+import type { ProjectRecord, ProjectWithWorkspacesRecord } from "../api";
 import { RestApiError } from "../api/restClient";
 import { getApiServiceClient } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
 import { workspaceStore } from "../store/workspaceStore";
-import type { RepoSnapshot } from "../types/projectTypes";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 async function inspectLocalRepository(path: string): Promise<{
@@ -41,122 +38,36 @@ async function inspectLocalRepository(path: string): Promise<{
   }
 }
 
-/**
- * Maps org/project REST rows into the legacy workspace-store snapshot shape.
- */
-function mapOrgProjectSnapshotToStore(
-  projectsList: Array<{
-    id: string;
-    name: string;
-    sourceType: "git" | "git-local" | "unknown";
-    repoProvider: string | null;
-    repoUrl: string | null;
-    repoKey: string | null;
-  }>,
-  workspacesList: Array<{
-    id: string;
-    projectId: string;
-    branch: string | null;
-    localPath: string;
-  }>,
-): RepoSnapshot {
-  const projectById = new Map<
-    string,
-    {
-      id: string;
-      key: string;
-      name?: string;
-      localPath: string;
-      gitUrl: string;
-      worktreePath: string;
-      privateContextEnabled: boolean;
-      defaultBranch: string;
-      icon: string;
-      color: string;
-      setupScript: string;
-      postScript: string;
-    }
-  >();
-  const workspaces: RepoSnapshot["workspaces"] = [];
-
-  for (const project of projectsList) {
-    projectById.set(project.id, {
-      id: project.id,
-      key: project.repoKey ?? project.id,
-      name: project.name,
-      localPath: "",
-      gitUrl: project.repoUrl ?? "",
-      worktreePath: "",
-      privateContextEnabled: true,
-      defaultBranch: "main",
-      icon: "folder",
-      color: "#1E66F5",
-      setupScript: "",
-      postScript: "",
-    });
-  }
-
-  for (const item of workspacesList) {
-    const parentId = item.projectId ?? "";
-    if (!parentId) {
-      continue;
-    }
-
-    if (!projectById.has(parentId)) {
-      projectById.set(parentId, {
-        id: parentId,
-        key: parentId,
-        localPath: item.localPath ?? "",
-        gitUrl: "",
-        worktreePath: item.localPath ?? "",
-        privateContextEnabled: true,
-        defaultBranch: item.branch ?? "main",
-        icon: "folder",
-        color: "#1E66F5",
-        setupScript: "",
-        postScript: "",
-      });
-    }
-
-    workspaces.push({
-      workspaceId: item.id,
-      repoId: parentId,
-      projectId: item.projectId,
-      name: item.branch ?? "Workspace",
-      sourceBranch: item.branch ?? "main",
-      branch: item.branch ?? "main",
-      worktreePath: item.localPath ?? "",
-      status: "open",
-    });
-  }
-
-  return {
-    repos: [...projectById.values()],
-    workspaces,
-  };
-}
-
 /** Loads backend snapshot data and hydrates the workspace store from it. */
 export async function loadWorkspaceFromBackend(): Promise<void> {
   const previousWorkspaces = workspaceStore.getState().workspaces;
 
   try {
-    const snapshotQuery = await rendererQueryClient.fetchQuery({
-      queryKey: ["org-project-snapshot"],
-      queryFn: getOrgProjectSnapshot,
-      staleTime: 30_000,
-    });
-    if (!snapshotQuery.organizationId) {
-      workspaceStore.getState().loadWorkspaceFromBackend({ repos: [], workspaces: [] }, []);
+    const sessionState = sessionStore.getState();
+    const organizations =
+      sessionState.organizations.length > 0 ? sessionState.organizations : await api.org.list();
+    const selectedOrganization =
+      sessionState.selectedOrganizationId &&
+      organizations.some((organization) => organization.id === sessionState.selectedOrganizationId)
+        ? organizations.find((organization) => organization.id === sessionState.selectedOrganizationId)
+        : organizations[0];
+
+    if (!selectedOrganization) {
+      workspaceStore.getState().loadWorkspaceFromBackend([], [], []);
       syncTabStoreWithWorkspace(previousWorkspaces);
       return;
     }
 
-    const snapshot = mapOrgProjectSnapshotToStore(snapshotQuery.projects, snapshotQuery.workspaces);
+    const projectsWithWorkspaces: ProjectWithWorkspacesRecord[] = await api.project.listByOrg(selectedOrganization.id, {
+      withWorkspaces: true,
+    });
+    const projects: ProjectRecord[] = projectsWithWorkspaces.map(({ workspaces: _, ...project }) => project);
+    const workspaces = projectsWithWorkspaces.flatMap((project) => project.workspaces ?? []);
+
     const persistedDisplayProjectIds = readPersistedDisplayRepoIds(
       typeof localStorage === "undefined" ? undefined : localStorage,
     );
-    workspaceStore.getState().loadWorkspaceFromBackend(snapshot, persistedDisplayProjectIds);
+    workspaceStore.getState().loadWorkspaceFromBackend(projects, workspaces, persistedDisplayProjectIds);
     syncTabStoreWithWorkspace(previousWorkspaces);
   } catch (error) {
     console.error("Failed to load workspace snapshot", error);
@@ -194,7 +105,9 @@ export async function createProject(input: {
   if (input.source === "local" && normalizedPath) {
     try {
       const nodes = await api.node.listByOrg(selectedOrganizationId);
-      const preferredLocalNode = nodes.find((node) => node.scope === "local" && node.canUse);
+      const preferredLocalNode = nodes.find(
+        (node) => (node.scope === "private" || node.scope === "local") && node.canUse,
+      );
       inferredNodeId = preferredLocalNode?.id;
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -236,7 +149,7 @@ export async function createProject(input: {
     return;
   }
 
-  workspaceStore.getState().createRepo({
+  workspaceStore.getState().createProject({
     ...input,
     name: backendProject.name || normalizedName,
     backendRepo: {
@@ -274,7 +187,7 @@ export async function deleteProject(projectId: string): Promise<void> {
     }
   }
 
-  workspaceStore.getState().deleteRepo(projectId);
+  workspaceStore.getState().deleteProject(projectId);
   syncTabStoreWithWorkspace(previousWorkspaces);
 }
 
@@ -292,13 +205,12 @@ export async function updateProjectConfig(
   },
 ): Promise<void> {
   const project =
-    workspaceStore.getState().projects.find((item) => item.id === projectId) ??
-    workspaceStore.getState().repos.find((item) => item.id === projectId);
+    workspaceStore.getState().projects.find((item) => item.id === projectId);
   if (!project) {
     return;
   }
 
   const store = workspaceStore.getState();
-  store.updateRepoConfig(projectId, config);
+  store.updateProjectConfig(projectId, config);
   store.incrementFileTreeRefreshVersion();
 }

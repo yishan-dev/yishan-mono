@@ -84,7 +84,7 @@ export class WorkspaceService {
         throw new WorkspaceNodeNotFoundError(input.nodeId);
       }
 
-      if (node.scope !== "private" && node.scope !== "local") {
+      if (node.scope !== "private") {
         throw new WorkspaceLocalNodeScopeInvalidError(input.nodeId);
       }
 
@@ -126,10 +126,7 @@ export class WorkspaceService {
         throw new Error("Failed to create workspace");
       }
 
-      return {
-        ...workspace,
-        kind: workspace.kind as WorkspaceKind
-      };
+      return workspace;
     });
 
     await this.workspaceProvisioner.enqueueWorkspaceProvision({
@@ -154,16 +151,6 @@ export class WorkspaceService {
       throw new OrganizationMembershipRequiredError();
     }
 
-    const projectRows = await this.db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(and(eq(projects.id, input.projectId), eq(projects.organizationId, input.organizationId)))
-      .limit(1);
-
-    if (projectRows.length === 0) {
-      throw new ProjectNotFoundError(input.projectId);
-    }
-
     const rows = await this.db
       .select()
       .from(workspaces)
@@ -175,9 +162,6 @@ export class WorkspaceService {
         )
       );
 
-    return rows.map((row) => ({
-      ...row,
-      kind: row.kind as WorkspaceKind
-    }));
+    return rows;
   }
 }

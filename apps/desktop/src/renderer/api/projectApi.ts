@@ -1,9 +1,20 @@
 import { requestJson } from "./restClient";
-import type { ProjectRecord } from "./types";
+import type { ProjectRecord, ProjectWithWorkspacesRecord } from "./types";
 
 /** Lists projects for one organization. */
-export async function listProjects(orgId: string): Promise<ProjectRecord[]> {
-  const response = await requestJson<{ projects: ProjectRecord[] }>(`/orgs/${orgId}/projects`);
+export async function listProjects(
+  orgId: string,
+  options: { withWorkspaces: true },
+): Promise<ProjectWithWorkspacesRecord[]>;
+export async function listProjects(orgId: string, options?: { withWorkspaces?: false }): Promise<ProjectRecord[]>;
+export async function listProjects(
+  orgId: string,
+  options?: { withWorkspaces?: boolean },
+): Promise<ProjectRecord[] | ProjectWithWorkspacesRecord[]> {
+  const query = options?.withWorkspaces === true ? "?withWorkspaces=true" : "";
+  const response = await requestJson<{ projects: ProjectRecord[] | ProjectWithWorkspacesRecord[] }>(
+    `/orgs/${orgId}/projects${query}`,
+  );
   return response.projects;
 }
 

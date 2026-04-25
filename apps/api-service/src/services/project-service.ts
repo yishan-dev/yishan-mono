@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { AppDb, AppDbWs } from "@/db/client";
 import { nodes, projects, workspaces } from "@/db/schema";
@@ -26,6 +26,21 @@ export type ProjectView = {
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type ProjectWithWorkspacesView = ProjectView & {
+  workspaces: Array<{
+    id: string;
+    organizationId: string;
+    projectId: string;
+    userId: string;
+    nodeId: string;
+    kind: "primary" | "worktree";
+    branch: string | null;
+    localPath: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
 };
 
 type CreateProjectInput = {
@@ -102,7 +117,7 @@ export class ProjectService {
           throw new WorkspaceNodeNotFoundError(nodeId);
         }
 
-        if (node.scope !== "private" && node.scope !== "local") {
+        if (node.scope !== "private") {
           throw new WorkspaceLocalNodeScopeInvalidError(nodeId);
         }
 
@@ -122,14 +137,15 @@ export class ProjectService {
         });
       }
 
-      return {
-        ...project,
-        sourceType: project.sourceType as ProjectSourceType
-      };
+      return project;
     });
   }
 
-  async listProjects(input: { organizationId: string; actorUserId: string }): Promise<ProjectView[]> {
+  async listProjects(input: {
+    organizationId: string;
+    actorUserId: string;
+    withWorkspaces?: boolean;
+  }): Promise<ProjectView[] | ProjectWithWorkspacesView[]> {
     const role = await this.organizationService.getMembershipRole({
       organizationId: input.organizationId,
       userId: input.actorUserId
@@ -141,9 +157,36 @@ export class ProjectService {
 
     const rows = await this.db.select().from(projects).where(eq(projects.organizationId, input.organizationId));
 
+    if (!input.withWorkspaces) {
+      return rows;
+    }
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const projectIds = rows.map((project) => project.id);
+    const workspaceRows = await this.db
+      .select()
+      .from(workspaces)
+      .where(
+        and(
+          eq(workspaces.organizationId, input.organizationId),
+          eq(workspaces.userId, input.actorUserId),
+          inArray(workspaces.projectId, projectIds)
+        )
+      );
+
+    const workspacesByProjectId = new Map<string, ProjectWithWorkspacesView["workspaces"]>();
+    for (const workspace of workspaceRows) {
+      const existing = workspacesByProjectId.get(workspace.projectId) ?? [];
+      existing.push(workspace);
+      workspacesByProjectId.set(workspace.projectId, existing);
+    }
+
     return rows.map((row) => ({
       ...row,
-      sourceType: row.sourceType as ProjectSourceType
+      workspaces: workspacesByProjectId.get(row.id) ?? []
     }));
   }
 

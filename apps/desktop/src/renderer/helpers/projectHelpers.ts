@@ -1,20 +1,17 @@
 import { buildWorkspaceStateFromData } from "../store/state";
 import { getFileName } from "../store/tabs";
 import type { Repo, RepoWorkspaceItem, WorkspaceStoreState } from "../store/types";
-import type { CreateRepoResult, RepoSnapshot } from "../types/projectTypes";
+import type { CreateRepoResult, ProjectRecord, ProjectWorkspaceRecord } from "../api/types";
 
 type RepoStoreSlice = Pick<
   WorkspaceStoreState,
   | "projects"
-  | "repos"
   | "workspaces"
   | "gitChangesCountByWorkspaceId"
   | "gitChangeTotalsByWorkspaceId"
   | "selectedProjectId"
-  | "selectedRepoId"
   | "selectedWorkspaceId"
   | "displayProjectIds"
-  | "displayRepoIds"
 >;
 
 /** Builds one deterministic local-workspace id for a repository id. */
@@ -71,10 +68,9 @@ export function readPersistedDisplayRepoIds(storage: Storage | undefined): strin
     const parsed = JSON.parse(raw) as {
       state?: {
         displayProjectIds?: unknown;
-        displayRepoIds?: unknown;
       };
     };
-    const candidate = parsed.state?.displayProjectIds ?? parsed.state?.displayRepoIds;
+    const candidate = parsed.state?.displayProjectIds;
     return Array.isArray(candidate) ? candidate.filter((item): item is string => typeof item === "string") : undefined;
   } catch {
     return undefined;
@@ -88,90 +84,105 @@ function filterWorkspaceScopedRecord<T>(record: Record<string, T>, workspaceIdSe
   ) as Record<string, T>;
 }
 
-/** Maps backend snapshot data into workspace repos and open workspaces. */
-function mapSnapshot(snapshot: RepoSnapshot): { repos: Repo[]; workspaces: RepoWorkspaceItem[] } {
-  const repos = snapshot.repos.map((repo) => {
-    const path = repo.localPath ?? "";
+/** Maps backend API data into workspace projects and open workspaces. */
+function mapApiData(projects: ProjectRecord[], workspacesFromApi: ProjectWorkspaceRecord[]): {
+  projects: Repo[];
+  workspaces: RepoWorkspaceItem[];
+} {
+  const preferredWorkspaceByProjectId = new Map<string, ProjectWorkspaceRecord>();
+  for (const workspace of workspacesFromApi) {
+    const projectId = workspace.projectId?.trim();
+    if (!projectId) {
+      continue;
+    }
+
+    const existing = preferredWorkspaceByProjectId.get(projectId);
+    if (!existing || (workspace.kind === "primary" && existing.kind !== "primary")) {
+      preferredWorkspaceByProjectId.set(projectId, workspace);
+    }
+  }
+
+  const mappedProjects = projects.map((repo) => {
+    const preferredWorkspace = preferredWorkspaceByProjectId.get(repo.id);
+    const path = preferredWorkspace?.localPath?.trim() ?? "";
     const displayName = repo.name?.trim() || (path ? getFileName(path) : repo.id);
     return {
       id: repo.id,
-      key: repo.key ?? repo.id,
+      key: repo.repoKey ?? repo.id,
       name: displayName,
       path,
       missing: !path,
-      gitUrl: repo.gitUrl ?? repo.repoUrl ?? "",
+      gitUrl: repo.repoUrl ?? "",
       localPath: path,
-      worktreePath: repo.worktreePath ?? path,
-      privateContextEnabled: repo.privateContextEnabled ?? repo.contextEnabled ?? true,
-      defaultBranch: repo.defaultBranch ?? "",
-      icon: repo.icon ?? "folder",
-      iconBgColor: repo.color ?? "#1E66F5",
-      setupScript: repo.setupScript ?? "",
-      postScript: repo.postScript ?? "",
+      worktreePath: path,
+      privateContextEnabled: true,
+      defaultBranch: preferredWorkspace?.branch ?? "",
+      icon: "folder",
+      iconBgColor: "#1E66F5",
+      setupScript: "",
+      postScript: "",
     } satisfies Repo;
   });
 
-  const repoIdSet = new Set(repos.map((repo) => repo.id));
-  const managedWorkspaces = snapshot.workspaces
+  const projectIdSet = new Set(mappedProjects.map((project) => project.id));
+  const managedWorkspaces = workspacesFromApi
     .filter((workspace) => {
-      const parentId = workspace.projectId ?? workspace.repoId ?? "";
-      const status = workspace.status ?? "open";
-      return repoIdSet.has(parentId) && status !== "closed";
+      const parentId = workspace.projectId ?? "";
+      return projectIdSet.has(parentId);
     })
     .map(
       (workspace) =>
         ({
-          id: workspace.workspaceId,
-          projectId: workspace.projectId ?? workspace.repoId ?? "",
-          repoId: workspace.projectId ?? workspace.repoId ?? "",
-          name: workspace.name ?? workspace.branch ?? "workspace",
-          title:
-            workspace.name || getFileName(workspace.worktreePath ?? workspace.localPath ?? "") || workspace.branch || "workspace",
-          sourceBranch: workspace.sourceBranch ?? workspace.branch ?? "main",
-          branch: workspace.branch ?? workspace.sourceBranch ?? "main",
-          summaryId: workspace.workspaceId,
-          worktreePath: workspace.worktreePath ?? workspace.localPath,
+          id: workspace.id,
+          projectId: workspace.projectId,
+          repoId: workspace.projectId,
+          name: workspace.branch ?? "workspace",
+          title: getFileName(workspace.localPath ?? "") || workspace.branch || "workspace",
+          sourceBranch: workspace.branch ?? "main",
+          branch: workspace.branch ?? "main",
+          summaryId: workspace.id,
+          worktreePath: workspace.localPath,
           kind: "managed",
         }) satisfies RepoWorkspaceItem,
     );
 
-  const localWorkspaces = repos
-    .map((repo) => buildLocalWorkspaceItem(repo))
+  const localWorkspaces = mappedProjects
+    .map((project) => buildLocalWorkspaceItem(project))
     .filter((workspace): workspace is RepoWorkspaceItem => workspace !== null);
 
   const workspaces = [...localWorkspaces, ...managedWorkspaces];
 
   return {
-    repos,
+    projects: mappedProjects,
     workspaces,
   };
 }
 
 /** Reconciles current state with backend snapshot while preserving compatible UI-only state. */
-export function buildHydratedStateFromSnapshot(
+export function buildHydratedStateFromApiData(
   state: RepoStoreSlice,
-  snapshot: RepoSnapshot,
+  projects: ProjectRecord[],
+  workspacesFromApi: ProjectWorkspaceRecord[],
   persistedDisplayRepoIds: string[] | undefined,
 ): Partial<RepoStoreSlice> {
-  const { repos, workspaces } = mapSnapshot(snapshot);
+  const { projects: mappedProjects, workspaces } = mapApiData(projects, workspacesFromApi);
   const nextBaseState = buildWorkspaceStateFromData({
-    repos,
+    projects: mappedProjects,
     workspaces,
-    preferredRepoId: state.selectedRepoId,
+    preferredProjectId: state.selectedProjectId,
     preferredWorkspaceId: state.selectedWorkspaceId,
   });
-  const nextRepoIdSet = new Set(repos.map((repo) => repo.id));
-  const baseDisplayRepoIds = persistedDisplayRepoIds ?? state.displayProjectIds ?? state.displayRepoIds;
-  const nextDisplayRepoIds =
-    persistedDisplayRepoIds === undefined && baseDisplayRepoIds.length === 0
-      ? repos.map((repo) => repo.id)
-      : baseDisplayRepoIds.filter((repoId) => nextRepoIdSet.has(repoId));
+  const nextProjectIdSet = new Set(mappedProjects.map((project) => project.id));
+  const baseDisplayProjectIds = persistedDisplayRepoIds ?? state.displayProjectIds;
+  const nextDisplayProjectIds =
+    persistedDisplayRepoIds === undefined && baseDisplayProjectIds.length === 0
+      ? mappedProjects.map((project) => project.id)
+      : baseDisplayProjectIds.filter((projectId) => nextProjectIdSet.has(projectId));
   const nextWorkspaceIdSet = new Set(workspaces.map((workspace) => workspace.id));
 
   return {
     ...nextBaseState,
-    displayProjectIds: nextDisplayRepoIds,
-    displayRepoIds: nextDisplayRepoIds,
+    displayProjectIds: nextDisplayProjectIds,
     gitChangesCountByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangesCountByWorkspaceId, nextWorkspaceIdSet),
     gitChangeTotalsByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangeTotalsByWorkspaceId, nextWorkspaceIdSet),
   };
@@ -204,8 +215,8 @@ export function buildCreatedRepoState(
     backendRepo: CreateRepoResult;
   },
 ): Partial<RepoStoreSlice> {
-  const currentProjects = state.projects ?? state.repos;
-  const currentDisplayProjectIds = state.displayProjectIds ?? state.displayRepoIds;
+  const currentProjects = state.projects;
+  const currentDisplayProjectIds = state.displayProjectIds;
   const nextRepoId = input.backendRepo.id;
   const repoPath = input.backendRepo.localPath ?? input.resolvedPath;
   const nextProject = {
@@ -231,10 +242,6 @@ export function buildCreatedRepoState(
 
   return {
     projects: [...currentProjects, nextProject],
-    repos: [
-      ...state.repos,
-      nextProject,
-    ],
     workspaces: hasLocalWorkspace
       ? [
           ...state.workspaces,
@@ -252,22 +259,19 @@ export function buildCreatedRepoState(
           },
         ]
       : state.workspaces,
-    displayRepoIds:
-      state.displayRepoIds.length === state.repos.length ? [...state.displayRepoIds, nextRepoId] : state.displayRepoIds,
     displayProjectIds:
       currentDisplayProjectIds.length === currentProjects.length
         ? [...currentDisplayProjectIds, nextRepoId]
         : currentDisplayProjectIds,
     selectedProjectId: nextRepoId,
-    selectedRepoId: nextRepoId,
     selectedWorkspaceId: hasLocalWorkspace ? localWorkspaceId : "",
   };
 }
 
 /** Removes a repo and all workspace-scoped UI state derived from that repo. */
 export function buildDeletedRepoState(state: RepoStoreSlice, repoId: string): Partial<RepoStoreSlice> {
-  const currentDisplayProjectIds = state.displayProjectIds ?? state.displayRepoIds;
-  const nextRepos = state.repos.filter((repo) => repo.id !== repoId);
+  const currentDisplayProjectIds = state.displayProjectIds;
+  const nextProjects = state.projects.filter((project) => project.id !== repoId);
   const deletedWorkspaceIdSet = new Set(
     state.workspaces
       .filter((workspace) => (workspace.projectId ?? workspace.repoId) === repoId)
@@ -281,21 +285,19 @@ export function buildDeletedRepoState(state: RepoStoreSlice, repoId: string): Pa
     delete nextGitChangeTotalsByWorkspaceId[workspaceId];
   }
 
-  const nextSelectedRepoId = state.selectedRepoId === repoId ? (nextRepos[0]?.id ?? "") : state.selectedRepoId;
+  const nextSelectedProjectId =
+    state.selectedProjectId === repoId ? (nextProjects[0]?.id ?? "") : state.selectedProjectId;
   const nextSelectedWorkspaceId = nextWorkspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)
     ? state.selectedWorkspaceId
-    : (nextWorkspaces.find((workspace) => (workspace.projectId ?? workspace.repoId) === nextSelectedRepoId)?.id ??
+    : (nextWorkspaces.find((workspace) => (workspace.projectId ?? workspace.repoId) === nextSelectedProjectId)?.id ??
       nextWorkspaces[0]?.id ??
       "");
 
   return {
-    projects: nextRepos,
-    repos: nextRepos,
+    projects: nextProjects,
     workspaces: nextWorkspaces,
     displayProjectIds: currentDisplayProjectIds.filter((id) => id !== repoId),
-    displayRepoIds: state.displayRepoIds.filter((id) => id !== repoId),
-    selectedProjectId: nextSelectedRepoId,
-    selectedRepoId: nextSelectedRepoId,
+    selectedProjectId: nextSelectedProjectId,
     selectedWorkspaceId: nextSelectedWorkspaceId,
     gitChangesCountByWorkspaceId: nextGitChangesCountByWorkspaceId,
     gitChangeTotalsByWorkspaceId: nextGitChangeTotalsByWorkspaceId,
@@ -304,15 +306,15 @@ export function buildDeletedRepoState(state: RepoStoreSlice, repoId: string): Pa
 
 /** Applies repo config updates to local state after save attempts. */
 export function buildUpdatedRepoConfigState(
-  state: Pick<WorkspaceStoreState, "repos">,
+  state: Pick<WorkspaceStoreState, "projects">,
   repoId: string,
   config: RepoConfigUpdate,
-): Pick<WorkspaceStoreState, "repos"> {
+): Pick<WorkspaceStoreState, "projects"> {
   return {
-    repos: state.repos.map((repo) =>
-      repo.id === repoId
+    projects: state.projects.map((project) =>
+      project.id === repoId
         ? {
-            ...repo,
+            ...project,
             name: config.name,
             worktreePath: config.worktreePath,
             privateContextEnabled: config.privateContextEnabled,
@@ -321,7 +323,7 @@ export function buildUpdatedRepoConfigState(
             setupScript: config.setupScript,
             postScript: config.postScript,
           }
-        : repo,
+        : project,
     ),
   };
 }

@@ -70,7 +70,7 @@ export function CreateWorkspaceDialogView({
 }: CreateWorkspaceDialogViewProps) {
   const theme = useTheme();
   const { t } = useTranslation();
-  const repos = workspaceStore((state) => state.repos);
+  const projects = workspaceStore((state) => state.projects);
   const workspaces = workspaceStore((state) => state.workspaces);
   const { createWorkspace, renameWorkspace, renameWorkspaceBranch, getGitAuthorName, listGitBranches } = useCommands();
   const prefixMode = gitBranchStore((state) => state.prefixMode);
@@ -80,7 +80,7 @@ export function CreateWorkspaceDialogView({
     ? t("workspace.rename.branchNameLabel")
     : t("workspace.create.branchNameLabel");
   const [selectedRepoId, setSelectedRepoId] = useState(() =>
-    repos.some((repo) => repo.id === repoId) ? repoId : (repos[0]?.id ?? ""),
+    projects.some((project) => project.id === repoId) ? repoId : (projects[0]?.id ?? ""),
   );
   const [sourceBranchOptions, setSourceBranchOptions] = useState<string[]>([]);
   const [sourceBranch, setSourceBranch] = useState("");
@@ -110,17 +110,17 @@ export function CreateWorkspaceDialogView({
     hasSyncedRepoIdForOpenRef.current = true;
     hasEditedTargetBranchRef.current = false;
     setSelectedRepoId((currentRepoId) => {
-      if (repos.some((repo) => repo.id === repoId)) {
+      if (projects.some((project) => project.id === repoId)) {
         return repoId;
       }
-      if (repos.some((repo) => repo.id === currentRepoId)) {
+      if (projects.some((project) => project.id === currentRepoId)) {
         return currentRepoId;
       }
-      return repos[0]?.id ?? "";
+      return projects[0]?.id ?? "";
     });
-  }, [open, repoId, repos]);
+  }, [open, repoId, projects]);
 
-  const selectedRepo = repos.find((repo) => repo.id === selectedRepoId);
+  const selectedRepo = projects.find((project) => project.id === selectedRepoId);
   const selectedWorkspace = workspaces.find(
     (workspace) => workspace.id === workspaceId && workspace.repoId === selectedRepoId && workspace.kind !== "local",
   );
@@ -366,7 +366,7 @@ export function CreateWorkspaceDialogView({
                     displayEmpty: true,
                     renderValue: (value) => {
                       const selectedValue = typeof value === "string" ? value : "";
-                      const selectedValueRepo = repos.find((repo) => repo.id === selectedValue);
+                      const selectedValueRepo = projects.find((project) => project.id === selectedValue);
                       const repoName = selectedValueRepo?.name ?? t("project.unknown");
 
                       return (
@@ -393,7 +393,7 @@ export function CreateWorkspaceDialogView({
                   },
                 }}
               >
-                {repos.map((repo) => (
+                {projects.map((repo) => (
                   <MenuItem key={repo.id} value={repo.id}>
                     <Stack direction="row" alignItems="center" gap={1}>
                       <Avatar

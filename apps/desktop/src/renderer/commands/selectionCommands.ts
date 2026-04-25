@@ -1,9 +1,9 @@
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 
-/** Selects one repo and syncs tab selection to the newly selected workspace. */
-export function setSelectedRepo(repoId: string): void {
-  workspaceStore.getState().setSelectedRepoId(repoId);
+/** Selects one project and syncs tab selection to the newly selected workspace. */
+export function setSelectedRepo(projectId: string): void {
+  workspaceStore.getState().setSelectedProjectId(projectId);
   tabStore.getState().setSelectedWorkspaceId(workspaceStore.getState().selectedWorkspaceId);
 }
 

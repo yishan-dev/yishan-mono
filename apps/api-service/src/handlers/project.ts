@@ -1,13 +1,23 @@
 import { StatusCodes } from "http-status-codes";
 
 import type { AppContext } from "@/hono";
-import type { CreateProjectBodyInput, OrganizationProjectParamsInput, ProjectWorkspaceParamsInput } from "@/validation/project";
+import type {
+  CreateProjectBodyInput,
+  OrganizationProjectListQueryInput,
+  OrganizationProjectParamsInput,
+  ProjectWorkspaceParamsInput
+} from "@/validation/project";
 
-export async function listProjectsHandler(c: AppContext, params: OrganizationProjectParamsInput) {
+export async function listProjectsHandler(
+  c: AppContext,
+  params: OrganizationProjectParamsInput,
+  query: OrganizationProjectListQueryInput
+) {
   const actorUser = c.get("sessionUser");
   const projects = await c.get("services").project.listProjects({
     actorUserId: actorUser.id,
-    organizationId: params.orgId
+    organizationId: params.orgId,
+    withWorkspaces: query.withWorkspaces === true
   });
 
   return c.json({ projects });

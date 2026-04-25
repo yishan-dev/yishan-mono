@@ -28,10 +28,29 @@ export type ProjectWorkspaceRecord = {
   updatedAt: string;
 };
 
+export type ProjectWithWorkspacesRecord = ProjectRecord & {
+  workspaces: ProjectWorkspaceRecord[];
+};
+
+export type CreateRepoResult = {
+  id: string;
+  key?: string | null;
+  localPath?: string | null;
+  worktreePath?: string | null;
+  gitUrl?: string | null;
+  privateContextEnabled?: boolean;
+  contextEnabled?: boolean;
+  icon?: string | null;
+  color?: string | null;
+  setupScript?: string | null;
+  postScript?: string | null;
+  defaultBranch?: string | null;
+};
+
 export type NodeRecord = {
   id: string;
   name: string;
-  scope: "local" | "remote";
+  scope: "private" | "shared" | "local" | "remote";
   endpoint: string | null;
   metadata: Record<string, unknown> | null;
   ownerUserId: string | null;

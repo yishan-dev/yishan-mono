@@ -32,8 +32,8 @@ function repoMatchesQuickSearch(repoName: string, repoPath: string, keyword: str
 /** Renders the repo filter trigger and popover with all/clear controls and quick search. */
 export function ProjectFilterPopoverView() {
   const { t } = useTranslation();
-  const repos = workspaceStore((state) => state.repos);
-  const displayRepoIds = workspaceStore((state) => state.displayRepoIds);
+  const repos = workspaceStore((state) => state.projects);
+  const displayRepoIds = workspaceStore((state) => state.displayProjectIds);
   const { setDisplayRepoIds } = useCommands();
   const [repoFilterAnchor, setRepoFilterAnchor] = useState<HTMLElement | null>(null);
   const [repoQuickSearch, setRepoQuickSearch] = useState("");

@@ -71,11 +71,11 @@ function resolveWorkspaceIndicator(input: {
 export function ProjectListView() {
   const workspaceInfoCloseDelayMs = 120;
   const { t } = useTranslation();
-  const repos = workspaceStore((state) => state.repos);
+  const projects = workspaceStore((state) => state.projects);
   const workspaces = workspaceStore((state) => state.workspaces);
-  const selectedRepoId = workspaceStore((state) => state.selectedRepoId);
+  const selectedProjectId = workspaceStore((state) => state.selectedProjectId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
-  const displayRepoIds = workspaceStore((state) => state.displayRepoIds);
+  const displayProjectIds = workspaceStore((state) => state.displayProjectIds);
   const gitChangeTotalsByWorkspaceId = workspaceStore((state) => state.gitChangeTotalsByWorkspaceId);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const {
@@ -193,7 +193,7 @@ export function ProjectListView() {
     }
     return acc;
   }, {});
-  const filteredRepos = repos.filter((repo) => displayRepoIds.includes(repo.id));
+  const filteredRepos = projects.filter((repo) => displayProjectIds.includes(repo.id));
 
   /** Opens the create workspace dialog for one selected repository id. */
   const handleOpenCreateWorkspace = useCallback((repoId: string) => {
@@ -267,7 +267,7 @@ export function ProjectListView() {
 
   /** Opens confirmation dialog for deleting a repository row. */
   const handleRequestRepoDeletion = (repoId: string) => {
-    const repo = repos.find((item) => item.id === repoId);
+    const repo = projects.find((item) => item.id === repoId);
     if (!repo) {
       return;
     }
@@ -600,7 +600,7 @@ export function ProjectListView() {
             <Box key={repo.id} sx={{ mb: 0.5 }}>
               <ProjectRow
                 repo={repo}
-                isSelected={selectedRepoId === repo.id}
+                isSelected={selectedProjectId === repo.id}
                 isFolded={isRepoFolded}
                 addWorkspaceAriaLabel={t("workspace.actions.add")}
                 addWorkspaceTooltipLabel={createWorkspaceTooltipLabel}

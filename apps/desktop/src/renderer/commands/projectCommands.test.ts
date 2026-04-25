@@ -8,32 +8,26 @@ import { workspaceStore } from "../store/workspaceStore";
 import { createProject, deleteProject, loadWorkspaceFromBackend, updateProjectConfig } from "./projectCommands";
 
 const apiMocks = vi.hoisted(() => ({
+  listOrganizations: vi.fn(),
+  listProjects: vi.fn(),
   createProject: vi.fn(),
   deleteProject: vi.fn(),
   listOrganizationNodes: vi.fn(),
-  fetchOrgProjectSnapshot: vi.fn(),
-  queryClientFetchQuery: vi.fn(),
 }));
 
 vi.mock("../api", () => ({
   api: {
+    org: {
+      list: apiMocks.listOrganizations,
+    },
     project: {
+      listByOrg: apiMocks.listProjects,
       create: apiMocks.createProject,
       delete: apiMocks.deleteProject,
     },
     node: {
       listByOrg: apiMocks.listOrganizationNodes,
     },
-  },
-}));
-
-vi.mock("../api/orgProjectQueries", () => ({
-  getOrgProjectSnapshot: apiMocks.fetchOrgProjectSnapshot,
-}));
-
-vi.mock("../queryClient", () => ({
-  rendererQueryClient: {
-    fetchQuery: apiMocks.queryClientFetchQuery,
   },
 }));
 
@@ -70,51 +64,51 @@ describe("projectCommands", () => {
     const setSelectedWorkspaceId = vi.fn();
     tabStore.setState({ retainWorkspaceTabs, setSelectedWorkspaceId });
     workspaceStore.setState({ loadWorkspaceFromBackend: hydrate });
-    apiMocks.queryClientFetchQuery.mockResolvedValueOnce({
-      organizationId: "org-1",
-      projects: [
-        {
-          id: "project-1",
-          name: "Project 1",
-          sourceType: "git",
-          repoProvider: "github",
-          repoUrl: "https://github.com/test/project-1.git",
-          repoKey: "project-1",
-        },
-      ],
-      workspaces: [],
+    sessionStore.setState({
+      organizations: [{ id: "org-1", name: "Org 1" }],
+      selectedOrganizationId: "org-1",
+      loaded: true,
     });
+    apiMocks.listProjects.mockResolvedValueOnce([
+      {
+        id: "project-1",
+        name: "Project 1",
+        sourceType: "git",
+        repoProvider: "github",
+        repoUrl: "https://github.com/test/project-1.git",
+        repoKey: "project-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        createdByUserId: "user-1",
+        workspaces: [],
+      },
+    ]);
 
     await loadWorkspaceFromBackend();
 
-    expect(apiMocks.queryClientFetchQuery).toHaveBeenCalledTimes(1);
+    expect(apiMocks.listProjects).toHaveBeenCalledWith("org-1", { withWorkspaces: true });
     expect(hydrate).toHaveBeenCalledTimes(1);
-    expect(hydrate.mock.calls[0]?.[0]).toEqual({
-      repos: [
-        {
-          id: "project-1",
-          key: "project-1",
-          name: "Project 1",
-          localPath: "",
-          gitUrl: "https://github.com/test/project-1.git",
-          worktreePath: "",
-          privateContextEnabled: true,
-          defaultBranch: "main",
-          icon: "folder",
-          color: "#1E66F5",
-          setupScript: "",
-          postScript: "",
-        },
-      ],
-      workspaces: [],
-    });
+    expect(hydrate.mock.calls[0]?.[0]).toEqual([
+      {
+        id: "project-1",
+        name: "Project 1",
+        sourceType: "git",
+        repoProvider: "github",
+        repoUrl: "https://github.com/test/project-1.git",
+        repoKey: "project-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        createdByUserId: "user-1",
+      },
+    ]);
+    expect(hydrate.mock.calls[0]?.[1]).toEqual([]);
     expect(retainWorkspaceTabs).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
   });
 
-  it("creates backend repo and then appends store state", async () => {
+  it("creates backend project and then appends store state", async () => {
     const appendRepo = vi.fn();
-    workspaceStore.setState({ createRepo: appendRepo });
+    workspaceStore.setState({ createProject: appendRepo });
     sessionStore.setState({ selectedOrganizationId: "org-1" });
     apiMocks.listOrganizationNodes.mockResolvedValueOnce([
       {
@@ -169,7 +163,7 @@ describe("projectCommands", () => {
     );
   });
 
-  it("deletes backend repo and then removes repo from store", async () => {
+  it("deletes backend project and then removes project from store", async () => {
     const removeRepo = vi.fn();
     const retainWorkspaceTabs = vi.fn().mockReturnValue(["tab-1"]);
     const setSelectedWorkspaceId = vi.fn();
@@ -178,7 +172,7 @@ describe("projectCommands", () => {
 
     tabStore.setState({ retainWorkspaceTabs, setSelectedWorkspaceId });
     chatStore.setState({ removeTabData, removeWorkspaceTaskCounts });
-    workspaceStore.setState({ deleteRepo: removeRepo });
+    workspaceStore.setState({ deleteProject: removeRepo });
     sessionStore.setState({ selectedOrganizationId: "org-1" });
     apiMocks.deleteProject.mockResolvedValueOnce(undefined);
 
@@ -196,7 +190,7 @@ describe("projectCommands", () => {
     const applyRepoConfig = vi.fn();
     const bumpRefreshVersion = vi.fn();
     workspaceStore.setState({
-      repos: [
+      projects: [
         {
           id: "repo-1",
           key: "repo-1",
@@ -208,7 +202,7 @@ describe("projectCommands", () => {
           worktreePath: "/tmp/repo-1",
         },
       ],
-      updateRepoConfig: applyRepoConfig,
+      updateProjectConfig: applyRepoConfig,
       incrementFileTreeRefreshVersion: bumpRefreshVersion,
     });
     await updateProjectConfig("repo-1", {

@@ -13,6 +13,7 @@ import { validationErrorResponse } from "@/validation/error-response";
 import {
   createProjectBodySchema,
   createWorkspaceBodySchema,
+  organizationProjectListQuerySchema,
   organizationProjectParamsSchema,
   projectWorkspaceParamsSchema
 } from "@/validation/project";
@@ -26,7 +27,8 @@ organizationProjectsRouter.use("/*", requireOrganizationMemberFromParam);
 organizationProjectsRouter.get(
   "/",
   zValidator("param", organizationProjectParamsSchema, validationErrorResponse),
-  (c) => listProjectsHandler(c, c.req.valid("param"))
+  zValidator("query", organizationProjectListQuerySchema, validationErrorResponse),
+  (c) => listProjectsHandler(c, c.req.valid("param"), c.req.valid("query"))
 );
 
 organizationProjectsRouter.post(

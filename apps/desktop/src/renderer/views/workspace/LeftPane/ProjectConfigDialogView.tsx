@@ -57,9 +57,9 @@ function getDefaultDraft(): ProjectConfigDraft {
 }
 
 export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfigDialogViewProps) {
-  const repos = workspaceStore((state) => state.repos);
+  const projects = workspaceStore((state) => state.projects);
   const { updateProjectConfig, getDefaultWorktreeLocation, openEntryInExternalApp, openLocalFolderDialog } = useCommands();
-  const repo = repos.find((item) => item.id === repoId);
+  const repo = projects.find((item) => item.id === repoId);
   const [draft, setDraft] = useState<ProjectConfigDraft>(getDefaultDraft);
   const [iconAnchorEl, setIconAnchorEl] = useState<HTMLElement | null>(null);
   const repoLocalPath = repo?.localPath ?? repo?.path ?? "";

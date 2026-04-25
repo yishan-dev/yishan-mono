@@ -117,7 +117,7 @@ function buildWorkspaceRows(
 export function LeftPaneResourceUsageControl() {
   const { t } = useTranslation();
   const isInRouterContext = useInRouterContext();
-  const repos = workspaceStore((state) => state.repos);
+  const projects = workspaceStore((state) => state.projects);
   const workspaces = workspaceStore((state) => state.workspaces);
   const tabs = tabStore((state) => state.tabs);
   const { getTerminalResourceUsage, setSelectedRepoId, setSelectedWorkspaceId } = useCommands();
@@ -125,8 +125,8 @@ export function LeftPaneResourceUsageControl() {
   const isMenuOpen = Boolean(menuAnchorEl);
 
   const repoNameById = useMemo(() => {
-    return new Map(repos.map((repo) => [repo.id, repo.name]));
-  }, [repos]);
+    return new Map(projects.map((project) => [project.id, project.name]));
+  }, [projects]);
   const workspaceNameById = useMemo(() => {
     return new Map(workspaces.map((workspace) => [workspace.id, workspace.title]));
   }, [workspaces]);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createWorkspaceRepoActions } from "./actions.projects";
 
 type TestState = {
-  repos: Array<{
+  projects: Array<{
     id: string;
     name: string;
     path: string;
@@ -26,9 +26,9 @@ type TestState = {
     summaryId: string;
     worktreePath?: string;
   }>;
-  selectedRepoId: string;
+  selectedProjectId: string;
   selectedWorkspaceId: string;
-  displayRepoIds: string[];
+  displayProjectIds: string[];
   fileTreeRefreshVersion: number;
   fileTreeChangedRelativePathsByWorktreePath: Record<string, string[]>;
   gitChangesCountByWorkspaceId: Record<string, number>;
@@ -38,7 +38,7 @@ type TestState = {
 /** Creates a minimal state harness for pure repo store actions. */
 function createHarness(overrides?: Partial<TestState>) {
   let state: TestState = {
-    repos: [
+    projects: [
       {
         id: "repo-1",
         name: "Repo 1",
@@ -90,9 +90,9 @@ function createHarness(overrides?: Partial<TestState>) {
         worktreePath: "/tmp/repo-2/.worktrees/feature-b",
       },
     ],
-    selectedRepoId: "repo-1",
+    selectedProjectId: "repo-1",
     selectedWorkspaceId: "workspace-1",
-    displayRepoIds: ["repo-1", "repo-2"],
+    displayProjectIds: ["repo-1", "repo-2"],
     fileTreeRefreshVersion: 0,
     fileTreeChangedRelativePathsByWorktreePath: {},
     gitChangesCountByWorkspaceId: {
@@ -124,14 +124,14 @@ function createHarness(overrides?: Partial<TestState>) {
 }
 
 describe("createWorkspaceRepoActions", () => {
-  it("deletes one repo and all child workspace state", () => {
+  it("deletes one project and all child workspace state", () => {
     const harness = createHarness();
-    harness.actions.deleteRepo("repo-1");
+    harness.actions.deleteProject("repo-1");
 
     const state = harness.getState();
-    expect(state.repos.map((repo) => repo.id)).toEqual(["repo-2"]);
+    expect(state.projects.map((repo) => repo.id)).toEqual(["repo-2"]);
     expect(state.workspaces.map((workspace) => workspace.id)).toEqual(["workspace-2"]);
-    expect(state.selectedRepoId).toBe("repo-2");
+    expect(state.selectedProjectId).toBe("repo-2");
     expect(state.selectedWorkspaceId).toBe("workspace-2");
     expect(state.gitChangesCountByWorkspaceId).toEqual({
       "workspace-2": 4,
@@ -145,41 +145,40 @@ describe("createWorkspaceRepoActions", () => {
     const harness = createHarness();
 
     harness.actions.loadWorkspaceFromBackend(
-      {
-        repos: [
-          {
-            id: "repo-1",
-            key: "repo-1",
-            localPath: "/tmp/repo-1",
-            worktreePath: "/tmp/repo-1",
-            privateContextEnabled: true,
-            icon: "folder",
-            color: "#1E66F5",
-            setupScript: "",
-            postScript: "",
-            defaultBranch: "main",
-            gitUrl: "https://example.com/acme/repo.git",
-          },
-        ],
-        workspaces: [
-          {
-            workspaceId: "workspace-1",
-            repoId: "repo-1",
-            name: "Feature A",
-            sourceBranch: "main",
-            branch: "feature-a",
-            worktreePath: "/tmp/repo-1/.worktrees/feature-a",
-            status: "open",
-          },
-        ],
-      },
+      [
+        {
+          id: "repo-1",
+          name: "Repo 1",
+          sourceType: "git-local",
+          repoProvider: "github",
+          repoUrl: "https://example.com/acme/repo.git",
+          repoKey: "repo-1",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          createdByUserId: "user-1",
+        },
+      ],
+      [
+        {
+          id: "workspace-1",
+          organizationId: "org-1",
+          projectId: "repo-1",
+          userId: "user-1",
+          nodeId: "node-1",
+          kind: "worktree",
+          branch: "feature-a",
+          localPath: "/tmp/repo-1/.worktrees/feature-a",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ],
       ["repo-1"],
     );
 
     const state = harness.getState();
-    expect(state.repos).toHaveLength(1);
-    expect(state.repos[0]?.gitUrl).toBe("https://example.com/acme/repo.git");
-    expect(state.displayRepoIds).toEqual(["repo-1"]);
+    expect(state.projects).toHaveLength(1);
+    expect(state.projects[0]?.gitUrl).toBe("https://example.com/acme/repo.git");
+    expect(state.displayProjectIds).toEqual(["repo-1"]);
     expect(state.gitChangesCountByWorkspaceId).toEqual({
       "workspace-1": 3,
     });
@@ -188,10 +187,10 @@ describe("createWorkspaceRepoActions", () => {
     });
   });
 
-  it("adds repo state from backend create result", () => {
-    const harness = createHarness({ repos: [], workspaces: [], displayRepoIds: [] });
+  it("adds project state from backend create result", () => {
+    const harness = createHarness({ projects: [], workspaces: [], displayProjectIds: [] });
 
-    harness.actions.createRepo({
+    harness.actions.createProject({
       name: "Repo 1",
       source: "local",
       path: "/tmp/repo-1",
@@ -211,7 +210,7 @@ describe("createWorkspaceRepoActions", () => {
     });
 
     const state = harness.getState();
-    expect(state.repos.map((repo) => repo.id)).toEqual(["repo-1"]);
+    expect(state.projects.map((repo) => repo.id)).toEqual(["repo-1"]);
     expect(state.workspaces).toEqual([
       expect.objectContaining({
         id: "local-repo-1",
@@ -221,13 +220,13 @@ describe("createWorkspaceRepoActions", () => {
         kind: "local",
       }),
     ]);
-    expect(state.selectedRepoId).toBe("repo-1");
+    expect(state.selectedProjectId).toBe("repo-1");
     expect(state.selectedWorkspaceId).toBe("local-repo-1");
   });
 
-  it("updates repo config and refresh version as separate pure actions", () => {
+  it("updates project config and refresh version as separate pure actions", () => {
     const harness = createHarness();
-    harness.actions.updateRepoConfig("repo-1", {
+    harness.actions.updateProjectConfig("repo-1", {
       name: "Repo Updated",
       worktreePath: "/tmp/repo-1",
       privateContextEnabled: true,
@@ -239,9 +238,9 @@ describe("createWorkspaceRepoActions", () => {
     harness.actions.incrementFileTreeRefreshVersion();
 
     const state = harness.getState();
-    expect(state.repos[0]?.name).toBe("Repo Updated");
-    expect(state.repos[0]?.setupScript).toBe("npm ci");
-    expect(state.repos[0]?.postScript).toBe("rm -rf node_modules");
+    expect(state.projects[0]?.name).toBe("Repo Updated");
+    expect(state.projects[0]?.setupScript).toBe("npm ci");
+    expect(state.projects[0]?.postScript).toBe("rm -rf node_modules");
     expect(state.fileTreeRefreshVersion).toBe(1);
   });
 });

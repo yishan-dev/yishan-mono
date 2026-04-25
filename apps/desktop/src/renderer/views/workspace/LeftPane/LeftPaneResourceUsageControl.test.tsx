@@ -104,7 +104,7 @@ describe("LeftPaneResourceUsageControl", () => {
     });
 
     workspaceStore.setState({
-      repos: [
+      projects: [
         {
           id: "repo-1",
           key: "repo-1",
@@ -144,7 +144,7 @@ describe("LeftPaneResourceUsageControl", () => {
           worktreePath: "/tmp/repo-2/workspace-2",
         },
       ],
-      selectedRepoId: "repo-1",
+      selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
     });
 

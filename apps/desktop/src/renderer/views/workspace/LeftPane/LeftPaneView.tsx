@@ -28,8 +28,8 @@ type LeftPaneViewProps = {
 /** Renders repo/workspace navigation and top-level left pane chrome. */
 export function LeftPaneView({ onCreateRepository, onToggleLeftPane }: LeftPaneViewProps = {}) {
   const { t } = useTranslation();
-  const repos = workspaceStore((state) => state.repos);
-  const displayRepoIds = workspaceStore((state) => state.displayRepoIds);
+  const repos = workspaceStore((state) => state.projects);
+  const displayRepoIds = workspaceStore((state) => state.displayProjectIds);
   const filteredRepos = repos.filter((repo) => displayRepoIds.includes(repo.id));
   const toggleLeftShortcutLabel = getShortcutDisplayLabelById("toggle-left-pane", getRendererPlatform());
   const toggleLeftTooltipLabel = toggleLeftShortcutLabel

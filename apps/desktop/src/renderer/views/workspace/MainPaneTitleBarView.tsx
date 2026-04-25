@@ -25,12 +25,12 @@ const titleBarSx = {
 export function MainPaneTitleBarView() {
   const { t } = useTranslation();
   const { leftCollapsed, rightCollapsed, onToggleLeftPane, onToggleRightPane } = useWorkspacePaneVisibilityContext();
-  const repos = workspaceStore((state) => state.repos);
+  const projects = workspaceStore((state) => state.projects);
   const workspaces = workspaceStore((state) => state.workspaces);
-  const selectedRepoId = workspaceStore((state) => state.selectedRepoId);
+  const selectedProjectId = workspaceStore((state) => state.selectedProjectId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const { setSelectedRepoId, setSelectedWorkspaceId } = useCommands();
-  const selectedRepo = repos.find((repo) => repo.id === selectedRepoId);
+  const selectedRepo = projects.find((project) => project.id === selectedProjectId);
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const workspacesForSelectedRepo = workspaces.filter((workspace) => workspace.repoId === selectedRepo?.id);
   const rendererPlatform = getRendererPlatform();
@@ -57,8 +57,8 @@ export function MainPaneTitleBarView() {
   const [workspaceSearchValue, setWorkspaceSearchValue] = useState("");
   const isRepoMenuOpen = Boolean(repoMenuAnchorEl);
   const isWorkspaceMenuOpen = Boolean(workspaceMenuAnchorEl);
-  const filteredRepoOptions = repos.filter((repo) =>
-    repo.name.toLowerCase().includes(repoSearchValue.trim().toLowerCase()),
+  const filteredRepoOptions = projects.filter((project) =>
+    project.name.toLowerCase().includes(repoSearchValue.trim().toLowerCase()),
   );
   const filteredWorkspaceOptions = workspacesForSelectedRepo.filter((workspace) =>
     workspace.name.toLowerCase().includes(workspaceSearchValue.trim().toLowerCase()),
@@ -216,7 +216,7 @@ export function MainPaneTitleBarView() {
         {filteredRepoOptions.map((repo) => (
           <MenuItem
             key={repo.id}
-            selected={repo.id === selectedRepoId}
+            selected={repo.id === selectedProjectId}
             onClick={() => {
               setSelectedRepoId(repo.id);
               setRepoMenuAnchorEl(null);

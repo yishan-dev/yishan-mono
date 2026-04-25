@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createOrganization, listOrganizations } from "../../api";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
-import { rendererQueryClient } from "../../queryClient";
 import { sessionStore } from "../../store/sessionStore";
 
 type CreateOrganizationDialogViewProps = {
@@ -50,7 +49,6 @@ export function CreateOrganizationDialogView({ open, onClose }: CreateOrganizati
         setErrorMessage(null);
         setIsCreating(false);
         onClose();
-        void rendererQueryClient.invalidateQueries({ queryKey: ["org-project-snapshot"] });
         void loadWorkspaceFromBackend();
       } catch {
         setErrorMessage(t("org.menu.newOrganizationFailed"));

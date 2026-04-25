@@ -32,7 +32,6 @@ import {
   LuSun,
 } from "react-icons/lu";
 import { useLocation, useNavigate } from "react-router-dom";
-import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
 import { requestJson } from "../../api/restClient";
 import { useThemePreference } from "../../hooks/useThemePreference";
 import { getRendererPlatform } from "../../helpers/platform";
@@ -404,8 +403,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                       setSelectedOrganizationId(organization.id);
                       setOrganizationMenuAnchor(null);
                       setMenuAnchor(null);
-                      void rendererQueryClient.invalidateQueries({ queryKey: ["org-project-snapshot"] });
-                      void loadWorkspaceFromBackend();
+                      void rendererQueryClient.invalidateQueries({ queryKey: ["org-nodes", organization.id] });
                     }}
                   >
                     <span>{organization.name}</span>

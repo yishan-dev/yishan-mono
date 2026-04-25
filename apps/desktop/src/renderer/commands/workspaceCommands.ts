@@ -168,7 +168,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
     return;
   }
 
-  const project = store.projects.find((item) => item.id === projectId) ?? store.repos.find((item) => item.id === projectId);
+  const project = store.projects.find((item) => item.id === projectId);
 
   let backendWorkspace: BackendWorkspace | undefined;
 
@@ -263,7 +263,7 @@ export async function refreshWorkspaceGitChanges(workspaceId: string, workspaceW
 
 /** Stores visible repo ids for left-pane filtering state. */
 export function setDisplayRepoIds(repoIds: string[]) {
-  readWorkspaceStoreState().setDisplayRepoIds(repoIds);
+  readWorkspaceStoreState().setDisplayProjectIds(repoIds);
 }
 
 /** Stores last used external app id for quick-open actions. */
@@ -311,14 +311,12 @@ export function openCreateWorkspaceDialog() {
   }
 
   const state = readWorkspaceStoreState();
-  const selectedProjectId = state.selectedProjectId.trim() || state.selectedRepoId.trim();
+  const selectedProjectId = state.selectedProjectId.trim();
   const selectedWorkspaceProjectId = state.workspaces.find(
     (workspace) => workspace.id === state.selectedWorkspaceId,
   )?.projectId;
   const selectedWorkspaceRepoId = state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.repoId;
-  const fallbackProjectId =
-    (state.projects ?? state.repos).find((project) => (state.displayProjectIds ?? state.displayRepoIds).includes(project.id))
-      ?.id;
+  const fallbackProjectId = state.projects.find((project) => state.displayProjectIds.includes(project.id))?.id;
   const projectId = selectedProjectId || selectedWorkspaceProjectId || selectedWorkspaceRepoId || fallbackProjectId;
 
   if (!projectId) {
