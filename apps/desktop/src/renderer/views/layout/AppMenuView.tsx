@@ -23,6 +23,7 @@ import {
   LuChevronRight,
   LuKeyboard,
   LuLaptop,
+  LuLogOut,
   LuMail,
   LuMenu,
   LuMoon,
@@ -32,10 +33,13 @@ import {
 } from "react-icons/lu";
 import { useLocation, useNavigate } from "react-router-dom";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
+import { requestJson } from "../../api/restClient";
 import { useThemePreference } from "../../hooks/useThemePreference";
 import { getRendererPlatform } from "../../helpers/platform";
 import { rendererQueryClient } from "../../queryClient";
+import { getDesktopHostBridge } from "../../rpc/rpcTransport";
 import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
+import { authStore } from "../../store/authStore";
 import { sessionStore } from "../../store/sessionStore";
 import type { AppThemePreference } from "../../theme";
 import { CreateOrganizationDialogView } from "./CreateOrganizationDialogView";
@@ -103,6 +107,8 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
   const organizations = sessionStore((state) => state.organizations);
   const selectedOrganizationId = sessionStore((state) => state.selectedOrganizationId);
   const setSelectedOrganizationId = sessionStore((state) => state.setSelectedOrganizationId);
+  const clearSessionData = sessionStore((state) => state.clearSessionData);
+  const setAuthState = authStore((state) => state.setAuthState);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [organizationMenuAnchor, setOrganizationMenuAnchor] = useState<HTMLElement | null>(null);
   const [isCreateOrganizationDialogOpen, setIsCreateOrganizationDialogOpen] = useState(false);
@@ -123,6 +129,29 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
     setMenuAnchor(null);
     setOrganizationMenuAnchor(null);
   }, [location.pathname]);
+
+  const handleLogout = async () => {
+    try {
+      const authTokens = await getDesktopHostBridge().getAuthTokens();
+      if (authTokens.authenticated && authTokens.refreshToken) {
+        await requestJson<{ ok?: boolean }>("/auth/revoke", {
+          method: "POST",
+          body: {
+            refreshToken: authTokens.refreshToken,
+          },
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to revoke auth session during logout", error);
+    }
+
+    setAuthState(false, true);
+    clearSessionData();
+    rendererQueryClient.clear();
+    setMenuAnchor(null);
+    setOrganizationMenuAnchor(null);
+    navigate("/");
+  };
 
   return (
     <>
@@ -315,6 +344,18 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                   }}
                 >
                   {t("org.menu.contactUs")}
+                </Button>
+                <Divider />
+                <Button
+                  size="small"
+                  fullWidth
+                  startIcon={<LuLogOut size={14} />}
+                  sx={menuItemButtonSx}
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                >
+                  Logout
                 </Button>
               </Box>
             </Stack>

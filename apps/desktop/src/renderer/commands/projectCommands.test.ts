@@ -10,6 +10,7 @@ import { createProject, deleteProject, loadWorkspaceFromBackend, updateProjectCo
 const apiMocks = vi.hoisted(() => ({
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+  listOrganizationNodes: vi.fn(),
   fetchOrgProjectSnapshot: vi.fn(),
   queryClientFetchQuery: vi.fn(),
 }));
@@ -17,6 +18,7 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock("../api/orgProjectApi", () => ({
   createProject: apiMocks.createProject,
   deleteProject: apiMocks.deleteProject,
+  listOrganizationNodes: apiMocks.listOrganizationNodes,
 }));
 
 vi.mock("../api/orgProjectQueries", () => ({
@@ -108,6 +110,21 @@ describe("projectCommands", () => {
     const appendRepo = vi.fn();
     workspaceStore.setState({ createRepo: appendRepo });
     sessionStore.setState({ selectedOrganizationId: "org-1" });
+    apiMocks.listOrganizationNodes.mockResolvedValueOnce([
+      {
+        id: "node-local-1",
+        name: "local",
+        scope: "local",
+        endpoint: null,
+        metadata: null,
+        ownerUserId: "user-1",
+        organizationId: null,
+        canUse: true,
+        createdByUserId: "user-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
     rpcMocks.gitInspect.mockResolvedValueOnce({
       isGitRepository: true,
       remoteUrl: "https://github.com/test/repo-1.git",
@@ -133,6 +150,7 @@ describe("projectCommands", () => {
       name: "Repo 1",
       sourceTypeHint: "git-local",
       repoUrl: "https://github.com/test/repo-1.git",
+      nodeId: "node-local-1",
       localPath: "/tmp/repo-1",
     });
     expect(appendRepo).toHaveBeenCalledTimes(1);

@@ -1,5 +1,9 @@
 import { readPersistedDisplayRepoIds } from "../helpers/projectHelpers";
-import { createProject as createRemoteProject, deleteProject as deleteRemoteProject } from "../api/orgProjectApi";
+import {
+  createProject as createRemoteProject,
+  deleteProject as deleteRemoteProject,
+  listOrganizationNodes,
+} from "../api/orgProjectApi";
 import type { ProjectRecord } from "../api/orgProjectApi";
 import { getOrgProjectSnapshot } from "../api/orgProjectQueries";
 import { rendererQueryClient } from "../queryClient";
@@ -187,8 +191,19 @@ export async function createProject(input: {
   let inferredSourceTypeHint: "unknown" | "git-local" = input.source === "local" ? "git-local" : "unknown";
   let inferredRemoteUrl = input.source === "remote" ? normalizedGitUrl || undefined : undefined;
   let inferredDefaultBranch: string | undefined;
+  let inferredNodeId: string | undefined;
 
   if (input.source === "local" && normalizedPath) {
+    try {
+      const nodes = await listOrganizationNodes(selectedOrganizationId);
+      const preferredLocalNode = nodes.find((node) => node.scope === "local" && node.canUse);
+      inferredNodeId = preferredLocalNode?.id;
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.debug("[projectCommands] listOrganizationNodes failed", { error });
+      }
+    }
+
     const localRepositoryMetadata = await inspectLocalRepository(normalizedPath);
     inferredSourceTypeHint = localRepositoryMetadata.isGitRepository ? "git-local" : "unknown";
     inferredRemoteUrl = localRepositoryMetadata.remoteUrl || undefined;
@@ -200,6 +215,7 @@ export async function createProject(input: {
         inferredSourceTypeHint,
         inferredRemoteUrl,
         inferredDefaultBranch,
+        inferredNodeId,
       });
     }
   }
@@ -211,6 +227,7 @@ export async function createProject(input: {
       name: normalizedName,
       sourceTypeHint: inferredSourceTypeHint,
       repoUrl: inferredRemoteUrl,
+      nodeId: inferredNodeId,
       localPath: input.source === "local" ? normalizedPath || undefined : undefined,
     });
   } catch (error) {

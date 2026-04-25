@@ -30,6 +30,20 @@ export type ProjectWorkspaceRecord = {
   updatedAt: string;
 };
 
+export type NodeRecord = {
+  id: string;
+  name: string;
+  scope: "local" | "remote";
+  endpoint: string | null;
+  metadata: Record<string, unknown> | null;
+  ownerUserId: string | null;
+  organizationId: string | null;
+  canUse: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Lists organizations visible to the signed-in user. */
 export async function listOrganizations(): Promise<OrganizationRecord[]> {
   const response = await requestJson<{ organizations: OrganizationRecord[] }>("/orgs");
@@ -52,10 +66,35 @@ export async function listProjects(orgId: string): Promise<ProjectRecord[]> {
   return response.projects;
 }
 
+/** Lists nodes available to one organization member. */
+export async function listOrganizationNodes(orgId: string): Promise<NodeRecord[]> {
+  const response = await requestJson<{ nodes: NodeRecord[] }>(`/orgs/${orgId}/nodes`);
+  return response.nodes;
+}
+
 /** Lists project workspaces for one organization project. */
 export async function listProjectWorkspaces(orgId: string, projectId: string): Promise<ProjectWorkspaceRecord[]> {
   const response = await requestJson<{ workspaces: ProjectWorkspaceRecord[] }>(`/orgs/${orgId}/projects/${projectId}/workspaces`);
   return response.workspaces;
+}
+
+/** Creates one workspace under one project. */
+export async function createProjectWorkspace(
+  orgId: string,
+  projectId: string,
+  input: {
+    nodeId: string;
+    kind?: "primary" | "worktree";
+    branch?: string;
+    localPath: string;
+  },
+): Promise<ProjectWorkspaceRecord> {
+  const response = await requestJson<{ workspace: ProjectWorkspaceRecord }>(`/orgs/${orgId}/projects/${projectId}/workspaces`, {
+    method: "POST",
+    body: input,
+  });
+
+  return response.workspace;
 }
 
 /** Creates one project in one organization. */

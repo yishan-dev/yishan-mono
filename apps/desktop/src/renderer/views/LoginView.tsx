@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FcGoogle } from "react-icons/fc";
 import { login } from "../commands/appCommands";
+import { getRendererPlatform } from "../helpers/platform";
 import { useRemoteHealthQuery } from "../hooks/useRemoteHealthQuery";
 import { authStore } from "../store/authStore";
 
@@ -13,6 +14,7 @@ export function LoginView() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const remoteHealthQuery = useRemoteHealthQuery();
+  const shouldReserveMacWindowControlsInset = getRendererPlatform() === "darwin";
 
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
@@ -38,12 +40,29 @@ export function LoginView() {
       sx={{
         height: "100%",
         width: "100%",
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         px: 3,
       }}
     >
+      <Box
+        component="header"
+        className="electron-webkit-app-region-drag"
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 36,
+          display: "flex",
+          alignItems: "center",
+          px: 1,
+        }}
+      >
+        {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
+      </Box>
       <Stack
         spacing={2.5}
         sx={{
