@@ -1,9 +1,14 @@
 import { Box } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
+import { ACTIONS } from "../../shared/contracts/actions";
 import { THREE_COL_GAP_PX, THREE_COL_SPLITTER_PX, ThreeColumnLayout } from "../components/ThreeColumnLayout";
+import { subscribeAppActionEvent } from "../events";
 import { useCommands } from "../hooks/useCommands";
 import { WorkspacePaneVisibilityProvider, useWorkspacePaneVisibility } from "../hooks/useWorkspacePaneVisibility";
+import { parseWorkspaceSessionNavigationPath } from "../navigation/workspaceNavigation";
+import { isEditableActiveElement } from "../shortcuts/editableTarget";
 import { layoutStore } from "../store/layoutStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
@@ -38,6 +43,7 @@ function getLayoutOverhead(hasLeft: boolean, hasRight: boolean): number {
 /** Renders the workspace dashboard and tracks notification/running-task state for pane indicators. */
 export function WorkspaceView() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(1400);
   const [isCreateRepoOpen, setIsCreateRepoOpen] = useState(false);
@@ -55,17 +61,81 @@ export function WorkspaceView() {
 
     return state.gitRefreshVersionByWorktreePath?.[selectedWorkspaceWorktreePath] ?? 0;
   });
-  const { setLeftWidth, setRightWidth, setSelectedWorkspaceId, loadWorkspaceFromBackend, refreshWorkspaceGitChanges } =
-    useCommands();
+  const cmd = useCommands();
   const [terminalRecoveryCoordinator] = useState(() => new TerminalRecoveryCoordinator());
   const { leftCollapsed, rightCollapsed, onToggleLeftPane, onToggleRightPane } = paneVisibility;
+
+  useEffect(() => {
+    return subscribeAppActionEvent((payload) => {
+      if (payload.action === ACTIONS.NAVIGATE) {
+        const targetPath = payload.path.trim();
+        if (!targetPath) {
+          return;
+        }
+        const { workspaceId, sessionId, tabId } = parseWorkspaceSessionNavigationPath(targetPath);
+        if (workspaceId) {
+          const storeState = workspaceStore.getState();
+          const workspace = storeState.workspaces.find((item) => item.id === workspaceId);
+          if (workspace) {
+            cmd.setSelectedRepoId(workspace.repoId);
+          }
+          cmd.setSelectedWorkspaceId(workspaceId);
+
+          if (tabId) {
+            const tab = tabStore.getState().tabs.find((item) => item.workspaceId === workspaceId && item.id === tabId);
+            if (tab) {
+              cmd.setSelectedTabId(tab.id);
+            }
+          } else if (sessionId) {
+            const sessionTab = tabStore
+              .getState()
+              .tabs.find(
+                (tab) => tab.workspaceId === workspaceId && tab.kind === "session" && tab.data.sessionId === sessionId,
+              );
+            if (sessionTab) {
+              cmd.setSelectedTabId(sessionTab.id);
+            }
+          }
+        }
+
+        navigate(targetPath);
+        return;
+      }
+
+      if (payload.action === ACTIONS.TOGGLE_LEFT_PANE) {
+        cmd.toggleLeftPaneVisibility();
+        return;
+      }
+
+      if (payload.action === ACTIONS.TOGGLE_RIGHT_PANE) {
+        cmd.toggleRightPaneVisibility();
+        return;
+      }
+
+      if (isEditableActiveElement()) {
+        return;
+      }
+
+      if (payload.action === ACTIONS.FILE_DELETE) {
+        cmd.deleteSelectedFileTreeEntry();
+        return;
+      }
+
+      if (payload.action === ACTIONS.FILE_UNDO) {
+        cmd.undoFileTreeOperation();
+      }
+    });
+  }, [
+    cmd,
+    navigate,
+  ]);
 
   useEffect(() => {
     let disposed = false;
     let unsubscribePersist: (() => void) | undefined;
 
     const loadAndRestore = async () => {
-      await loadWorkspaceFromBackend();
+      await cmd.loadWorkspaceFromBackend();
       if (disposed) {
         return;
       }
@@ -74,7 +144,7 @@ export function WorkspaceView() {
       if (restoredWorkspaceId) {
         const currentSelectedWorkspaceId = workspaceStore.getState().selectedWorkspaceId;
         if (restoredWorkspaceId !== currentSelectedWorkspaceId) {
-          setSelectedWorkspaceId(restoredWorkspaceId);
+          cmd.setSelectedWorkspaceId(restoredWorkspaceId);
         }
       }
       if (disposed) {
@@ -89,7 +159,7 @@ export function WorkspaceView() {
       disposed = true;
       unsubscribePersist?.();
     };
-  }, [loadWorkspaceFromBackend, setSelectedWorkspaceId, terminalRecoveryCoordinator]);
+  }, [cmd, terminalRecoveryCoordinator]);
 
   useEffect(() => {
     const root = layoutRef.current;
@@ -131,7 +201,7 @@ export function WorkspaceView() {
       inFlight = true;
 
       try {
-        await refreshWorkspaceGitChanges(selectedWorkspaceId, selectedWorkspaceWorktreePath);
+        await cmd.refreshWorkspaceGitChanges(selectedWorkspaceId, selectedWorkspaceWorktreePath);
       } finally {
         inFlight = false;
         if (queued) {
@@ -146,7 +216,7 @@ export function WorkspaceView() {
     return () => {
       cancelled = true;
     };
-  }, [refreshWorkspaceGitChanges, selectedWorkspaceId, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
+  }, [cmd, selectedWorkspaceId, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
 
   const maxLeftWidth = Math.max(
     LEFT_MIN_WIDTH,
@@ -169,7 +239,7 @@ export function WorkspaceView() {
     const onMouseMove = (event: MouseEvent) => {
       const delta = event.clientX - clientXStart;
       const nextWidth = clamp(startWidth + delta, LEFT_MIN_WIDTH, maxLeftWidth);
-      setLeftWidth(nextWidth);
+      cmd.setLeftWidth(nextWidth);
     };
 
     const onMouseUp = () => {
@@ -190,7 +260,7 @@ export function WorkspaceView() {
     const onMouseMove = (event: MouseEvent) => {
       const delta = clientXStart - event.clientX;
       const nextWidth = clamp(startWidth + delta, RIGHT_MIN_WIDTH, maxRightWidth);
-      setRightWidth(nextWidth);
+      cmd.setRightWidth(nextWidth);
     };
 
     const onMouseUp = () => {

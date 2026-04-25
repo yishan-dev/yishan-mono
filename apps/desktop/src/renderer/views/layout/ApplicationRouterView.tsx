@@ -181,7 +181,7 @@ export function ApplicationRouterView() {
       }
     };
 
-    void bootstrapSession();
+    bootstrapSession();
 
     return () => {
       disposed = true;
@@ -212,9 +212,9 @@ export function ApplicationRouterView() {
   }
 
   return (
-    <Box sx={{ height: "100%", position: "relative" }}>
+    <>
       <WorkspaceView />
       <Outlet />
-    </Box>
+    </>
   );
 }
