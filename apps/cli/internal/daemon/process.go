@@ -227,15 +227,24 @@ func StartDetached(cfg StartConfig) (int, error) {
 
 	command := exec.Command(executable, args...)
 	command.Env = append(os.Environ(), detachedEnvKey+"=1")
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return 0, fmt.Errorf("open %s for daemon stdio: %w", os.DevNull, err)
+	}
+	defer func() {
+		if closeErr := devNull.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("failed to close /dev/null handle")
+		}
+	}()
 	if cfg.Stdout != nil {
 		command.Stdout = cfg.Stdout
 	} else {
-		command.Stdout = os.Stdout
+		command.Stdout = devNull
 	}
 	if cfg.Stderr != nil {
 		command.Stderr = cfg.Stderr
 	} else {
-		command.Stderr = os.Stderr
+		command.Stderr = devNull
 	}
 	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
@@ -251,11 +260,26 @@ func StartDetached(cfg StartConfig) (int, error) {
 	return pid, nil
 }
 
+func IsHealthy(state RuntimeState, timeout time.Duration) bool {
+	if state.Host == "" || state.Port <= 0 {
+		return false
+	}
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Get("http://" + net.JoinHostPort(state.Host, strconv.Itoa(state.Port)) + "/healthz")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK
+}
+
 func WaitForReady(statePath string, timeout time.Duration) (RuntimeState, error) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		state, err := LoadState(statePath)
-		if err == nil && IsProcessRunning(state.PID) {
+		if err == nil && IsProcessRunning(state.PID) && IsHealthy(state, 250*time.Millisecond) {
 			return state, nil
 		}
 		time.Sleep(200 * time.Millisecond)

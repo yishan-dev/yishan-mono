@@ -17,7 +17,15 @@ function createDbWs(databaseUrl: string) {
 const dbCache = new Map<string, ReturnType<typeof createDb>>();
 const dbWsCache = new Map<string, ReturnType<typeof createDbWs>>();
 
+function isCloudflareWorkersRuntime(): boolean {
+  return typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair !== "undefined";
+}
+
 export function getDb(databaseUrl: string) {
+  if (isCloudflareWorkersRuntime()) {
+    return createDb(databaseUrl);
+  }
+
   const cached = dbCache.get(databaseUrl);
   if (cached) {
     return cached;
@@ -29,6 +37,10 @@ export function getDb(databaseUrl: string) {
 }
 
 export function getDbWs(databaseUrl: string) {
+  if (isCloudflareWorkersRuntime()) {
+    return createDbWs(databaseUrl);
+  }
+
   const cached = dbWsCache.get(databaseUrl);
   if (cached) {
     return cached;

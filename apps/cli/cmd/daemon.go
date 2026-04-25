@@ -88,8 +88,12 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 	state, err := daemon.LoadState(statePath)
 	if err == nil {
 		if daemon.IsProcessRunning(state.PID) {
-			log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon already running")
-			return nil
+			if daemon.IsHealthy(state, 250*time.Millisecond) {
+				log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon already running")
+				return nil
+			}
+
+			log.Warn().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon state exists but health check failed; removing stale state")
 		}
 
 		if err := daemon.RemoveState(statePath); err != nil {

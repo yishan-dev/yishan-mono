@@ -6,6 +6,22 @@ import type * as Rpc from "./jsonRpcTypes";
 import { isDevMode } from "../runtime/environment";
 
 const DAEMON_STATE_FILE_NAME = "daemon.state.json";
+const SOCKET_CONNECT_RETRY_COUNT = 6;
+const SOCKET_CONNECT_RETRY_DELAY_MS = 250;
+const DAEMON_DEBUG_LOGS_ENABLED = isDevMode() || process.env.YISHAN_DAEMON_DEBUG === "1";
+
+function logDaemonDebug(message: string, details?: Record<string, unknown>): void {
+  if (!DAEMON_DEBUG_LOGS_ENABLED) {
+    return;
+  }
+
+  if (details) {
+    console.info(`[DaemonJsonRpc] ${message}`, details);
+    return;
+  }
+
+  console.info(`[DaemonJsonRpc] ${message}`);
+}
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") {
@@ -64,6 +80,10 @@ function resolveDaemonStateFilePath(): string {
   return resolve(homedir(), ".yishan", "profiles", resolveCliProfileName(), DAEMON_STATE_FILE_NAME);
 }
 
+function isFileNotFoundError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
 function ensureDaemonState(candidate: unknown): Rpc.DaemonState {
   const state = asRecord(candidate);
   if (!state) {
@@ -119,14 +139,28 @@ async function resolveDaemonWebSocketUrl(): Promise<string> {
     return explicitUrl;
   }
 
-  const stateRaw = await readFile(resolveDaemonStateFilePath(), "utf8");
+  const stateFilePath = resolveDaemonStateFilePath();
+  let stateRaw: string;
+  try {
+    stateRaw = await readFile(stateFilePath, "utf8");
+  } catch (error) {
+    if (isFileNotFoundError(error)) {
+      throw new Error(`daemon state file not found: ${stateFilePath}`);
+    }
+    throw error;
+  }
+
   const state = ensureDaemonState(JSON.parse(stateRaw));
   return `ws://${state.host}:${state.port}/ws`;
 }
 
-export async function openSocket(): Promise<WebSocket> {
-  const url = await resolveDaemonWebSocketUrl();
+function delay(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
 
+async function openSocketOnce(url: string): Promise<WebSocket> {
   return await new Promise<WebSocket>((resolvePromise, rejectPromise) => {
     const socket = new WebSocket(url);
     let settled = false;
@@ -159,6 +193,33 @@ export async function openSocket(): Promise<WebSocket> {
       rejectOnce(new Error("daemon websocket closed before opening"));
     });
   });
+}
+
+export async function openSocket(): Promise<WebSocket> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= SOCKET_CONNECT_RETRY_COUNT; attempt += 1) {
+    try {
+      const url = await resolveDaemonWebSocketUrl();
+      return await openSocketOnce(url);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("failed to connect to daemon websocket");
+      if (attempt % 2 === 0 || attempt === SOCKET_CONNECT_RETRY_COUNT) {
+        logDaemonDebug("socket connect retry", {
+          attempt: attempt + 1,
+          maxAttempts: SOCKET_CONNECT_RETRY_COUNT + 1,
+          error: lastError.message,
+        });
+      }
+      if (attempt === SOCKET_CONNECT_RETRY_COUNT) {
+        break;
+      }
+
+      await delay(SOCKET_CONNECT_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError ?? new Error("failed to connect to daemon websocket");
 }
 
 export function buildRequest(method: string, params?: unknown): Rpc.JsonRpcRequest {

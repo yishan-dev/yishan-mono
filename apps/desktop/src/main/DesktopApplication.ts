@@ -20,6 +20,35 @@ export class DesktopApplication {
   private readonly apiSubscriptionsByWebContentsId = new Map<number, Set<string>>();
   private readonly apiCleanupHookRegisteredWebContentsIds = new Set<number>();
   private hasProcessedBeforeQuit = false;
+  private daemonReady = false;
+  private daemonReadyInFlight: Promise<void> | null = null;
+
+  private async ensureDaemonReady(_reason: string): Promise<void> {
+    if (this.daemonReady) {
+      return;
+    }
+
+    if (this.daemonReadyInFlight) {
+      return await this.daemonReadyInFlight;
+    }
+
+    const task = this.daemonManager.ensureStarted();
+    this.daemonReadyInFlight = task;
+
+    try {
+      await task;
+      this.daemonReady = true;
+    } finally {
+      if (this.daemonReadyInFlight === task) {
+        this.daemonReadyInFlight = null;
+      }
+    }
+  }
+
+  private async runWithDaemonAvailability<T>(reason: string, operation: () => Promise<T>): Promise<T> {
+    // await this.ensureDaemonReady(reason);
+    return await operation();
+  }
 
   /**
    * Starts the desktop app and exits on startup failure.
@@ -27,9 +56,17 @@ export class DesktopApplication {
   static run() {
     const desktopApplication = new DesktopApplication();
 
-    desktopApplication.start().catch((error: unknown) => {
+    desktopApplication.start().catch(async (error: unknown) => {
       console.error("Failed to start desktop application", error);
-      app.exit(1);
+      try {
+        await desktopApplication.daemonManager.stop();
+      } catch (stopError) {
+        console.warn("Failed to stop daemon service after startup failure", stopError);
+      } finally {
+        desktopApplication.daemonReady = false;
+        desktopApplication.daemonJsonRpcClient.dispose();
+        app.exit(1);
+      }
     });
   }
 
@@ -58,6 +95,7 @@ export class DesktopApplication {
             console.warn("Failed to stop daemon service during desktop shutdown", error);
           })
           .finally(() => {
+            this.daemonReady = false;
             this.daemonJsonRpcClient.dispose();
             app.quit();
           });
@@ -72,6 +110,7 @@ export class DesktopApplication {
 
     app.on("window-all-closed", () => {
       if (process.platform !== "darwin") {
+        this.daemonReady = false;
         this.daemonJsonRpcClient.dispose();
         app.quit();
       }
@@ -111,37 +150,41 @@ export class DesktopApplication {
 
   private registerApiIpcHandlers() {
     ipcMain.handle(API_RPC_IPC_CHANNELS.invoke, async (_event, input) => {
-      return await this.daemonJsonRpcClient.invokeApi({
-        namespace: input.namespace,
-        method: input.method,
-        input: input.input,
+      return await this.runWithDaemonAvailability("api.invoke", async () => {
+        return await this.daemonJsonRpcClient.invokeApi({
+          namespace: input.namespace,
+          method: input.method,
+          input: input.input,
+        });
       });
     });
 
     ipcMain.handle(API_RPC_IPC_CHANNELS.startSubscription, async (event, input) => {
       const webContentsId = event.sender.id;
-      const subscriptionId = await this.daemonJsonRpcClient.startSubscription({
-        namespace: input.namespace,
-        method: input.method,
-        input: input.input,
-        onNotification: (notification) => {
-          if (event.sender.isDestroyed()) {
-            return;
-          }
+      const subscriptionId = await this.runWithDaemonAvailability("api.startSubscription", async () => {
+        return await this.daemonJsonRpcClient.startSubscription({
+          namespace: input.namespace,
+          method: input.method,
+          input: input.input,
+          onNotification: (notification) => {
+            if (event.sender.isDestroyed()) {
+              return;
+            }
 
-          event.sender.send(DESKTOP_RPC_IPC_CHANNELS.event, {
-            method: "apiRpc.subscription",
-            payload: {
-              subscriptionId,
-              data: this.formatSubscriptionEventData(notification.method, notification.payload),
-            },
-          });
+            event.sender.send(DESKTOP_RPC_IPC_CHANNELS.event, {
+              method: "apiRpc.subscription",
+              payload: {
+                subscriptionId,
+                data: this.formatSubscriptionEventData(notification.method, notification.payload),
+              },
+            });
 
-          event.sender.send(DESKTOP_RPC_IPC_CHANNELS.event, {
-            method: notification.method,
-            payload: notification.payload,
-          });
-        },
+            event.sender.send(DESKTOP_RPC_IPC_CHANNELS.event, {
+              method: notification.method,
+              payload: notification.payload,
+            });
+          },
+        });
       });
 
       const subscriptionIds = this.apiSubscriptionsByWebContentsId.get(webContentsId) ?? new Set<string>();

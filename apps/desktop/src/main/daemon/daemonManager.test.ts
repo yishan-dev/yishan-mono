@@ -4,9 +4,10 @@ import { DaemonManager } from "./daemonManager";
 describe("DaemonManager", () => {
   it("starts the daemon service through CLI", async () => {
     const run = vi.fn().mockResolvedValue({ exitCode: 0, stdout: "", stderr: "" });
-    const manager = new DaemonManager({ run });
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("offline"));
+    const manager = new DaemonManager({ run, fetch });
 
-    await manager.ensureStarted();
+    await expect(manager.ensureStarted()).rejects.toThrow("Daemon did not become healthy after start");
 
     expect(run).toHaveBeenCalledWith(["daemon", "start", "--jwt-required=false"]);
   });
