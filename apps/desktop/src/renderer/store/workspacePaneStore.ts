@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 
 export type WorkspaceRightPaneTab = "files" | "changes";
 
@@ -10,15 +11,17 @@ type WorkspacePaneStoreState = {
 };
 
 /** Stores workspace pane UI state shared between shortcuts, commands, and pane views. */
-export const workspacePaneStore = create<WorkspacePaneStoreState>((set) => ({
-  rightPaneTab: "files",
-  fileSearchRequestKey: 0,
-  setRightPaneTab: (rightPaneTab) => {
-    set({ rightPaneTab });
-  },
-  requestFileSearch: () => {
-    set((state) => ({
-      fileSearchRequestKey: state.fileSearchRequestKey + 1,
-    }));
-  },
-}));
+export const workspacePaneStore = create<WorkspacePaneStoreState>()(
+  immer((set) => ({
+    rightPaneTab: "files",
+    fileSearchRequestKey: 0,
+    setRightPaneTab: (rightPaneTab) => {
+      set({ rightPaneTab });
+    },
+    requestFileSearch: () => {
+      set((state) => {
+        state.fileSearchRequestKey += 1;
+      });
+    },
+  })),
+);

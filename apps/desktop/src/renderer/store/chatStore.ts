@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import type { AvailableCommand, AvailableModel, ChatMessage } from "./types";
 
 export type WorkspaceAgentStatus = "running" | "waiting_input" | "idle";
@@ -63,8 +64,9 @@ function sanitizeAvailableModels(models: AvailableModel[]): AvailableModel[] {
 }
 
 /** Stores chat/session data with explicit cleanup orchestration from commands. */
-export const chatStore = create<ChatStoreState>((set, get) => {
-  return {
+export const chatStore = create<ChatStoreState>()(
+  immer((set, get) => {
+    return {
     messagesByTabId: {},
     availableCommandsByTabId: {},
     availableModelsByTabId: {},
@@ -225,5 +227,6 @@ export const chatStore = create<ChatStoreState>((set, get) => {
         workspaceUnreadToneByWorkspaceId: omitKeys(state.workspaceUnreadToneByWorkspaceId, removedWorkspaceIds),
       }));
     },
-  };
-});
+    };
+  }),
+);

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type GitBranchPrefixMode = "none" | "user" | "custom";
@@ -57,12 +58,12 @@ type GitBranchStoreState = {
 /** Stores persisted global git-branch naming preferences used during workspace branch creation. */
 export const gitBranchStore = create<GitBranchStoreState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       prefixMode: DEFAULT_GIT_BRANCH_PREFIX_MODE,
       customPrefix: "",
       setPrefixMode: (prefixMode) => set({ prefixMode }),
       setCustomPrefix: (customPrefix) => set({ customPrefix }),
-    }),
+    })),
     {
       name: GIT_BRANCH_STORE_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),

@@ -50,7 +50,9 @@ export function createWorkspaceRepoActions(
 
   return {
     load: (organizationId, projects, workspaces) => {
-      set((state) => buildHydratedStateFromApiData(state, organizationId, projects, workspaces));
+      set((state) => {
+        Object.assign(state, buildHydratedStateFromApiData(state, organizationId, projects, workspaces));
+      });
     },
     createProject,
     deleteProject: (projectId) => {
@@ -69,16 +71,14 @@ export function createWorkspaceRepoActions(
         .map((path) => path.trim())
         .filter((path) => path.length > 0);
 
-      set((state) => ({
-        fileTreeRefreshVersion: state.fileTreeRefreshVersion + 1,
-        fileTreeChangedRelativePathsByWorktreePath:
-          normalizedWorkspaceWorktreePath.length === 0
-            ? state.fileTreeChangedRelativePathsByWorktreePath
-            : {
-                ...state.fileTreeChangedRelativePathsByWorktreePath,
-                [normalizedWorkspaceWorktreePath]: normalizedChangedRelativePaths,
-              },
-      }));
+      set((state) => {
+        state.fileTreeRefreshVersion += 1;
+        if (normalizedWorkspaceWorktreePath.length === 0) {
+          return;
+        }
+
+        state.fileTreeChangedRelativePathsByWorktreePath[normalizedWorkspaceWorktreePath] = normalizedChangedRelativePaths;
+      });
     },
   };
 }

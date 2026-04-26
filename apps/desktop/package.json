@@ -55,6 +55,7 @@
     "esbuild": "^0.28.0",
     "hotkeys-js": "^4.0.3",
     "i18next": "^26.0.6",
+    "immer": "^11.1.4",
     "jsdom": "^29.0.2",
     "material-icon-theme": "^5.33.1",
     "react": "^19.2.5",

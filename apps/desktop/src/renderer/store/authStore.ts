@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export const AUTH_STORE_STORAGE_KEY = "yishan-auth-store";
@@ -12,13 +13,13 @@ type AuthStoreState = {
 /** Stores one persisted signed-in flag used to gate app shell routes. */
 export const authStore = create<AuthStoreState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       isAuthenticated: false,
       authStatusResolved: false,
       setAuthState: (isAuthenticated, authStatusResolved) => {
         set({ isAuthenticated, authStatusResolved });
       },
-    }),
+    })),
     {
       name: AUTH_STORE_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type SessionUser = {
@@ -33,7 +34,7 @@ type SessionStoreState = {
 /** Stores renderer session metadata (user + organizations) for remote REST flows. */
 export const sessionStore = create<SessionStoreState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       currentUser: null,
       organizations: [],
       selectedOrganizationId: undefined,
@@ -79,7 +80,7 @@ export const sessionStore = create<SessionStoreState>()(
           loaded: false,
         });
       },
-    }),
+    })),
     {
       name: "yishan-session-store",
       storage: createJSONStorage(() => localStorage),

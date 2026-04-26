@@ -211,7 +211,12 @@ export type WorkspaceStoreActions = Pick<
   | "incrementGitRefreshVersion"
 >;
 
-export type WorkspaceStoreCreator = StateCreator<WorkspaceStoreState, [], [], WorkspaceStoreState>;
+export type WorkspaceStoreCreator = StateCreator<
+  WorkspaceStoreState,
+  [["zustand/immer", never]],
+  [],
+  WorkspaceStoreState
+>;
 
 export type WorkspaceStoreSetState = Parameters<WorkspaceStoreCreator>[0];
 export type WorkspaceStoreGetState = Parameters<WorkspaceStoreCreator>[1];

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { type DesktopAgentKind, createDefaultAgentInUseByKind, isDesktopAgentKind } from "../helpers/agentSettings";
 
@@ -35,7 +36,7 @@ function normalizeInUseByAgentKind(
 /** Stores persisted desktop-agent in-use preferences used by workspace tab creation menus. */
 export const agentSettingsStore = create<AgentSettingsStoreState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       inUseByAgentKind: createDefaultAgentInUseByKind(true),
       setAgentInUse: (agentKind, inUse) => {
         set((state) => ({
@@ -45,7 +46,7 @@ export const agentSettingsStore = create<AgentSettingsStoreState>()(
           },
         }));
       },
-    }),
+    })),
     {
       name: AGENT_SETTINGS_STORE_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),

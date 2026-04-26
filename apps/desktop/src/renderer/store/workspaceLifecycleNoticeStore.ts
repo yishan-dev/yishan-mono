@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 
 export type WorkspaceLifecycleScriptWarning = {
   scriptKind: "setup" | "post";
@@ -32,46 +33,46 @@ function createNoticeId(scriptKind: "setup" | "post"): string {
 }
 
 /** Stores workspace lifecycle warning queue and selected detail modal payload. */
-export const workspaceLifecycleNoticeStore = create<WorkspaceLifecycleNoticeStoreState>((set) => ({
-  queue: [],
-  detailNotice: null,
-  enqueueWarnings: (workspaceName, warnings) => {
-    const normalizedWorkspaceName = workspaceName.trim() || "Workspace";
-    const notices = warnings.map((warning) => ({
-      id: createNoticeId(warning.scriptKind),
-      workspaceName: normalizedWorkspaceName,
-      warning,
-    }));
-    if (notices.length === 0) {
-      return;
-    }
-
-    set((state) => ({
-      queue: [...state.queue, ...notices],
-    }));
-  },
-  dismissActiveNotice: () => {
-    set((state) => ({
-      queue: state.queue.slice(1),
-    }));
-  },
-  openActiveNoticeDetails: () => {
-    set((state) => {
-      const activeNotice = state.queue[0] ?? null;
-      if (!activeNotice) {
-        return state;
+export const workspaceLifecycleNoticeStore = create<WorkspaceLifecycleNoticeStoreState>()(
+  immer((set) => ({
+    queue: [],
+    detailNotice: null,
+    enqueueWarnings: (workspaceName, warnings) => {
+      const normalizedWorkspaceName = workspaceName.trim() || "Workspace";
+      const notices = warnings.map((warning) => ({
+        id: createNoticeId(warning.scriptKind),
+        workspaceName: normalizedWorkspaceName,
+        warning,
+      }));
+      if (notices.length === 0) {
+        return;
       }
 
-      return {
-        queue: state.queue.slice(1),
-        detailNotice: activeNotice,
-      };
-    });
-  },
-  closeDetailNotice: () => {
-    set({ detailNotice: null });
-  },
-}));
+      set((state) => {
+        state.queue.push(...notices);
+      });
+    },
+    dismissActiveNotice: () => {
+      set((state) => {
+        state.queue = state.queue.slice(1);
+      });
+    },
+    openActiveNoticeDetails: () => {
+      set((state) => {
+        const activeNotice = state.queue[0] ?? null;
+        if (!activeNotice) {
+          return;
+        }
+
+        state.queue = state.queue.slice(1);
+        state.detailNotice = activeNotice;
+      });
+    },
+    closeDetailNotice: () => {
+      set({ detailNotice: null });
+    },
+  })),
+);
 
 /** Enqueues lifecycle warnings for workspace create/close in-app notifications. */
 export function enqueueWorkspaceLifecycleWarnings(input: {

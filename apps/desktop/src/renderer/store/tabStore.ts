@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { resolveSelectedTabIdForWorkspace } from "./tabs";
 import {
   closeAllTabsState,
@@ -71,18 +72,19 @@ function readWorkspaceState(): WorkspaceStoreState {
 }
 
 /** Stores all tab state and tab actions. */
-export const tabStore = create<TabStoreState>((set, get) => {
-  const initialWorkspace = readWorkspaceState();
+export const tabStore = create<TabStoreState>()(
+  immer((set, get) => {
+    const initialWorkspace = readWorkspaceState();
 
-  return {
+    return {
     tabs: [],
     selectedWorkspaceId: initialWorkspace.selectedWorkspaceId,
     selectedTabId: "",
     selectedTabIdByWorkspaceId: {},
     getWorkspaceTabs: (workspaceId) => {
       return get()
-        .tabs.filter((tab) => tab.workspaceId === workspaceId)
-        .sort((leftTab, rightTab) => {
+        .tabs.filter((tab: WorkspaceTab) => tab.workspaceId === workspaceId)
+        .sort((leftTab: WorkspaceTab, rightTab: WorkspaceTab) => {
           if (leftTab.pinned === rightTab.pinned) {
             return 0;
           }
@@ -103,7 +105,7 @@ export const tabStore = create<TabStoreState>((set, get) => {
       set((state) => {
         const tabs = state.tabs ?? [];
         const selectedTabIdByWorkspaceId = state.selectedTabIdByWorkspaceId ?? {};
-        const nextTab = tabs.find((tab) => tab.id === tabId);
+        const nextTab = tabs.find((tab: WorkspaceTab) => tab.id === tabId);
         if (!nextTab) {
           return { selectedTabId: tabId };
         }
@@ -121,13 +123,15 @@ export const tabStore = create<TabStoreState>((set, get) => {
       const workspaceIdSet = new Set(workspaceIds);
       const previous = get();
       const previousTabs = previous.tabs ?? [];
-      const removedTabIds = previousTabs.filter((tab) => !workspaceIdSet.has(tab.workspaceId)).map((tab) => tab.id);
+      const removedTabIds = previousTabs
+        .filter((tab: WorkspaceTab) => !workspaceIdSet.has(tab.workspaceId))
+        .map((tab: WorkspaceTab) => tab.id);
 
       set((state) => {
         const currentTabs = state.tabs ?? [];
         const currentSelectedByWorkspaceId = state.selectedTabIdByWorkspaceId ?? {};
-        const nextTabs = currentTabs.filter((tab) => workspaceIdSet.has(tab.workspaceId));
-        const nextTabIdSet = new Set(nextTabs.map((tab) => tab.id));
+        const nextTabs = currentTabs.filter((tab: WorkspaceTab) => workspaceIdSet.has(tab.workspaceId));
+        const nextTabIdSet = new Set(nextTabs.map((tab: WorkspaceTab) => tab.id));
         const nextSelectedTabIdByWorkspaceId = Object.fromEntries(
           Object.entries(currentSelectedByWorkspaceId).filter(
             ([workspaceId, tabId]) => workspaceIdSet.has(workspaceId) && nextTabIdSet.has(tabId),
@@ -154,7 +158,8 @@ export const tabStore = create<TabStoreState>((set, get) => {
       }
 
       const tabNumber =
-        get().tabs.filter((tab) => tab.workspaceId === targetWorkspaceId && tab.kind === "session").length + 1;
+        get().tabs.filter((tab: WorkspaceTab) => tab.workspaceId === targetWorkspaceId && tab.kind === "session").length +
+        1;
       const nextTabTitle = `Untitled ${tabNumber}`;
       const nextTabId = createClientTabId();
 
@@ -206,7 +211,7 @@ export const tabStore = create<TabStoreState>((set, get) => {
       }
 
       set((state) => ({
-        tabs: state.tabs.map((tab) =>
+        tabs: state.tabs.map((tab: WorkspaceTab) =>
           tab.id === normalizedTabId && tab.kind === "terminal"
             ? {
                 ...tab,
@@ -234,5 +239,6 @@ export const tabStore = create<TabStoreState>((set, get) => {
     markFileTabSaved: (tabId) => {
       set((state) => markFileTabSavedState(state, tabId));
     },
-  };
-});
+    };
+  }),
+);

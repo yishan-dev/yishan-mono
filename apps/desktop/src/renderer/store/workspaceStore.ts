@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { createWorkspaceStoreActions } from "./actions";
 import { initialWorkspaceState, partializeWorkspaceState } from "./state";
@@ -15,7 +16,7 @@ export type {
 
 export const workspaceStore = create<WorkspaceStoreState>()(
   persist(
-    (set, get) => ({
+    immer((set, get) => ({
       projects: initialWorkspaceState.projects,
       workspaces: initialWorkspaceState.workspaces,
       gitChangesCountByWorkspaceId: {},
@@ -29,7 +30,7 @@ export const workspaceStore = create<WorkspaceStoreState>()(
       organizationPreferencesById: {},
       fileTreeRefreshVersion: 0,
       ...createWorkspaceStoreActions(set, get),
-    }),
+    })),
     {
       name: "yishan-workspace-store",
       storage: createJSONStorage(() => localStorage),

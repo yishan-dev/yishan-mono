@@ -98,27 +98,21 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) => ({
-        gitChangesCountByWorkspaceId: {
-          ...state.gitChangesCountByWorkspaceId,
-          [workspaceId]: count,
-        },
-      }));
+      set((state) => {
+        state.gitChangesCountByWorkspaceId[workspaceId] = count;
+      });
     },
     setWorkspaceGitChangeTotals: (workspaceId, totals) => {
       if (!workspaceId) {
         return;
       }
 
-      set((state) => ({
-        gitChangeTotalsByWorkspaceId: {
-          ...state.gitChangeTotalsByWorkspaceId,
-          [workspaceId]: {
-            additions: Math.max(0, totals.additions),
-            deletions: Math.max(0, totals.deletions),
-          },
-        },
-      }));
+      set((state) => {
+        state.gitChangeTotalsByWorkspaceId[workspaceId] = {
+          additions: Math.max(0, totals.additions),
+          deletions: Math.max(0, totals.deletions),
+        };
+      });
     },
     incrementGitRefreshVersion: (workspaceWorktreePath) => {
       const normalizedWorkspaceWorktreePath = workspaceWorktreePath.trim();
@@ -126,13 +120,10 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) => ({
-        gitRefreshVersionByWorktreePath: {
-          ...state.gitRefreshVersionByWorktreePath,
-          [normalizedWorkspaceWorktreePath]:
-            (state.gitRefreshVersionByWorktreePath[normalizedWorkspaceWorktreePath] ?? 0) + 1,
-        },
-      }));
+      set((state) => {
+        state.gitRefreshVersionByWorktreePath[normalizedWorkspaceWorktreePath] =
+          (state.gitRefreshVersionByWorktreePath[normalizedWorkspaceWorktreePath] ?? 0) + 1;
+      });
     },
   };
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { AppThemePreference } from "../theme";
 
@@ -22,7 +23,7 @@ type LayoutStoreState = {
 /** Stores persisted desktop layout preferences including pane widths and theme mode preference. */
 export const layoutStore = create<LayoutStoreState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       leftWidth: DEFAULT_LEFT_WIDTH,
       rightWidth: DEFAULT_RIGHT_WIDTH,
       themePreference: "system",
@@ -43,7 +44,7 @@ export const layoutStore = create<LayoutStoreState>()(
       setIsRightPaneManuallyHidden: (isRightPaneManuallyHidden) => {
         set({ isRightPaneManuallyHidden });
       },
-    }),
+    })),
     {
       name: LAYOUT_STORE_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
