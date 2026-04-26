@@ -145,6 +145,7 @@ describe("createWorkspaceRepoActions", () => {
     const harness = createHarness();
 
     harness.actions.load(
+      "org-1",
       [
         {
           id: "repo-1",
@@ -172,7 +173,6 @@ describe("createWorkspaceRepoActions", () => {
           updatedAt: "2026-01-01T00:00:00Z",
         },
       ],
-      ["repo-1"],
     );
 
     const state = harness.getState();

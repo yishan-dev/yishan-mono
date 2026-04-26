@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildHydratedStateFromApiData, normalizeCreateRepoInput, readPersistedDisplayRepoIds } from "./projectHelpers";
+import {
+  buildHydratedStateFromApiData,
+  normalizeCreateRepoInput,
+  readPersistedWorkspacePreferencesByOrg,
+} from "./projectHelpers";
 
 describe("projectHelpers", () => {
   it("normalizes create-repo input based on source", () => {
@@ -28,18 +32,34 @@ describe("projectHelpers", () => {
     });
   });
 
-  it("reads persisted display repo ids and ignores invalid payloads", () => {
+  it("reads persisted organization workspace preferences and ignores invalid payloads", () => {
     const storage = {
-      getItem: () => JSON.stringify({ state: { displayProjectIds: ["repo-1", "repo-2", 3] } }),
+      getItem: () =>
+        JSON.stringify({
+          state: {
+            organizationPreferencesById: {
+              "org-1": {
+                selectedProjectId: "repo-1",
+                selectedWorkspaceId: "workspace-1",
+                displayProjectIds: ["repo-1", "repo-2", 3],
+              },
+            },
+          },
+        }),
     } as unknown as Storage;
 
-    expect(readPersistedDisplayRepoIds(storage)).toEqual(["repo-1", "repo-2"]);
+    expect(readPersistedWorkspacePreferencesByOrg(storage, "org-1")).toEqual({
+      selectedProjectId: "repo-1",
+      selectedWorkspaceId: "workspace-1",
+      displayProjectIds: ["repo-1", "repo-2"],
+      lastUsedExternalAppId: undefined,
+    });
 
     const invalidStorage = {
       getItem: () => "not json",
     } as unknown as Storage;
 
-    expect(readPersistedDisplayRepoIds(invalidStorage)).toBeUndefined();
+    expect(readPersistedWorkspacePreferencesByOrg(invalidStorage, "org-1")).toBeUndefined();
   });
 
   it("falls back to showing all repos when persisted display ids are stale", () => {
@@ -51,10 +71,16 @@ describe("projectHelpers", () => {
       selectedProjectId: "",
       selectedWorkspaceId: "",
       displayProjectIds: [],
+      organizationPreferencesById: {
+        "org-1": {
+          displayProjectIds: ["missing-repo-id"],
+        },
+      },
     };
 
     const hydrated = buildHydratedStateFromApiData(
       initialState,
+      "org-1",
       [
         {
           id: "repo-1",
@@ -62,7 +88,6 @@ describe("projectHelpers", () => {
         },
       ],
       [],
-      ["missing-repo-id"],
     );
 
     expect(hydrated.displayProjectIds).toEqual(["repo-1"]);
@@ -77,17 +102,22 @@ describe("projectHelpers", () => {
       selectedProjectId: "",
       selectedWorkspaceId: "",
       displayProjectIds: [],
+      organizationPreferencesById: {
+        "org-1": {
+          displayProjectIds: [],
+        },
+      },
     };
 
     const hydrated = buildHydratedStateFromApiData(
       initialState,
+      "org-1",
       [
         {
           id: "repo-1",
           name: "Repo 1",
         },
       ],
-      [],
       [],
     );
 

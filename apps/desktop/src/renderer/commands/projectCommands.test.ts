@@ -93,7 +93,8 @@ describe("projectCommands", () => {
 
     expect(apiMocks.listProjects).toHaveBeenCalledWith("org-1", { withWorkspaces: true });
     expect(hydrate).toHaveBeenCalledTimes(1);
-    expect(hydrate.mock.calls[0]?.[0]).toEqual([
+    expect(hydrate.mock.calls[0]?.[0]).toBe("org-1");
+    expect(hydrate.mock.calls[0]?.[1]).toEqual([
       {
         id: "project-1",
         name: "Project 1",
@@ -106,7 +107,7 @@ describe("projectCommands", () => {
         createdByUserId: "user-1",
       },
     ]);
-    expect(hydrate.mock.calls[0]?.[1]).toEqual([]);
+    expect(hydrate.mock.calls[0]?.[2]).toEqual([]);
     expect(retainWorkspaceTabs).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
   });

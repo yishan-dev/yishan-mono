@@ -121,15 +121,16 @@ export type WorkspaceStoreState = {
   selectedWorkspaceId: string;
   displayProjectIds: string[];
   lastUsedExternalAppId?: ExternalAppId;
+  organizationPreferencesById?: Record<string, WorkspaceStoreOrganizationPreference>;
   fileTreeRefreshVersion: number;
   setSelectedProjectId: (projectId: string) => void;
   setSelectedWorkspaceId: (workspaceId: string) => void;
   setDisplayProjectIds: (projectIds: string[]) => void;
   setLastUsedExternalAppId: (appId: ExternalAppId) => void;
   load: (
+    organizationId: string,
     projects: ProjectRecord[],
     workspaces: ProjectWorkspaceRecord[],
-    persistedDisplayProjectIds?: string[],
   ) => void;
   createProject: (input: {
     name: string;
@@ -178,9 +179,16 @@ export type WorkspaceStoreState = {
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
 };
 
+export type WorkspaceStoreOrganizationPreference = {
+  selectedProjectId?: string;
+  selectedWorkspaceId?: string;
+  displayProjectIds?: string[];
+  lastUsedExternalAppId?: ExternalAppId;
+};
+
 export type WorkspaceStorePersistedState = Pick<
   WorkspaceStoreState,
-  "displayProjectIds" | "lastUsedExternalAppId"
+  "displayProjectIds" | "lastUsedExternalAppId" | "organizationPreferencesById"
 >;
 
 export type WorkspaceStoreActions = Pick<

@@ -1,3 +1,4 @@
+import { sessionStore } from "./sessionStore";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";
 
 type WorkspaceSelectionActions = Pick<
@@ -29,19 +30,78 @@ export function createWorkspaceSelectionActions(
       set({
         selectedProjectId: projectId,
         selectedWorkspaceId: nextWorkspaceId,
+        organizationPreferencesById: (() => {
+          const organizationId = sessionStore.getState().selectedOrganizationId?.trim();
+          if (!organizationId) {
+            return get().organizationPreferencesById;
+          }
+
+          return {
+            ...(get().organizationPreferencesById ?? {}),
+            [organizationId]: {
+              ...(get().organizationPreferencesById?.[organizationId] ?? {}),
+              selectedProjectId: projectId,
+              selectedWorkspaceId: nextWorkspaceId,
+            },
+          };
+        })(),
       });
     },
     setSelectedWorkspaceId: (workspaceId) => {
-      set({ selectedWorkspaceId: workspaceId });
+      set({
+        selectedWorkspaceId: workspaceId,
+        organizationPreferencesById: (() => {
+          const organizationId = sessionStore.getState().selectedOrganizationId?.trim();
+          if (!organizationId) {
+            return get().organizationPreferencesById;
+          }
+
+          return {
+            ...(get().organizationPreferencesById ?? {}),
+            [organizationId]: {
+              ...(get().organizationPreferencesById?.[organizationId] ?? {}),
+              selectedWorkspaceId: workspaceId,
+            },
+          };
+        })(),
+      });
     },
     setDisplayProjectIds: (projectIds) => {
       set({
-        displayProjectIds: projectIds
+        displayProjectIds: projectIds,
+        organizationPreferencesById: (() => {
+          const organizationId = sessionStore.getState().selectedOrganizationId?.trim();
+          if (!organizationId) {
+            return get().organizationPreferencesById;
+          }
+
+          return {
+            ...(get().organizationPreferencesById ?? {}),
+            [organizationId]: {
+              ...(get().organizationPreferencesById?.[organizationId] ?? {}),
+              displayProjectIds: projectIds,
+            },
+          };
+        })(),
       });
     },
     setLastUsedExternalAppId: (appId) => {
       set({
         lastUsedExternalAppId: appId,
+        organizationPreferencesById: (() => {
+          const organizationId = sessionStore.getState().selectedOrganizationId?.trim();
+          if (!organizationId) {
+            return get().organizationPreferencesById;
+          }
+
+          return {
+            ...(get().organizationPreferencesById ?? {}),
+            [organizationId]: {
+              ...(get().organizationPreferencesById?.[organizationId] ?? {}),
+              lastUsedExternalAppId: appId,
+            },
+          };
+        })(),
       });
     },
   };

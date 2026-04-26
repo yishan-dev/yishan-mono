@@ -1,4 +1,4 @@
-import { readPersistedDisplayRepoIds } from "../helpers/projectHelpers";
+import { readPersistedWorkspacePreferencesByOrg } from "../helpers/projectHelpers";
 import {
   api,
 } from "../api";
@@ -6,6 +6,7 @@ import type { ProjectRecord, ProjectWithWorkspacesRecord } from "../api";
 import { RestApiError } from "../api/restClient";
 import { getDaemonRpcClient } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
+import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
@@ -53,7 +54,7 @@ export async function loadWorkspaceFromBackend(): Promise<void> {
         : organizations[0];
 
     if (!selectedOrganization) {
-      workspaceStore.getState().load([], [], []);
+      workspaceStore.getState().load("", [], []);
       syncTabStoreWithWorkspace(previousWorkspaces);
       return;
     }
@@ -64,10 +65,23 @@ export async function loadWorkspaceFromBackend(): Promise<void> {
     const projects: ProjectRecord[] = projectsWithWorkspaces.map(({ workspaces: _, ...project }) => project);
     const workspaces = projectsWithWorkspaces.flatMap((project) => project.workspaces ?? []);
 
-    const persistedDisplayProjectIds = readPersistedDisplayRepoIds(
+    const persistedWorkspacePreferences = readPersistedWorkspacePreferencesByOrg(
       typeof localStorage === "undefined" ? undefined : localStorage,
+      selectedOrganization.id,
     );
-    workspaceStore.getState().load(projects, workspaces, persistedDisplayProjectIds);
+    if (persistedWorkspacePreferences) {
+      workspaceStore.setState((state) => ({
+        organizationPreferencesById: {
+          ...(state.organizationPreferencesById ?? {}),
+          [selectedOrganization.id]: {
+            ...(state.organizationPreferencesById?.[selectedOrganization.id] ?? {}),
+            ...persistedWorkspacePreferences,
+          },
+        },
+      }));
+    }
+
+    workspaceStore.getState().load(selectedOrganization.id, projects, workspaces);
     syncTabStoreWithWorkspace(previousWorkspaces);
   } catch (error) {
     console.error("Failed to load workspace snapshot", error);

@@ -49,8 +49,8 @@ export function createWorkspaceRepoActions(
   };
 
   return {
-    load: (projects, workspaces, displayProjectIds) => {
-      set((state) => buildHydratedStateFromApiData(state, projects, workspaces, displayProjectIds));
+    load: (organizationId, projects, workspaces) => {
+      set((state) => buildHydratedStateFromApiData(state, organizationId, projects, workspaces));
     },
     createProject,
     deleteProject: (projectId) => {

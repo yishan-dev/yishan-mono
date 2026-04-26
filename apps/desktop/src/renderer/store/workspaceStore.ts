@@ -26,6 +26,7 @@ export const workspaceStore = create<WorkspaceStoreState>()(
       selectedWorkspaceId: initialWorkspaceState.selectedWorkspaceId,
       displayProjectIds: [],
       lastUsedExternalAppId: undefined,
+      organizationPreferencesById: {},
       fileTreeRefreshVersion: 0,
       ...createWorkspaceStoreActions(set, get),
     }),

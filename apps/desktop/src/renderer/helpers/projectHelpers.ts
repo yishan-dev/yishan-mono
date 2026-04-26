@@ -1,7 +1,7 @@
 import { buildWorkspaceStateFromData } from "../store/state";
 import { getFileName } from "../store/tabs";
 import type { CreateRepoResult, ProjectRecord, ProjectWorkspaceRecord } from "../api/types";
-import type { RepoWorkspaceItem, WorkspaceStoreState } from "../store/types";
+import type { RepoWorkspaceItem, WorkspaceStoreOrganizationPreference, WorkspaceStoreState } from "../store/types";
 
 type ProjectStoreSlice = Pick<
   WorkspaceStoreState,
@@ -12,6 +12,8 @@ type ProjectStoreSlice = Pick<
   | "selectedProjectId"
   | "selectedWorkspaceId"
   | "displayProjectIds"
+  | "lastUsedExternalAppId"
+  | "organizationPreferencesById"
 >;
 
 type RepoConfigUpdate = Pick<
@@ -19,9 +21,17 @@ type RepoConfigUpdate = Pick<
   "name" | "worktreePath" | "privateContextEnabled" | "icon" | "iconBgColor" | "setupScript" | "postScript"
 >;
 
-/** Returns persisted repo display ids from local storage when available. */
-export function readPersistedDisplayRepoIds(storage: Storage | undefined): string[] | undefined {
+/** Returns persisted workspace preferences for one organization id when available. */
+export function readPersistedWorkspacePreferencesByOrg(
+  storage: Storage | undefined,
+  organizationId: string,
+): WorkspaceStoreOrganizationPreference | undefined {
   if (!storage) {
+    return undefined;
+  }
+
+  const normalizedOrganizationId = organizationId.trim();
+  if (!normalizedOrganizationId) {
     return undefined;
   }
 
@@ -33,11 +43,47 @@ export function readPersistedDisplayRepoIds(storage: Storage | undefined): strin
 
     const parsed = JSON.parse(raw) as {
       state?: {
+        selectedProjectId?: unknown;
+        selectedWorkspaceId?: unknown;
         displayProjectIds?: unknown;
+        lastUsedExternalAppId?: unknown;
+        organizationPreferencesById?: Record<string, WorkspaceStoreOrganizationPreference>;
       };
     };
-    const candidate = parsed.state?.displayProjectIds;
-    return Array.isArray(candidate) ? candidate.filter((item): item is string => typeof item === "string") : undefined;
+    const organizationPreferencesById = parsed.state?.organizationPreferencesById;
+    if (organizationPreferencesById && typeof organizationPreferencesById === "object") {
+      const scopedPreferences = organizationPreferencesById[normalizedOrganizationId];
+      if (!scopedPreferences || typeof scopedPreferences !== "object") {
+        return undefined;
+      }
+
+      return {
+        selectedProjectId:
+          typeof scopedPreferences.selectedProjectId === "string" ? scopedPreferences.selectedProjectId : undefined,
+        selectedWorkspaceId:
+          typeof scopedPreferences.selectedWorkspaceId === "string" ? scopedPreferences.selectedWorkspaceId : undefined,
+        displayProjectIds: Array.isArray(scopedPreferences.displayProjectIds)
+          ? scopedPreferences.displayProjectIds.filter((item): item is string => typeof item === "string")
+          : undefined,
+        lastUsedExternalAppId:
+          typeof scopedPreferences.lastUsedExternalAppId === "string"
+            ? (scopedPreferences.lastUsedExternalAppId as WorkspaceStoreOrganizationPreference["lastUsedExternalAppId"])
+            : undefined,
+      };
+    }
+
+    return {
+      selectedProjectId: typeof parsed.state?.selectedProjectId === "string" ? parsed.state.selectedProjectId : undefined,
+      selectedWorkspaceId:
+        typeof parsed.state?.selectedWorkspaceId === "string" ? parsed.state.selectedWorkspaceId : undefined,
+      displayProjectIds: Array.isArray(parsed.state?.displayProjectIds)
+        ? parsed.state.displayProjectIds.filter((item): item is string => typeof item === "string")
+        : undefined,
+      lastUsedExternalAppId:
+        typeof parsed.state?.lastUsedExternalAppId === "string"
+          ? (parsed.state.lastUsedExternalAppId as WorkspaceStoreOrganizationPreference["lastUsedExternalAppId"])
+          : undefined,
+    };
   } catch {
     return undefined;
   }
@@ -121,36 +167,54 @@ function mapApiData(projects: ProjectRecord[], workspacesFromApi: ProjectWorkspa
 /** Reconciles current state with backend snapshot while preserving compatible UI-only state. */
 export function buildHydratedStateFromApiData(
   state: ProjectStoreSlice,
+  organizationId: string,
   projects: ProjectRecord[],
   workspacesFromApi: ProjectWorkspaceRecord[],
-  displayRepoIds: string[] | undefined,
 ): Partial<ProjectStoreSlice> {
+  const normalizedOrganizationId = organizationId.trim();
+  const orgPreferences =
+    normalizedOrganizationId.length > 0 ? state.organizationPreferencesById?.[normalizedOrganizationId] : undefined;
   const { projects: mappedProjects, workspaces } = mapApiData(projects, workspacesFromApi);
   const nextBaseState = buildWorkspaceStateFromData({
     projects: mappedProjects,
     workspaces,
-    preferredProjectId: state.selectedProjectId,
-    preferredWorkspaceId: state.selectedWorkspaceId,
+    preferredProjectId: orgPreferences?.selectedProjectId,
+    preferredWorkspaceId: orgPreferences?.selectedWorkspaceId,
   });
   const nextProjectIdSet = new Set(mappedProjects.map((project) => project.id));
-  const baseDisplayProjectIds = displayRepoIds ?? state.displayProjectIds;
+  const baseDisplayProjectIds = orgPreferences?.displayProjectIds ?? [];
   const filteredDisplayProjectIds = baseDisplayProjectIds.filter((projectId) => nextProjectIdSet.has(projectId));
   const shouldResetPersistedDisplayProjectIds =
-    displayRepoIds !== undefined &&
-    displayRepoIds.length > 0 &&
+    orgPreferences?.displayProjectIds !== undefined &&
+    orgPreferences.displayProjectIds.length > 0 &&
     filteredDisplayProjectIds.length === 0 &&
     mappedProjects.length > 0;
   const nextDisplayProjectIds =
-    displayRepoIds === undefined && baseDisplayProjectIds.length === 0
+    orgPreferences?.displayProjectIds === undefined && baseDisplayProjectIds.length === 0
       ? mappedProjects.map((project) => project.id)
       : shouldResetPersistedDisplayProjectIds
         ? mappedProjects.map((project) => project.id)
         : filteredDisplayProjectIds;
+  const nextLastUsedExternalAppId = orgPreferences?.lastUsedExternalAppId;
   const nextWorkspaceIdSet = new Set(workspaces.map((workspace) => workspace.id));
+  const nextOrganizationPreferencesById =
+    normalizedOrganizationId.length === 0
+      ? state.organizationPreferencesById
+      : {
+          ...(state.organizationPreferencesById ?? {}),
+          [normalizedOrganizationId]: {
+            selectedProjectId: nextBaseState.selectedProjectId,
+            selectedWorkspaceId: nextBaseState.selectedWorkspaceId,
+            displayProjectIds: nextDisplayProjectIds,
+            lastUsedExternalAppId: nextLastUsedExternalAppId,
+          },
+        };
 
   return {
     ...nextBaseState,
     displayProjectIds: nextDisplayProjectIds,
+    lastUsedExternalAppId: nextLastUsedExternalAppId,
+    organizationPreferencesById: nextOrganizationPreferencesById,
     gitChangesCountByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangesCountByWorkspaceId, nextWorkspaceIdSet),
     gitChangeTotalsByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangeTotalsByWorkspaceId, nextWorkspaceIdSet),
   };
@@ -204,7 +268,7 @@ export function buildCreatedRepoState(
     postScript: input.backendRepo.postScript ?? "",
     sourceType: input.source === "local" ? "git-local" : "git",
     repoProvider: null,
-    repoUrl: input.backendRepo.gitUrl ?? (input.source === "remote" ? input.normalizedGitUrl : "") || null,
+    repoUrl: (input.backendRepo.gitUrl ?? (input.source === "remote" ? input.normalizedGitUrl : "")) || null,
     repoKey: input.backendRepo.key ?? nextRepoId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

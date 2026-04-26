@@ -43,5 +43,6 @@ export function partializeWorkspaceState(state: WorkspaceStoreState): WorkspaceS
   return {
     displayProjectIds: state.displayProjectIds,
     lastUsedExternalAppId: state.lastUsedExternalAppId,
+    organizationPreferencesById: state.organizationPreferencesById,
   };
 }
