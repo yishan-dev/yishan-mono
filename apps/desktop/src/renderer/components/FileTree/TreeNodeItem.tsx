@@ -15,6 +15,7 @@ type TreeNodeItemProps = {
   node: TreeNode;
   ignoredPathSet: Set<string>;
   loadedDirectoryPathSet: Set<string>;
+  expandedPathSet: Set<string>;
   editingPath: string;
   editingName: string;
   editingInputRef: RefObject<HTMLInputElement | null>;
@@ -27,8 +28,8 @@ type TreeNodeItemProps = {
   onExternalDrop: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
 };
 
-function renderLabel(node: TreeNode, isIgnored: boolean) {
-  const icon = getFileTreeIcon(node.path, node.isDirectory || node.children.size > 0);
+function renderLabel(node: TreeNode, isIgnored: boolean, isExpanded: boolean) {
+  const icon = getFileTreeIcon(node.path, node.isDirectory || node.children.size > 0, isExpanded);
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -109,6 +110,7 @@ export function TreeNodeItem({
   node,
   ignoredPathSet,
   loadedDirectoryPathSet,
+  expandedPathSet,
   editingPath,
   editingName,
   editingInputRef,
@@ -124,6 +126,7 @@ export function TreeNodeItem({
   const isDirectory = node.isDirectory || children.length > 0;
   const isIgnored = ignoredPathSet.has(node.path);
   const isLoadedDirectory = loadedDirectoryPathSet.has(node.path);
+  const isExpanded = expandedPathSet.has(node.path);
 
   if (!isDirectory) {
     const parentPath = getParentDirectoryPath(node.path);
@@ -144,7 +147,7 @@ export function TreeNodeItem({
             />
           ) : (
             <Box onDragOver={onExternalDragOver} onDrop={(event) => onExternalDrop(event, node.path, false)}>
-              {renderLabel(node, isIgnored)}
+              {renderLabel(node, isIgnored, false)}
             </Box>
           )
         }
@@ -181,7 +184,7 @@ export function TreeNodeItem({
           />
         ) : (
           <Box onDragOver={onExternalDragOver} onDrop={(event) => onExternalDrop(event, node.path, true)}>
-            {renderLabel(node, isIgnored)}
+            {renderLabel(node, isIgnored, isExpanded)}
           </Box>
         )
       }
@@ -198,6 +201,7 @@ export function TreeNodeItem({
           node={child}
           ignoredPathSet={ignoredPathSet}
           loadedDirectoryPathSet={loadedDirectoryPathSet}
+          expandedPathSet={expandedPathSet}
           editingPath={editingPath}
           editingName={editingName}
           editingInputRef={editingInputRef}

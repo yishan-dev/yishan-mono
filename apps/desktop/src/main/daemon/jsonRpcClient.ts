@@ -16,6 +16,17 @@ import {
 
 const RPC_REQUEST_TIMEOUT_MS = 30_000;
 
+/** Normalizes daemon file-entry paths so directories always keep a trailing slash. */
+function normalizeDaemonFileEntries(files: Rpc.DaemonFileEntry[]): Rpc.DaemonFileEntry[] {
+  return files.map((entry) => {
+    const trimmedPath = entry.path.replace(/\\/g, "/").replace(/\/+$/, "");
+    return {
+      ...entry,
+      path: entry.isDir ? `${trimmedPath}/` : trimmedPath,
+    };
+  });
+}
+
 export class DaemonJsonRpcClient {
   private readonly subscriptionSockets = new Map<string, WebSocket | null>();
   private readonly workspaceIdByWorktreePath = new Map<string, string>();
@@ -403,7 +414,11 @@ export class DaemonJsonRpcClient {
     const workspaceId = await this.resolveWorkspaceId(input);
     const relativePath = readOptionalString(record?.relativePath) || "";
     const files = await this.invoke("file.list", { workspaceId, path: relativePath });
-    return { files: Array.isArray(files) ? (files as Rpc.FileListResponse["files"]) : [] };
+    return {
+      files: Array.isArray(files)
+        ? normalizeDaemonFileEntries(files as Rpc.FileListResponse["files"])
+        : [],
+    };
   }
 
   private async listFilesBatch(input: Rpc.FileListBatchInput): Promise<Rpc.FileListBatchResponse> {
@@ -418,7 +433,9 @@ export class DaemonJsonRpcClient {
           const files = await this.invoke("file.list", { workspaceId, path: relativePath });
           return {
             request: { relativePath, recursive: readOptionalBoolean(requestRecord.recursive) ?? false },
-            files: Array.isArray(files) ? (files as Rpc.FileListResponse["files"]) : [],
+            files: Array.isArray(files)
+              ? normalizeDaemonFileEntries(files as Rpc.FileListResponse["files"])
+              : [],
           };
         } catch (error) {
           return {

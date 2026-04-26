@@ -74,6 +74,7 @@ export function FileTree({
     () => new Set(files.map((path) => path.replace(/\/$/, "")).filter(Boolean)),
     [files],
   );
+  const expandedPathSet = useMemo(() => new Set(expandedItems), [expandedItems]);
 
   /** Applies one external selection request and optionally focuses the tree for keyboard actions. */
   useEffect(() => {
@@ -514,6 +515,7 @@ export function FileTree({
             onExternalDrop={(event, targetPath, targetIsDirectory) => {
               void handleExternalDrop(event, targetPath, targetIsDirectory);
             }}
+            expandedPathSet={expandedPathSet}
           />
         ))}
       </SimpleTreeView>
