@@ -20,33 +20,8 @@ export class DesktopApplication {
   private readonly apiSubscriptionsByWebContentsId = new Map<number, Set<string>>();
   private readonly apiCleanupHookRegisteredWebContentsIds = new Set<number>();
   private hasProcessedBeforeQuit = false;
-  private daemonReady = false;
-  private daemonReadyInFlight: Promise<void> | null = null;
-
-  private async ensureDaemonReady(_reason: string): Promise<void> {
-    if (this.daemonReady) {
-      return;
-    }
-
-    if (this.daemonReadyInFlight) {
-      return await this.daemonReadyInFlight;
-    }
-
-    const task = this.daemonManager.ensureStarted();
-    this.daemonReadyInFlight = task;
-
-    try {
-      await task;
-      this.daemonReady = true;
-    } finally {
-      if (this.daemonReadyInFlight === task) {
-        this.daemonReadyInFlight = null;
-      }
-    }
-  }
 
   private async runWithDaemonAvailability<T>(reason: string, operation: () => Promise<T>): Promise<T> {
-    // await this.ensureDaemonReady(reason);
     return await operation();
   }
 
@@ -63,7 +38,6 @@ export class DesktopApplication {
       } catch (stopError) {
         console.warn("Failed to stop daemon service after startup failure", stopError);
       } finally {
-        desktopApplication.daemonReady = false;
         desktopApplication.daemonJsonRpcClient.dispose();
         app.exit(1);
       }
