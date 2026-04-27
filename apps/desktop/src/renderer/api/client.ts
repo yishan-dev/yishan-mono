@@ -1,6 +1,6 @@
 import { listOrganizationNodes } from "./nodeApi";
 import { createOrganization, listOrganizations } from "./orgApi";
-import { createProject, deleteProject, listProjects } from "./projectApi";
+import { createProject, deleteProject, listProjects, updateProject } from "./projectApi";
 import { createProjectWorkspace, listProjectWorkspaces } from "./workspaceApi";
 
 export const api = {
@@ -15,6 +15,7 @@ export const api = {
     listByOrg: listProjects,
     create: createProject,
     delete: deleteProject,
+    update: updateProject,
   },
   workspace: {
     listByProject: listProjectWorkspaces,

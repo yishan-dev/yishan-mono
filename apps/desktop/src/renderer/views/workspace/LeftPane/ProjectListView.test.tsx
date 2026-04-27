@@ -25,7 +25,7 @@ const mocked = vi.hoisted(() => {
         missing: boolean;
         worktreePath: string;
         icon: string;
-        iconBgColor: string;
+        color: string;
       }>;
       workspaces: Array<{
         id: string;
@@ -199,7 +199,7 @@ function renderRepoList(
         missing: false,
         worktreePath: "/tmp/worktrees",
         icon: "folder",
-        iconBgColor: "#111111",
+        color: "#111111",
       },
     ],
     workspaces: [
@@ -281,7 +281,7 @@ describe("ProjectListView", () => {
           missing: false,
           worktreePath: "/tmp/worktrees",
           icon: "folder",
-          iconBgColor: "#111111",
+          color: "#111111",
         },
       ],
       workspaces: [
@@ -340,7 +340,7 @@ describe("ProjectListView", () => {
           missing: false,
           worktreePath: "/tmp/worktrees",
           icon: "folder",
-          iconBgColor: "#111111",
+          color: "#111111",
         },
       ],
       workspaces: [

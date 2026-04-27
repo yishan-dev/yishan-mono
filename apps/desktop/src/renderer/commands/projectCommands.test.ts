@@ -12,6 +12,7 @@ const apiMocks = vi.hoisted(() => ({
   listProjects: vi.fn(),
   createProject: vi.fn(),
   deleteProject: vi.fn(),
+  updateProject: vi.fn(),
   listOrganizationNodes: vi.fn(),
 }));
 
@@ -24,6 +25,7 @@ vi.mock("../api", () => ({
       listByOrg: apiMocks.listProjects,
       create: apiMocks.createProject,
       delete: apiMocks.deleteProject,
+      update: apiMocks.updateProject,
     },
     node: {
       listByOrg: apiMocks.listOrganizationNodes,
@@ -264,16 +266,42 @@ describe("projectCommands", () => {
       updateProjectConfig: applyRepoConfig,
       incrementFileTreeRefreshVersion: bumpRefreshVersion,
     });
+    sessionStore.setState({ selectedOrganizationId: "org-1" });
+    apiMocks.updateProject.mockResolvedValueOnce({
+      id: "repo-1",
+      name: "Repo 1",
+      sourceType: "git-local",
+      repoProvider: null,
+      repoUrl: null,
+      repoKey: null,
+      icon: "folder",
+      color: "#1E66F5",
+      setupScript: "npm ci",
+      postScript: "rm -rf node_modules",
+      contextEnabled: true,
+      organizationId: "org-1",
+      createdByUserId: "user-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
     await updateProjectConfig("repo-1", {
       name: "Repo 1",
       worktreePath: "/tmp/repo-1",
-      privateContextEnabled: true,
+      contextEnabled: true,
       icon: "folder",
-      iconBgColor: "#1E66F5",
+      color: "#1E66F5",
       setupScript: "npm ci",
       postScript: "rm -rf node_modules",
     });
 
+    expect(apiMocks.updateProject).toHaveBeenCalledWith("org-1", "repo-1", {
+      name: "Repo 1",
+      icon: "folder",
+      color: "#1E66F5",
+      setupScript: "npm ci",
+      postScript: "rm -rf node_modules",
+      contextEnabled: true,
+    });
     expect(applyRepoConfig).toHaveBeenCalledTimes(1);
     expect(bumpRefreshVersion).toHaveBeenCalledTimes(1);
   });

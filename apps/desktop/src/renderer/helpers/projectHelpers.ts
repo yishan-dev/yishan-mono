@@ -23,7 +23,7 @@ type ProjectStoreSlice = Pick<
 
 type RepoConfigUpdate = Pick<
   WorkspaceProjectRecord,
-  "name" | "worktreePath" | "contextEnabled" | "privateContextEnabled" | "icon" | "iconBgColor" | "setupScript" | "postScript"
+  "name" | "worktreePath" | "contextEnabled" | "icon" | "color" | "setupScript" | "postScript"
 >;
 
 /** Returns persisted workspace preferences for one organization id when available. */
@@ -133,10 +133,9 @@ function mapApiData(projects: ProjectRecord[], workspacesFromApi: WorkspaceRecor
       localPath: path,
       worktreePath: path,
       contextEnabled: repo.contextEnabled,
-      privateContextEnabled: repo.contextEnabled,
       defaultBranch: preferredWorkspace?.branch ?? "",
       icon: repo.icon,
-      iconBgColor: repo.color,
+      color: repo.color,
       setupScript: repo.setupScript,
       postScript: repo.postScript,
     } satisfies WorkspaceProjectRecord;
@@ -267,10 +266,9 @@ export function buildCreatedRepoState(
     localPath: input.source === "local" ? repoPath : "",
     worktreePath: input.backendProject.worktreePath ?? (input.source === "local" ? repoPath : ""),
     contextEnabled: input.backendProject.contextEnabled ?? true,
-    privateContextEnabled: input.backendProject.contextEnabled ?? true,
     defaultBranch: input.backendProject.defaultBranch ?? "",
     icon: input.backendProject.icon ?? "folder",
-    iconBgColor: input.backendProject.iconBgColor ?? "#1E66F5",
+    color: input.backendProject.color ?? "#1E66F5",
     setupScript: input.backendProject.setupScript ?? "",
     postScript: input.backendProject.postScript ?? "",
     sourceType: input.source === "local" ? "git-local" : "git",
@@ -341,11 +339,10 @@ export function buildUpdatedRepoConfigState(
         ? {
             ...project,
             name: config.name,
-            worktreePath: config.worktreePath,
-            contextEnabled: config.contextEnabled ?? config.privateContextEnabled ?? project.contextEnabled,
-            privateContextEnabled: config.privateContextEnabled,
+            worktreePath: config.worktreePath ?? project.worktreePath,
+            contextEnabled: config.contextEnabled ?? project.contextEnabled,
             icon: config.icon,
-            iconBgColor: config.iconBgColor,
+            color: config.color,
             setupScript: config.setupScript,
             postScript: config.postScript,
           }

@@ -192,9 +192,8 @@ export async function createProject(input: {
       gitUrl: project.repoUrl ?? inferredRemoteUrl,
       repoUrl: project.repoUrl ?? inferredRemoteUrl,
       contextEnabled: project.contextEnabled,
-      privateContextEnabled: project.contextEnabled,
       icon: project.icon,
-      iconBgColor: project.color,
+      color: project.color,
       setupScript: project.setupScript,
       postScript: project.postScript,
       defaultBranch: resolvedProjectDefaultBranch,
@@ -248,10 +247,10 @@ export async function updateProjectConfig(
   projectId: string,
   config: {
     name: string;
-    worktreePath: string;
-    privateContextEnabled?: boolean;
+    worktreePath?: string;
+    contextEnabled?: boolean;
     icon?: string;
-    iconBgColor?: string;
+    color?: string;
     setupScript?: string;
     postScript?: string;
   },
@@ -260,6 +259,38 @@ export async function updateProjectConfig(
     workspaceStore.getState().projects.find((item) => item.id === projectId);
   if (!project) {
     return;
+  }
+
+  const selectedOrganizationId = sessionStore.getState().selectedOrganizationId?.trim();
+  if (selectedOrganizationId) {
+    try {
+      const updatedProject = await api.project.update(selectedOrganizationId, projectId, {
+        name: config.name,
+        icon: config.icon,
+        color: config.color,
+        setupScript: config.setupScript,
+        postScript: config.postScript,
+        contextEnabled: config.contextEnabled,
+      });
+
+      const persistedConfig = {
+        ...config,
+        name: updatedProject.name,
+        contextEnabled: updatedProject.contextEnabled,
+        icon: updatedProject.icon,
+        color: updatedProject.color,
+        setupScript: updatedProject.setupScript,
+        postScript: updatedProject.postScript,
+      };
+
+      const store = workspaceStore.getState();
+      store.updateProjectConfig(projectId, persistedConfig);
+      store.incrementFileTreeRefreshVersion();
+      return;
+    } catch (error) {
+      console.error("Failed to update backend project", error);
+      return;
+    }
   }
 
   const store = workspaceStore.getState();

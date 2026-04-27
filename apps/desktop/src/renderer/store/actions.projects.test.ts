@@ -10,9 +10,9 @@ type TestState = {
     localPath?: string;
     gitUrl?: string;
     worktreePath: string;
-    privateContextEnabled?: boolean;
+    contextEnabled?: boolean;
     icon?: string;
-    iconBgColor?: string;
+    color?: string;
     setupScript?: string;
     postScript?: string;
   }>;
@@ -47,9 +47,9 @@ function createHarness(overrides?: Partial<TestState>) {
         localPath: "/tmp/repo-1",
         gitUrl: "",
         worktreePath: "/tmp/repo-1",
-        privateContextEnabled: true,
+        contextEnabled: true,
         icon: "folder",
-        iconBgColor: "#1E66F5",
+        color: "#1E66F5",
         setupScript: "",
         postScript: "",
       },
@@ -61,9 +61,9 @@ function createHarness(overrides?: Partial<TestState>) {
         localPath: "/tmp/repo-2",
         gitUrl: "",
         worktreePath: "/tmp/repo-2",
-        privateContextEnabled: true,
+        contextEnabled: true,
         icon: "folder",
-        iconBgColor: "#1E66F5",
+        color: "#1E66F5",
         setupScript: "",
         postScript: "",
       },
@@ -204,11 +204,11 @@ describe("createWorkspaceRepoActions", () => {
         worktreePath: "/tmp/repo-1",
         gitUrl: "",
         repoUrl: null,
-        privateContextEnabled: true,
+        contextEnabled: true,
         sourceType: "git-local",
         repoProvider: null,
         icon: "folder",
-        iconBgColor: "#1E66F5",
+        color: "#1E66F5",
         setupScript: "",
         postScript: "",
         defaultBranch: null,
@@ -230,9 +230,9 @@ describe("createWorkspaceRepoActions", () => {
     harness.actions.updateProjectConfig("repo-1", {
       name: "Repo Updated",
       worktreePath: "/tmp/repo-1",
-      privateContextEnabled: true,
+      contextEnabled: true,
       icon: "folder",
-      iconBgColor: "#1E66F5",
+      color: "#1E66F5",
       setupScript: "npm ci",
       postScript: "rm -rf node_modules",
     });

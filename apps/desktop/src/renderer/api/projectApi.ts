@@ -42,3 +42,23 @@ export async function deleteProject(orgId: string, projectId: string): Promise<v
     method: "DELETE",
   });
 }
+
+/** Updates one project in one organization. */
+export async function updateProject(
+  orgId: string,
+  projectId: string,
+  input: {
+    name?: string;
+    icon?: string;
+    color?: string;
+    setupScript?: string;
+    postScript?: string;
+    contextEnabled?: boolean;
+  },
+): Promise<ProjectRecord> {
+  const response = await requestJson<{ project: ProjectRecord }>(`/orgs/${orgId}/projects/${projectId}`, {
+    method: "PUT",
+    body: input,
+  });
+  return response.project;
+}

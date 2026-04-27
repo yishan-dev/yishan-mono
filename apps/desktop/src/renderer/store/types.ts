@@ -16,10 +16,9 @@ export type WorkspaceProjectRecord = {
   localPath?: string | null;
   worktreePath?: string | null;
   contextEnabled?: boolean;
-  privateContextEnabled?: boolean;
   defaultBranch?: string | null;
   icon?: string | null;
-  iconBgColor?: string | null;
+  color?: string | null;
   setupScript?: string | null;
   postScript?: string | null;
   createdAt?: string;
@@ -172,9 +171,8 @@ export type WorkspaceStoreState = {
       | "name"
       | "worktreePath"
       | "contextEnabled"
-      | "privateContextEnabled"
       | "icon"
-      | "iconBgColor"
+      | "color"
       | "setupScript"
       | "postScript"
     >,

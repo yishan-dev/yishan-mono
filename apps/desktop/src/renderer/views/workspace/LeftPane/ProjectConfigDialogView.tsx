@@ -34,9 +34,9 @@ type ProjectConfigDialogViewProps = {
 type ProjectConfigDraft = {
   name: string;
   worktreePath: string;
-  privateContextEnabled: boolean;
+  contextEnabled: boolean;
   icon: string;
-  iconBgColor: string;
+  color: string;
   setupScript: string;
   postScript: string;
 };
@@ -48,9 +48,9 @@ function getDefaultDraft(): ProjectConfigDraft {
   return {
     name: "",
     worktreePath: "",
-    privateContextEnabled: true,
+    contextEnabled: true,
     icon: DEFAULT_PROJECT_ICON_ID,
-    iconBgColor: DEFAULT_ICON_BG_COLOR,
+    color: DEFAULT_ICON_BG_COLOR,
     setupScript: "",
     postScript: "",
   };
@@ -91,9 +91,9 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
       setDraft({
         name: repo.name,
         worktreePath,
-        privateContextEnabled: repo.privateContextEnabled ?? true,
+        contextEnabled: repo.contextEnabled ?? true,
         icon: findProjectIconOption(repo.icon)?.id ?? DEFAULT_PROJECT_ICON_ID,
-        iconBgColor: repo.iconBgColor ?? DEFAULT_ICON_BG_COLOR,
+        color: repo.color ?? DEFAULT_ICON_BG_COLOR,
         setupScript: repo.setupScript ?? "",
         postScript: repo.postScript ?? "",
       });
@@ -134,16 +134,16 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
       return;
     }
 
-    const normalizedIconBgColor = /^#[0-9a-fA-F]{6}$/.test(draft.iconBgColor)
-      ? draft.iconBgColor
+    const normalizedIconBgColor = /^#[0-9a-fA-F]{6}$/.test(draft.color)
+      ? draft.color
       : DEFAULT_ICON_BG_COLOR;
 
     updateProjectConfig(repo.id, {
       name: draft.name.trim() || repo.name,
       worktreePath: draft.worktreePath.trim(),
-      privateContextEnabled: draft.privateContextEnabled,
+      contextEnabled: draft.contextEnabled,
       icon: findProjectIconOption(draft.icon)?.id ?? DEFAULT_PROJECT_ICON_ID,
-      iconBgColor: normalizedIconBgColor,
+      color: normalizedIconBgColor,
       setupScript: draft.setupScript,
       postScript: draft.postScript,
     });
@@ -250,16 +250,16 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
               sx={{ ml: 0 }}
               control={
                 <Switch
-                  checked={draft.privateContextEnabled}
+                  checked={draft.contextEnabled}
                   onChange={(_event, checked) =>
                     setDraft((previous) => ({
                       ...previous,
-                      privateContextEnabled: checked,
+                      contextEnabled: checked,
                     }))
                   }
                 />
               }
-              label={draft.privateContextEnabled ? "Enabled" : "Disabled"}
+              label={draft.contextEnabled ? "Enabled" : "Disabled"}
             />
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
               Creates `.private-context` symlink on new workspace creation.
@@ -314,7 +314,7 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
               </Typography>
               <Stack direction="row" spacing={1} sx={{ pt: 0.75 }}>
                 {ICON_BG_COLOR_PRESETS.map((color) => {
-                  const selected = draft.iconBgColor.toLowerCase() === color.toLowerCase();
+                  const selected = draft.color.toLowerCase() === color.toLowerCase();
                   return (
                     <Tooltip key={color} title={color} arrow>
                       <IconButton
@@ -323,7 +323,7 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
                         onClick={() =>
                           setDraft((previous) => ({
                             ...previous,
-                            iconBgColor: color,
+                            color: color,
                           }))
                         }
                         sx={{

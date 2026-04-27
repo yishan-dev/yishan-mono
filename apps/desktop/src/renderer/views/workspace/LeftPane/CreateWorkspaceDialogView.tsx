@@ -376,9 +376,9 @@ export function CreateWorkspaceDialogView({
                             sx={{
                               width: 20,
                               height: 20,
-                              bgcolor: selectedValueRepo?.iconBgColor ?? theme.palette.primary.main,
+                              bgcolor: selectedValueRepo?.color ?? theme.palette.primary.main,
                               color: theme.palette.getContrastText(
-                                selectedValueRepo?.iconBgColor ?? theme.palette.primary.main,
+                                selectedValueRepo?.color ?? theme.palette.primary.main,
                               ),
                             }}
                           >
@@ -401,8 +401,8 @@ export function CreateWorkspaceDialogView({
                         sx={{
                           width: 20,
                           height: 20,
-                          bgcolor: repo.iconBgColor ?? theme.palette.primary.main,
-                          color: theme.palette.getContrastText(repo.iconBgColor ?? theme.palette.primary.main),
+                          bgcolor: repo.color ?? theme.palette.primary.main,
+                          color: theme.palette.getContrastText(repo.color ?? theme.palette.primary.main),
                         }}
                       >
                         {renderProjectIcon(repo.icon, 12)}

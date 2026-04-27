@@ -59,7 +59,7 @@ export function ProjectRow({
             sx={{
               width: 20,
               height: 20,
-              bgcolor: repo.iconBgColor ?? theme.palette.primary.main,
+              bgcolor: repo.color ?? theme.palette.primary.main,
               fontSize: 12,
               fontWeight: 700,
             }}

@@ -195,9 +195,8 @@ export type Commands = {
       | "name"
       | "worktreePath"
       | "contextEnabled"
-      | "privateContextEnabled"
       | "icon"
-      | "iconBgColor"
+      | "color"
       | "setupScript"
       | "postScript"
     >,
