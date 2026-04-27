@@ -72,6 +72,7 @@
   "build": {
     "appId": "dev.yishan.desktop",
     "productName": "Yishan",
+    "icon": "src/assets/images/yishan-app-icon.png",
     "directories": {
       "output": "release"
     },
@@ -92,14 +93,17 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "identity": null
+      "identity": null,
+      "icon": "src/assets/icons/yishan.icns"
     },
     "win": {
+      "icon": "src/assets/images/yishan-app-icon.png",
       "target": [
         "nsis"
       ]
     },
     "linux": {
+      "icon": "src/assets/images/yishan-app-icon.png",
       "target": [
         "AppImage"
       ]
