@@ -10,8 +10,9 @@
     "dev:hmr": "concurrently \"bun run hmr\" \"bun run electron:watch:main\" \"bun run electron:watch:preload\" \"bun run electron:dev\"",
     "hmr": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build && bun run electron:build",
-    "build:app": "bun run build && electron-builder --publish never",
-    "build:app:dir": "bun run build && electron-builder --dir --publish never",
+    "cli:build": "node scripts/buildCliBinary.mjs",
+    "build:app": "bun run cli:build && bun run build && electron-builder --publish never",
+    "build:app:dir": "bun run cli:build && bun run build && electron-builder --dir --publish never",
     "electron:build": "bun run electron:build:main && bun run electron:build:preload",
     "electron:build:main": "esbuild src/main/main.ts --bundle --platform=node --format=cjs --outfile=dist/electron/main.cjs --external:electron",
     "electron:build:preload": "esbuild src/main/preload.ts --bundle --platform=node --format=cjs --outfile=dist/electron/preload.js --external:electron",
@@ -78,6 +79,16 @@
       "dist/**/*",
       "src/assets/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/resources",
+        "to": ".",
+        "filter": [
+          "yishan",
+          "yishan.exe"
+        ]
+      }
     ],
     "mac": {
       "category": "public.app-category.developer-tools",

@@ -1,5 +1,7 @@
 APP_NAME := yishan
 BUILD_DIR := bin
+VERSION ?= dev
+LDFLAGS := -s -w -X yishan/apps/cli/internal/buildinfo.Version=$(VERSION)
 
 .PHONY: help fmt test build run daemon clean release-snapshot
 
@@ -21,7 +23,7 @@ test:
 
 build:
 	mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME) .
+	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(APP_NAME) .
 
 run:
 	go run .

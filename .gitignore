@@ -11,3 +11,4 @@ test-results/
 .env
 .wrangler
 apps/desktop/release/
+apps/cli/bin/
