@@ -59,6 +59,18 @@ type CreateProjectInput = {
   localPath?: string;
 };
 
+type UpdateProjectInput = {
+  organizationId: string;
+  projectId: string;
+  actorUserId: string;
+  name?: string;
+  icon?: string;
+  color?: string;
+  setupScript?: string;
+  postScript?: string;
+  contextEnabled?: boolean;
+};
+
 export class ProjectService {
   constructor(
     private readonly db: AppDb,
@@ -224,5 +236,39 @@ export class ProjectService {
     if (deletedRows.length === 0) {
       throw new ProjectNotFoundError(input.projectId);
     }
+  }
+
+  async updateProject(input: UpdateProjectInput): Promise<ProjectView> {
+    const { organizationId, actorUserId, projectId, ...updates } = input;
+    const role = await this.organizationService.getMembershipRole({
+      organizationId: organizationId,
+      userId: actorUserId
+    });
+
+    if (!role) {
+      throw new OrganizationMembershipRequiredError();
+    }
+
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([, value]) => value !== undefined)
+    ) as Partial<
+      Pick<ProjectView, "name" | "icon" | "color" | "setupScript" | "postScript" | "contextEnabled">
+    >;
+
+    const updatedRows = await this.dbWs
+      .update(projects)
+      .set({
+        ...filteredUpdates,
+        updatedAt: new Date()
+      })
+      .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)))
+      .returning();
+
+    const project = updatedRows[0];
+    if (!project) {
+      throw new ProjectNotFoundError(projectId);
+    }
+
+    return project;
   }
 }

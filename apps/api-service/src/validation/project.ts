@@ -26,6 +26,19 @@ export const createProjectBodySchema = z.object({
   localPath: nonEmptyStringSchema.optional()
 });
 
+export const updateProjectBodySchema = z
+  .object({
+    name: nonEmptyStringSchema.optional(),
+    icon: nonEmptyStringSchema.optional(),
+    color: nonEmptyStringSchema.optional(),
+    setupScript: z.string().optional(),
+    postScript: z.string().optional(),
+    contextEnabled: z.boolean().optional()
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: "At least one field must be provided"
+  });
+
 export const createWorkspaceBodySchema = z.object({
   kind: z.enum(["primary", "worktree"]).optional().default("primary"),
   branch: nonEmptyStringSchema.optional(),
@@ -37,4 +50,5 @@ export type OrganizationProjectParamsInput = z.infer<typeof organizationProjectP
 export type OrganizationProjectListQueryInput = z.infer<typeof organizationProjectListQuerySchema>;
 export type ProjectWorkspaceParamsInput = z.infer<typeof projectWorkspaceParamsSchema>;
 export type CreateProjectBodyInput = z.infer<typeof createProjectBodySchema>;
+export type UpdateProjectBodyInput = z.infer<typeof updateProjectBodySchema>;
 export type CreateWorkspaceBodyInput = z.infer<typeof createWorkspaceBodySchema>;

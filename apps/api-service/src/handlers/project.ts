@@ -5,7 +5,8 @@ import type {
   CreateProjectBodyInput,
   OrganizationProjectListQueryInput,
   OrganizationProjectParamsInput,
-  ProjectWorkspaceParamsInput
+  ProjectWorkspaceParamsInput,
+  UpdateProjectBodyInput
 } from "@/validation/project";
 
 export async function listProjectsHandler(
@@ -51,4 +52,25 @@ export async function deleteProjectHandler(c: AppContext, params: ProjectWorkspa
   });
 
   return c.json({ ok: true });
+}
+
+export async function updateProjectHandler(
+  c: AppContext,
+  params: ProjectWorkspaceParamsInput,
+  body: UpdateProjectBodyInput
+) {
+  const actorUser = c.get("sessionUser");
+  const project = await c.get("services").project.updateProject({
+    actorUserId: actorUser.id,
+    organizationId: params.orgId,
+    projectId: params.projectId,
+    name: body.name,
+    icon: body.icon,
+    color: body.color,
+    setupScript: body.setupScript,
+    postScript: body.postScript,
+    contextEnabled: body.contextEnabled
+  });
+
+  return c.json({ project }, StatusCodes.OK);
 }
