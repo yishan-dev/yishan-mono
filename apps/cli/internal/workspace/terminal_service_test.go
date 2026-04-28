@@ -7,6 +7,87 @@ import (
 	"time"
 )
 
+func TestResolveTerminalCommand(t *testing.T) {
+	tests := []struct {
+		name            string
+		request         TerminalStartRequest
+		goos            string
+		shellEnv        string
+		wantCommand     string
+		wantArgsLen     int
+		wantFirstArg    string
+		wantArgsPresent bool
+	}{
+		{
+			name: "uses explicit command when provided",
+			request: TerminalStartRequest{
+				Command: "python",
+				Args:    []string{"-V"},
+			},
+			goos:            "darwin",
+			shellEnv:        "/bin/zsh",
+			wantCommand:     "python",
+			wantArgsLen:     1,
+			wantFirstArg:    "-V",
+			wantArgsPresent: true,
+		},
+		{
+			name: "uses shell env on unix when command missing",
+			request: TerminalStartRequest{
+				Args: []string{"-l"},
+			},
+			goos:            "linux",
+			shellEnv:        "/bin/zsh",
+			wantCommand:     "/bin/zsh",
+			wantArgsLen:     1,
+			wantFirstArg:    "-l",
+			wantArgsPresent: true,
+		},
+		{
+			name: "falls back to zsh on darwin when shell env missing",
+			request: TerminalStartRequest{},
+			goos:            "darwin",
+			shellEnv:        "",
+			wantCommand:     "/bin/zsh",
+			wantArgsLen:     0,
+			wantArgsPresent: false,
+		},
+		{
+			name: "falls back to bash on linux when shell env missing",
+			request: TerminalStartRequest{},
+			goos:            "linux",
+			shellEnv:        "",
+			wantCommand:     "/bin/bash",
+			wantArgsLen:     0,
+			wantArgsPresent: false,
+		},
+		{
+			name: "uses cmd on windows",
+			request: TerminalStartRequest{},
+			goos:            "windows",
+			shellEnv:        "C:/Program Files/Git/bin/bash.exe",
+			wantCommand:     "cmd.exe",
+			wantArgsLen:     0,
+			wantArgsPresent: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotCommand, gotArgs := resolveTerminalCommand(test.request, test.goos, test.shellEnv)
+			if gotCommand != test.wantCommand {
+				t.Fatalf("expected command %q, got %q", test.wantCommand, gotCommand)
+			}
+			if len(gotArgs) != test.wantArgsLen {
+				t.Fatalf("expected %d args, got %d", test.wantArgsLen, len(gotArgs))
+			}
+			if test.wantArgsPresent && gotArgs[0] != test.wantFirstArg {
+				t.Fatalf("expected first arg %q, got %q", test.wantFirstArg, gotArgs[0])
+			}
+		})
+	}
+}
+
 func TestTerminalSessionSendReadStop(t *testing.T) {
 	m := NewTerminalManager()
 

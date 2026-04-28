@@ -89,6 +89,7 @@ export function TerminalView({ tabId }: TerminalViewProps) {
     if (!host) {
       return;
     }
+    let disposed = false;
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -103,7 +104,7 @@ export function TerminalView({ tabId }: TerminalViewProps) {
     });
     const { fitAddon, searchAddon } = loadTerminalAddons(terminal);
     terminal.open(host);
-    fitAddon.fit();
+    safeFitTerminalToHost(terminal, fitAddon);
 
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
@@ -130,8 +131,6 @@ export function TerminalView({ tabId }: TerminalViewProps) {
       return false;
     });
 
-    terminal.writeln("Connecting terminal session...");
-
     const writeDisposable = terminal.onData((data) => {
       const sessionId = sessionIdRef.current;
       if (!sessionId) {
@@ -143,7 +142,11 @@ export function TerminalView({ tabId }: TerminalViewProps) {
     });
 
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
+      if (disposed) {
+        return;
+      }
+
+      safeFitTerminalToHost(terminal, fitAddon);
       const sessionId = sessionIdRef.current;
       if (!sessionId) {
         return;
@@ -156,6 +159,7 @@ export function TerminalView({ tabId }: TerminalViewProps) {
     resizeObserver.observe(host);
 
     return () => {
+      disposed = true;
       writeDisposable.dispose();
       outputSubscriptionRef.current?.unsubscribe();
       outputSubscriptionRef.current = null;
@@ -278,6 +282,10 @@ export function TerminalView({ tabId }: TerminalViewProps) {
 
             readIndexRef.current = payload.nextIndex;
             if (payload.chunk.length > 0) {
+              if (!isTerminalAttached(terminal)) {
+                return;
+              }
+
               terminal.write(payload.chunk);
             }
             return;
@@ -462,4 +470,26 @@ function isMacPlatform(): boolean {
     ?.platform;
   const platformHint = (userAgentDataPlatform ?? navigator.userAgent).toLowerCase();
   return platformHint.includes("mac");
+}
+
+/** Fits one attached xterm instance to its host without throwing during teardown races. */
+function safeFitTerminalToHost(terminal: Terminal, fitAddon: FitAddon): void {
+  if (!isTerminalAttached(terminal)) {
+    return;
+  }
+
+  try {
+    fitAddon.fit();
+  } catch (error) {
+    reportTerminalAsyncError("fit terminal", error);
+  }
+}
+
+/** Returns true when one xterm instance is still attached to one DOM element. */
+function isTerminalAttached(terminal: Terminal): boolean {
+  if (!("element" in terminal)) {
+    return true;
+  }
+
+  return Boolean(terminal.element);
 }

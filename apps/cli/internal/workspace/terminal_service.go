@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -115,11 +117,9 @@ func NewTerminalManager() *TerminalManager {
 }
 
 func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStartRequest) (TerminalStartResponse, error) {
-	if req.Command == "" {
-		return TerminalStartResponse{}, NewRPCError(-32602, "command is required")
-	}
+	command, args := resolveTerminalCommand(req, runtime.GOOS, os.Getenv("SHELL"))
 
-	cmd := exec.Command(req.Command, req.Args...)
+	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), req.Env...)
 
@@ -158,6 +158,35 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 	}()
 
 	return TerminalStartResponse{SessionID: id}, nil
+}
+
+func resolveTerminalCommand(req TerminalStartRequest, goos string, shellEnv string) (string, []string) {
+	command := strings.TrimSpace(req.Command)
+	if command != "" {
+		return command, req.Args
+	}
+
+	defaultCommand := resolveDefaultTerminalCommand(goos, shellEnv)
+	return defaultCommand, req.Args
+}
+
+func resolveDefaultTerminalCommand(goos string, shellEnv string) string {
+	if goos != "windows" {
+		resolvedShell := strings.TrimSpace(shellEnv)
+		if resolvedShell != "" {
+			return resolvedShell
+		}
+	}
+
+	if goos == "windows" {
+		return "cmd.exe"
+	}
+
+	if goos == "darwin" {
+		return "/bin/zsh"
+	}
+
+	return "/bin/bash"
 }
 
 func (m *TerminalManager) Send(req TerminalSendRequest) (TerminalSendResponse, error) {

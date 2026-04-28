@@ -101,7 +101,6 @@ describe("TerminalSessionOrchestrator", () => {
     );
 
     const terminal = {
-      reset: vi.fn(),
       write: vi.fn(),
       cols: 120,
       rows: 30,
@@ -123,7 +122,6 @@ describe("TerminalSessionOrchestrator", () => {
     expect(commands.readTerminalOutput).toHaveBeenCalledWith({ sessionId: "session-1", fromIndex: 0 });
     expect(commands.resizeTerminal).toHaveBeenCalledWith({ sessionId: "session-1", cols: 120, rows: 30 });
     expect(commands.writeTerminalInput).not.toHaveBeenCalled();
-    expect(terminal.reset).toHaveBeenCalledOnce();
     expect(fitAddon.fit).toHaveBeenCalledOnce();
     expect(terminal.write).toHaveBeenCalledWith("hello world");
     expect(tabStoreAccess.setTerminalTabSessionId).not.toHaveBeenCalled();
@@ -152,7 +150,6 @@ describe("TerminalSessionOrchestrator", () => {
     const restored = await orchestrator.attachOrCreateAndRestore({
       tabId: "tab-2",
       terminal: {
-        reset: vi.fn(),
         write: vi.fn(),
         cols: 100,
         rows: 20,
@@ -202,7 +199,6 @@ describe("TerminalSessionOrchestrator", () => {
     const restored = await orchestrator.attachOrCreateAndRestore({
       tabId: "tab-2b",
       terminal: {
-        reset: vi.fn(),
         write: vi.fn(),
         cols: 100,
         rows: 20,
@@ -245,7 +241,6 @@ describe("TerminalSessionOrchestrator", () => {
     const restored = await orchestrator.attachOrCreateAndRestore({
       tabId: "tab-2c",
       terminal: {
-        reset: vi.fn(),
         write: vi.fn(),
         cols: 90,
         rows: 24,
@@ -279,7 +274,6 @@ describe("TerminalSessionOrchestrator", () => {
     const restored = await orchestrator.attachOrCreateAndRestore({
       tabId: "missing-tab",
       terminal: {
-        reset: vi.fn(),
         write: vi.fn(),
         cols: 120,
         rows: 30,
@@ -312,13 +306,11 @@ describe("TerminalSessionOrchestrator", () => {
     const orchestratorB = new TerminalSessionOrchestrator(commands, tabStoreAccess, workspaceStoreAccess);
 
     const terminalA = {
-      reset: vi.fn(),
       write: vi.fn(),
       cols: 120,
       rows: 30,
     };
     const terminalB = {
-      reset: vi.fn(),
       write: vi.fn(),
       cols: 80,
       rows: 24,

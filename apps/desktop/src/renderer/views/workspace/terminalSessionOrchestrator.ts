@@ -52,7 +52,7 @@ export class TerminalSessionOrchestrator {
    */
   async attachOrCreateAndRestore(input: {
     tabId: string;
-    terminal: Pick<Terminal, "reset" | "write" | "cols" | "rows">;
+    terminal: Pick<Terminal, "write" | "cols" | "rows">;
     fitAddon: Pick<FitAddon, "fit">;
   }): Promise<{ sessionId: string; nextIndex: number; exited: boolean } | null> {
     const tab = this.tabStoreAccess
@@ -70,10 +70,17 @@ export class TerminalSessionOrchestrator {
 
     const resolvedSession = await this.resolveSessionSnapshot(tab, workspaceWorktreePath);
 
-    input.terminal.reset();
-    input.fitAddon.fit();
+    try {
+      input.fitAddon.fit();
+    } catch {
+      // Ignore fit races during mount/unmount; session attach can still proceed.
+    }
     if (resolvedSession.snapshot.chunks.length > 0) {
-      input.terminal.write(resolvedSession.snapshot.chunks.join(""));
+      try {
+        input.terminal.write(resolvedSession.snapshot.chunks.join(""));
+      } catch {
+        // Ignore write races during teardown; live subscription still restores output.
+      }
     }
 
     await this.commands.resizeTerminal({

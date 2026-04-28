@@ -374,32 +374,6 @@ export class DaemonClient {
     throw new Error("workspaceId or workspaceWorktreePath is required");
   }
 
-  private toTerminalCreateCommand(input: unknown): { command: string; args?: string[]; env?: string[] } {
-    const record = asRecord(input) ?? {};
-    const explicitCommand = readOptionalString(record.command);
-    const args = readOptionalStringArray(record.args);
-    const env = readOptionalStringArray(record.env);
-
-    if (explicitCommand) {
-      return {
-        command: explicitCommand,
-        args,
-        env,
-      };
-    }
-
-    if (process.platform === "win32") {
-      return {
-        command: "cmd.exe",
-      };
-    }
-
-    return {
-      command: process.env.SHELL?.trim() || "/bin/bash",
-      args: ["-l"],
-    };
-  }
-
   private async createWorkspace(input: Rpc.WorkspaceCreateInput): Promise<Rpc.WorkspaceCreateResponse> {
     const record = asRecord(input);
     const workspaceWorktreePath = readOptionalString(record?.workspaceWorktreePath);
@@ -684,16 +658,22 @@ export class DaemonClient {
   }
 
   private async createTerminalSession(input: Rpc.TerminalCreateSessionInput): Promise<Rpc.TerminalCreateSessionResponse> {
+    const record = asRecord(input);
     const workspaceId = await this.resolveWorkspaceId(input);
-    const { command, args, env } = this.toTerminalCreateCommand(input);
-    return (await this.invoke("terminal.start", { workspaceId, command, args, env })) as Rpc.TerminalCreateSessionResponse;
+    return (await this.invoke("terminal.start", {
+      workspaceId,
+      command: readOptionalString(record?.command),
+      args: readOptionalStringArray(record?.args),
+      env: readOptionalStringArray(record?.env),
+    })) as Rpc.TerminalCreateSessionResponse;
   }
 
   private async writeTerminalInput(input: Rpc.TerminalWriteInput): Promise<Rpc.TerminalMutationOkResponse> {
     const record = asRecord(input);
+    const data = typeof record?.data === "string" ? record.data : "";
     await this.invoke("terminal.send", {
       sessionId: readOptionalString(record?.sessionId) || "",
-      input: readOptionalString(record?.data) || "",
+      input: data,
     });
     return { ok: true };
   }
