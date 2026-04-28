@@ -2,6 +2,11 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppDb, AppDbWs } from "@/db/client";
 import { oauthAccounts, users } from "@/db/schema";
+import {
+  type NotificationPreferences,
+  type NotificationPreferencesPatch,
+  normalizeNotificationPreferences,
+} from "@/lib/notification-preferences";
 import { newId } from "@/lib/id";
 import type { OAuthProfile } from "@/types";
 
@@ -111,5 +116,43 @@ export class UserService {
 
       return linkedUserId;
     });
+  }
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+    const rows = await this.db
+      .select({ notificationPreferences: users.notificationPreferences })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    return normalizeNotificationPreferences(rows[0]?.notificationPreferences);
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    patch: NotificationPreferencesPatch,
+  ): Promise<NotificationPreferences> {
+    const currentPreferences = await this.getNotificationPreferences(userId);
+    const mergedPreferences = normalizeNotificationPreferences(
+      {
+        ...currentPreferences,
+        ...patch,
+        eventSounds: {
+          ...currentPreferences.eventSounds,
+          ...patch.eventSounds,
+        },
+      },
+      currentPreferences,
+    );
+
+    await this.db
+      .update(users)
+      .set({
+        notificationPreferences: mergedPreferences,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return mergedPreferences;
   }
 }

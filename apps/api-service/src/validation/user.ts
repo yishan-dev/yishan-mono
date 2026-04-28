@@ -1,0 +1,38 @@
+import { z } from "zod";
+
+const notificationEventTypeSchema = z.enum(["run-finished", "run-failed"]);
+const notificationSoundIdSchema = z.enum(["chime", "ping", "pop", "zip", "alert"]);
+const notificationCategorySchema = z.enum(["ai-task"]);
+
+const notificationEventSoundsSchema = z.object({
+  "run-finished": notificationSoundIdSchema,
+  "run-failed": notificationSoundIdSchema,
+});
+
+export const notificationPreferencesSchema = z.object({
+  enabled: z.boolean(),
+  osEnabled: z.boolean(),
+  soundEnabled: z.boolean(),
+  volume: z.number().min(0).max(1),
+  focusOnClick: z.boolean(),
+  enabledEventTypes: z.array(notificationEventTypeSchema),
+  eventSounds: notificationEventSoundsSchema,
+  enabledCategories: z.array(notificationCategorySchema),
+});
+
+export const updateNotificationPreferencesBodySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    osEnabled: z.boolean().optional(),
+    soundEnabled: z.boolean().optional(),
+    volume: z.number().min(0).max(1).optional(),
+    focusOnClick: z.boolean().optional(),
+    enabledEventTypes: z.array(notificationEventTypeSchema).optional(),
+    eventSounds: notificationEventSoundsSchema.partial().optional(),
+    enabledCategories: z.array(notificationCategorySchema).optional(),
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: "At least one field must be provided",
+  });
+
+export type UpdateNotificationPreferencesBodyInput = z.infer<typeof updateNotificationPreferencesBodySchema>;

@@ -29,6 +29,19 @@ vi.mock("../../api/sessionApi", () => ({
       email: "user@example.com",
       name: "User",
       avatarUrl: null,
+      notificationPreferences: {
+        enabled: true,
+        osEnabled: true,
+        soundEnabled: true,
+        volume: 1,
+        focusOnClick: true,
+        enabledEventTypes: ["run-finished", "run-failed"],
+        eventSounds: {
+          "run-finished": "chime",
+          "run-failed": "alert",
+        },
+        enabledCategories: ["ai-task"],
+      },
     },
     organizations: [
       {
@@ -131,6 +144,19 @@ describe("ApplicationRouterView", () => {
         email: "user@example.com",
         name: "User",
         avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
       },
       organizations: [
         {
