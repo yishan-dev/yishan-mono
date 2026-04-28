@@ -158,6 +158,82 @@ func TestTerminalSessionSendReadStop(t *testing.T) {
 	}
 }
 
+func TestTerminalListSessions(t *testing.T) {
+	m := NewTerminalManager()
+
+	running, err := m.Start(context.Background(), t.TempDir(), TerminalStartRequest{WorkspaceID: "workspace-1", Command: "cat"})
+	if err != nil {
+		t.Fatalf("start running terminal: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = m.Stop(TerminalStopRequest{SessionID: running.SessionID})
+	})
+
+	exited, err := m.Start(context.Background(), t.TempDir(), TerminalStartRequest{WorkspaceID: "workspace-2", Command: "sh", Args: []string{"-c", "exit 0"}})
+	if err != nil {
+		t.Fatalf("start exiting terminal: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var sawExited bool
+	for time.Now().Before(deadline) {
+		sessions := m.ListSessions(TerminalListSessionsRequest{IncludeExited: true})
+		for _, session := range sessions {
+			if session.SessionID == exited.SessionID && session.Status == "exited" {
+				sawExited = true
+				break
+			}
+		}
+		if sawExited {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !sawExited {
+		t.Fatal("timed out waiting for terminal session to exit")
+	}
+
+	runningOnly := m.ListSessions(TerminalListSessionsRequest{})
+	if len(runningOnly) != 1 {
+		t.Fatalf("expected one running session, got %d", len(runningOnly))
+	}
+	if runningOnly[0].SessionID != running.SessionID {
+		t.Fatalf("expected running session %q, got %q", running.SessionID, runningOnly[0].SessionID)
+	}
+	if runningOnly[0].WorkspaceID != "workspace-1" {
+		t.Fatalf("expected workspace id workspace-1, got %q", runningOnly[0].WorkspaceID)
+	}
+	if runningOnly[0].PID <= 0 {
+		t.Fatalf("expected pid to be set, got %d", runningOnly[0].PID)
+	}
+	if runningOnly[0].Status != "running" {
+		t.Fatalf("expected running status, got %q", runningOnly[0].Status)
+	}
+	if runningOnly[0].StartedAt == "" {
+		t.Fatal("expected startedAt to be set")
+	}
+
+	all := m.ListSessions(TerminalListSessionsRequest{IncludeExited: true})
+	if len(all) != 2 {
+		t.Fatalf("expected running and exited sessions, got %d", len(all))
+	}
+	var foundExited bool
+	for _, session := range all {
+		if session.SessionID == exited.SessionID {
+			foundExited = true
+			if session.Status != "exited" {
+				t.Fatalf("expected exited status, got %q", session.Status)
+			}
+			if session.ExitedAt == "" {
+				t.Fatal("expected exitedAt to be set")
+			}
+		}
+	}
+	if !foundExited {
+		t.Fatal("expected exited session in includeExited list")
+	}
+}
+
 func TestTerminalSubscriptionStreamsOutputAndExit(t *testing.T) {
 	m := NewTerminalManager()
 

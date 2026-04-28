@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/creack/pty"
 )
@@ -52,6 +54,19 @@ type TerminalStopRequest struct {
 
 type TerminalStopResponse struct {
 	Stopped bool `json:"stopped"`
+}
+
+type TerminalListSessionsRequest struct {
+	IncludeExited bool `json:"includeExited,omitempty"`
+}
+
+type TerminalSessionSummary struct {
+	SessionID   string `json:"sessionId"`
+	WorkspaceID string `json:"workspaceId"`
+	PID         int    `json:"pid"`
+	Status      string `json:"status"`
+	StartedAt   string `json:"startedAt,omitempty"`
+	ExitedAt    string `json:"exitedAt,omitempty"`
 }
 
 type TerminalResizeRequest struct {
@@ -101,15 +116,18 @@ type TerminalManager struct {
 }
 
 type terminalSession struct {
-	id       string
-	cmd      *exec.Cmd
-	pty      *os.File
-	output   bytes.Buffer
-	outputMu sync.Mutex
-	running  atomic.Bool
-	exitCode atomic.Int32
-	subsMu   sync.Mutex
-	subs     map[uint64]chan TerminalEvent
+	id               string
+	workspaceID      string
+	cmd              *exec.Cmd
+	pty              *os.File
+	output           bytes.Buffer
+	outputMu         sync.Mutex
+	running          atomic.Bool
+	exitCode         atomic.Int32
+	startedAt        time.Time
+	exitedAtUnixNano atomic.Int64
+	subsMu           sync.Mutex
+	subs             map[uint64]chan TerminalEvent
 }
 
 func NewTerminalManager() *TerminalManager {
@@ -129,7 +147,7 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 	}
 
 	id := fmt.Sprintf("term-%d", m.nextID.Add(1))
-	s := &terminalSession{id: id, cmd: cmd, pty: ptyFile, subs: make(map[uint64]chan TerminalEvent)}
+	s := &terminalSession{id: id, workspaceID: req.WorkspaceID, cmd: cmd, pty: ptyFile, startedAt: time.Now().UTC(), subs: make(map[uint64]chan TerminalEvent)}
 	s.running.Store(true)
 	s.exitCode.Store(-1)
 
@@ -150,6 +168,7 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 		}
 		s.exitCode.Store(code)
 		s.running.Store(false)
+		s.exitedAtUnixNano.Store(time.Now().UTC().UnixNano())
 		_ = s.pty.Close()
 
 		exit := int(code)
@@ -158,6 +177,45 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 	}()
 
 	return TerminalStartResponse{SessionID: id}, nil
+}
+
+func (m *TerminalManager) ListSessions(req TerminalListSessionsRequest) []TerminalSessionSummary {
+	m.mu.RLock()
+	sessions := make([]*terminalSession, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		sessions = append(sessions, s)
+	}
+	m.mu.RUnlock()
+
+	out := make([]TerminalSessionSummary, 0, len(sessions))
+	for _, s := range sessions {
+		running := s.running.Load()
+		if !running && !req.IncludeExited {
+			continue
+		}
+
+		status := "exited"
+		if running {
+			status = "running"
+		}
+
+		summary := TerminalSessionSummary{
+			SessionID:   s.id,
+			WorkspaceID: s.workspaceID,
+			PID:         s.cmd.Process.Pid,
+			Status:      status,
+			StartedAt:   s.startedAt.Format(time.RFC3339Nano),
+		}
+		if exitedAtUnixNano := s.exitedAtUnixNano.Load(); exitedAtUnixNano > 0 {
+			summary.ExitedAt = time.Unix(0, exitedAtUnixNano).UTC().Format(time.RFC3339Nano)
+		}
+		out = append(out, summary)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].SessionID < out[j].SessionID
+	})
+	return out
 }
 
 func resolveTerminalCommand(req TerminalStartRequest, goos string, shellEnv string) (string, []string) {

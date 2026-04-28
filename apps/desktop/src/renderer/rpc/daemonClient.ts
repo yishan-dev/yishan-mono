@@ -324,8 +324,28 @@ export class DaemonClient {
     return workspaces;
   }
 
-  private async ensureWorkspaceIdByWorktreePath(worktreePath: string): Promise<string> {
+  private async ensureWorkspaceIdByWorktreePath(worktreePath: string, preferredWorkspaceId?: string): Promise<string> {
     const normalizedWorktreePath = normalizeWorktreePath(worktreePath);
+    const normalizedPreferredWorkspaceId = preferredWorkspaceId?.trim();
+    if (normalizedPreferredWorkspaceId) {
+      const workspaces = await this.listWorkspaces();
+      for (const workspace of workspaces) {
+        this.workspaceIdByWorktreePath.set(workspace.path, workspace.id);
+      }
+
+      const existingPreferredWorkspace = workspaces.find((workspace) => workspace.id === normalizedPreferredWorkspaceId);
+      if (existingPreferredWorkspace) {
+        return existingPreferredWorkspace.id;
+      }
+
+      await this.invoke("open", {
+        id: normalizedPreferredWorkspaceId,
+        path: normalizedWorktreePath,
+      });
+      this.workspaceIdByWorktreePath.set(normalizedWorktreePath, normalizedPreferredWorkspaceId);
+      return normalizedPreferredWorkspaceId;
+    }
+
     const cachedWorkspaceId = this.workspaceIdByWorktreePath.get(normalizedWorktreePath);
     if (cachedWorkspaceId) {
       return cachedWorkspaceId;
@@ -356,17 +376,17 @@ export class DaemonClient {
       throw new Error("workspace input is required");
     }
 
+    const workspaceId = readOptionalString(record.workspaceId);
     const workspaceWorktreePath = readOptionalString(record.workspaceWorktreePath);
     if (workspaceWorktreePath) {
-      return await this.ensureWorkspaceIdByWorktreePath(workspaceWorktreePath);
+      return await this.ensureWorkspaceIdByWorktreePath(workspaceWorktreePath, workspaceId);
     }
 
     const cwd = readOptionalString(record.cwd);
     if (cwd) {
-      return await this.ensureWorkspaceIdByWorktreePath(cwd);
+      return await this.ensureWorkspaceIdByWorktreePath(cwd, workspaceId);
     }
 
-    const workspaceId = readOptionalString(record.workspaceId);
     if (workspaceId) {
       return workspaceId;
     }
@@ -720,8 +740,8 @@ export class DaemonClient {
     return { processes: [] };
   }
 
-  private async listTerminalSessions(_input?: Rpc.TerminalListSessionsInput): Promise<Rpc.TerminalSessionSummary[]> {
-    return [];
+  private async listTerminalSessions(input?: Rpc.TerminalListSessionsInput): Promise<Rpc.TerminalSessionSummary[]> {
+    return (await this.invoke("terminal.listSessions", input ?? {})) as Rpc.TerminalSessionSummary[];
   }
 
   async invokeApi(options: {

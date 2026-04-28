@@ -307,6 +307,10 @@ func (m *Manager) TerminalSend(req TerminalSendRequest) (TerminalSendResponse, e
 	return m.terminals.Send(req)
 }
 
+func (m *Manager) TerminalListSessions(req TerminalListSessionsRequest) []TerminalSessionSummary {
+	return m.terminals.ListSessions(req)
+}
+
 func (m *Manager) TerminalRead(req TerminalReadRequest) (TerminalReadResponse, error) {
 	return m.terminals.Read(req)
 }
