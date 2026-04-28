@@ -3,27 +3,27 @@ import { z } from "zod";
 import { nonEmptyStringSchema } from "@/validation/common";
 
 export const organizationProjectParamsSchema = z.object({
-  orgId: nonEmptyStringSchema
+  orgId: nonEmptyStringSchema,
 });
 
 export const projectWorkspaceParamsSchema = z.object({
   orgId: nonEmptyStringSchema,
-  projectId: nonEmptyStringSchema
+  projectId: nonEmptyStringSchema,
 });
 
 export const organizationProjectListQuerySchema = z.object({
   withWorkspaces: z
     .enum(["true", "false"])
     .optional()
-    .transform((value) => value === "true")
+    .transform((value) => value === "true"),
 });
 
 export const createProjectBodySchema = z.object({
   name: nonEmptyStringSchema,
-  sourceTypeHint: z.enum(["unknown", "git-local"]).optional(),
+  sourceTypeHint: z.enum(["unknown", "git-local", "git"]).optional(),
   repoUrl: nonEmptyStringSchema.optional(),
   nodeId: nonEmptyStringSchema.optional(),
-  localPath: nonEmptyStringSchema.optional()
+  localPath: nonEmptyStringSchema.optional(),
 });
 
 export const updateProjectBodySchema = z
@@ -33,17 +33,17 @@ export const updateProjectBodySchema = z
     color: nonEmptyStringSchema.optional(),
     setupScript: z.string().optional(),
     postScript: z.string().optional(),
-    contextEnabled: z.boolean().optional()
+    contextEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
-    message: "At least one field must be provided"
+    message: "At least one field must be provided",
   });
 
 export const createWorkspaceBodySchema = z.object({
   kind: z.enum(["primary", "worktree"]).optional().default("primary"),
   branch: nonEmptyStringSchema.optional(),
   nodeId: nonEmptyStringSchema,
-  localPath: nonEmptyStringSchema
+  localPath: nonEmptyStringSchema,
 });
 
 export type OrganizationProjectParamsInput = z.infer<typeof organizationProjectParamsSchema>;

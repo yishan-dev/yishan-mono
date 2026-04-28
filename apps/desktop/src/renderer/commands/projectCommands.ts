@@ -1,9 +1,7 @@
-import { readPersistedWorkspacePreferencesByOrg } from "../helpers/projectHelpers";
-import {
-  api,
-} from "../api";
+import { api } from "../api";
 import type { ProjectRecord, ProjectWithWorkspacesRecord } from "../api";
 import { RestApiError } from "../api/restClient";
+import { readPersistedWorkspacePreferencesByOrg } from "../helpers/projectHelpers";
 import { getDaemonClient } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
 import { tabStore } from "../store/tabStore";
@@ -39,14 +37,27 @@ async function inspectLocalRepository(path: string): Promise<{
   }
 }
 
+/** Infers whether one local folder is non-git, git-local, or git with a remote. */
+export async function inspectLocalProjectSource(path: string): Promise<{
+  sourceTypeHint: "unknown" | "git-local" | "git";
+  remoteUrl?: string;
+}> {
+  const metadata = await inspectLocalRepository(path);
+  const remoteUrl = metadata.remoteUrl?.trim() || undefined;
+
+  return {
+    sourceTypeHint: remoteUrl ? "git" : metadata.isGitRepository ? "git-local" : "unknown",
+    remoteUrl,
+  };
+}
+
 /** Loads backend snapshot data and hydrates the workspace store from it. */
 export async function loadWorkspaceFromBackend(): Promise<void> {
   const previousWorkspaces = workspaceStore.getState().workspaces;
 
   try {
     const sessionState = sessionStore.getState();
-    const organizations =
-      sessionState.organizations.length > 0 ? sessionState.organizations : await api.org.list();
+    const organizations = sessionState.organizations.length > 0 ? sessionState.organizations : await api.org.list();
     const selectedOrganization =
       sessionState.selectedOrganizationId &&
       organizations.some((organization) => organization.id === sessionState.selectedOrganizationId)
@@ -91,16 +102,15 @@ export async function loadWorkspaceFromBackend(): Promise<void> {
 /** Creates one project in backend, then applies it into the local legacy store shape. */
 export async function createProject(input: {
   name: string;
-  key?: string;
-  source: "local" | "remote";
+  sourceTypeHint?: "unknown" | "git-local" | "git";
   path?: string;
   gitUrl?: string;
 }): Promise<void> {
   const normalizedName = input.name.trim();
-  const normalizedKey = input.key?.trim() || "";
   const normalizedPath = input.path?.trim() || "";
   const normalizedGitUrl = input.gitUrl?.trim() || "";
-  const resolvedPath = input.source === "local" ? normalizedPath : normalizedGitUrl || normalizedPath;
+  const isLocalSource = Boolean(normalizedPath);
+  const resolvedPath = normalizedPath || normalizedGitUrl;
   if (!normalizedName || !resolvedPath) {
     return;
   }
@@ -111,12 +121,13 @@ export async function createProject(input: {
     return;
   }
 
-  let inferredSourceTypeHint: "unknown" | "git-local" = input.source === "local" ? "git-local" : "unknown";
-  let inferredRemoteUrl = input.source === "remote" ? normalizedGitUrl || undefined : undefined;
+  let inferredSourceTypeHint: "unknown" | "git-local" | "git" =
+    input.sourceTypeHint ?? (isLocalSource ? "git-local" : "git");
+  let inferredRemoteUrl = normalizedGitUrl || undefined;
   let inferredDefaultBranch: string | undefined;
   let inferredNodeId: string | undefined;
 
-  if (input.source === "local" && normalizedPath) {
+  if (isLocalSource) {
     const daemonId = sessionStore.getState().daemonId?.trim();
 
     try {
@@ -137,8 +148,12 @@ export async function createProject(input: {
     }
 
     const localRepositoryMetadata = await inspectLocalRepository(normalizedPath);
-    inferredSourceTypeHint = localRepositoryMetadata.isGitRepository ? "git-local" : "unknown";
     inferredRemoteUrl = localRepositoryMetadata.remoteUrl || undefined;
+    inferredSourceTypeHint = inferredRemoteUrl
+      ? "git"
+      : localRepositoryMetadata.isGitRepository
+        ? "git-local"
+        : "unknown";
     inferredDefaultBranch = localRepositoryMetadata.currentBranch || undefined;
 
     if (import.meta.env.DEV) {
@@ -160,7 +175,7 @@ export async function createProject(input: {
       sourceTypeHint: inferredSourceTypeHint,
       repoUrl: inferredRemoteUrl,
       nodeId: inferredNodeId,
-      localPath: input.source === "local" ? normalizedPath || undefined : undefined,
+      localPath: isLocalSource ? normalizedPath || undefined : undefined,
     });
   } catch (error) {
     console.error("Failed to create backend project", error);
@@ -172,22 +187,22 @@ export async function createProject(input: {
   }
 
   const workspaces = project.workspaces ?? [];
-  const primaryWorkspace =
-    workspaces.find((workspace) => workspace.kind === "primary") ?? workspaces[0];
-  const resolvedProjectLocalPath =
-    input.source === "local"
-      ? normalizedPath || undefined
-      : (primaryWorkspace?.localPath?.trim() || undefined);
+  const primaryWorkspace = workspaces.find((workspace) => workspace.kind === "primary") ?? workspaces[0];
+  const resolvedProjectLocalPath = isLocalSource
+    ? normalizedPath || undefined
+    : primaryWorkspace?.localPath?.trim() || undefined;
   const resolvedProjectDefaultBranch = primaryWorkspace?.branch ?? inferredDefaultBranch ?? null;
 
   workspaceStore.getState().createProject({
-    ...input,
     name: project.name || normalizedName,
+    source: isLocalSource ? "local" : "remote",
+    path: isLocalSource ? normalizedPath : undefined,
+    gitUrl: isLocalSource ? undefined : normalizedGitUrl,
     backendProject: {
       id: project.id,
       name: project.name || normalizedName,
-      key: project.repoKey ?? normalizedKey ?? undefined,
-      repoKey: project.repoKey ?? normalizedKey ?? null,
+      key: project.repoKey ?? undefined,
+      repoKey: project.repoKey ?? null,
       localPath: resolvedProjectLocalPath,
       worktreePath: resolvedProjectLocalPath,
       gitUrl: project.repoUrl ?? inferredRemoteUrl,
@@ -257,8 +272,7 @@ export async function updateProjectConfig(
     postScript?: string;
   },
 ): Promise<void> {
-  const project =
-    workspaceStore.getState().projects.find((item) => item.id === projectId);
+  const project = workspaceStore.getState().projects.find((item) => item.id === projectId);
   if (!project) {
     return;
   }

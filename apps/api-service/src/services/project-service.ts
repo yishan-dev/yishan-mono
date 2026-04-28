@@ -53,7 +53,7 @@ type CreateProjectInput = {
   organizationId: string;
   actorUserId: string;
   name: string;
-  sourceTypeHint?: "unknown" | "git-local";
+  sourceTypeHint?: "unknown" | "git-local" | "git";
   repoUrl?: string;
   nodeId?: string;
   localPath?: string;

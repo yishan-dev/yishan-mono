@@ -23,7 +23,7 @@ export async function createProject(
   orgId: string,
   input: {
     name: string;
-    sourceTypeHint?: "unknown" | "git-local";
+    sourceTypeHint?: "unknown" | "git-local" | "git";
     repoUrl?: string;
     nodeId?: string;
     localPath?: string;

@@ -57,6 +57,7 @@ import {
 import {
   createProject as createProjectCommand,
   deleteProject as deleteProjectCommand,
+  inspectLocalProjectSource as inspectLocalProjectSourceCommand,
   loadWorkspaceFromBackend as loadWorkspaceFromBackendCommand,
   updateProjectConfig as updateProjectConfigCommand,
 } from "../commands/projectCommands";
@@ -180,10 +181,10 @@ export type Commands = {
   previewNotification: typeof previewNotificationCommand;
   playNotificationSound: typeof playNotificationSoundCommand;
   loadWorkspaceFromBackend: () => Promise<void>;
+  inspectLocalProjectSource: typeof inspectLocalProjectSourceCommand;
   createProject: (input: {
     name: string;
-    key?: string;
-    source: "local" | "remote";
+    sourceTypeHint?: "unknown" | "git-local" | "git";
     path?: string;
     gitUrl?: string;
   }) => Promise<void>;
@@ -192,13 +193,7 @@ export type Commands = {
     repoId: string,
     config: Pick<
       WorkspaceProjectRecord,
-      | "name"
-      | "worktreePath"
-      | "contextEnabled"
-      | "icon"
-      | "color"
-      | "setupScript"
-      | "postScript"
+      "name" | "worktreePath" | "contextEnabled" | "icon" | "color" | "setupScript" | "postScript"
     >,
   ) => Promise<void>;
   createWorkspace: (input: {
@@ -299,6 +294,7 @@ export function useCommands(): Commands {
       playNotificationSound: playNotificationSoundCommand,
       setSelectedTabId: setSelectedTabCommand,
       loadWorkspaceFromBackend: loadWorkspaceFromBackendCommand,
+      inspectLocalProjectSource: inspectLocalProjectSourceCommand,
       createProject: createProjectCommand,
       deleteProject: deleteProjectCommand,
       updateProjectConfig: updateProjectConfigCommand,

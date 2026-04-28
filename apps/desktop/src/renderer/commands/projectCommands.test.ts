@@ -137,23 +137,21 @@ describe("projectCommands", () => {
     apiMocks.createProject.mockResolvedValueOnce({
       id: "project-1",
       name: "Repo 1",
-      sourceType: "git-local",
+      sourceType: "git",
       repoProvider: null,
-      repoUrl: null,
+      repoUrl: "https://github.com/test/repo-1.git",
       repoKey: "repo-1",
       workspaces: [],
     });
 
     await createProject({
       name: "Repo 1",
-      key: "repo-1",
-      source: "local",
       path: "/tmp/repo-1",
     });
 
     expect(apiMocks.createProject).toHaveBeenCalledWith("org-1", {
       name: "Repo 1",
-      sourceTypeHint: "git-local",
+      sourceTypeHint: "git",
       repoUrl: "https://github.com/test/repo-1.git",
       nodeId: "daemon-1",
       localPath: "/tmp/repo-1",
@@ -200,7 +198,7 @@ describe("projectCommands", () => {
 
     await createProject({
       name: "Remote Repo",
-      source: "remote",
+      sourceTypeHint: "git",
       gitUrl: "https://github.com/test/remote-repo.git",
     });
 

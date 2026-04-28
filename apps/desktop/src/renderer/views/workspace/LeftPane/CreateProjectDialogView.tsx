@@ -27,15 +27,22 @@ type CreateProjectDialogViewProps = {
 
 type RepoDraft = {
   name: string;
-  key?: string;
   source: "local" | "remote";
-  path?: string;
-  gitUrl?: string;
-  keyEdited: boolean;
+  path: string;
+  gitUrl: string;
+  sourceTypeHint?: "unknown" | "git-local" | "git";
+  nameEdited: boolean;
 };
 
-/** Converts one local path or URL into a default repository key candidate. */
-function deriveDefaultRepoKey(input: string): string {
+type CreateProjectInput = {
+  name: string;
+  sourceTypeHint?: "unknown" | "git-local" | "git";
+  path?: string;
+  gitUrl?: string;
+};
+
+/** Converts one local path or URL into a default project display name. */
+function deriveDefaultProjectName(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) {
     return "";
@@ -47,28 +54,18 @@ function deriveDefaultRepoKey(input: string): string {
       .split(/[\\/]/)
       .filter((part) => part.length > 0)
       .at(-1) ?? "";
-  const withoutGitSuffix = segment.replace(/\.git$/i, "");
-  return withoutGitSuffix
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return segment.replace(/\.git$/i, "");
 }
 
-/** Returns true when one repository key satisfies the frontend naming constraints. */
-function isValidRepoKey(value: string): boolean {
-  return /^[a-z0-9-]+$/.test(value);
-}
-
-const defaultDraft: RepoDraft = { name: "", key: "", source: "local", path: "", gitUrl: "", keyEdited: false };
+const defaultDraft: RepoDraft = { name: "", source: "local", path: "", gitUrl: "", nameEdited: false };
 
 export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogViewProps) {
   const { t } = useTranslation();
-  const { createProject, openLocalFolderDialog } = useCommands();
+  const { createProject, inspectLocalProjectSource, openLocalFolderDialog } = useCommands();
   const [repoDraft, setRepoDraft] = useState<RepoDraft>(defaultDraft);
 
   const createProjectMutation = useMutation({
-    mutationFn: async (input: Omit<RepoDraft, "keyEdited">) => {
+    mutationFn: async (input: CreateProjectInput) => {
       await createProject(input);
     },
     onSuccess: () => {
@@ -87,21 +84,23 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
     onClose();
   };
 
-  const normalizedKey = repoDraft.key.trim();
-  const isKeyInvalid = normalizedKey.length > 0 && !isValidRepoKey(normalizedKey);
-
   const isCreateDisabled =
     repoDraft.name.trim().length === 0 ||
-    normalizedKey.length === 0 ||
-    isKeyInvalid ||
     (repoDraft.source === "local" ? repoDraft.path.trim().length === 0 : repoDraft.gitUrl.trim().length === 0);
 
   const handlePickRepoFolder = async () => {
     const selectedPath = await openLocalFolderDialog(repoDraft.path.trim() || undefined);
     if (selectedPath) {
+      const sourceInspection = await inspectLocalProjectSource(selectedPath);
       setRepoDraft((previous) => {
-        const nextKey = previous.keyEdited ? previous.key : deriveDefaultRepoKey(selectedPath);
-        return { ...previous, path: selectedPath, key: nextKey };
+        const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(selectedPath);
+        return {
+          ...previous,
+          path: selectedPath,
+          gitUrl: sourceInspection.remoteUrl ?? "",
+          name: nextName,
+          sourceTypeHint: sourceInspection.sourceTypeHint,
+        };
       });
     }
   };
@@ -121,10 +120,10 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
     createProjectMutation.mutate(
       {
         name,
-        key: normalizedKey,
-        source: repoDraft.source,
+        sourceTypeHint: repoDraft.source === "remote" ? "git" : repoDraft.sourceTypeHint,
         path: repoDraft.source === "local" ? location : "",
-        gitUrl: repoDraft.source === "remote" ? location : "",
+        gitUrl:
+          repoDraft.source === "remote" ? location : repoDraft.sourceTypeHint === "git" ? repoDraft.gitUrl.trim() : "",
       },
       {
         onError: (error) => {
@@ -135,54 +134,10 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={resetAndClose}
-      fullWidth
-      maxWidth="sm"
-      disableEscapeKeyDown={isCreating}
-    >
+    <Dialog open={open} onClose={resetAndClose} fullWidth maxWidth="sm" disableEscapeKeyDown={isCreating}>
       <DialogTitle>{t("project.actions.addRepository")}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {t("project.form.name")}
-            </Typography>
-            <TextField
-              autoFocus
-              size="small"
-              disabled={isCreating}
-              value={repoDraft.name}
-              onChange={(event) =>
-                setRepoDraft((previous) => ({
-                  ...previous,
-                  name: event.target.value,
-                }))
-              }
-              fullWidth
-            />
-          </Box>
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {t("project.form.key")}
-            </Typography>
-            <TextField
-              size="small"
-              disabled={isCreating}
-              value={repoDraft.key}
-              onChange={(event) =>
-                setRepoDraft((previous) => ({
-                  ...previous,
-                  key: event.target.value,
-                  keyEdited: true,
-                }))
-              }
-              error={isKeyInvalid}
-              helperText={isKeyInvalid ? t("project.form.keyInvalid") : t("project.form.keyHelp")}
-              fullWidth
-            />
-          </Box>
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               {t("project.form.source.label")}
@@ -193,11 +148,15 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
                 variant={repoDraft.source === "local" ? "contained" : "outlined"}
                 disabled={isCreating}
                 onClick={() =>
-                  setRepoDraft((previous) => ({
-                    ...previous,
-                    source: "local",
-                    key: previous.keyEdited ? previous.key : deriveDefaultRepoKey(previous.path),
-                  }))
+                  setRepoDraft((previous) => {
+                    const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(previous.path);
+                    return {
+                      ...previous,
+                      source: "local",
+                      name: nextName,
+                      sourceTypeHint: previous.path ? previous.sourceTypeHint : undefined,
+                    };
+                  })
                 }
               >
                 {t("project.form.source.local")}
@@ -207,11 +166,15 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
                 variant={repoDraft.source === "remote" ? "contained" : "outlined"}
                 disabled={isCreating}
                 onClick={() =>
-                  setRepoDraft((previous) => ({
-                    ...previous,
-                    source: "remote",
-                    key: previous.keyEdited ? previous.key : deriveDefaultRepoKey(previous.gitUrl),
-                  }))
+                  setRepoDraft((previous) => {
+                    const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(previous.gitUrl);
+                    return {
+                      ...previous,
+                      source: "remote",
+                      name: nextName,
+                      sourceTypeHint: "git",
+                    };
+                  })
                 }
               >
                 {t("project.form.source.remote")}
@@ -223,17 +186,20 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
               {repoDraft.source === "local" ? t("project.form.path") : t("project.form.gitUrl")}
             </Typography>
             <TextField
+              autoFocus
               size="small"
               value={repoDraft.source === "local" ? repoDraft.path : repoDraft.gitUrl}
               disabled={isCreating}
               onChange={(event) =>
                 setRepoDraft((previous) => {
                   const nextLocation = event.target.value;
-                  const nextKey = previous.keyEdited ? previous.key : deriveDefaultRepoKey(nextLocation);
+                  const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(nextLocation);
                   return {
                     ...previous,
                     [repoDraft.source === "local" ? "path" : "gitUrl"]: nextLocation,
-                    key: nextKey,
+                    name: nextName,
+                    gitUrl: repoDraft.source === "local" ? "" : nextLocation,
+                    sourceTypeHint: repoDraft.source === "remote" ? "git" : undefined,
                   };
                 })
               }
@@ -261,6 +227,24 @@ export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogVi
                     }
                   : undefined
               }
+            />
+          </Box>
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {t("project.form.name")}
+            </Typography>
+            <TextField
+              size="small"
+              disabled={isCreating}
+              value={repoDraft.name}
+              onChange={(event) =>
+                setRepoDraft((previous) => ({
+                  ...previous,
+                  name: event.target.value,
+                  nameEdited: true,
+                }))
+              }
+              fullWidth
             />
           </Box>
         </Stack>
