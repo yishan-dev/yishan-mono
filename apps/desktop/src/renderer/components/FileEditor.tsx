@@ -11,6 +11,7 @@ import { DARK_SURFACE_COLORS } from "../theme";
 type FileEditorProps = {
   path: string;
   content: string;
+  focusRequestKey?: number;
   onContentChange?: (content: string) => void;
   onSave?: (content: string) => void | Promise<void>;
 };
@@ -94,7 +95,7 @@ function createEditorSyntaxTheme(mode: "light" | "dark") {
 }
 
 /** Renders a CodeMirror file editor with local edit tracking and Cmd/Ctrl+S save shortcut. */
-export function FileEditor({ path, content, onContentChange, onSave }: FileEditorProps) {
+export function FileEditor({ path, content, focusRequestKey = 0, onContentChange, onSave }: FileEditorProps) {
   const theme = useTheme();
   const editorTheme = useMemo(() => createEditorTheme(theme.palette.mode), [theme.palette.mode]);
   const editorSyntaxTheme = useMemo(() => createEditorSyntaxTheme(theme.palette.mode), [theme.palette.mode]);
@@ -176,6 +177,20 @@ export function FileEditor({ path, content, onContentChange, onSave }: FileEdito
       changes: { from: 0, to: currentDoc.length, insert: content },
     });
   }, [content]);
+
+  useEffect(() => {
+    if (focusRequestKey <= 0) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      editorViewRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [focusRequestKey]);
 
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

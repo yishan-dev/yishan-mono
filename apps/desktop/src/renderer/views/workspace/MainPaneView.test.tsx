@@ -118,7 +118,9 @@ vi.mock("./LaunchView", () => ({
 }));
 
 vi.mock("./TerminalView", () => ({
-  TerminalView: ({ tabId }: { tabId: string }) => <div data-testid="terminal-view" data-tab-id={tabId} />,
+  TerminalView: ({ tabId, focusRequestKey = 0 }: { tabId: string; focusRequestKey?: number }) => (
+    <div data-testid="terminal-view" data-tab-id={tabId} data-focus-request-key={focusRequestKey} />
+  ),
 }));
 
 afterEach(() => {
@@ -319,6 +321,72 @@ describe("MainPaneView", () => {
     expect(screen.getAllByTestId("terminal-view")).toHaveLength(2);
     expect(document.querySelector('[data-tab-id="terminal-tab-1"]')).toBeTruthy();
     expect(document.querySelector('[data-tab-id="terminal-tab-2"]')).toBeTruthy();
+  });
+
+  it("requests content focus when selected tab changes outside the tab bar", () => {
+    mocked.stateRef.current = {
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          branch: "origin/main",
+          title: "Workspace 1",
+          name: "Workspace 1",
+          worktreePath: "/tmp/workspace-1",
+        },
+      ],
+      projects: [{ id: "repo-1", name: "Repo 1", path: "/tmp/repo-1" }],
+      selectedProjectId: "repo-1",
+      selectedWorkspaceId: "workspace-1",
+      tabs: [
+        {
+          id: "terminal-tab-1",
+          workspaceId: "workspace-1",
+          title: "Terminal A",
+          pinned: false,
+          kind: "terminal",
+          data: {
+            title: "Terminal A",
+          },
+        },
+        {
+          id: "terminal-tab-2",
+          workspaceId: "workspace-1",
+          title: "Terminal B",
+          pinned: false,
+          kind: "terminal",
+          data: {
+            title: "Terminal B",
+          },
+        },
+      ],
+      selectedTabId: "terminal-tab-1",
+      listDetectedPorts: vi.fn().mockResolvedValue([]),
+      setSelectedRepoId: vi.fn(),
+      setSelectedWorkspaceId: vi.fn(),
+      setSelectedTabId: vi.fn(),
+      createTab: vi.fn(),
+      openTab: vi.fn(),
+      closeTab: vi.fn(),
+      closeOtherTabs: vi.fn(),
+      closeAllTabs: vi.fn(),
+      toggleTabPinned: vi.fn(),
+      reorderTab: vi.fn(),
+      renameTab: vi.fn(),
+      updateFileTabContent: vi.fn(),
+      markFileTabSaved: vi.fn(),
+    };
+
+    const view = render(<MainPaneView />);
+    expect(document.querySelector('[data-tab-id="terminal-tab-1"]')?.getAttribute("data-focus-request-key")).toBe("0");
+
+    mocked.stateRef.current = {
+      ...mocked.stateRef.current,
+      selectedTabId: "terminal-tab-2",
+    };
+    view.rerender(<MainPaneView />);
+
+    expect(document.querySelector('[data-tab-id="terminal-tab-2"]')?.getAttribute("data-focus-request-key")).toBe("1");
   });
 
   it("keeps existing terminal views mounted when selected workspace has no tabs", () => {

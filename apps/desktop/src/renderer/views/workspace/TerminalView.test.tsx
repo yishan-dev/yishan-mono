@@ -55,6 +55,7 @@ const mocked = vi.hoisted(() => {
     },
   );
   const writeTerminalInput = vi.fn().mockResolvedValue({ ok: true });
+  const xtermFocus = vi.fn();
   const closeTab = vi.fn((tabId: string) => {
     const state = stateRef.current as { closeTab?: (nextTabId: string) => void };
     state.closeTab?.(tabId);
@@ -83,6 +84,7 @@ const mocked = vi.hoisted(() => {
     resizeTerminal,
     subscribeTerminalOutput,
     writeTerminalInput,
+    xtermFocus,
     closeTab,
     searchAddon,
     loadTerminalAddons,
@@ -131,7 +133,9 @@ vi.mock("@xterm/xterm", () => {
       this.onDataHandler?.(data);
     }
     dispose() {}
-    focus() {}
+    focus() {
+      mocked.xtermFocus();
+    }
     attachCustomKeyEventHandler(handler: (event: KeyboardEvent) => boolean) {
       mocked.setTerminalCustomKeyEventHandler(handler);
     }
@@ -454,6 +458,44 @@ describe("TerminalView", () => {
     expect(mocked.searchAddon.clearDecorations).toHaveBeenCalled();
     expect(mocked.searchAddon.clearActiveDecoration).toHaveBeenCalled();
     expect(screen.queryByLabelText("Search terminal output")).toBeNull();
+  });
+
+  it("focuses xterm when requested", async () => {
+    const state = buildStoreState();
+    mocked.stateRef.current = state;
+    mocked.createTerminalSession.mockResolvedValueOnce({
+      sessionId: "session-focus",
+      cwd: "/tmp/workspace-1",
+      cols: 120,
+      rows: 30,
+    });
+    mocked.readTerminalOutput.mockResolvedValueOnce({
+      nextIndex: 0,
+      chunks: [],
+      exited: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mocked.resizeTerminal.mockResolvedValue({ ok: true });
+
+    class MockResizeObserver {
+      observe() {}
+      disconnect() {}
+    }
+
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const view = render(<TerminalView tabId="terminal-tab-1" focusRequestKey={0} />);
+    expect(mocked.xtermFocus).not.toHaveBeenCalled();
+
+    view.rerender(<TerminalView tabId="terminal-tab-1" focusRequestKey={1} />);
+
+    expect(mocked.xtermFocus).toHaveBeenCalledTimes(1);
   });
 
   it("releases macOS Cmd+W from terminal key handling for renderer tab close", async () => {

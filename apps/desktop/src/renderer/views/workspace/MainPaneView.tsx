@@ -1,5 +1,5 @@
 import { Box, Typography } from "@mui/material";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuSquareTerminal } from "react-icons/lu";
 import { FileEditor } from "../../components/FileEditor";
@@ -126,6 +126,28 @@ export function MainPaneView() {
     [inUseByAgentKind],
   );
   const enabledAgentKindSet = useMemo(() => new Set(enabledAgentKinds), [enabledAgentKinds]);
+  const [focusContentRequestKey, setFocusContentRequestKey] = useState(0);
+  const didTrackSelectedTabRef = useRef(false);
+
+  const handleSelectTab = (tabId: string) => {
+    setSelectedTabId(tabId);
+    if (tabId === selectedTabId) {
+      setFocusContentRequestKey((requestKey) => requestKey + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (!didTrackSelectedTabRef.current) {
+      didTrackSelectedTabRef.current = true;
+      return;
+    }
+
+    if (!selectedTabId) {
+      return;
+    }
+
+    setFocusContentRequestKey((requestKey) => requestKey + 1);
+  }, [selectedTabId]);
 
   /** Handles tab creation from the tab bar type selector menu. */
   const handleCreateTab = (option: TabBarCreateOption) => {
@@ -164,7 +186,7 @@ export function MainPaneView() {
         <TabBar
           tabs={tabBarTabs}
           selectedTabId={selectedTabId}
-          onSelectTab={setSelectedTabId}
+          onSelectTab={handleSelectTab}
           onCloseTab={closeTab}
           onCloseOtherTabs={closeOtherTabs}
           onCloseAllTabs={closeAllTabs}
@@ -233,6 +255,7 @@ export function MainPaneView() {
                 <FileEditor
                   path={tab.data.path}
                   content={tab.data.content ?? ""}
+                  focusRequestKey={isSelected ? focusContentRequestKey : 0}
                   onContentChange={(nextContent) => {
                     updateFileTabContent(tab.id, nextContent);
                   }}
@@ -305,7 +328,7 @@ export function MainPaneView() {
                 flexDirection: "column",
               }}
             >
-              <TerminalView tabId={tab.id} />
+              <TerminalView tabId={tab.id} focusRequestKey={isSelected ? focusContentRequestKey : 0} />
             </Box>
           );
         })}

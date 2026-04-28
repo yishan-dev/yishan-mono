@@ -10,6 +10,7 @@ import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
 
 type TerminalViewProps = {
   tabId: string;
+  focusRequestKey?: number;
 };
 
 const TERMINAL_SEARCH_OPTIONS: ISearchOptions = {
@@ -20,7 +21,7 @@ const TERMINAL_SEARCH_OPTIONS: ISearchOptions = {
 };
 
 /** Renders an xterm instance and binds it to a daemon-backed terminal session. */
-export function TerminalView({ tabId }: TerminalViewProps) {
+export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -220,6 +221,20 @@ export function TerminalView({ tabId }: TerminalViewProps) {
       window.cancelAnimationFrame(frame);
     };
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (focusRequestKey <= 0 || isSearchOpen) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      xtermRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [focusRequestKey, isSearchOpen]);
 
   useEffect(() => {
     if (!isSearchOpen) {

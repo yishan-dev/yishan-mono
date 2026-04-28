@@ -10,12 +10,14 @@ const mockStateRef: {
   latestExtensions: unknown[];
   editorDocText: string;
   editorStateCreateCount: number;
+  editorFocus: () => void;
   updateListener: null | ((update: { docChanged: boolean; state: { doc: { toString: () => string } } }) => void);
   keymapRun: null | (() => boolean);
 } = {
   latestExtensions: [],
   editorDocText: "",
   editorStateCreateCount: 0,
+  editorFocus: vi.fn(),
   updateListener: null,
   keymapRun: null,
 };
@@ -120,6 +122,10 @@ vi.mock("codemirror", () => {
       return undefined;
     }
 
+    focus() {
+      mockStateRef.editorFocus();
+    }
+
     destroy() {
       return undefined;
     }
@@ -136,8 +142,10 @@ afterEach(() => {
   mockStateRef.latestExtensions = [];
   mockStateRef.editorDocText = "";
   mockStateRef.editorStateCreateCount = 0;
+  mockStateRef.editorFocus = vi.fn();
   mockStateRef.updateListener = null;
   mockStateRef.keymapRun = null;
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
@@ -212,5 +220,29 @@ describe("FileEditor", () => {
     );
 
     expect(mockStateRef.editorStateCreateCount).toBe(1);
+  });
+
+  it("focuses the editor when requested", () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const { rerender } = render(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor path="src/a.ts" content="initial" focusRequestKey={0} />
+      </ThemeProvider>,
+    );
+
+    expect(mockStateRef.editorFocus).not.toHaveBeenCalled();
+
+    rerender(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor path="src/a.ts" content="initial" focusRequestKey={1} />
+      </ThemeProvider>,
+    );
+
+    expect(mockStateRef.editorFocus).toHaveBeenCalledTimes(1);
   });
 });
