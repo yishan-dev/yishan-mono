@@ -32,10 +32,8 @@ func TestResolveTerminalCommand(t *testing.T) {
 			wantArgsPresent: true,
 		},
 		{
-			name: "uses shell env on unix when command missing",
-			request: TerminalStartRequest{
-				Args: []string{"-l"},
-			},
+			name:            "uses shell env on unix when command missing",
+			request:         TerminalStartRequest{},
 			goos:            "linux",
 			shellEnv:        "/bin/zsh",
 			wantCommand:     "/bin/zsh",
@@ -44,26 +42,40 @@ func TestResolveTerminalCommand(t *testing.T) {
 			wantArgsPresent: true,
 		},
 		{
-			name: "falls back to zsh on darwin when shell env missing",
-			request: TerminalStartRequest{},
+			name: "keeps explicit default shell args",
+			request: TerminalStartRequest{
+				Args: []string{"-f"},
+			},
+			goos:            "linux",
+			shellEnv:        "/bin/zsh",
+			wantCommand:     "/bin/zsh",
+			wantArgsLen:     1,
+			wantFirstArg:    "-f",
+			wantArgsPresent: true,
+		},
+		{
+			name:            "falls back to zsh on darwin when shell env missing",
+			request:         TerminalStartRequest{},
 			goos:            "darwin",
 			shellEnv:        "",
 			wantCommand:     "/bin/zsh",
-			wantArgsLen:     0,
-			wantArgsPresent: false,
+			wantArgsLen:     1,
+			wantFirstArg:    "-l",
+			wantArgsPresent: true,
 		},
 		{
-			name: "falls back to bash on linux when shell env missing",
-			request: TerminalStartRequest{},
+			name:            "falls back to bash on linux when shell env missing",
+			request:         TerminalStartRequest{},
 			goos:            "linux",
 			shellEnv:        "",
 			wantCommand:     "/bin/bash",
-			wantArgsLen:     0,
-			wantArgsPresent: false,
+			wantArgsLen:     1,
+			wantFirstArg:    "--login",
+			wantArgsPresent: true,
 		},
 		{
-			name: "uses cmd on windows",
-			request: TerminalStartRequest{},
+			name:            "uses cmd on windows",
+			request:         TerminalStartRequest{},
 			goos:            "windows",
 			shellEnv:        "C:/Program Files/Git/bin/bash.exe",
 			wantCommand:     "cmd.exe",
@@ -85,6 +97,21 @@ func TestResolveTerminalCommand(t *testing.T) {
 				t.Fatalf("expected first arg %q, got %q", test.wantFirstArg, gotArgs[0])
 			}
 		})
+	}
+}
+
+func TestResolveTerminalEnvDefaults(t *testing.T) {
+	got := resolveTerminalEnv([]string{"PATH=/usr/bin"}, []string{"TERM=screen-256color"})
+	joined := strings.Join(got, "\n")
+
+	if !strings.Contains(joined, "TERM=screen-256color") {
+		t.Fatalf("expected request env to override TERM, got %v", got)
+	}
+	if !strings.Contains(joined, "COLORTERM=truecolor") {
+		t.Fatalf("expected COLORTERM default, got %v", got)
+	}
+	if !strings.Contains(joined, "LANG=en_US.UTF-8") {
+		t.Fatalf("expected LANG default, got %v", got)
 	}
 }
 

@@ -121,7 +121,7 @@ func (m *TerminalManager) Start(_ context.Context, cwd string, req TerminalStart
 
 	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), req.Env...)
+	cmd.Env = resolveTerminalEnv(os.Environ(), req.Env)
 
 	ptyFile, err := pty.Start(cmd)
 	if err != nil {
@@ -167,7 +167,11 @@ func resolveTerminalCommand(req TerminalStartRequest, goos string, shellEnv stri
 	}
 
 	defaultCommand := resolveDefaultTerminalCommand(goos, shellEnv)
-	return defaultCommand, req.Args
+	if len(req.Args) > 0 {
+		return defaultCommand, req.Args
+	}
+
+	return defaultCommand, resolveDefaultTerminalArgs(defaultCommand, goos)
 }
 
 func resolveDefaultTerminalCommand(goos string, shellEnv string) string {
@@ -187,6 +191,56 @@ func resolveDefaultTerminalCommand(goos string, shellEnv string) string {
 	}
 
 	return "/bin/bash"
+}
+
+func resolveDefaultTerminalArgs(command string, goos string) []string {
+	if goos == "windows" {
+		return nil
+	}
+
+	shellName := strings.ToLower(strings.TrimSpace(command))
+	if lastSlash := strings.LastIndexAny(shellName, "/\\"); lastSlash >= 0 {
+		shellName = shellName[lastSlash+1:]
+	}
+
+	switch shellName {
+	case "bash":
+		return []string{"--login"}
+	case "zsh", "fish":
+		return []string{"-l"}
+	default:
+		return nil
+	}
+}
+
+func resolveTerminalEnv(baseEnv []string, requestEnv []string) []string {
+	env := append([]string{}, baseEnv...)
+	env = upsertEnv(env, "TERM", envValueOrDefault(env, "TERM", "xterm-256color"))
+	env = upsertEnv(env, "COLORTERM", envValueOrDefault(env, "COLORTERM", "truecolor"))
+	env = upsertEnv(env, "LANG", envValueOrDefault(env, "LANG", "en_US.UTF-8"))
+	env = append(env, requestEnv...)
+	return env
+}
+
+func envValueOrDefault(env []string, key string, fallback string) string {
+	prefix := key + "="
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) && strings.TrimSpace(strings.TrimPrefix(entry, prefix)) != "" {
+			return strings.TrimPrefix(entry, prefix)
+		}
+	}
+	return fallback
+}
+
+func upsertEnv(env []string, key string, value string) []string {
+	prefix := key + "="
+	for index, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			env[index] = prefix + value
+			return env
+		}
+	}
+	return append(env, prefix+value)
 }
 
 func (m *TerminalManager) Send(req TerminalSendRequest) (TerminalSendResponse, error) {
