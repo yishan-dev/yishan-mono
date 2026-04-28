@@ -11,6 +11,7 @@ export const SUPPORTED_DESKTOP_AGENT_KINDS = [
 export type DesktopAgentKind = (typeof SUPPORTED_DESKTOP_AGENT_KINDS)[number];
 
 export type AgentIconContext = "tabMenu" | "settingsRow";
+export type AgentIconThemeMode = "light" | "dark";
 
 type AgentIconSizeRatio = {
   width: number;
@@ -23,8 +24,11 @@ export type AgentIconPresentation = {
   width: number;
   height: number;
   scale: number;
-  monochromeInDarkMode: boolean;
+  filterByTheme: Partial<Record<AgentIconThemeMode, string>>;
 };
+
+const MONOCHROME_BLACK_FILTER = "brightness(0) saturate(100%)";
+const MONOCHROME_WHITE_FILTER = `${MONOCHROME_BLACK_FILTER} invert(1)`;
 
 export const AGENT_SETTINGS_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, string> = {
   opencode: "settings.agents.items.opencode",
@@ -98,8 +102,12 @@ const AGENT_ICON_SCALE_BY_KIND: Record<DesktopAgentKind, number> = {
   claude: 1,
   gemini: 1,
   pi: 1,
-  copilot: 1,
+  copilot: 1.1,
   cursor: 1,
+};
+
+const AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND: Partial<Record<DesktopAgentKind, string>> = {
+  copilot: MONOCHROME_BLACK_FILTER,
 };
 
 /**
@@ -111,13 +119,17 @@ export function getAgentIconPresentation(
 ): AgentIconPresentation {
   const slotSize = AGENT_ICON_SLOT_SIZE_BY_CONTEXT[context];
   const sizeRatio = AGENT_ICON_SIZE_RATIO_BY_KIND[agentKind];
+  const lightModeFilter = AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND[agentKind];
   return {
     src: AGENT_ICON_SRC_BY_KIND[agentKind],
     slotSize,
     width: Math.round(slotSize * sizeRatio.width),
     height: Math.round(slotSize * sizeRatio.height),
     scale: AGENT_ICON_SCALE_BY_KIND[agentKind],
-    monochromeInDarkMode: true,
+    filterByTheme: {
+      dark: MONOCHROME_WHITE_FILTER,
+      ...(lightModeFilter ? { light: lightModeFilter } : {}),
+    },
   };
 }
 

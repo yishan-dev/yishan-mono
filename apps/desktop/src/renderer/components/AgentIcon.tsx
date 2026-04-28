@@ -40,10 +40,7 @@ export function AgentIcon({ agentKind, context, label, decorative = false }: Age
           maxHeight: "100%",
           display: "block",
           objectFit: "contain",
-          filter:
-            theme.palette.mode === "dark" && icon.monochromeInDarkMode
-              ? "brightness(0) saturate(100%) invert(1)"
-              : "none",
+          filter: icon.filterByTheme[theme.palette.mode] ?? "none",
           transform: `scale(${icon.scale})`,
           transformOrigin: "center",
         }}
