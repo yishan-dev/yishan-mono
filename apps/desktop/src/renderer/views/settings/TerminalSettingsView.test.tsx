@@ -3,6 +3,7 @@
 import type { TerminalSessionLifecycleEvent } from "@api-service/domain/terminal/types";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { tabStore } from "../../store/tabStore";
 import { TerminalSettingsView } from "./TerminalSettingsView";
 
 const mocked = vi.hoisted(() => {
@@ -41,6 +42,12 @@ describe("TerminalSettingsView", () => {
     mocked.closeTerminalSession.mockReset();
     mocked.listTerminalSessions.mockReset();
     mocked.subscribeTerminalSessions.mockClear();
+    tabStore.setState({
+      tabs: [],
+      selectedWorkspaceId: "",
+      selectedTabId: "",
+      selectedTabIdByWorkspaceId: {},
+    });
   });
 
   afterEach(() => {
@@ -49,6 +56,21 @@ describe("TerminalSettingsView", () => {
   });
 
   it("loads sessions and allows killing a running terminal", async () => {
+    tabStore.setState({
+      tabs: [
+        {
+          id: "terminal-tab-1",
+          workspaceId: "workspace-1",
+          title: "Terminal",
+          kind: "terminal",
+          pinned: false,
+          data: { title: "Terminal", sessionId: "term_1" },
+        },
+      ],
+      selectedWorkspaceId: "workspace-1",
+      selectedTabId: "terminal-tab-1",
+      selectedTabIdByWorkspaceId: { "workspace-1": "terminal-tab-1" },
+    });
     mocked.listTerminalSessions.mockResolvedValue([
       {
         sessionId: "term_1",
@@ -78,6 +100,11 @@ describe("TerminalSettingsView", () => {
     await waitFor(() => {
       expect(mocked.closeTerminalSession).toHaveBeenCalledWith({ sessionId: "term_1" });
     });
+    await waitFor(() => {
+      expect(screen.queryByText("term_1")).toBeNull();
+      expect(screen.getByText("settings.terminal.empty")).toBeTruthy();
+    });
+    expect(tabStore.getState().tabs.some((tab) => tab.id === "terminal-tab-1")).toBe(false);
   });
 
   it("removes exited sessions from the list on lifecycle updates", async () => {

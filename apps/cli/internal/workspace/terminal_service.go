@@ -345,7 +345,7 @@ func (m *TerminalManager) Stop(req TerminalStopRequest) (TerminalStopResponse, e
 	}
 
 	if s.running.Load() {
-		if err := s.cmd.Process.Kill(); err != nil {
+		if err := stopTerminalProcess(s.cmd); err != nil {
 			return TerminalStopResponse{}, err
 		}
 		s.running.Store(false)

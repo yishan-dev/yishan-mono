@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSectionHeader } from "../../components/settings";
 import { useCommands } from "../../hooks/useCommands";
+import { tabStore } from "../../store/tabStore";
 import { workspaceStore } from "../../store/workspaceStore";
 
 /** Builds one stable map key for in-flight close action tracking. */
@@ -40,6 +41,23 @@ function applyLifecycleEvent(
 /** Sorts terminal sessions by session id for stable rendering. */
 function sortTerminalSessions(sessions: TerminalSessionSummary[]): TerminalSessionSummary[] {
   return [...sessions].sort((left, right) => left.sessionId.localeCompare(right.sessionId));
+}
+
+/** Closes workspace terminal tabs backed by one stopped daemon session. */
+function closeTerminalTabsForSession(sessionId: string): void {
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedSessionId) {
+    return;
+  }
+
+  const tabState = tabStore.getState();
+  const tabIds = tabState.tabs
+    .filter((tab) => tab.kind === "terminal" && tab.data.sessionId?.trim() === normalizedSessionId)
+    .map((tab) => tab.id);
+
+  for (const tabId of tabIds) {
+    tabStore.getState().closeTab(tabId);
+  }
 }
 
 /** Resolves one display pair of workspace and repo names for one terminal session. */
@@ -213,6 +231,12 @@ export function TerminalSettingsView() {
                               });
 
                               void closeTerminalSession({ sessionId: session.sessionId })
+                                .then(() => {
+                                  setSessions((previousSessions) =>
+                                    previousSessions.filter((candidate) => candidate.sessionId !== session.sessionId),
+                                  );
+                                  closeTerminalTabsForSession(session.sessionId);
+                                })
                                 .catch((error) => {
                                   console.error("[TerminalSettingsView] Failed to close terminal session", error);
                                 })
