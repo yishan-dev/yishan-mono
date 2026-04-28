@@ -123,4 +123,65 @@ describe("projectHelpers", () => {
 
     expect(hydrated.displayProjectIds).toEqual([]);
   });
+
+  it("maps primary workspace display names to local", () => {
+    const initialState = {
+      projects: [],
+      workspaces: [],
+      gitChangesCountByWorkspaceId: {},
+      gitChangeTotalsByWorkspaceId: {},
+      selectedProjectId: "",
+      selectedWorkspaceId: "",
+      displayProjectIds: [],
+      organizationPreferencesById: {},
+    };
+
+    const hydrated = buildHydratedStateFromApiData(
+      initialState,
+      "org-1",
+      [
+        {
+          id: "repo-1",
+          name: "Repo 1",
+          sourceType: "git-local",
+          repoProvider: null,
+          repoUrl: null,
+          repoKey: "repo-1",
+          icon: "folder",
+          color: "#1E66F5",
+          setupScript: "",
+          postScript: "",
+          contextEnabled: true,
+          organizationId: "org-1",
+          createdByUserId: "user-1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      [
+        {
+          id: "workspace-1",
+          organizationId: "org-1",
+          projectId: "repo-1",
+          userId: "user-1",
+          nodeId: "node-1",
+          kind: "primary",
+          status: "active",
+          branch: "main",
+          localPath: "/tmp/repo-1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    );
+
+    expect(hydrated.workspaces?.[0]).toEqual(
+      expect.objectContaining({
+        id: "workspace-1",
+        name: "local",
+        title: "local",
+        branch: "main",
+      }),
+    );
+  });
 });

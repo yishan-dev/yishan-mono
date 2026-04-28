@@ -217,7 +217,7 @@ describe("projectCommands", () => {
     expect(addWorkspace).toHaveBeenCalledWith({
       projectId: "project-remote-1",
       workspaceId: "workspace-1",
-      name: "main",
+      name: "local",
       sourceBranch: "main",
       branch: "main",
       worktreePath: "/tmp/remote-repo",

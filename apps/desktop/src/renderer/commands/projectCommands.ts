@@ -207,10 +207,11 @@ export async function createProject(input: {
   });
 
   for (const workspace of workspaces) {
+    const workspaceName = workspace.kind === "primary" ? "local" : workspace.branch?.trim() || "workspace";
     workspaceStore.getState().addWorkspace({
       projectId: workspace.projectId ?? project.id,
       workspaceId: workspace.id,
-      name: workspace.branch?.trim() || "workspace",
+      name: workspaceName,
       sourceBranch: workspace.branch?.trim() || "main",
       branch: workspace.branch?.trim() || "main",
       worktreePath: workspace.localPath,
