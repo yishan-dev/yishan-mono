@@ -381,27 +381,6 @@ export function FileTree({
     cancelRename();
   };
 
-  /** Returns the first visible file path from current tree expansion state. */
-  const findFirstVisibleFilePath = (nodes: readonly TreeNode[]): string | null => {
-    for (const node of nodes) {
-      if (!node.isDirectory) {
-        return node.path;
-      }
-
-      if (!expandedItems.includes(node.path)) {
-        continue;
-      }
-
-      const childNodes = [...node.children.values()];
-      const firstChildPath = findFirstVisibleFilePath(childNodes);
-      if (firstChildPath) {
-        return firstChildPath;
-      }
-    }
-
-    return null;
-  };
-
   /** Selects the first visible tree entry when focus enters without an existing selection. */
   const selectFirstTreeEntryOnFocus = () => {
     if (selectedEntryPath) {
@@ -412,7 +391,7 @@ export function FileTree({
       return;
     }
 
-    const firstVisibleEntryPath = findFirstVisibleFilePath(topLevelNodes) ?? topLevelNodes[0]?.path;
+    const firstVisibleEntryPath = topLevelNodes[0]?.path;
     if (!firstVisibleEntryPath) {
       return;
     }

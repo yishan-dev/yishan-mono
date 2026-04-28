@@ -115,7 +115,7 @@ describe("FileTree", () => {
     });
   });
 
-  it("selects first visible file on focus so arrow navigation can start immediately", async () => {
+  it("selects first visible entry on focus so arrow navigation can start immediately", async () => {
     const onCopyEntry = vi.fn().mockResolvedValue(undefined);
 
     render(<FileTree files={["src/a.ts"]} onCopyEntry={onCopyEntry} />);
@@ -124,14 +124,27 @@ describe("FileTree", () => {
     treeArea.focus();
 
     await waitFor(() => {
-      expect(screen.getByRole("treeitem", { name: "a.ts" }).getAttribute("aria-checked")).toBe("true");
+      expect(screen.getByText("src").closest('[role="treeitem"]')?.getAttribute("aria-checked")).toBe("true");
     });
 
     fireEvent.keyDown(treeArea, { key: "c", metaKey: true });
 
     await waitFor(() => {
-      expect(onCopyEntry).toHaveBeenCalledWith("src/a.ts");
+      expect(onCopyEntry).toHaveBeenCalledWith("src");
     });
+  });
+
+  it("does not auto-select a child file when a folder is the first visible entry", async () => {
+    const onSelectEntry = vi.fn();
+
+    render(<FileTree files={["src/", "src/.DS_Store"]} onSelectEntry={onSelectEntry} />);
+
+    screen.getByTestId("repo-file-tree-area").focus();
+
+    await waitFor(() => {
+      expect(onSelectEntry).toHaveBeenCalledWith({ path: "src", isDirectory: true });
+    });
+    expect(onSelectEntry).not.toHaveBeenCalledWith({ path: "src/.DS_Store", isDirectory: false });
   });
 
   it("imports dropped external entries into directory targets", async () => {
