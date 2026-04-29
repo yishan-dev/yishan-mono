@@ -1,13 +1,15 @@
 import { Box, Button, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuBookMarked, LuChevronRight, LuFolderTree, LuPanelLeft, LuPanelRight } from "react-icons/lu";
+import { LuChevronRight, LuFolderGit2, LuMonitor, LuPanelLeft, LuPanelRight } from "react-icons/lu";
 import { getMainWindowFullscreenState } from "../../commands/appCommands";
+import { renderProjectIcon } from "../../components/projectIcons";
 import { useCommands } from "../../hooks/useCommands";
 import { useWorkspacePaneVisibilityContext } from "../../hooks/useWorkspacePaneVisibility";
 import { getRendererPlatform } from "../../helpers/platform";
 import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
 import { workspaceStore } from "../../store/workspaceStore";
+import type { RepoWorkspaceItem, WorkspaceProjectRecord } from "../../store/types";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
 import { WorkspaceResourceUsageControl } from "./WorkspaceResourceUsageControl";
 
@@ -21,6 +23,27 @@ const titleBarSx = {
   justifyContent: "space-between",
 } as const;
 
+/** Resolves the workspace displayed as local in the left pane for a project. */
+function resolvePrimaryWorkspaceId(project: WorkspaceProjectRecord | undefined, workspaces: RepoWorkspaceItem[]) {
+  const preferredProjectPath = project?.localPath?.trim() || project?.path?.trim() || project?.worktreePath?.trim() || "";
+  if (!project || !preferredProjectPath) {
+    return undefined;
+  }
+
+  return workspaces.find(
+    (workspace) => workspace.repoId === project.id && workspace.kind !== "local" && workspace.worktreePath?.trim() === preferredProjectPath,
+  )?.id;
+}
+
+/** Renders the same workspace kind icon used by left-pane workspace rows. */
+function renderWorkspaceKindIcon(workspace: RepoWorkspaceItem | undefined, isPrimaryWorkspace: boolean, size: number) {
+  if (workspace?.kind === "local" || isPrimaryWorkspace) {
+    return <LuMonitor size={size} />;
+  }
+
+  return <LuFolderGit2 size={size} />;
+}
+
 /** Renders the main pane title bar with repo/workspace selectors and pane toggle controls. */
 export function MainPaneTitleBarView() {
   const { t } = useTranslation();
@@ -33,6 +56,7 @@ export function MainPaneTitleBarView() {
   const selectedRepo = projects.find((project) => project.id === selectedProjectId);
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const workspacesForSelectedRepo = workspaces.filter((workspace) => workspace.repoId === selectedRepo?.id);
+  const primaryWorkspaceId = resolvePrimaryWorkspaceId(selectedRepo, workspacesForSelectedRepo);
   const rendererPlatform = getRendererPlatform();
   const toggleLeftShortcutLabel = getShortcutDisplayLabelById("toggle-left-pane", rendererPlatform);
   const toggleRightShortcutLabel = getShortcutDisplayLabelById("toggle-right-pane", rendererPlatform);
@@ -121,7 +145,7 @@ export function MainPaneTitleBarView() {
             size="small"
             variant="outlined"
             aria-label={t("project.selected")}
-            startIcon={<LuBookMarked size={14} />}
+            startIcon={renderProjectIcon(selectedRepo?.icon ?? undefined, 14)}
             onClick={(event) => {
               setRepoMenuAnchorEl(event.currentTarget);
               setRepoSearchValue("");
@@ -147,7 +171,7 @@ export function MainPaneTitleBarView() {
             size="small"
             variant="outlined"
             aria-label={t("workspace.column")}
-            startIcon={<LuFolderTree size={14} />}
+            startIcon={renderWorkspaceKindIcon(selectedWorkspace, selectedWorkspace?.id === primaryWorkspaceId, 14)}
             onClick={(event) => {
               setWorkspaceMenuAnchorEl(event.currentTarget);
               setWorkspaceSearchValue("");
@@ -225,7 +249,12 @@ export function MainPaneTitleBarView() {
               setWorkspaceSearchValue("");
             }}
           >
-            {repo.name}
+            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", mr: 1 }}>
+              {renderProjectIcon(repo.icon ?? undefined, 14)}
+            </Box>
+            <Typography variant="body2" noWrap>
+              {repo.name}
+            </Typography>
           </MenuItem>
         ))}
       </Menu>
@@ -264,7 +293,12 @@ export function MainPaneTitleBarView() {
               setWorkspaceSearchValue("");
             }}
           >
-            {workspace.name}
+            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", mr: 1 }}>
+              {renderWorkspaceKindIcon(workspace, workspace.id === primaryWorkspaceId, 14)}
+            </Box>
+            <Typography variant="body2" noWrap>
+              {workspace.name}
+            </Typography>
           </MenuItem>
         ))}
       </Menu>
