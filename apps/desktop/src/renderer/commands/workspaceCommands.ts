@@ -11,6 +11,7 @@ import { tabStore } from "../store/tabStore";
 import type { WorkspaceStoreState } from "../store/types";
 import { workspaceFileTreeStore } from "../store/workspaceFileTreeStore";
 import {
+  enqueueWorkspaceErrorNotice,
   type WorkspaceLifecycleScriptWarning,
   enqueueWorkspaceLifecycleWarnings,
 } from "../store/workspaceLifecycleNoticeStore";
@@ -81,6 +82,12 @@ function notifyLifecycleScriptWarnings(
     workspaceName,
     warnings,
   });
+}
+
+function formatWorkspaceCreateError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Workspace creation failed.";
+  const daemonPrefixMatch = message.match(/^daemon RPC error -?\d+:\s*(.*)$/s);
+  return daemonPrefixMatch?.[1]?.trim() || message;
 }
 
 /**
@@ -207,6 +214,10 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
     };
   } catch (error) {
     console.error("Failed to create backend workspace worktree", error);
+    enqueueWorkspaceErrorNotice({
+      title: "Failed to create workspace",
+      message: formatWorkspaceCreateError(error),
+    });
   }
 
   if (!backendWorkspace?.id) {

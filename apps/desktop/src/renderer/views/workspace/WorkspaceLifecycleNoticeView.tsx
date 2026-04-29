@@ -19,8 +19,14 @@ export function WorkspaceLifecycleNoticeView() {
   const openActiveNoticeDetails = workspaceLifecycleNoticeStore((state) => state.openActiveNoticeDetails);
   const closeDetailNotice = workspaceLifecycleNoticeStore((state) => state.closeDetailNotice);
 
-  const activeScriptLabel = activeNotice?.warning.scriptKind === "setup" ? "setup" : "post";
-  const activeTitle = `Workspace ${activeScriptLabel} script failed`;
+  const activeScriptLabel = activeNotice?.kind === "lifecycle" && activeNotice.warning.scriptKind === "setup" ? "setup" : "post";
+  const activeTitle = activeNotice?.kind === "error" ? activeNotice.title : `Workspace ${activeScriptLabel} script failed`;
+  const activeMessage =
+    activeNotice?.kind === "error"
+      ? activeNotice.message
+      : activeNotice
+        ? `${activeNotice.workspaceName}: ${activeNotice.warning.message}`
+        : "";
 
   return (
     <>
@@ -33,13 +39,15 @@ export function WorkspaceLifecycleNoticeView() {
         }}
       >
         <Alert
-          severity="warning"
+          severity={activeNotice?.kind === "error" ? "error" : "warning"}
           sx={{ alignItems: "center", minWidth: 380 }}
           action={
             <Stack direction="row" spacing={0.5}>
-              <Button color="inherit" size="small" onClick={openActiveNoticeDetails}>
-                View output
-              </Button>
+              {activeNotice?.kind === "lifecycle" ? (
+                <Button color="inherit" size="small" onClick={openActiveNoticeDetails}>
+                  View output
+                </Button>
+              ) : null}
               <Button color="inherit" size="small" onClick={dismissActiveNotice}>
                 Dismiss
               </Button>
@@ -50,7 +58,7 @@ export function WorkspaceLifecycleNoticeView() {
             {activeTitle}
           </Typography>
           <Typography variant="caption" sx={{ display: "block" }}>
-            {activeNotice ? `${activeNotice.workspaceName}: ${activeNotice.warning.message}` : ""}
+            {activeMessage}
           </Typography>
         </Alert>
       </Snackbar>

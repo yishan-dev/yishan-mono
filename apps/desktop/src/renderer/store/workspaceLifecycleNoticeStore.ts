@@ -15,14 +15,25 @@ export type WorkspaceLifecycleScriptWarning = {
 
 export type WorkspaceLifecycleNotice = {
   id: string;
+  kind: "lifecycle";
   workspaceName: string;
   warning: WorkspaceLifecycleScriptWarning;
 };
 
+export type WorkspaceErrorNotice = {
+  id: string;
+  kind: "error";
+  title: string;
+  message: string;
+};
+
+export type WorkspaceNotice = WorkspaceLifecycleNotice | WorkspaceErrorNotice;
+
 type WorkspaceLifecycleNoticeStoreState = {
-  queue: WorkspaceLifecycleNotice[];
+  queue: WorkspaceNotice[];
   detailNotice: WorkspaceLifecycleNotice | null;
   enqueueWarnings: (workspaceName: string, warnings: WorkspaceLifecycleScriptWarning[]) => void;
+  enqueueError: (title: string, message: string) => void;
   dismissActiveNotice: () => void;
   openActiveNoticeDetails: () => void;
   closeDetailNotice: () => void;
@@ -41,6 +52,7 @@ export const workspaceLifecycleNoticeStore = create<WorkspaceLifecycleNoticeStor
       const normalizedWorkspaceName = workspaceName.trim() || "Workspace";
       const notices = warnings.map((warning) => ({
         id: createNoticeId(warning.scriptKind),
+        kind: "lifecycle" as const,
         workspaceName: normalizedWorkspaceName,
         warning,
       }));
@@ -52,6 +64,16 @@ export const workspaceLifecycleNoticeStore = create<WorkspaceLifecycleNoticeStor
         state.queue.push(...notices);
       });
     },
+    enqueueError: (title, message) => {
+      set((state) => {
+        state.queue.push({
+          id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          kind: "error",
+          title,
+          message,
+        });
+      });
+    },
     dismissActiveNotice: () => {
       set((state) => {
         state.queue = state.queue.slice(1);
@@ -60,7 +82,7 @@ export const workspaceLifecycleNoticeStore = create<WorkspaceLifecycleNoticeStor
     openActiveNoticeDetails: () => {
       set((state) => {
         const activeNotice = state.queue[0] ?? null;
-        if (!activeNotice) {
+        if (!activeNotice || activeNotice.kind !== "lifecycle") {
           return;
         }
 
@@ -80,4 +102,8 @@ export function enqueueWorkspaceLifecycleWarnings(input: {
   warnings: WorkspaceLifecycleScriptWarning[];
 }): void {
   workspaceLifecycleNoticeStore.getState().enqueueWarnings(input.workspaceName, input.warnings);
+}
+
+export function enqueueWorkspaceErrorNotice(input: { title: string; message: string }): void {
+  workspaceLifecycleNoticeStore.getState().enqueueError(input.title, input.message);
 }

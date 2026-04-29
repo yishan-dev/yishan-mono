@@ -42,10 +42,12 @@ const rpcMocks = vi.hoisted(() => ({
   closeWorkspace: vi.fn(),
   listGitChanges: vi.fn(),
   renameGitBranch: vi.fn(),
+  enqueueWorkspaceErrorNotice: vi.fn(),
   enqueueWorkspaceLifecycleWarnings: vi.fn(),
 }));
 
 vi.mock("../store/workspaceLifecycleNoticeStore", () => ({
+  enqueueWorkspaceErrorNotice: rpcMocks.enqueueWorkspaceErrorNotice,
   enqueueWorkspaceLifecycleWarnings: rpcMocks.enqueueWorkspaceLifecycleWarnings,
 }));
 

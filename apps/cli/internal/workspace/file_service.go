@@ -46,6 +46,9 @@ func (s *FileService) List(root string, path string, recursive bool) ([]FileEntr
 
 	out := make([]FileEntry, 0, len(entries))
 	for _, entry := range entries {
+		if entry.Name() == ".git" {
+			continue
+		}
 		info, err := entry.Info()
 		if err != nil {
 			return nil, err
@@ -76,8 +79,11 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 		if fullPath == dir {
 			return nil
 		}
-		if entry.IsDir() && entry.Name() == ".git" {
-			return filepath.SkipDir
+		if entry.Name() == ".git" {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		info, err := entry.Info()

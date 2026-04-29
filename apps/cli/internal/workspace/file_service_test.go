@@ -167,6 +167,9 @@ func TestFileServiceDirectListMarksGitIgnoredEntries(t *testing.T) {
 	if ignoredByPath["readme.md"] || ignoredByPath[".gitignore"] {
 		t.Fatalf("expected visible entries to stay unignored, got %+v", entries)
 	}
+	if _, ok := ignoredByPath[".git"]; ok {
+		t.Fatalf("expected .git metadata to stay hidden, got %+v", entries)
+	}
 }
 
 func TestFileServiceReadDiff(t *testing.T) {

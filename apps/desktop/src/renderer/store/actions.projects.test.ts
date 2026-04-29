@@ -244,4 +244,17 @@ describe("createWorkspaceRepoActions", () => {
     expect(state.projects[0]?.postScript).toBe("rm -rf node_modules");
     expect(state.fileTreeRefreshVersion).toBe(1);
   });
+
+  it("ignores git internals when recording changed file-tree paths", () => {
+    const harness = createHarness();
+
+    harness.actions.incrementFileTreeRefreshVersion("/tmp/repo-1/.worktrees/feature-a", [
+      ".git/worktrees/feature-a",
+      "src/app.ts",
+    ]);
+
+    expect(harness.getState().fileTreeChangedRelativePathsByWorktreePath).toEqual({
+      "/tmp/repo-1/.worktrees/feature-a": ["src/app.ts"],
+    });
+  });
 });

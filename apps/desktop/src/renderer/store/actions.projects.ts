@@ -16,6 +16,10 @@ type WorkspaceRepoActions = Pick<
   | "incrementFileTreeRefreshVersion"
 >;
 
+function isGitInternalPath(path: string): boolean {
+  return path === ".git" || path.startsWith(".git/");
+}
+
 /** Creates project-related workspace store actions and reconciles backend snapshots with in-memory UI state. */
 export function createWorkspaceRepoActions(
   set: WorkspaceStoreSetState,
@@ -75,7 +79,7 @@ export function createWorkspaceRepoActions(
       const normalizedWorkspaceWorktreePath = workspaceWorktreePath?.trim() ?? "";
       const normalizedChangedRelativePaths = (changedRelativePaths ?? [])
         .map((path) => path.trim())
-        .filter((path) => path.length > 0);
+        .filter((path) => path.length > 0 && !isGitInternalPath(path));
 
       set((state) => {
         state.fileTreeRefreshVersion += 1;

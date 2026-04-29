@@ -38,6 +38,8 @@ type ActiveSubscription = {
   onNotification: (event: Rpc.DaemonNotification) => void;
 };
 
+type DaemonRpcError = Error & { code?: number };
+
 /** Normalizes daemon file-entry paths so directories always keep a trailing slash. */
 function normalizeDaemonFileEntries(files: Rpc.DaemonFileEntry[]): Rpc.DaemonFileEntry[] {
   return files.map((entry) => {
@@ -47,6 +49,12 @@ function normalizeDaemonFileEntries(files: Rpc.DaemonFileEntry[]): Rpc.DaemonFil
       path: entry.isDir ? `${trimmedPath}/` : trimmedPath,
     };
   });
+}
+
+function createDaemonRpcError(code: number, message: string): DaemonRpcError {
+  const error = new Error(message || `daemon RPC error ${code}`) as DaemonRpcError;
+  error.code = code;
+  return error;
 }
 
 export class DaemonClient {
@@ -156,7 +164,7 @@ export class DaemonClient {
     clearTimeout(pending.timeout);
 
     if (response.error) {
-      pending.reject(new Error(`daemon RPC error ${response.error.code}: ${response.error.message}`));
+      pending.reject(createDaemonRpcError(response.error.code, response.error.message));
       return;
     }
 
