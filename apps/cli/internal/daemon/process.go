@@ -27,13 +27,14 @@ var ErrNotRunning = errors.New("daemon is not running")
 const detachedEnvKey = "YISHAN_DAEMON_DETACHED"
 
 type RunConfig struct {
-	Host         string
-	Port         int
-	JWTSecret    string
-	JWTIssuer    string
-	JWTAudience  string
-	JWTRequired  bool
-	RegisterNode func(NodeRegistration) error
+	Host            string
+	Port            int
+	JWTSecret       string
+	JWTIssuer       string
+	JWTAudience     string
+	JWTRequired     bool
+	RegisterNode    func(NodeRegistration) error
+	CreateWorkspace func(context.Context, WorkspaceCreation) error
 }
 
 type StartConfig struct {
@@ -83,7 +84,7 @@ func Run(cfg RunConfig, statePath string) error {
 	currentPID := os.Getpid()
 
 	workspaceManager := workspace.NewManager()
-	handler := NewJSONRPCHandler(workspaceManager)
+	handler := NewJSONRPCHandler(workspaceManager, daemonID, cfg.CreateWorkspace)
 	auth := NewJWTAuth(JWTAuthConfig{
 		Secret:   cfg.JWTSecret,
 		Issuer:   cfg.JWTIssuer,

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -69,13 +70,14 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 	}
 
 	return daemon.Run(daemon.RunConfig{
-		Host:         appConfig.Daemon.Host,
-		Port:         appConfig.Daemon.Port,
-		JWTSecret:    appConfig.Daemon.JWTSecret,
-		JWTIssuer:    appConfig.Daemon.JWTIssuer,
-		JWTAudience:  appConfig.Daemon.JWTAudience,
-		JWTRequired:  appConfig.Daemon.JWTRequired,
-		RegisterNode: buildDaemonNodeRegistrar(),
+		Host:            appConfig.Daemon.Host,
+		Port:            appConfig.Daemon.Port,
+		JWTSecret:       appConfig.Daemon.JWTSecret,
+		JWTIssuer:       appConfig.Daemon.JWTIssuer,
+		JWTAudience:     appConfig.Daemon.JWTAudience,
+		JWTRequired:     appConfig.Daemon.JWTRequired,
+		RegisterNode:    buildDaemonNodeRegistrar(),
+		CreateWorkspace: buildDaemonWorkspaceCreator(),
 	}, statePath)
 }
 
@@ -163,6 +165,30 @@ func buildDaemonNodeRegistrar() func(daemon.NodeRegistration) error {
 		})
 		if err != nil {
 			return fmt.Errorf("register node %q: %w", registration.ID, err)
+		}
+
+		return nil
+	}
+}
+
+func buildDaemonWorkspaceCreator() func(context.Context, daemon.WorkspaceCreation) error {
+	return func(ctx context.Context, creation daemon.WorkspaceCreation) error {
+		if strings.TrimSpace(appConfig.API.Token) == "" || strings.TrimSpace(appConfig.API.BaseURL) == "" {
+			return fmt.Errorf("API credentials are required to create remote workspace records")
+		}
+		orgID := strings.TrimSpace(creation.OrganizationID)
+		if orgID == "" {
+			return fmt.Errorf("organizationId is required")
+		}
+
+		_, err := apiClient().CreateWorkspace(orgID, creation.ProjectID, api.CreateWorkspaceInput{
+			NodeID:    creation.NodeID,
+			LocalPath: creation.LocalPath,
+			Kind:      creation.Kind,
+			Branch:    creation.Branch,
+		})
+		if err != nil {
+			return fmt.Errorf("create API workspace for project %q: %w", creation.ProjectID, err)
 		}
 
 		return nil

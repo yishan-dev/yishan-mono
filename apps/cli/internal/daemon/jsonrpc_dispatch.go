@@ -25,7 +25,23 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
-		return h.manager.CreateWorkspace(ctx, req)
+		created, err := h.manager.CreateWorkspace(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		if h.createWorkspace != nil && req.ProjectID != "" {
+			if err := h.createWorkspace(ctx, WorkspaceCreation{
+				NodeID:         h.nodeID,
+				OrganizationID: req.OrganizationID,
+				ProjectID:      req.ProjectID,
+				Kind:           "worktree",
+				Branch:         req.TargetBranch,
+				LocalPath:      created.Path,
+			}); err != nil {
+				return nil, err
+			}
+		}
+		return created, nil
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
 	case MethodFileRead:

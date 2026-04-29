@@ -197,7 +197,7 @@ export type Commands = {
     >,
   ) => Promise<void>;
   createWorkspace: (input: {
-    repoId: string;
+    projectId: string;
     name: string;
     sourceBranch?: string;
     targetBranch?: string;

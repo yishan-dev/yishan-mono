@@ -57,9 +57,11 @@ export type DaemonWorkspace = {
 };
 
 export type WorkspaceCreateInput = {
-  workspaceWorktreePath: string;
+  organizationId?: string;
+  repoKey?: string;
+  sourcePath?: string;
   workspaceName?: string;
-  repositoryId?: string;
+  projectId?: string;
   sourceBranch?: string;
   targetBranch?: string;
 };
@@ -191,17 +193,13 @@ export type TerminalListSessionsInput = {
 export type WorkspaceListResponse = DaemonWorkspace[];
 
 export type WorkspaceCreateResponse = {
-  workspace: { id: string };
-  workspaceInstance: {
-    workspaceId: string;
-    repoId: string;
-    projectId: string;
-    name: string;
-    sourceBranch: string;
-    branch: string;
-    worktreePath: string;
-    status: string;
-  };
+  workspaceId: string;
+  projectId: string;
+  name: string;
+  sourceBranch: string;
+  branch: string;
+  worktreePath: string;
+  status: string;
   lifecycleScriptWarnings: unknown[];
 };
 

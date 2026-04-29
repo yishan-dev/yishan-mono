@@ -65,7 +65,7 @@ export class DaemonClient {
 
   readonly workspace = {
     list: this.listWorkspaces.bind(this),
-    create: this.createWorkspace.bind(this),
+    createWorkspace: this.createWorkspace.bind(this),
     close: this.closeWorkspace.bind(this),
   };
 
@@ -396,37 +396,50 @@ export class DaemonClient {
 
   private async createWorkspace(input: Rpc.WorkspaceCreateInput): Promise<Rpc.WorkspaceCreateResponse> {
     const record = asRecord(input);
-    const workspaceWorktreePath = readOptionalString(record?.workspaceWorktreePath);
-    if (!workspaceWorktreePath) {
-      throw new Error("workspaceWorktreePath is required");
+    const organizationId = readOptionalString(record?.organizationId);
+    if (!organizationId) {
+      throw new Error("organizationId is required");
+    }
+    const sourcePath = readOptionalString(record?.sourcePath);
+    if (!sourcePath) {
+      throw new Error("sourcePath is required");
+    }
+    const repoKey = readOptionalString(record?.repoKey);
+    if (!repoKey) {
+      throw new Error("repoKey is required");
+    }
+    const sourceBranch = readOptionalString(record?.sourceBranch) || "";
+    if (!sourceBranch) {
+      throw new Error("sourceBranch is required");
+    }
+    const targetBranch = readOptionalString(record?.targetBranch) || sourceBranch;
+    const workspaceId = createDesktopWorkspaceId();
+    const workspaceName = readOptionalString(record?.workspaceName) || workspaceId;
+
+    const createdWorkspace = (await this.invoke("workspace.create", {
+      id: workspaceId,
+      organizationId,
+      projectId: readOptionalString(record?.projectId) || "",
+      repoKey,
+      workspaceName,
+      sourcePath,
+      targetBranch,
+      sourceBranch,
+    })) as Rpc.DaemonWorkspace;
+
+    const createdWorktreePath = createdWorkspace.path || "";
+    if (createdWorktreePath) {
+      this.workspaceIdByWorktreePath.set(createdWorktreePath, workspaceId);
     }
 
-    const workspaceId = createDesktopWorkspaceId();
-    const normalizedWorktreePath = normalizeWorktreePath(workspaceWorktreePath);
-    await this.invoke("open", {
-      id: workspaceId,
-      path: normalizedWorktreePath,
-    });
-    this.workspaceIdByWorktreePath.set(normalizedWorktreePath, workspaceId);
-
-    const sourceBranch = readOptionalString(record?.sourceBranch) || "";
-    const targetBranch = readOptionalString(record?.targetBranch) || sourceBranch;
-    const worktreePathParts = normalizedWorktreePath.split(/[/\\]/).filter(Boolean);
-    const derivedWorkspaceName = worktreePathParts[worktreePathParts.length - 1];
-    const workspaceName = readOptionalString(record?.workspaceName) || derivedWorkspaceName || workspaceId;
-
     return {
-      workspace: { id: workspaceId },
-      workspaceInstance: {
-        workspaceId,
-        repoId: readOptionalString(record?.repositoryId) || workspaceId,
-        projectId: readOptionalString(record?.repositoryId) || workspaceId,
-        name: workspaceName,
-        sourceBranch,
-        branch: targetBranch,
-        worktreePath: normalizedWorktreePath,
-        status: "active",
-      },
+      workspaceId: createdWorkspace.id || workspaceId,
+      projectId: readOptionalString(record?.projectId) || workspaceId,
+      name: workspaceName,
+      sourceBranch,
+      branch: targetBranch,
+      worktreePath: createdWorktreePath,
+      status: "active",
       lifecycleScriptWarnings: [],
     };
   }

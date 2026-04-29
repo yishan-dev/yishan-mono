@@ -6,6 +6,7 @@ import {
 } from "../helpers/workspaceHelpers";
 import { getDaemonClient } from "../rpc/rpcTransport";
 import { layoutStore } from "../store/layoutStore";
+import { sessionStore } from "../store/sessionStore";
 import { tabStore } from "../store/tabStore";
 import type { WorkspaceStoreState } from "../store/types";
 import { workspaceFileTreeStore } from "../store/workspaceFileTreeStore";
@@ -18,8 +19,7 @@ import { workspaceStore } from "../store/workspaceStore";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 type CreateWorkspaceInput = {
-  projectId?: string;
-  repoId?: string;
+  projectId: string;
   name: string;
   sourceBranch?: string;
   targetBranch?: string;
@@ -37,7 +37,6 @@ type BackendWorkspace = {
 type WorkspaceListResponse = Array<{
   id: string;
   projectId?: string | null;
-  repositoryId?: string | null;
   instance: {
     workspaceId: string;
     repoId: string;
@@ -51,17 +50,13 @@ type WorkspaceListResponse = Array<{
 }>;
 
 type CreateWorkspaceResponse = {
-  workspace: { id: string };
-  workspaceInstance: {
-    workspaceId: string;
-    repoId: string;
-    projectId?: string;
-    name: string;
-    sourceBranch: string;
-    branch: string;
-    worktreePath: string;
-    status: string;
-  } | null;
+  workspaceId: string;
+  projectId?: string;
+  name: string;
+  sourceBranch: string;
+  branch: string;
+  worktreePath: string;
+  status: string;
   lifecycleScriptWarnings: WorkspaceLifecycleScriptWarning[];
 };
 
@@ -162,44 +157,56 @@ function readWorkspaceStoreState(): WorkspaceStoreState {
 export async function createWorkspace(input: CreateWorkspaceInput): Promise<void> {
   const store = readWorkspaceStoreState();
   const { normalizedName } = normalizeCreateWorkspaceInput(input);
-  const projectId = input.projectId ?? input.repoId ?? "";
+  const projectId = input.projectId;
 
   if (!projectId || !normalizedName) {
     return;
   }
 
   const project = store.projects.find((item) => item.id === projectId);
+  const organizationId = sessionStore.getState().selectedOrganizationId?.trim() || "";
 
   let backendWorkspace: BackendWorkspace | undefined;
 
-  const projectWorktreePath = project?.worktreePath?.trim() || project?.localPath?.trim() || "";
-  if (projectWorktreePath) {
-    const client = await getDaemonClient();
-    try {
-      const created = (await client.workspace.create({
-        orgId: "default",
-        repositoryId: projectId,
-        workspaceName: normalizedName,
-        sourceBranch: input.sourceBranch?.trim() || undefined,
-        targetBranch: input.targetBranch?.trim() || undefined,
-        workspaceWorktreePath: projectWorktreePath,
-      })) as CreateWorkspaceResponse;
-      notifyLifecycleScriptWarnings(normalizedName, created.lifecycleScriptWarnings);
+  const repoKey = project?.repoKey?.trim() || project?.key?.trim() || project?.id || "";
+  const sourcePath = project?.localPath?.trim() || project?.path?.trim() || "";
+  const sourceBranch = input.sourceBranch?.trim() || "";
+  const targetBranch = input.targetBranch?.trim() || sourceBranch;
+  if (!organizationId || !repoKey || !sourcePath || !sourceBranch || !targetBranch) {
+    console.error("Missing required workspace create input", {
+      organizationId,
+      projectId,
+      hasRepoKey: Boolean(repoKey),
+      hasSourcePath: Boolean(sourcePath),
+      hasSourceBranch: Boolean(sourceBranch),
+      hasTargetBranch: Boolean(targetBranch),
+    });
+    return;
+  }
 
-      const linkedWorkspace = created.workspaceInstance;
-      if (linkedWorkspace) {
-        backendWorkspace = {
-          id: linkedWorkspace.workspaceId,
-          projectId: linkedWorkspace.projectId ?? linkedWorkspace.repoId,
-          name: linkedWorkspace.name,
-          sourceBranch: linkedWorkspace.sourceBranch,
-          branch: linkedWorkspace.branch,
-          worktreePath: linkedWorkspace.worktreePath,
-        };
-      }
-    } catch (error) {
-      console.error("Failed to create backend workspace worktree", error);
-    }
+  const client = await getDaemonClient();
+  try {
+    const created = (await client.workspace.createWorkspace({
+      organizationId,
+      projectId,
+      repoKey,
+      workspaceName: normalizedName,
+      sourcePath,
+      sourceBranch,
+      targetBranch,
+    })) as CreateWorkspaceResponse;
+    notifyLifecycleScriptWarnings(normalizedName, created.lifecycleScriptWarnings);
+
+    backendWorkspace = {
+      id: created.workspaceId,
+      projectId: created.projectId ?? projectId,
+      name: created.name,
+      sourceBranch: created.sourceBranch,
+      branch: created.branch,
+      worktreePath: created.worktreePath,
+    };
+  } catch (error) {
+    console.error("Failed to create backend workspace worktree", error);
   }
 
   if (!backendWorkspace?.id) {

@@ -19,7 +19,7 @@ export type DaemonRpcClient = {
   };
   workspace: {
     list: (input?: unknown) => Promise<unknown>;
-    create: (input: unknown) => Promise<Rpc.WorkspaceCreateResponse>;
+    createWorkspace: (input: Rpc.WorkspaceCreateInput) => Promise<Rpc.WorkspaceCreateResponse>;
     close: (input: { workspaceId: string; removeBranch?: boolean }) => Promise<Rpc.WorkspaceCloseExecutionResponse | undefined>;
   };
   file: {

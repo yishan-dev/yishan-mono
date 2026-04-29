@@ -264,7 +264,7 @@ export function CreateWorkspaceDialogView({
     setIsCreatingWorkspace(true);
     try {
       await createWorkspace({
-        repoId: selectedRepoId,
+        projectId: selectedRepoId,
         name: normalizedName,
         sourceBranch: sourceBranch.trim() || undefined,
         targetBranch: normalizedTargetBranch,
@@ -319,7 +319,12 @@ export function CreateWorkspaceDialogView({
   };
 
   const canCreateWorkspace =
-    Boolean(selectedRepoId) && !isLoadingSourceBranches && !isCreatingWorkspace && Boolean(name.trim());
+    Boolean(selectedRepoId) &&
+    !isLoadingSourceBranches &&
+    !isCreatingWorkspace &&
+    Boolean(name.trim()) &&
+    Boolean(sourceBranch.trim()) &&
+    Boolean(targetBranch.trim());
   const hasRenameChanges =
     Boolean(selectedWorkspace) &&
     (name.trim() !== (selectedWorkspace?.name.trim() ?? "") ||

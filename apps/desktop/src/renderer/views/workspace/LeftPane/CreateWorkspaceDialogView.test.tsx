@@ -142,7 +142,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Feature Workspace",
         sourceBranch: "feature/alpha",
         targetBranch: "feature-workspace",
@@ -193,7 +193,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-2",
+        projectId: "repo-2",
         name: "Repo Two Workspace",
         sourceBranch: "master",
         targetBranch: "repo-two-workspace",
@@ -216,7 +216,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Created Once",
         sourceBranch: "main",
         targetBranch: "created-once",
@@ -271,7 +271,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-2",
+        projectId: "repo-2",
         name: "Keep Repo Two",
         sourceBranch: "master",
         targetBranch: "keep-repo-two",
@@ -297,7 +297,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Prefer Main Workspace",
         sourceBranch: "main",
         targetBranch: "prefer-main-workspace",
@@ -337,7 +337,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Fix Login Timeout",
         sourceBranch: "main",
         targetBranch: "team-core/fix-login-timeout",
@@ -373,7 +373,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Manual Prefix Workspace",
         sourceBranch: "main",
         targetBranch: "team-core/manual-branch",
@@ -415,7 +415,7 @@ describe("CreateWorkspaceDialogView", () => {
 
     await waitFor(() => {
       expect(mocked.createWorkspace).toHaveBeenCalledWith({
-        repoId: "repo-1",
+        projectId: "repo-1",
         name: "Reopen Prefix Workspace",
         sourceBranch: "main",
         targetBranch: "team-core/reopen-prefix-workspace",
