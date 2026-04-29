@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"yishan/apps/cli/internal/output"
 	"yishan/apps/cli/internal/provision"
 
@@ -41,10 +44,6 @@ var workspaceCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		nodeID, err := cmd.Flags().GetString("node-id")
-		if err != nil {
-			return err
-		}
 		localPath, err := cmd.Flags().GetString("local-path")
 		if err != nil {
 			return err
@@ -57,8 +56,19 @@ var workspaceCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		sourceBranch, err := cmd.Flags().GetString("source-branch")
+		if err != nil {
+			return err
+		}
+		name, err := cmd.Flags().GetString("name")
+		if err != nil {
+			return err
+		}
+		if kind == "primary" && strings.TrimSpace(localPath) == "" {
+			return fmt.Errorf("local-path is required for primary workspaces")
+		}
 
-		service := provision.NewForRuntime(apiClient(), provision.RuntimeConfig{
+		provisioner := provision.NewRuntimeProvisioner(apiClient(), provision.RuntimeConfig{
 			ConfigPath: appConfig.ConfigPath,
 			Daemon: provision.DaemonAuthConfig{
 				Host:        appConfig.Daemon.Host,
@@ -70,19 +80,20 @@ var workspaceCreateCmd = &cobra.Command{
 			},
 		})
 
-		body, err := service.Create(cmd.Context(), provision.CreateRequest{
+		response, err := provisioner.CreateWorkspace(cmd.Context(), provision.CreateWorkspaceRequest{
 			OrganizationID: orgID,
 			ProjectID:      projectID,
-			NodeID:         nodeID,
 			LocalPath:      localPath,
 			Kind:           kind,
 			Branch:         branch,
+			SourceBranch:   sourceBranch,
+			WorkspaceName:  name,
 		})
 		if err != nil {
 			return err
 		}
 
-		return output.PrintResponse(body)
+		return output.PrintAny(response)
 	},
 }
 
@@ -99,11 +110,10 @@ func init() {
 
 	workspaceCreateCmd.Flags().String("org-id", "", "organization ID")
 	workspaceCreateCmd.Flags().String("project-id", "", "project ID")
-	workspaceCreateCmd.Flags().String("node-id", "", "node ID")
 	workspaceCreateCmd.Flags().String("local-path", "", "local path")
 	workspaceCreateCmd.Flags().String("kind", "primary", "workspace kind (primary|worktree)")
 	workspaceCreateCmd.Flags().String("branch", "", "branch name for worktree")
+	workspaceCreateCmd.Flags().String("source-branch", "", "source branch for worktree")
+	workspaceCreateCmd.Flags().String("name", "", "workspace name for worktree path")
 	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("project-id"))
-	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("node-id"))
-	cobra.CheckErr(workspaceCreateCmd.MarkFlagRequired("local-path"))
 }

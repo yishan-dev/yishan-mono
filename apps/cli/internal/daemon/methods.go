@@ -3,8 +3,9 @@ package daemon
 const (
 	MethodDaemonPing = "daemon.ping"
 
-	MethodOpen = "open"
-	MethodList = "list"
+	MethodOpen            = "open"
+	MethodList            = "list"
+	MethodWorkspaceCreate = "workspace.create"
 
 	MethodAgentListDetectionStatuses = "agent.listDetectionStatuses"
 

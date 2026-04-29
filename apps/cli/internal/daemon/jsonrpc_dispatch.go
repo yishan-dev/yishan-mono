@@ -20,6 +20,12 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		return h.manager.Open(req)
 	case MethodList:
 		return h.manager.List(), nil
+	case MethodWorkspaceCreate:
+		var req workspace.CreateRequest
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		return h.manager.CreateWorkspace(ctx, req)
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
 	case MethodFileRead:

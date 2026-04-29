@@ -1,10 +1,12 @@
 package provision
 
 import (
-	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
+	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/daemon"
+	"yishan/apps/cli/internal/workspace"
 )
 
 type RuntimeConfig struct {
@@ -12,22 +14,20 @@ type RuntimeConfig struct {
 	Daemon     DaemonAuthConfig
 }
 
-func NewForRuntime(apiClient rawClient, cfg RuntimeConfig) *Service {
-	daemonAuth := cfg.Daemon
+func NewRuntimeProvisioner(apiClient *api.Client, cfg RuntimeConfig) *Provisioner {
+	localNodeID := ""
 
 	statePath, err := daemon.ResolveStateFilePath(cfg.ConfigPath)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to resolve daemon runtime state path")
-	} else if state, err := daemon.LoadState(statePath); err == nil {
-		if daemon.IsProcessRunning(state.PID) {
-			daemonAuth.Host = state.Host
-			daemonAuth.Port = state.Port
-		} else if err := daemon.RemoveState(statePath); err != nil {
-			log.Warn().Err(err).Msg("failed to remove stale daemon state file")
+	} else {
+		daemonIDPath := filepath.Join(filepath.Dir(statePath), daemon.IDFileName)
+		if id, err := daemon.EnsureDaemonID(daemonIDPath); err == nil {
+			localNodeID = id
+		} else {
+			log.Warn().Err(err).Msg("failed to resolve local daemon id")
 		}
-	} else if !os.IsNotExist(err) {
-		log.Warn().Err(err).Msg("failed to load daemon runtime state")
 	}
 
-	return New(apiClient, daemonAuth)
+	return NewLocalProvisioner(apiClient, cfg.Daemon, workspace.NewManager(), localNodeID)
 }

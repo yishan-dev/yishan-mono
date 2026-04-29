@@ -28,6 +28,13 @@ type RegisterNodeInput struct {
 	Scope    string
 }
 
+type CreateWorkspaceInput struct {
+	NodeID    string
+	LocalPath string
+	Kind      string
+	Branch    string
+}
+
 func (c *Client) Health() (HealthResponse, error) {
 	var response HealthResponse
 	err := c.DoDecode("GET", "/health", nil, &response)
@@ -154,6 +161,21 @@ func (c *Client) CreateProject(orgID string, input CreateProjectInput) (CreatePr
 func (c *Client) ListWorkspaces(orgID string, projectID string) (ListWorkspacesResponse, error) {
 	var response ListWorkspacesResponse
 	err := c.DoDecode("GET", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces", nil, &response)
+	return response, err
+}
+
+func (c *Client) CreateWorkspace(orgID string, projectID string, input CreateWorkspaceInput) (CreateWorkspaceResponse, error) {
+	payload := map[string]string{
+		"nodeId":    input.NodeID,
+		"localPath": input.LocalPath,
+		"kind":      input.Kind,
+	}
+	if input.Branch != "" {
+		payload["branch"] = input.Branch
+	}
+
+	var response CreateWorkspaceResponse
+	err := c.DoDecode("POST", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces", payload, &response)
 	return response, err
 }
 

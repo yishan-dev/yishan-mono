@@ -75,9 +75,10 @@ type Project struct {
 	OrganizationID string `json:"organizationId"`
 	NodeID         string `json:"nodeId"`
 	Name           string `json:"name"`
-	SourceTypeHint string `json:"sourceTypeHint"`
+	SourceType     string `json:"sourceType"`
 	RepoProvider   string `json:"repoProvider"`
 	RepoURL        string `json:"repoUrl"`
+	RepoKey        string `json:"repoKey"`
 	LocalPath      string `json:"localPath"`
 	CreatedAt      string `json:"createdAt"`
 	UpdatedAt      string `json:"updatedAt"`
@@ -105,6 +106,10 @@ type Workspace struct {
 
 type ListWorkspacesResponse struct {
 	Workspaces []Workspace `json:"workspaces"`
+}
+
+type CreateWorkspaceResponse struct {
+	Workspace Workspace `json:"workspace"`
 }
 
 type RefreshTokenResponse struct {
