@@ -95,6 +95,35 @@ func TestFileServicePathEscapeRejected(t *testing.T) {
 	}
 }
 
+func TestFileServiceGitMetadataRejected(t *testing.T) {
+	root := t.TempDir()
+	svc := NewFileService()
+
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git/config"), []byte("[core]\n"), 0o644); err != nil {
+		t.Fatalf("write .git/config: %v", err)
+	}
+
+	_, err := svc.Read(root, ".git/config")
+	if err == nil {
+		t.Fatal("expected .git path to be rejected")
+	}
+
+	rpcErr, ok := err.(*RPCError)
+	if !ok {
+		t.Fatalf("expected RPCError, got %T", err)
+	}
+	if rpcErr.Code != -32003 {
+		t.Fatalf("expected code -32003, got %d", rpcErr.Code)
+	}
+
+	if _, err := svc.List(root, ".git", false); err == nil {
+		t.Fatal("expected listing .git to be rejected")
+	}
+}
+
 func TestFileServiceRecursiveListUsesGitIgnore(t *testing.T) {
 	root := t.TempDir()
 	initGitRepo(t, root)

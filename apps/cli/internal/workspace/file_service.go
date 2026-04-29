@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -379,6 +380,10 @@ func safeJoin(root string, p string) (string, error) {
 		return "", NewRPCError(-32602, "path is required")
 	}
 
+	if containsGitMetadataPath(p) {
+		return "", NewRPCError(-32003, "path points to ignored git metadata")
+	}
+
 	candidate := filepath.Join(root, p)
 	full, err := filepath.Abs(candidate)
 	if err != nil {
@@ -403,4 +408,8 @@ func safeJoinOptional(root string, p string) (string, error) {
 		return filepath.Clean(root), nil
 	}
 	return safeJoin(root, p)
+}
+
+func containsGitMetadataPath(path string) bool {
+	return slices.Contains(strings.Split(filepath.ToSlash(filepath.Clean(path)), "/"), ".git")
 }
