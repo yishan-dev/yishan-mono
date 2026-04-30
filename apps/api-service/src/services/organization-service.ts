@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import type { AppDb, AppDbWs } from "@/db/client";
+import type { AppDb } from "@/db/client";
 import { organizationMembers, organizations, users } from "@/db/schema";
 import {
   InvalidOrganizationMemberRoleError,
@@ -39,10 +39,7 @@ type OrganizationView = {
 };
 
 export class OrganizationService {
-  constructor(
-    private readonly db: AppDb,
-    private readonly dbWs: AppDbWs
-  ) {}
+  constructor(private readonly db: AppDb) {}
 
   async getMembershipRole(input: {
     organizationId: string;
@@ -82,7 +79,7 @@ export class OrganizationService {
     memberUserId: string;
     role: "member" | "admin";
   }): Promise<OrganizationMemberView> {
-    return this.dbWs.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const existingOrganizationRows = await tx
         .select({ id: organizations.id })
         .from(organizations)
@@ -177,7 +174,7 @@ export class OrganizationService {
     actorUserId: string;
     memberUserId: string;
   }): Promise<void> {
-    await this.dbWs.transaction(async (tx) => {
+    await this.db.transaction(async (tx) => {
       const existingOrganizationRows = await tx
         .select({ id: organizations.id })
         .from(organizations)
@@ -236,7 +233,7 @@ export class OrganizationService {
   }
 
   async deleteOrganization(input: { organizationId: string; actorUserId: string }): Promise<void> {
-    await this.dbWs.transaction(async (tx) => {
+    await this.db.transaction(async (tx) => {
       const existingOrganizationRows = await tx
         .select({ id: organizations.id })
         .from(organizations)
@@ -268,7 +265,7 @@ export class OrganizationService {
   }
 
   async createOrganization(input: CreateOrganizationInput): Promise<OrganizationView> {
-    return this.dbWs.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const normalizedUserIds = Array.from(new Set([input.actorUserId, ...input.memberUserIds]));
 
       const existingUsers = await tx

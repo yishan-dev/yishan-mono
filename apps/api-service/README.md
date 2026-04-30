@@ -6,7 +6,7 @@ API service built with Hono + Bun, deployed to both Cloudflare Workers and a rem
 
 - Runtime: Bun and Cloudflare Workers
 - Router/API: Hono
-- Database: Neon Postgres
+- Database: Postgres via Cloudflare Hyperdrive + node-postgres
 - ORM: Drizzle ORM
 - Auth: Google OAuth + GitHub OAuth
 
@@ -14,7 +14,8 @@ API service built with Hono + Bun, deployed to both Cloudflare Workers and a rem
 
 Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 
-- `DATABASE_URL`
+- `DATABASE_URL` (Bun runtime and Drizzle CLI; defaults to local Postgres in examples. Workers prefer the `HYPERDRIVE` binding when present)
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` (optional override for Wrangler local Hyperdrive emulation)
 - `APP_BASE_URL`
 - `SESSION_SECRET`
 - `SESSION_TTL_DAYS` (default `30`)
@@ -34,6 +35,7 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 
 - `bun run dev:bun` - run the remote service locally via Bun
 - `bun run dev:worker` - run the Cloudflare Worker locally with Wrangler
+- `bun run db:local` - start the local Postgres database used by Wrangler Hyperdrive emulation
 - `bun run check` - typecheck
 - `bun run db:generate` - generate Drizzle migrations
 - `bun run db:push` - push schema directly to database
@@ -74,3 +76,13 @@ Notes:
 - `GET /orgs/:orgId/nodes` returns both org remote nodes and local nodes owned by org members; listing visibility does not imply usage permission (`canUse` indicates direct usability).
 - `POST /orgs/:orgId/projects/:projectId/workspaces` creates workspace records via API first; node provisioning is handled as a backend orchestration concern.
 - Org-scoped resources reject access when the authenticated user is not a member of that org.
+
+## Local Hyperdrive
+
+`wrangler dev` requires a local Postgres database for the `HYPERDRIVE` binding. Start the matching database before running the worker:
+
+```sh
+bun run db:local
+bun run db:push
+bun run dev:worker
+```

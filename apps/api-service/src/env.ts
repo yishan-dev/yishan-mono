@@ -14,6 +14,16 @@ function readEnv(c: Context, key: string): string | undefined {
   return bindings?.[key] ?? RUNTIME_ENV[key];
 }
 
+function readHyperdriveConnectionString(c: Context): string | undefined {
+  const bindings = c.env as { HYPERDRIVE?: { connectionString?: string } } | undefined;
+  return bindings?.HYPERDRIVE?.connectionString;
+}
+
+export function hasHyperdriveBinding(c: Context): boolean {
+  const bindings = c.env as { HYPERDRIVE?: unknown } | undefined;
+  return Boolean(bindings?.HYPERDRIVE);
+}
+
 function requireEnv(c: Context, key: string): string {
   const value = readEnv(c, key);
   if (!value) {
@@ -56,7 +66,7 @@ export function getServiceConfig(c: Context): ServiceConfig {
   const jwtAudience = readEnv(c, "JWT_AUDIENCE") ?? "api-service";
 
   return {
-    databaseUrl: requireEnv(c, "DATABASE_URL"),
+    databaseUrl: readHyperdriveConnectionString(c) ?? requireEnv(c, "DATABASE_URL"),
     appBaseUrl,
     sessionSecret: requireEnv(c, "SESSION_SECRET"),
     sessionTtlDays,

@@ -1,4 +1,5 @@
-DATABASE_URL=
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/yishan
+CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=postgres://postgres:postgres@localhost:5432/yishan
 APP_BASE_URL=http://localhost:8787
 SESSION_SECRET=
 SESSION_TTL_DAYS=30

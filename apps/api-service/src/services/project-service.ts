@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import type { AppDb, AppDbWs } from "@/db/client";
+import type { AppDb } from "@/db/client";
 import { nodes, projects, workspaces } from "@/db/schema";
 import {
   OrganizationMembershipRequiredError,
@@ -74,7 +74,6 @@ type UpdateProjectInput = {
 export class ProjectService {
   constructor(
     private readonly db: AppDb,
-    private readonly dbWs: AppDbWs,
     private readonly organizationService: OrganizationService
   ) {}
 
@@ -103,7 +102,7 @@ export class ProjectService {
       repoKey = inferred.repoKey;
     }
 
-    return this.dbWs.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const insertedRows = await tx
         .insert(projects)
         .values({
@@ -228,7 +227,7 @@ export class ProjectService {
       throw new OrganizationMembershipRequiredError();
     }
 
-    const deletedRows = await this.dbWs
+    const deletedRows = await this.db
       .delete(projects)
       .where(and(eq(projects.id, input.projectId), eq(projects.organizationId, input.organizationId)))
       .returning({ id: projects.id });
@@ -255,7 +254,7 @@ export class ProjectService {
       Pick<ProjectView, "name" | "icon" | "color" | "setupScript" | "postScript" | "contextEnabled">
     >;
 
-    const updatedRows = await this.dbWs
+    const updatedRows = await this.db
       .update(projects)
       .set({
         ...filteredUpdates,

@@ -1,6 +1,6 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 
-import type { AppDb, AppDbWs } from "@/db/client";
+import type { AppDb } from "@/db/client";
 import { nodes, organizationMembers } from "@/db/schema";
 import {
   NodeDeletePermissionRequiredError,
@@ -48,7 +48,6 @@ type RegisterNodeInput = {
 export class NodeService {
   constructor(
     private readonly db: AppDb,
-    private readonly dbWs: AppDbWs,
     private readonly organizationService: OrganizationService
   ) {}
 
@@ -61,7 +60,7 @@ export class NodeService {
   }
 
   async createNode(input: CreateNodeInput): Promise<NodeView> {
-    return this.dbWs.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const actorMembershipRows = await tx
         .select({ role: organizationMembers.role })
         .from(organizationMembers)
@@ -156,7 +155,7 @@ export class NodeService {
 
   async registerNode(input: RegisterNodeInput): Promise<NodeView> {
     const now = new Date();
-    const upsertedRows = await this.dbWs
+    const upsertedRows = await this.db
       .insert(nodes)
       .values({
         id: input.nodeId,
@@ -201,7 +200,7 @@ export class NodeService {
     nodeId: string;
     actorUserId: string;
   }): Promise<void> {
-    await this.dbWs.transaction(async (tx) => {
+    await this.db.transaction(async (tx) => {
       const actorMembershipRows = await tx
         .select({ role: organizationMembers.role })
         .from(organizationMembers)

@@ -4,7 +4,14 @@ import type { SessionUser } from "@/auth/session";
 import type { AppServices } from "@/services";
 import type { OAuthProvider, ServiceConfig } from "@/types";
 
+type HyperdriveBinding = {
+  connectionString: string;
+};
+
 export type AppEnv = {
+  Bindings: {
+    HYPERDRIVE?: HyperdriveBinding;
+  };
   Variables: {
     config: ServiceConfig;
     services: AppServices;

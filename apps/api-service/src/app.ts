@@ -17,11 +17,11 @@ export const app = new Hono<AppEnv>();
 const protectedRouter = new Hono<AppEnv>();
 
 app.use("/*", corsMiddleware);
+app.route("/", systemRouter);
 app.use("/*", injectRequestContext);
 app.onError(handleAppError);
 app.notFound((c) => c.json({ error: "Not Found" }, StatusCodes.NOT_FOUND));
 
-app.route("/", systemRouter);
 app.route("/auth", authRouter);
 
 protectedRouter.use("/*", requireAuthUser);

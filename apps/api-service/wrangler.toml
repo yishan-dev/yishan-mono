@@ -1,6 +1,12 @@
 name = "yishan-api-service"
 main = "src/worker.ts"
 compatibility_date = "2026-04-22"
+compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "1ea658ace38348609cf27570666c4c78"
+localConnectionString = "postgres://postgres:postgres@localhost:5432/yishan"
