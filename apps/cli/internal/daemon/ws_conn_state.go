@@ -113,7 +113,7 @@ func (c *wsConnState) AttachEventStream(events <-chan frontendEvent, cancel func
 
 	go func() {
 		for event := range events {
-			if err := c.Notify(MethodEventsStream, map[string]any{
+			if err := c.Notify(MethodFrontendEventsStream, map[string]any{
 				"topic":   event.Topic,
 				"payload": event.Payload,
 			}); err != nil {

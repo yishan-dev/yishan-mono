@@ -44,7 +44,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		return created, nil
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
-	case MethodEventsStream:
+	case MethodFrontendEventsStream:
 		subscriptionID, events := h.events.Subscribe()
 		connState.AttachEventStream(events, func() {
 			h.events.Unsubscribe(subscriptionID)
