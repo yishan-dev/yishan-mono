@@ -708,6 +708,8 @@ export class DaemonClient {
       command: readOptionalString(record?.command),
       args: readOptionalStringArray(record?.args),
       env: readOptionalStringArray(record?.env),
+      tabId: readOptionalString(record?.tabId),
+      paneId: readOptionalString(record?.paneId),
     })) as Rpc.TerminalCreateSessionResponse;
   }
 

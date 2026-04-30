@@ -5,6 +5,8 @@ type StartRequest struct {
 	Command     string   `json:"command"`
 	Args        []string `json:"args,omitempty"`
 	Env         []string `json:"env,omitempty"`
+	TabID       string   `json:"tabId,omitempty"`
+	PaneID      string   `json:"paneId,omitempty"`
 }
 
 type StartResponse struct {

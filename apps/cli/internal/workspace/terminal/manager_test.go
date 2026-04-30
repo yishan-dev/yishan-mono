@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -69,8 +71,8 @@ func TestResolveCommand(t *testing.T) {
 			goos:            "linux",
 			shellEnv:        "",
 			wantCommand:     "/bin/bash",
-			wantArgsLen:     1,
-			wantFirstArg:    "--login",
+			wantArgsLen:     3,
+			wantFirstArg:    "--rcfile",
 			wantArgsPresent: true,
 		},
 		{
@@ -101,6 +103,7 @@ func TestResolveCommand(t *testing.T) {
 }
 
 func TestResolveEnvDefaults(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	got := resolveEnv([]string{"PATH=/usr/bin"}, []string{"TERM=screen-256color"})
 	joined := strings.Join(got, "\n")
 
@@ -112,6 +115,27 @@ func TestResolveEnvDefaults(t *testing.T) {
 	}
 	if !strings.Contains(joined, "LANG=en_US.UTF-8") {
 		t.Fatalf("expected LANG default, got %v", got)
+	}
+	if !strings.Contains(joined, "PATH="+filepath.Join(os.Getenv("HOME"), ".yishan", "bin")+string(os.PathListSeparator)+"/usr/bin") {
+		t.Fatalf("expected managed bin path to be prepended, got %v", got)
+	}
+}
+
+func TestResolveSessionMetadataEnv(t *testing.T) {
+	got := resolveSessionMetadataEnv([]string{"PATH=/usr/bin"}, StartRequest{
+		WorkspaceID: "workspace-1",
+		TabID:       "tab-1",
+		PaneID:      "pane-1",
+	})
+	joined := strings.Join(got, "\n")
+	for _, expected := range []string{
+		"YISHAN_WORKSPACE_ID=workspace-1",
+		"YISHAN_TAB_ID=tab-1",
+		"YISHAN_PANE_ID=pane-1",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("expected %s in env, got %v", expected, got)
+		}
 	}
 }
 

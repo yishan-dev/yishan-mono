@@ -1,6 +1,9 @@
 package terminal
 
-import "strings"
+import (
+	"runtime"
+	"strings"
+)
 
 func resolveCommand(req StartRequest, goos string, shellEnv string) (string, []string) {
 	command := strings.TrimSpace(req.Command)
@@ -47,6 +50,9 @@ func resolveDefaultArgs(command string, goos string) []string {
 
 	switch shellName {
 	case "bash":
+		if rcfilePath := resolveManagedBashRcfilePath(); rcfilePath != "" {
+			return []string{"--rcfile", rcfilePath, "-i"}
+		}
 		return []string{"--login"}
 	case "zsh", "fish":
 		return []string{"-l"}
@@ -60,7 +66,20 @@ func resolveEnv(baseEnv []string, requestEnv []string) []string {
 	env = upsertEnv(env, "TERM", envValueOrDefault(env, "TERM", "xterm-256color"))
 	env = upsertEnv(env, "COLORTERM", envValueOrDefault(env, "COLORTERM", "truecolor"))
 	env = upsertEnv(env, "LANG", envValueOrDefault(env, "LANG", "en_US.UTF-8"))
-	env = append(env, requestEnv...)
+	env = mergeEnvOverrides(env, requestEnv)
+	env = resolveManagedRuntimeEnv(env, resolveDefaultCommand(runtime.GOOS, envValueOrDefault(env, "SHELL", "")))
+	return env
+}
+
+func mergeEnvOverrides(env []string, overrides []string) []string {
+	for _, entry := range overrides {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			env = append(env, entry)
+			continue
+		}
+		env = upsertEnv(env, key, value)
+	}
 	return env
 }
 

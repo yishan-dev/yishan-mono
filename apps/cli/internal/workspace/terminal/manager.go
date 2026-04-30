@@ -48,7 +48,7 @@ func (m *Manager) Start(_ context.Context, cwd string, req StartRequest) (StartR
 
 	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
-	cmd.Env = resolveEnv(os.Environ(), req.Env)
+	cmd.Env = resolveSessionMetadataEnv(resolveEnv(os.Environ(), req.Env), req)
 
 	ptyFile, err := pty.Start(cmd)
 	if err != nil {
