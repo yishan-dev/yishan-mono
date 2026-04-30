@@ -33,6 +33,7 @@ import {
 } from "react-icons/lu";
 import { useLocation, useNavigate } from "react-router-dom";
 import { requestJson } from "../../api/restClient";
+import { openExternalUrl } from "../../commands/appCommands";
 import { useThemePreference } from "../../hooks/useThemePreference";
 import { getRendererPlatform } from "../../helpers/platform";
 import { rendererQueryClient } from "../../queryClient";
@@ -150,6 +151,13 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
     setMenuAnchor(null);
     setOrganizationMenuAnchor(null);
     navigate("/");
+  };
+
+  const handleOpenExternalUrl = (url: string) => {
+    void openExternalUrl(url).catch((error) => {
+      console.warn("Failed to open external URL", error);
+    });
+    setMenuAnchor(null);
   };
 
   return (
@@ -305,8 +313,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                   startIcon={<LuBookOpen size={14} />}
                   sx={menuItemButtonSx}
                   onClick={() => {
-                    window.open("https://www.electronjs.org/docs/latest/", "_blank", "noopener,noreferrer");
-                    setMenuAnchor(null);
+                    handleOpenExternalUrl("https://www.electronjs.org/docs/latest/");
                   }}
                 >
                   {t("org.menu.documentation")}
@@ -339,8 +346,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                   startIcon={<LuMail size={14} />}
                   sx={menuItemButtonSx}
                   onClick={() => {
-                    window.open("mailto:support@vestin.io", "_blank", "noopener,noreferrer");
-                    setMenuAnchor(null);
+                    handleOpenExternalUrl("mailto:support@yishan.dev");
                   }}
                 >
                   {t("org.menu.contactUs")}
