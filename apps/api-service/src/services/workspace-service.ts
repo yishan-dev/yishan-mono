@@ -194,7 +194,8 @@ export class WorkspaceService {
         and(
           eq(workspaces.organizationId, input.organizationId),
           eq(workspaces.projectId, input.projectId),
-          eq(workspaces.userId, input.actorUserId)
+          eq(workspaces.userId, input.actorUserId),
+          eq(workspaces.status, "active")
         )
       );
 

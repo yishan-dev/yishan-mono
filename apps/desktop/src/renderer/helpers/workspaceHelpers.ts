@@ -40,6 +40,7 @@ export function buildCreatedWorkspaceState(
     normalizedBranch: string;
     backendWorkspace: {
       workspaceId: string;
+      organizationId?: string;
       name: string;
       sourceBranch: string;
       branch: string;
@@ -54,6 +55,7 @@ export function buildCreatedWorkspaceState(
       ...state.workspaces,
       {
         id: nextWorkspaceId,
+        organizationId: input.backendWorkspace.organizationId,
         projectId: input.projectId,
         repoId: input.projectId,
         name: input.backendWorkspace.name || input.normalizedName,

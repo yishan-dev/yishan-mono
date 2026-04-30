@@ -151,6 +151,7 @@ function mapApiData(projects: ProjectRecord[], workspacesFromApi: WorkspaceRecor
       (workspace) =>
         ({
           id: workspace.id,
+          organizationId: workspace.organizationId,
           projectId: workspace.projectId,
           repoId: workspace.projectId,
           name: workspace.kind === "primary" ? "local" : (workspace.branch ?? "workspace"),

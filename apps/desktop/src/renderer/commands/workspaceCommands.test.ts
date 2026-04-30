@@ -118,6 +118,7 @@ describe("workspaceCommands", () => {
     expect(rpcMocks.list).not.toHaveBeenCalled();
     expect(addWorkspace).toHaveBeenCalledWith({
       repoId: "repo-1",
+      organizationId: "org-1",
       workspaceId: "workspace-2",
       name: "feature-a",
       sourceBranch: "main",
@@ -234,6 +235,7 @@ describe("workspaceCommands", () => {
       workspaces: [
         {
           id: "workspace-1",
+          organizationId: "org-1",
           repoId: "repo-1",
           name: "Feature A",
           title: "Feature A",
@@ -256,7 +258,7 @@ describe("workspaceCommands", () => {
     await vi.waitFor(() => {
       expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-1",
-        organizationId: undefined,
+        organizationId: "org-1",
         projectId: "repo-1",
         workspaceWorktreePath: "/tmp/worktrees/feature-a",
         branch: "feature-a",
@@ -272,6 +274,7 @@ describe("workspaceCommands", () => {
       workspaces: [
         {
           id: "workspace-1",
+          organizationId: "org-1",
           repoId: "repo-1",
           name: "Feature A",
           title: "Feature A",
@@ -329,6 +332,7 @@ describe("workspaceCommands", () => {
       workspaces: [
         {
           id: "workspace-1",
+          organizationId: "org-1",
           repoId: "repo-1",
           name: "Feature A",
           title: "Feature A",
@@ -344,7 +348,7 @@ describe("workspaceCommands", () => {
     await vi.waitFor(() => {
       expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-1",
-        organizationId: undefined,
+        organizationId: "org-1",
         projectId: "repo-1",
         workspaceWorktreePath: undefined,
         branch: "feature-a",
@@ -373,6 +377,7 @@ describe("workspaceCommands", () => {
       workspaces: [
         {
           id: "workspace-1",
+          organizationId: "org-1",
           repoId: "repo-1",
           name: "Feature A",
           title: "Feature A",
@@ -398,7 +403,7 @@ describe("workspaceCommands", () => {
     expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
     expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
       workspaceId: "workspace-1",
-      organizationId: undefined,
+      organizationId: "org-1",
       projectId: "repo-1",
       workspaceWorktreePath: undefined,
       branch: "feature-a",

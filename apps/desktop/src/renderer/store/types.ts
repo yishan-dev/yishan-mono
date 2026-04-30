@@ -46,6 +46,7 @@ export type AvailableModel = {
 
 export type RepoWorkspaceItem = {
   id: string;
+  organizationId?: string;
   projectId?: string;
   repoId: string;
   name: string;
@@ -180,6 +181,7 @@ export type WorkspaceStoreState = {
   ) => void;
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   addWorkspace: (input: {
+    organizationId?: string;
     projectId?: string;
     repoId?: string;
     name: string;

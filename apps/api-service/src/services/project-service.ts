@@ -200,6 +200,7 @@ export class ProjectService {
         and(
           eq(workspaces.organizationId, input.organizationId),
           eq(workspaces.userId, input.actorUserId),
+          eq(workspaces.status, "active"),
           inArray(workspaces.projectId, projectIds)
         )
       );

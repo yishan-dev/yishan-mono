@@ -195,6 +195,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
     branch: backendWorkspace.branch,
     worktreePath: backendWorkspace.worktreePath,
     workspaceId: backendWorkspace.id,
+    organizationId,
   });
   tabStore.getState().setSelectedWorkspaceId(readWorkspaceStoreState().selectedWorkspaceId);
 }
@@ -218,7 +219,7 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
   void closeWorkspaceInBackground({
     workspaceId,
     workspaceName: workspace.name,
-    organizationId: sessionStore.getState().selectedOrganizationId?.trim() || undefined,
+    organizationId: workspace.organizationId?.trim() || sessionStore.getState().selectedOrganizationId?.trim() || undefined,
     projectId: workspace.projectId ?? workspace.repoId,
     workspaceWorktreePath: workspace.worktreePath?.trim() || undefined,
     branch: workspace.branch,
