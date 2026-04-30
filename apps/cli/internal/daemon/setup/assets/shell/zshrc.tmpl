@@ -1,0 +1,8 @@
+# Yishan zsh rc wrapper
+_yishan_home="{{.OrigZdotdirExpansion}}"
+export ZDOTDIR="$_yishan_home"
+[[ -f "$_yishan_home/.zshrc" ]] && source "$_yishan_home/.zshrc"
+{{.PathEnsureFunction}}
+{{.ZshPrecmdHook}}
+rehash 2>/dev/null || true
+export ZDOTDIR={{.QuotedZshWrapperDir}}

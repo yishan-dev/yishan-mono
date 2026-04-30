@@ -34,7 +34,7 @@ describe("AgentSettingsView", () => {
         gemini: true,
         pi: true,
         copilot: true,
-        cursor: true,
+        "cursor-agent": true,
       },
     });
   });
@@ -47,7 +47,7 @@ describe("AgentSettingsView", () => {
       { agentKind: "gemini", detected: false },
       { agentKind: "pi", detected: false },
       { agentKind: "copilot", detected: false },
-      { agentKind: "cursor", detected: false },
+      { agentKind: "cursor-agent", detected: false },
     ]);
 
     render(<AgentSettingsView />);
@@ -92,7 +92,7 @@ describe("AgentSettingsView", () => {
         { agentKind: "gemini", detected: false },
         { agentKind: "pi", detected: false },
         { agentKind: "copilot", detected: false },
-        { agentKind: "cursor", detected: false },
+        { agentKind: "cursor-agent", detected: false },
       ]);
 
     render(<AgentSettingsView />);
@@ -114,7 +114,7 @@ describe("AgentSettingsView", () => {
       { agentKind: "gemini", detected: false },
       { agentKind: "pi", detected: false },
       { agentKind: "copilot", detected: false },
-      { agentKind: "cursor", detected: false },
+      { agentKind: "cursor-agent", detected: false },
     ]);
   });
 });

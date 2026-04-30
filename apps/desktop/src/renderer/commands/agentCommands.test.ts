@@ -32,7 +32,7 @@ describe("agentCommands", () => {
       { agentKind: "gemini", detected: false },
       { agentKind: "pi", detected: false },
       { agentKind: "copilot", detected: false },
-      { agentKind: "cursor", detected: false },
+      { agentKind: "cursor-agent", detected: false },
     ]);
   });
 });

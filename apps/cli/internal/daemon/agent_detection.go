@@ -19,7 +19,7 @@ const loginShellPathTimeout = 1 * time.Second
 var versionPattern = regexp.MustCompile(`\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
 
 // SupportedAgentCLIKinds contains all supported agent CLIs that can be detected on one node.
-var SupportedAgentCLIKinds = []string{"opencode", "codex", "claude", "gemini", "pi", "copilot", "cursor"}
+var SupportedAgentCLIKinds = []string{"opencode", "codex", "claude", "gemini", "pi", "copilot", "cursor-agent"}
 
 type supportedAgentCLI struct {
 	Kind     string
@@ -32,8 +32,8 @@ var supportedAgentCLIs = []supportedAgentCLI{
 	{Kind: "claude", Commands: []string{"claude"}},
 	{Kind: "gemini", Commands: []string{"gemini"}},
 	{Kind: "pi", Commands: []string{"pi"}},
-	{Kind: "copilot", Commands: []string{"copilot", "github-copilot"}},
-	{Kind: "cursor", Commands: []string{"cursor", "cursor-agent"}},
+	{Kind: "copilot", Commands: []string{"copilot"}},
+	{Kind: "cursor-agent", Commands: []string{"cursor"}},
 }
 
 // AgentCLIDetectionStatus captures one supported agent CLI detection result.

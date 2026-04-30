@@ -91,9 +91,9 @@ vi.mock("../../components/TabBar", () => ({
   }: {
     tabs: Array<{ id: string; title: string }>;
     onCreateTab: (
-      option: "terminal" | "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor",
+      option: "terminal" | "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor-agent",
     ) => void;
-    enabledAgentKinds?: Array<"opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor">;
+    enabledAgentKinds?: Array<"opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor-agent">;
   }) => (
     <div>
       <div data-testid="tab-bar">{tabs.map((tab) => tab.title).join(",")}</div>
@@ -135,7 +135,7 @@ afterEach(() => {
       gemini: true,
       pi: true,
       copilot: true,
-      cursor: true,
+      "cursor-agent": true,
     },
   });
 });
@@ -479,7 +479,7 @@ describe("MainPaneView", () => {
         gemini: true,
         pi: true,
         copilot: true,
-        cursor: true,
+        "cursor-agent": true,
       },
     });
     mocked.stateRef.current = {

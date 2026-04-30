@@ -1,0 +1,5 @@
+# Yishan zsh profile wrapper
+_yishan_home="{{.OrigZdotdirExpansion}}"
+export ZDOTDIR="$_yishan_home"
+[[ -f "$_yishan_home/.zprofile" ]] && source "$_yishan_home/.zprofile"
+export ZDOTDIR={{.QuotedZshWrapperDir}}

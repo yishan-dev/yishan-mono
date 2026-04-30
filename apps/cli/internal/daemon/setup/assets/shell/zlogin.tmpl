@@ -1,0 +1,10 @@
+# Yishan zsh login wrapper
+_yishan_home="{{.OrigZdotdirExpansion}}"
+export ZDOTDIR="$_yishan_home"
+if [[ -o interactive ]]; then
+  [[ -f "$_yishan_home/.zlogin" ]] && source "$_yishan_home/.zlogin"
+fi
+{{.PathEnsureFunction}}
+{{.ZshPrecmdHook}}
+rehash 2>/dev/null || true
+export ZDOTDIR={{.QuotedZshWrapperDir}}

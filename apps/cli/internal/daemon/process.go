@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"yishan/apps/cli/internal/buildinfo"
+	"yishan/apps/cli/internal/daemon/setup"
 	"yishan/apps/cli/internal/workspace"
 
 	"github.com/rs/zerolog/log"
@@ -120,6 +121,7 @@ func Run(cfg RunConfig, statePath string) error {
 	}); err != nil {
 		return fmt.Errorf("save daemon state: %w", err)
 	}
+	setup.EnsureManagedAgentRuntime()
 	defer func() {
 		if err := RemoveState(statePath); err != nil {
 			log.Warn().Err(err).Msg("failed to remove daemon state file")

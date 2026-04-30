@@ -1,0 +1,95 @@
+{{.PluginMarker}}
+export const YishanNotifyPlugin = async ({ $, client }) => {
+  if (globalThis.__yishanOpencodeNotifyPluginV1) return {};
+  globalThis.__yishanOpencodeNotifyPluginV1 = true;
+
+  if (!process?.env?.{{.TabIDEnvKey}}) return {};
+
+  const notifyPath = {{.NotifyPathLiteral}};
+  let currentState = "idle";
+  let rootSessionId = null;
+  let stopSent = false;
+
+  const notify = async (hookEventName) => {
+    try {
+      {{.NotifyCommand}}
+    } catch {
+      // fail-open
+    }
+  };
+
+  const isChildSession = async (sessionId) => {
+    if (!sessionId || !client?.session?.list) {
+      return true;
+    }
+    try {
+      const sessions = await client.session.list();
+      const session = sessions.data?.find((value) => value.id === sessionId);
+      return !!session?.parentID;
+    } catch {
+      return true;
+    }
+  };
+
+  const handleBusy = async (sessionId) => {
+    if (!rootSessionId) {
+      rootSessionId = sessionId;
+    }
+    if (sessionId !== rootSessionId) {
+      return;
+    }
+    if (currentState === "idle") {
+      currentState = "busy";
+      stopSent = false;
+      await notify("Start");
+    }
+  };
+
+  const handleStop = async (sessionId) => {
+    if (rootSessionId && sessionId !== rootSessionId) {
+      return;
+    }
+    if (currentState === "busy" && !stopSent) {
+      currentState = "idle";
+      stopSent = true;
+      await notify("Stop");
+      rootSessionId = null;
+    }
+  };
+
+  return {
+    event: async ({ event }) => {
+      const sessionId = event.properties?.sessionID;
+      if (await isChildSession(sessionId)) {
+        return;
+      }
+
+      if (event.type === "session.status") {
+        const status = event.properties?.status;
+        if (status?.type === "busy") {
+          await handleBusy(sessionId);
+        } else if (status?.type === "idle") {
+          await handleStop(sessionId);
+        }
+      }
+
+      if (event.type === "session.busy") {
+        await handleBusy(sessionId);
+      }
+      if (event.type === "session.idle") {
+        await handleStop(sessionId);
+      }
+      if (event.type === "session.error") {
+        currentState = "idle";
+        stopSent = true;
+        rootSessionId = null;
+        await notify("Failed");
+      }
+    },
+    "permission.ask": async (_permission, output) => {
+      if (output?.status === "ask") {
+        await notify("PermissionRequest");
+      }
+    },
+  };
+};

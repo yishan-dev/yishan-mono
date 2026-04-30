@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# yishan wrapper for codex
+
+set -u
+
+readonly WRAPPER_BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${WRAPPER_BIN_DIR}/../lib/common.sh"
+if [ -f "${WRAPPER_BIN_DIR}/../lib/hook_ingress.sh" ]; then
+  # shellcheck source=../lib/hook_ingress.sh
+  source "${WRAPPER_BIN_DIR}/../lib/hook_ingress.sh"
+else
+  notify_event() { :; }
+fi
+
+MANAGED_BIN_DIR="$(resolve_managed_bin_dir)"
+REAL_BIN="$(resolve_real_binary "codex" "$WRAPPER_BIN_DIR" "$MANAGED_BIN_DIR" || true)"
+if [ -z "$REAL_BIN" ]; then
+  echo "yishan wrapper: real codex not found in PATH" >&2
+  exit 127
+fi
+
+extra_dir_args=()
+if [ -n "${MANAGED_BIN_DIR:-}" ]; then
+  managed_bin_dir="${MANAGED_BIN_DIR%/}"
+  if [[ "$managed_bin_dir" == */bin ]]; then
+    managed_root_dir="${managed_bin_dir%/bin}"
+    managed_contexts_dir="${managed_root_dir}/contexts"
+    if [ -d "$managed_contexts_dir" ]; then
+      extra_dir_args+=(--add-dir "$managed_contexts_dir")
+    fi
+  fi
+fi
+
+codex_terminal_emitted=0
+emit_terminal_once() {
+  local event_name="${1:-Stop}"
+  if [ "${codex_terminal_emitted}" -eq 1 ]; then
+    return 0
+  fi
+  codex_terminal_emitted=1
+  notify_event "codex" "$event_name"
+}
+
+emit_exit_terminal_event() {
+  local exit_status="$1"
+  if [ "$exit_status" -eq 0 ]; then
+    emit_terminal_once "Stop"
+    return 0
+  fi
+
+  emit_terminal_once "Failed"
+}
+
+cleanup_watcher() {
+  if [ -n "${yishan_codex_start_watcher_pid:-}" ]; then
+    debug "watcher:stop pid=${yishan_codex_start_watcher_pid}"
+    kill "$yishan_codex_start_watcher_pid" >/dev/null 2>&1 || true
+    wait "$yishan_codex_start_watcher_pid" 2>/dev/null || true
+  fi
+}
+
+handle_interrupt() {
+  local signal="$1"
+  cleanup_watcher
+  emit_terminal_once "Failed"
+  trap - "$signal"
+  kill -s "$signal" "$$"
+}
+
+if [ -n "${YISHAN_TAB_ID:-}" ] && [ -x "${NOTIFY_SCRIPT_PATH:-}" ]; then
+  yishan_codex_debug_log_path="${TMPDIR:-/tmp}/yishan-codex-wrapper-debug-${YISHAN_TAB_ID}.log"
+  debug() {
+    if [ -z "${YISHAN_DEBUG_HOOKS:-}" ]; then
+      return 0
+    fi
+    printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || printf 'unknown-time')" "$1" >>"$yishan_codex_debug_log_path" 2>/dev/null || true
+  }
+
+  debug "watcher:init tab_id=${YISHAN_TAB_ID}"
+
+  export CODEX_TUI_RECORD_SESSION=1
+  if [ -z "${CODEX_TUI_SESSION_LOG_PATH:-}" ]; then
+    yishan_codex_ts="$(date +%s 2>/dev/null || echo "$$")"
+    export CODEX_TUI_SESSION_LOG_PATH="${TMPDIR:-/tmp}/yishan-codex-session-$$_${yishan_codex_ts}.jsonl"
+  fi
+  debug "watcher:session_log_path=${CODEX_TUI_SESSION_LOG_PATH}"
+
+  (
+    yishan_codex_log_path="$CODEX_TUI_SESSION_LOG_PATH"
+    yishan_codex_last_turn_id=""
+    yishan_codex_last_approval_id=""
+    yishan_codex_last_exec_call_id=""
+    yishan_codex_approval_fallback_seq=0
+
+    emit_event() {
+      debug "watcher:emit event=$1"
+      notify_event "codex" "$1"
+    }
+
+    yishan_codex_wait_attempts=0
+    while [ ! -f "$yishan_codex_log_path" ] && [ "$yishan_codex_wait_attempts" -lt 200 ]; do
+      yishan_codex_wait_attempts=$((yishan_codex_wait_attempts + 1))
+      sleep 0.05
+    done
+    if [ ! -f "$yishan_codex_log_path" ]; then
+      debug "watcher:log_not_found_exit path=${yishan_codex_log_path}"
+      exit 0
+    fi
+    debug "watcher:tail_start path=${yishan_codex_log_path}"
+
+    tail -n 0 -F "$yishan_codex_log_path" 2>/dev/null | while IFS= read -r yishan_codex_line; do
+      case "$yishan_codex_line" in
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"task_started"'*)
+          yishan_codex_turn_id="$(printf '%s\n' "$yishan_codex_line" | awk -F'"turn_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')"
+          [ -n "$yishan_codex_turn_id" ] || yishan_codex_turn_id="task_started"
+          if [ "$yishan_codex_turn_id" != "$yishan_codex_last_turn_id" ]; then
+            yishan_codex_last_turn_id="$yishan_codex_turn_id"
+            debug "watcher:task_started turn_id=${yishan_codex_turn_id}"
+            emit_event "Start"
+          fi
+          ;;
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"exec_command_begin"'*)
+          yishan_codex_exec_call_id="$(printf '%s\n' "$yishan_codex_line" | awk -F'"call_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')"
+          if [ -n "$yishan_codex_exec_call_id" ]; then
+            if [ "$yishan_codex_exec_call_id" != "$yishan_codex_last_exec_call_id" ]; then
+              yishan_codex_last_exec_call_id="$yishan_codex_exec_call_id"
+              debug "watcher:exec_command_begin call_id=${yishan_codex_exec_call_id}"
+              emit_event "Start"
+            fi
+          else
+            debug "watcher:exec_command_begin call_id=none"
+            emit_event "Start"
+          fi
+          ;;
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"'*'_approval_request"'*)
+          yishan_codex_approval_id="$(printf '%s\n' "$yishan_codex_line" | awk -F'"id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')"
+          [ -n "$yishan_codex_approval_id" ] || yishan_codex_approval_id="$(printf '%s\n' "$yishan_codex_line" | awk -F'"approval_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')"
+          [ -n "$yishan_codex_approval_id" ] || yishan_codex_approval_id="$(printf '%s\n' "$yishan_codex_line" | awk -F'"call_id":"' 'NF > 1 { sub(/".*/, "", $2); print $2; exit }')"
+          if [ -z "$yishan_codex_approval_id" ]; then
+            yishan_codex_approval_fallback_seq=$((yishan_codex_approval_fallback_seq + 1))
+            yishan_codex_approval_id="approval_request_${yishan_codex_approval_fallback_seq}"
+          fi
+          if [ "$yishan_codex_approval_id" != "$yishan_codex_last_approval_id" ]; then
+            yishan_codex_last_approval_id="$yishan_codex_approval_id"
+            debug "watcher:approval_request id=${yishan_codex_approval_id}"
+            emit_event "PermissionRequest"
+          fi
+          ;;
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"task_interrupted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"turn_aborted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"task_aborted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"agent_turn_aborted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"agent-turn-aborted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"turn_interrupted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"agent_turn_interrupted"'*|\
+        *'"dir":"to_tui"'*'"kind":"codex_event"'*'"msg":{"type":"agent-turn-interrupted"'*|\
+        *'Conversation interrupted'*)
+          debug "watcher:interrupt_detected"
+          emit_event "Failed"
+          ;;
+      esac
+    done
+  ) &
+  yishan_codex_start_watcher_pid=$!
+  debug "watcher:pid=${yishan_codex_start_watcher_pid}"
+fi
+
+trap 'handle_interrupt INT' INT
+trap 'handle_interrupt TERM' TERM
+trap 'handle_interrupt HUP' HUP
+trap 'cleanup_watcher; emit_exit_terminal_event "$?"' EXIT
+
+if [ -x "${NOTIFY_SCRIPT_PATH:-}" ]; then
+  "$REAL_BIN" "${extra_dir_args[@]}" -c "notify=[\"bash\",\"$NOTIFY_SCRIPT_PATH\",\"--agent\",\"codex\"]" "$@"
+else
+  "$REAL_BIN" "${extra_dir_args[@]}" "$@"
+fi
+status=$?
+exit "$status"

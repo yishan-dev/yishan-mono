@@ -1,0 +1,30 @@
+# Yishan bash rc wrapper
+
+# Source system profile first
+[[ -f /etc/profile ]] && source /etc/profile
+
+# Source user's login profile
+if [[ -f "$HOME/.bash_profile" ]]; then
+  source "$HOME/.bash_profile"
+elif [[ -f "$HOME/.bash_login" ]]; then
+  source "$HOME/.bash_login"
+elif [[ -f "$HOME/.profile" ]]; then
+  source "$HOME/.profile"
+fi
+
+# Source user's bashrc
+[[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
+
+{{.PathEnsureFunction}}
+hash -r 2>/dev/null || true
+
+# Re-assert managed bin path before each prompt because user hooks can mutate PATH.
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+  PROMPT_COMMAND=("${PROMPT_COMMAND[@]}" "{{.PathEnsureFunctionName}}")
+else
+  if [[ -n "${PROMPT_COMMAND}" ]]; then
+    PROMPT_COMMAND="${PROMPT_COMMAND};{{.PathEnsureFunctionName}}"
+  else
+    PROMPT_COMMAND="{{.PathEnsureFunctionName}}"
+  fi
+fi

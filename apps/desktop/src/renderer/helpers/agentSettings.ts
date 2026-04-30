@@ -5,7 +5,7 @@ export const SUPPORTED_DESKTOP_AGENT_KINDS = [
   "gemini",
   "pi",
   "copilot",
-  "cursor",
+  "cursor-agent",
 ] as const;
 
 export type DesktopAgentKind = (typeof SUPPORTED_DESKTOP_AGENT_KINDS)[number];
@@ -37,7 +37,7 @@ export const AGENT_SETTINGS_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, string> 
   gemini: "settings.agents.items.gemini",
   pi: "settings.agents.items.pi",
   copilot: "settings.agents.items.copilot",
-  cursor: "settings.agents.items.cursor",
+  "cursor-agent": "settings.agents.items.cursor",
 };
 
 export const AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, string> = {
@@ -47,7 +47,7 @@ export const AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, s
   gemini: "tabs.createMenu.gemini",
   pi: "tabs.createMenu.pi",
   copilot: "tabs.createMenu.copilot",
-  cursor: "tabs.createMenu.cursor",
+  "cursor-agent": "tabs.createMenu.cursor",
 };
 
 const AGENT_ICON_SRC_BY_KIND: Record<DesktopAgentKind, string> = {
@@ -57,7 +57,7 @@ const AGENT_ICON_SRC_BY_KIND: Record<DesktopAgentKind, string> = {
   gemini: "app-icons/preset-icons/gemini.svg",
   pi: "app-icons/preset-icons/opencode.svg",
   copilot: "material-icons/copilot.svg",
-  cursor: "app-icons/preset-icons/cursor.svg",
+  "cursor-agent": "app-icons/preset-icons/cursor.svg",
 };
 
 const AGENT_ICON_SLOT_SIZE_BY_CONTEXT: Record<AgentIconContext, number> = {
@@ -90,7 +90,7 @@ const AGENT_ICON_SIZE_RATIO_BY_KIND: Record<DesktopAgentKind, AgentIconSizeRatio
     width: 1,
     height: 1,
   },
-  cursor: {
+  "cursor-agent": {
     width: 1,
     height: 1,
   },
@@ -103,7 +103,7 @@ const AGENT_ICON_SCALE_BY_KIND: Record<DesktopAgentKind, number> = {
   gemini: 1,
   pi: 1,
   copilot: 1.1,
-  cursor: 1,
+  "cursor-agent": 1,
 };
 
 const AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND: Partial<Record<DesktopAgentKind, string>> = {

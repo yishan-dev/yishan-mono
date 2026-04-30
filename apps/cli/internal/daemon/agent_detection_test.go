@@ -85,7 +85,7 @@ func TestListAgentCLIDetectionStatusesWithOptionsDetectsVersion(t *testing.T) {
 		t.Fatalf("expected copilot version to be empty, got %q", copilotStatus.Version)
 	}
 
-	cursorStatus := statusByAgent["cursor"]
+	cursorStatus := statusByAgent["cursor-agent"]
 	if cursorStatus.Detected {
 		t.Fatalf("expected cursor to be undetected")
 	}
@@ -94,7 +94,7 @@ func TestListAgentCLIDetectionStatusesWithOptionsDetectsVersion(t *testing.T) {
 	}
 }
 
-func TestListAgentCLIDetectionStatusesWithOptionsDetectsAliases(t *testing.T) {
+func TestListAgentCLIDetectionStatusesWithOptionsDetectsAgentBinaryNames(t *testing.T) {
 	t.Setenv("PATH", "")
 
 	if runtime.GOOS == "windows" {
@@ -102,8 +102,8 @@ func TestListAgentCLIDetectionStatusesWithOptionsDetectsAliases(t *testing.T) {
 	}
 
 	binDir := t.TempDir()
-	writeExecutableScript(t, binDir, "github-copilot", "3.0.0")
-	writeExecutableScript(t, binDir, "cursor-agent", "1.0.0")
+	writeExecutableScript(t, binDir, "copilot", "3.0.0")
+	writeExecutableScript(t, binDir, "cursor", "1.0.0")
 
 	statuses := listAgentCLIDetectionStatusesWithOptions(agentDetectionOptions{
 		PathValue:      binDir,
@@ -120,15 +120,15 @@ func TestListAgentCLIDetectionStatusesWithOptionsDetectsAliases(t *testing.T) {
 
 	copilotStatus := statusByAgent["copilot"]
 	if !copilotStatus.Detected {
-		t.Fatalf("expected copilot to be detected by github-copilot alias")
+		t.Fatalf("expected copilot to be detected by copilot binary")
 	}
 	if copilotStatus.Version != "3.0.0" {
 		t.Fatalf("expected copilot version 3.0.0, got %q", copilotStatus.Version)
 	}
 
-	cursorStatus := statusByAgent["cursor"]
+	cursorStatus := statusByAgent["cursor-agent"]
 	if !cursorStatus.Detected {
-		t.Fatalf("expected cursor to be detected by cursor-agent alias")
+		t.Fatalf("expected cursor-agent to be detected by cursor binary")
 	}
 	if cursorStatus.Version != "1.0.0" {
 		t.Fatalf("expected cursor version 1.0.0, got %q", cursorStatus.Version)
