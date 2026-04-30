@@ -5,10 +5,13 @@ import { cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api";
+import { createOrganization, listOrganizations } from "../../api";
 import { getSessionBootstrapData } from "../../api/sessionApi";
 import { getAuthStatus, getDaemonInfo } from "../../commands/appCommands";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
+import { rendererQueryClient } from "../../queryClient";
 import { authStore } from "../../store/authStore";
+import { sessionStore } from "../../store/sessionStore";
 import { ApplicationRouterView, NotFoundRouteView } from "./ApplicationRouterView";
 
 vi.mock("react-i18next", () => ({
@@ -19,7 +22,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../../commands/appCommands", () => ({
   getAuthStatus: vi.fn(async () => ({ authenticated: false })),
-  getDaemonInfo: vi.fn(async () => ({ daemonId: "daemon-1", version: "0.0.0" })),
+  getDaemonInfo: vi.fn(async () => ({ daemonId: "daemon-1", version: "0.0.0", wsUrl: "ws://127.0.0.1:0" })),
 }));
 
 vi.mock("../../api/sessionApi", () => ({
@@ -57,6 +60,8 @@ vi.mock("../../commands/projectCommands", () => ({
 }));
 
 vi.mock("../../api", () => ({
+  createOrganization: vi.fn(async () => ({ id: "org-2", name: "New Organization" })),
+  listOrganizations: vi.fn(async () => [{ id: "org-2", name: "New Organization" }]),
   api: {
     node: {
       listByOrg: vi.fn(async () => []),
@@ -90,6 +95,10 @@ vi.mock("../WorkspaceView", async () => {
 
 vi.mock("../LoginView", () => ({
   LoginView: () => <div data-testid="login-view">login-view</div>,
+}));
+
+vi.mock("./AppMenuView", () => ({
+  AppMenuView: () => <div data-testid="app-menu-view" />,
 }));
 
 /** Exposes lightweight route controls for testing route transitions within one router instance. */
@@ -135,9 +144,11 @@ describe("ApplicationRouterView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    rendererQueryClient.clear();
     authStore.setState({ isAuthenticated: false, authStatusResolved: true });
+    sessionStore.getState().clearSessionData();
     vi.mocked(getAuthStatus).mockResolvedValue({ authenticated: false });
-    vi.mocked(getDaemonInfo).mockResolvedValue({ daemonId: "daemon-1", version: "0.0.0" });
+    vi.mocked(getDaemonInfo).mockResolvedValue({ daemonId: "daemon-1", version: "0.0.0", wsUrl: "ws://127.0.0.1:0" });
     vi.mocked(getSessionBootstrapData).mockResolvedValue({
       currentUser: {
         id: "user-1",
@@ -167,6 +178,8 @@ describe("ApplicationRouterView", () => {
     });
     vi.mocked(loadWorkspaceFromBackend).mockResolvedValue(undefined);
     vi.mocked(api.node.listByOrg).mockResolvedValue([]);
+    vi.mocked(createOrganization).mockResolvedValue({ id: "org-2", name: "New Organization" });
+    vi.mocked(listOrganizations).mockResolvedValue([{ id: "org-2", name: "New Organization" }]);
   });
 
   afterEach(() => {
@@ -187,6 +200,74 @@ describe("ApplicationRouterView", () => {
     expect(await screen.findByTestId("workspace-input")).toBeTruthy();
     expect(screen.queryByTestId("settings-overlay")).toBeNull();
     expect(screen.queryByTestId("keybindings-overlay")).toBeNull();
+  });
+
+  it("renders first organization setup when authenticated user has no organizations", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockResolvedValueOnce({
+      currentUser: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
+      },
+      organizations: [],
+    });
+
+    renderApplicationRouter("/");
+
+    expect(await screen.findByText("onboarding.firstOrganization.title")).toBeTruthy();
+    expect(screen.queryByTestId("workspace-input")).toBeNull();
+    expect(api.node.listByOrg).not.toHaveBeenCalled();
+  });
+
+  it("creates first organization and enters workspace", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockResolvedValueOnce({
+      currentUser: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
+      },
+      organizations: [],
+    });
+
+    renderApplicationRouter("/");
+
+    const input = (await screen.findByRole("textbox", { name: "org.menu.newOrganizationPrompt" })) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Acme" } });
+    fireEvent.click(screen.getByRole("button", { name: "onboarding.firstOrganization.submit" }));
+
+    expect(await screen.findByTestId("workspace-input")).toBeTruthy();
+    expect(createOrganization).toHaveBeenCalledWith("Acme");
+    expect(listOrganizations).toHaveBeenCalled();
   });
 
   it("keeps workspace mounted while showing settings overlay", async () => {

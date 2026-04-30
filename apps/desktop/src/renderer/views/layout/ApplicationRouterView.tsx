@@ -10,6 +10,7 @@ import { rendererQueryClient } from "../../queryClient";
 import { authStore } from "../../store/authStore";
 import { sessionStore } from "../../store/sessionStore";
 import { AppBootstrapLoadingView } from "./AppBootstrapLoadingView";
+import { OnboardOrgView } from "./OnboardOrgView";
 import { LoginView } from "../LoginView";
 import { WorkspaceView } from "../WorkspaceView";
 
@@ -56,6 +57,7 @@ export function ApplicationRouterView() {
   const isAuthenticated = authStore((state) => state.isAuthenticated);
   const authStatusResolved = authStore((state) => state.authStatusResolved);
   const setAuthState = authStore((state) => state.setAuthState);
+  const organizations = sessionStore((state) => state.organizations);
   const selectedOrganizationId = sessionStore((state) => state.selectedOrganizationId);
   const [appBootstrapReady, setAppBootstrapReady] = useState(false);
   const [appBootstrapError, setAppBootstrapError] = useState<string | null>(null);
@@ -209,6 +211,10 @@ export function ApplicationRouterView() {
         }}
       />
     );
+  }
+
+  if (organizations.length === 0) {
+    return <OnboardOrgView />;
   }
 
   return (

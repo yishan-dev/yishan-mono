@@ -218,6 +218,12 @@
     "defaultWorkspaceName": "默认组织"
   },
   "onboarding": {
+    "firstOrganization": {
+      "title": "创建你的第一个组织",
+      "description": "组织用于管理项目、工作区和共享节点。创建一个组织即可开始使用 Yishan。",
+      "submit": "创建组织",
+      "creating": "创建中..."
+    },
     "firstProject": {
       "title": "创建你的第一个项目",
       "description": "{{organizationName}} 还没有项目。添加本地文件夹或远程 Git 仓库即可开始工作。",
