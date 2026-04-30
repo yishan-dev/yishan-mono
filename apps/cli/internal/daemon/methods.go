@@ -8,7 +8,7 @@ const (
 	MethodWorkspaceCreate = "workspace.create"
 
 	MethodAgentListDetectionStatuses = "agent.listDetectionStatuses"
-	MethodFrontendEventsStream       = "events.stream"
+	MethodFrontendEventsStream       = "events.frontendStream"
 
 	MethodFileRead   = "file.read"
 	MethodFileList   = "file.list"

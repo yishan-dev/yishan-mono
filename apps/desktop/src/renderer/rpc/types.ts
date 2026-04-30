@@ -88,7 +88,7 @@ export type DaemonRpcClient = {
     updateNotificationPreferences: (input: unknown) => Promise<NotificationPreferences>;
   };
   events: {
-    stream: {
+    frontendStream: {
       subscribe: (
         input: undefined,
         handlers: {

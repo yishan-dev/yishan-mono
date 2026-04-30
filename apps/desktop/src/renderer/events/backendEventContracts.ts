@@ -1,5 +1,6 @@
 import type { DesktopRpcEventEnvelope } from "../../main/ipc";
 import type { RpcFrontendMessageKey, RpcFrontendMessagePayload } from "../../shared/contracts/rpcSchema";
+import { SUPPORTED_NOTIFICATION_EVENT_TYPES } from "../../shared/notifications/notificationPreferences";
 
 const FRONTEND_MESSAGE_KEYS = [
   "appAction",
@@ -107,6 +108,7 @@ function isNotificationEventPayload(
     (payload.workspaceId !== undefined && typeof payload.workspaceId !== "string") ||
     (payload.sessionId !== undefined && typeof payload.sessionId !== "string") ||
     (payload.navigationPath !== undefined && typeof payload.navigationPath !== "string") ||
+    (payload.notificationEventType !== undefined && !isSupportedNotificationEventType(payload.notificationEventType)) ||
     (payload.silent !== undefined && typeof payload.silent !== "boolean") ||
     (payload.showSystemNotification !== undefined && typeof payload.showSystemNotification !== "boolean") ||
     !isNotificationSoundPayload(payload.soundToPlay)
@@ -119,6 +121,10 @@ function isNotificationEventPayload(
   }
 
   return true;
+}
+
+function isSupportedNotificationEventType(value: unknown): boolean {
+  return typeof value === "string" && (SUPPORTED_NOTIFICATION_EVENT_TYPES as readonly string[]).includes(value);
 }
 
 /** Returns true when one optional notification sound payload has the supported runtime shape. */

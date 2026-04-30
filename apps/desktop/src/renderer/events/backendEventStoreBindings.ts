@@ -1,5 +1,6 @@
 import type { RpcFrontendMessagePayload } from "../../shared/contracts/rpcSchema";
-import { dispatchNotification, playNotificationSound } from "../commands/notificationCommands";
+import type { NotificationEventType, NotificationPreferences } from "../../shared/notifications/notificationPreferences";
+import { dispatchNotification, getNotificationPreferences, playNotificationSound } from "../commands/notificationCommands";
 import { type WorkspaceAgentStatus, type WorkspaceUnreadTone, chatStore } from "../store/chatStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { subscribeBackendEvent } from "./backendEventPipeline";
@@ -22,6 +23,7 @@ type BackendEventStoreBindingsDependencies = {
   recordWorkspaceUnreadNotification: (workspaceId: string, tone: WorkspaceUnreadTone) => void;
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
+  getNotificationPreferences?: () => Promise<NotificationPreferences>;
 };
 
 const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindingsDependencies = {
@@ -62,6 +64,7 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   playNotificationSound: async (input) => {
     await playNotificationSound(input);
   },
+  getNotificationPreferences,
 };
 
 /**
@@ -116,6 +119,46 @@ function deriveWorkspaceAgentStatusByWorkspaceId(
   return statusByWorkspaceId;
 }
 
+function shouldDeliverPreferenceBackedNotification(
+  preferences: NotificationPreferences,
+  eventType: NotificationEventType,
+): boolean {
+  return (
+    preferences.enabled &&
+    preferences.enabledCategories.includes("ai-task") &&
+    preferences.enabledEventTypes.includes(eventType)
+  );
+}
+
+async function dispatchPreferenceBackedNotification(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+) {
+  const eventType = payload.notificationEventType;
+  if (!eventType || payload.silent === true) {
+    return;
+  }
+
+  const preferences = await (dependencies.getNotificationPreferences ?? getNotificationPreferences)();
+  if (!shouldDeliverPreferenceBackedNotification(preferences, eventType)) {
+    return;
+  }
+
+  if (preferences.osEnabled) {
+    await dependencies.dispatchSystemNotification({
+      title: payload.title,
+      body: payload.body,
+    });
+  }
+
+  if (preferences.soundEnabled && preferences.volume > 0) {
+    await dependencies.playNotificationSound({
+      soundId: preferences.eventSounds[eventType],
+      volume: preferences.volume,
+    });
+  }
+}
+
 /**
  * Creates one binding function that connects normalized backend events to workspace store actions.
  */
@@ -167,7 +210,11 @@ export function createBackendEventStoreBindings(
         }
       }
 
-      if (payload.showSystemNotification) {
+      if (payload.notificationEventType) {
+        void dispatchPreferenceBackedNotification(payload, dependencies).catch(() => {
+          // Preference resolution and delivery failures should not block store state updates.
+        });
+      } else if (payload.showSystemNotification) {
         void dependencies
           .dispatchSystemNotification({
             title: payload.title,

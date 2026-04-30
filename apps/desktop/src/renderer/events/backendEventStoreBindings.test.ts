@@ -326,4 +326,75 @@ describe("createBackendEventStoreBindings", () => {
 
     stopBindings();
   });
+
+  it("applies notification preferences before dispatching preference-backed effects", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: true,
+      volume: 0.4,
+      focusOnClick: true,
+      enabledEventTypes: ["run-finished" as const],
+      eventSounds: {
+        "run-finished": "zip" as const,
+        "run-failed": "alert" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run completed",
+      tone: "success",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-finished",
+    });
+    inAppNotificationHarness.emit({
+      id: "notification-2",
+      title: "Run failed",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:01.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-failed",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getNotificationPreferences).toHaveBeenCalledTimes(2);
+    expect(dispatchSystemNotification).toHaveBeenCalledTimes(1);
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Run completed",
+      body: undefined,
+    });
+    expect(playNotificationSound).toHaveBeenCalledTimes(1);
+    expect(playNotificationSound).toHaveBeenCalledWith({
+      soundId: "zip",
+      volume: 0.4,
+    });
+
+    stopBindings();
+  });
 });

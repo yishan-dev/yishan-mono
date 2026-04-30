@@ -1,4 +1,5 @@
 import type { AppActionPayload } from "./actions";
+import type { NotificationEventType } from "../notifications/notificationPreferences";
 
 export type RpcSchema = {
   toFrontend: {
@@ -25,6 +26,7 @@ export type RpcSchema = {
         workspaceId?: string;
         sessionId?: string;
         navigationPath?: string;
+        notificationEventType?: NotificationEventType;
         silent?: boolean;
         showSystemNotification?: boolean;
         soundToPlay?: {

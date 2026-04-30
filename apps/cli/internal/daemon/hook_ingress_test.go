@@ -68,12 +68,11 @@ func TestServeAgentHookPublishesFailedNotificationEvent(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected map payload, got %T", event.Payload)
 	}
-	if payload["title"] != "Run Failed" || payload["tone"] != "error" || payload["showSystemNotification"] != true {
+	if payload["title"] != "Run Failed" || payload["tone"] != "error" || payload["notificationEventType"] != "run-failed" {
 		t.Fatalf("unexpected payload: %#v", payload)
 	}
-	sound, ok := payload["soundToPlay"].(map[string]any)
-	if !ok || sound["soundId"] != "alert" {
-		t.Fatalf("unexpected sound payload: %#v", payload["soundToPlay"])
+	if _, ok := payload["showSystemNotification"]; ok {
+		t.Fatalf("expected renderer to resolve system notification preference, got %#v", payload)
 	}
 }
 

@@ -116,20 +116,20 @@ func normalizeHookIngressPayload(payload hookIngressEvent) (normalizedHookEvent,
 func buildHookNotificationPayload(event normalizedHookEvent) map[string]any {
 	switch event.eventType {
 	case "start":
-		return hookNotificationPayload(event, "Run Started", "Workspace "+event.workspaceID+" is running.", "success", true, false, "")
+		return hookNotificationPayload(event, "Run Started", "Workspace "+event.workspaceID+" is running.", "success", true, "")
 	case "wait_input":
-		return hookNotificationPayload(event, "Input Required", "Workspace "+event.workspaceID+" is waiting for your approval or input.", "error", false, true, "alert")
+		return hookNotificationPayload(event, "Input Required", "Workspace "+event.workspaceID+" is waiting for your approval or input.", "error", false, "run-failed")
 	case "stop":
 		if isFailedHookEvent(event.rawEventType) {
-			return hookNotificationPayload(event, "Run Failed", "Workspace "+event.workspaceID+" has stopped with an error.", "error", false, true, "alert")
+			return hookNotificationPayload(event, "Run Failed", "Workspace "+event.workspaceID+" has stopped with an error.", "error", false, "run-failed")
 		}
-		return hookNotificationPayload(event, "Run Completed", "Workspace "+event.workspaceID+" has completed successfully.", "success", false, true, "chime")
+		return hookNotificationPayload(event, "Run Completed", "Workspace "+event.workspaceID+" has completed successfully.", "success", false, "run-finished")
 	default:
 		return nil
 	}
 }
 
-func hookNotificationPayload(event normalizedHookEvent, title string, body string, tone string, silent bool, showSystemNotification bool, soundID string) map[string]any {
+func hookNotificationPayload(event normalizedHookEvent, title string, body string, tone string, silent bool, notificationEventType string) map[string]any {
 	payload := map[string]any{
 		"id":          newHookEventID(),
 		"title":       title,
@@ -142,10 +142,9 @@ func hookNotificationPayload(event normalizedHookEvent, title string, body strin
 			"normalizedEventType": event.eventType,
 			"sessionKey":          event.sessionKey,
 		},
-		"showSystemNotification": showSystemNotification,
 	}
-	if soundID != "" {
-		payload["soundToPlay"] = map[string]any{"soundId": soundID, "volume": 1}
+	if notificationEventType != "" {
+		payload["notificationEventType"] = notificationEventType
 	}
 	return payload
 }

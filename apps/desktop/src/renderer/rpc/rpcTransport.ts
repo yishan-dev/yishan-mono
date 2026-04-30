@@ -287,7 +287,7 @@ async function ensureBackendEventsSubscription(): Promise<void> {
   }
 
   const client = await getDaemonClient();
-  backendEventsSubscription = client.events.stream.subscribe(undefined, {
+  backendEventsSubscription = client.events.frontendStream.subscribe(undefined, {
     onData: (event: { topic: string; payload: unknown }) => {
       emitDesktopRpcEvent({
         method: event.topic,
