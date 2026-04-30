@@ -11,7 +11,6 @@ import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
 import { workspaceStore } from "../../store/workspaceStore";
 import type { RepoWorkspaceItem, WorkspaceProjectRecord } from "../../store/types";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
-import { WorkspaceResourceUsageControl } from "./WorkspaceResourceUsageControl";
 
 const titleBarSx = {
   minHeight: 42,
@@ -194,7 +193,6 @@ export function MainPaneTitleBarView() {
           </Button>
         </Box>
         <Box className="electron-webkit-app-region-no-drag" sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <WorkspaceResourceUsageControl />
           <WorkspacePortsMenuControl />
           {rightCollapsed ? (
             <Tooltip title={toggleRightTooltipLabel} arrow>

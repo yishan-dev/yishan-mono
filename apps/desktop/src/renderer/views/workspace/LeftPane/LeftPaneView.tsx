@@ -5,7 +5,6 @@ import { getRendererPlatform } from "../../../helpers/platform";
 import { getShortcutDisplayLabelById } from "../../../shortcuts/shortcutDisplay";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { AppMenuView } from "../../layout/AppMenuView";
-import { LeftPaneResourceUsageControl } from "./LeftPaneResourceUsageControl";
 import { ProjectFilterPopoverView } from "./ProjectFilterPopoverView";
 import { ProjectListView } from "./ProjectListView";
 
@@ -56,9 +55,7 @@ export function LeftPaneView({ onCreateRepository, onToggleLeftPane }: LeftPaneV
         <Box
           className="electron-webkit-app-region-no-drag"
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 0, pr: 0.5 }}
-        >
-          <LeftPaneResourceUsageControl />
-        </Box>
+        />
         <Stack direction="row" alignItems="center" spacing={0.25}>
           <Box className="electron-webkit-app-region-no-drag" sx={{ display: "flex", alignItems: "center" }}>
             <ProjectFilterPopoverView />
