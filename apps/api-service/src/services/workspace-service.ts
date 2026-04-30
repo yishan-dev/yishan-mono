@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import type { AppDb } from "@/db/client";
 import { nodes, organizationMembers, projects, workspaces } from "@/db/schema";
@@ -8,6 +8,7 @@ import {
   WorkspaceBranchRequiredError,
   WorkspaceLocalNodePermissionRequiredError,
   WorkspaceLocalNodeScopeInvalidError,
+  WorkspaceNotFoundError,
   WorkspaceNodeNotFoundError
 } from "@/errors";
 import { newId } from "@/lib/id";
@@ -31,6 +32,16 @@ export type WorkspaceView = {
 };
 
 type CreateWorkspaceInput = {
+  organizationId: string;
+  actorUserId: string;
+  projectId: string;
+  nodeId: string;
+  kind: WorkspaceKind;
+  branch?: string;
+  localPath: string;
+};
+
+type CloseWorkspaceInput = {
   organizationId: string;
   actorUserId: string;
   projectId: string;
@@ -107,6 +118,31 @@ export class WorkspaceService {
         throw new WorkspaceNodeNotFoundError(input.nodeId);
       }
 
+      const reactivatedRows = await tx
+        .update(workspaces)
+        .set({
+          status: "active",
+          localPath: input.localPath.trim(),
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(workspaces.organizationId, input.organizationId),
+            eq(workspaces.projectId, input.projectId),
+            eq(workspaces.userId, input.actorUserId),
+            eq(workspaces.nodeId, input.nodeId),
+            eq(workspaces.kind, input.kind),
+            branch ? eq(workspaces.branch, branch) : isNull(workspaces.branch),
+            eq(workspaces.status, "closed")
+          )
+        )
+        .returning();
+
+      const reactivatedWorkspace = reactivatedRows[0];
+      if (reactivatedWorkspace) {
+        return reactivatedWorkspace;
+      }
+
       const insertedRows = await tx
         .insert(workspaces)
         .values({
@@ -163,5 +199,53 @@ export class WorkspaceService {
       );
 
     return rows;
+  }
+
+  async closeWorkspace(input: CloseWorkspaceInput): Promise<WorkspaceView> {
+    const role = await this.organizationService.getMembershipRole({
+      organizationId: input.organizationId,
+      userId: input.actorUserId
+    });
+
+    if (!role) {
+      throw new OrganizationMembershipRequiredError();
+    }
+
+    const branch = input.branch?.trim() ?? null;
+    if (input.kind === "worktree" && !branch) {
+      throw new WorkspaceBranchRequiredError();
+    }
+
+    const rows = await this.db
+      .update(workspaces)
+      .set({
+        status: "closed",
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(workspaces.organizationId, input.organizationId),
+          eq(workspaces.projectId, input.projectId),
+          eq(workspaces.userId, input.actorUserId),
+          eq(workspaces.nodeId, input.nodeId),
+          eq(workspaces.kind, input.kind),
+          branch ? eq(workspaces.branch, branch) : isNull(workspaces.branch),
+          eq(workspaces.localPath, input.localPath.trim())
+        )
+      )
+      .returning();
+
+    const workspace = rows[0];
+    if (!workspace) {
+      throw new WorkspaceNotFoundError({
+        projectId: input.projectId,
+        nodeId: input.nodeId,
+        kind: input.kind,
+        branch,
+        localPath: input.localPath
+      });
+    }
+
+    return workspace;
   }
 }

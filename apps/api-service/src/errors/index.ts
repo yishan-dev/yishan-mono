@@ -243,3 +243,10 @@ export class WorkspaceBranchRequiredError extends AppError {
     this.name = "WorkspaceBranchRequiredError";
   }
 }
+
+export class WorkspaceNotFoundError extends AppError {
+  constructor(details: Record<string, unknown>) {
+    super("Workspace not found", StatusCodes.NOT_FOUND, "WORKSPACE_NOT_FOUND", details);
+    this.name = "WorkspaceNotFoundError";
+  }
+}

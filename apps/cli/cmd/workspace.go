@@ -6,6 +6,7 @@ import (
 
 	"yishan/apps/cli/internal/output"
 	"yishan/apps/cli/internal/provision"
+	cliruntime "yishan/apps/cli/internal/runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,7 @@ var workspaceListCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().ListWorkspaces(orgID, projectID)
+		response, err := cliruntime.APIClient().ListWorkspaces(orgID, projectID)
 		if err != nil {
 			return err
 		}
@@ -68,7 +69,7 @@ var workspaceCreateCmd = &cobra.Command{
 			return fmt.Errorf("local-path is required for primary workspaces")
 		}
 
-		provisioner := provision.NewRuntimeProvisioner(apiClient(), provision.RuntimeConfig{
+		provisioner := provision.NewRuntimeProvisioner(cliruntime.APIClient(), provision.RuntimeConfig{
 			ConfigPath: appConfig.ConfigPath,
 			Daemon: provision.DaemonAuthConfig{
 				Host:        appConfig.Daemon.Host,

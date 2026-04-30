@@ -6,6 +6,7 @@ const (
 	MethodOpen            = "open"
 	MethodList            = "list"
 	MethodWorkspaceCreate = "workspace.create"
+	MethodWorkspaceClose  = "workspace.close"
 
 	MethodAgentListDetectionStatuses = "agent.listDetectionStatuses"
 	MethodFrontendEventsStream       = "events.frontendStream"

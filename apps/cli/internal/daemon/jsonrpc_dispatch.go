@@ -29,8 +29,8 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err != nil {
 			return nil, err
 		}
-		if h.createWorkspace != nil && req.ProjectID != "" {
-			if err := h.createWorkspace(ctx, WorkspaceCreation{
+		if req.ProjectID != "" {
+			if err := createRemoteWorkspace(ctx, WorkspaceCreation{
 				NodeID:         h.nodeID,
 				OrganizationID: req.OrganizationID,
 				ProjectID:      req.ProjectID,
@@ -42,6 +42,37 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			}
 		}
 		return created, nil
+	case MethodWorkspaceClose:
+		var req workspaceCloseParams
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		if err := h.manager.CloseWorkspace(ctx, workspace.CloseRequest{
+			WorkspaceID:   req.WorkspaceID,
+			Branch:        req.Branch,
+			RemoveBranch:  req.RemoveBranch,
+			ForceWorktree: req.ForceWorktree,
+			ForceBranch:   req.ForceBranch,
+		}); err != nil {
+			return nil, err
+		}
+		if req.ProjectID != "" {
+			if err := closeRemoteWorkspace(ctx, WorkspaceClose{
+				NodeID:         h.nodeID,
+				OrganizationID: req.OrganizationID,
+				ProjectID:      req.ProjectID,
+				Kind:           "worktree",
+				Branch:         req.Branch,
+				LocalPath:      req.WorktreePath,
+			}); err != nil {
+				return nil, err
+			}
+		}
+		return map[string]any{
+			"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
+			"workspaceId":             req.WorkspaceID,
+			"lifecycleScriptWarnings": []any{},
+		}, nil
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
 	case MethodFrontendEventsStream:

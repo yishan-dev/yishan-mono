@@ -46,9 +46,17 @@ export const createWorkspaceBodySchema = z.object({
   localPath: nonEmptyStringSchema,
 });
 
+export const closeWorkspaceBodySchema = z.object({
+  kind: z.enum(["primary", "worktree"]).optional().default("worktree"),
+  branch: nonEmptyStringSchema.optional(),
+  nodeId: nonEmptyStringSchema,
+  localPath: nonEmptyStringSchema,
+});
+
 export type OrganizationProjectParamsInput = z.infer<typeof organizationProjectParamsSchema>;
 export type OrganizationProjectListQueryInput = z.infer<typeof organizationProjectListQuerySchema>;
 export type ProjectWorkspaceParamsInput = z.infer<typeof projectWorkspaceParamsSchema>;
 export type CreateProjectBodyInput = z.infer<typeof createProjectBodySchema>;
 export type UpdateProjectBodyInput = z.infer<typeof updateProjectBodySchema>;
 export type CreateWorkspaceBodyInput = z.infer<typeof createWorkspaceBodySchema>;
+export type CloseWorkspaceBodyInput = z.infer<typeof closeWorkspaceBodySchema>;

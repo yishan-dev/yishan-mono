@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
 var refreshCmd = &cobra.Command{
@@ -14,7 +15,7 @@ var refreshCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().RefreshToken(refreshToken)
+		response, err := cliruntime.APIClient().RefreshToken(refreshToken)
 		if err != nil {
 			return err
 		}
@@ -32,7 +33,7 @@ var revokeCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().RevokeToken(refreshToken)
+		response, err := cliruntime.APIClient().RevokeToken(refreshToken)
 		if err != nil {
 			return err
 		}

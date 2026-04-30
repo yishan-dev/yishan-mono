@@ -23,19 +23,6 @@ import {
   setRightPaneWidth,
 } from "./workspaceCommands";
 
-type WorkspaceListResponse = Array<{
-  id: string;
-  instance: {
-    workspaceId: string;
-    repoId: string;
-    name: string;
-    sourceBranch: string;
-    branch: string;
-    worktreePath: string;
-    status: string;
-  } | null;
-}>;
-
 const rpcMocks = vi.hoisted(() => ({
   createWorkspace: vi.fn(),
   list: vi.fn(),
@@ -258,20 +245,6 @@ describe("workspaceCommands", () => {
       ],
       deleteWorkspace,
     });
-    rpcMocks.list.mockResolvedValueOnce([
-      {
-        id: "workspace-entity-1",
-        instance: {
-          workspaceId: "workspace-1",
-          repoId: "repo-1",
-          name: "Feature A",
-          sourceBranch: "main",
-          branch: "feature-a",
-          worktreePath: "/tmp/worktrees/feature-a",
-          status: "active",
-        },
-      },
-    ]);
     await closeWorkspace("workspace-1");
 
     expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
@@ -282,7 +255,11 @@ describe("workspaceCommands", () => {
 
     await vi.waitFor(() => {
       expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
-        workspaceId: "workspace-entity-1",
+        workspaceId: "workspace-1",
+        organizationId: undefined,
+        projectId: "repo-1",
+        workspaceWorktreePath: "/tmp/worktrees/feature-a",
+        branch: "feature-a",
         removeBranch: undefined,
       });
     });
@@ -306,22 +283,8 @@ describe("workspaceCommands", () => {
       ],
       deleteWorkspace,
     });
-    rpcMocks.list.mockResolvedValueOnce([
-      {
-        id: "workspace-entity-1",
-        instance: {
-          workspaceId: "workspace-1",
-          repoId: "repo-1",
-          name: "Feature A",
-          sourceBranch: "main",
-          branch: "feature-a",
-          worktreePath: "/tmp/worktrees/feature-a",
-          status: "active",
-        },
-      },
-    ]);
     rpcMocks.closeWorkspace.mockResolvedValueOnce({
-      workspace: { id: "workspace-entity-1", status: "archived" },
+      workspace: { id: "workspace-1", status: "archived" },
       workspaceId: "workspace-1",
       lifecycleScriptWarnings: [
         {
@@ -377,24 +340,14 @@ describe("workspaceCommands", () => {
       ],
       deleteWorkspace,
     });
-    rpcMocks.list.mockResolvedValueOnce([
-      {
-        id: "workspace-entity-1",
-        instance: {
-          workspaceId: "workspace-1",
-          repoId: "repo-1",
-          name: "Feature A",
-          sourceBranch: "main",
-          branch: "feature-a",
-          worktreePath: "",
-          status: "active",
-        },
-      },
-    ]);
     await closeWorkspace("workspace-1", { removeBranch: true });
     await vi.waitFor(() => {
       expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
-        workspaceId: "workspace-entity-1",
+        workspaceId: "workspace-1",
+        organizationId: undefined,
+        projectId: "repo-1",
+        workspaceWorktreePath: undefined,
+        branch: "feature-a",
         removeBranch: true,
       });
     });
@@ -432,37 +385,27 @@ describe("workspaceCommands", () => {
       deleteWorkspace,
     });
 
-    let resolveList: ((value: WorkspaceListResponse) => void) | undefined;
-    rpcMocks.list.mockReturnValueOnce(
-      new Promise<WorkspaceListResponse>((resolve) => {
-        resolveList = resolve;
+    let resolveClose: (() => void) | undefined;
+    rpcMocks.closeWorkspace.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveClose = () => {
+          resolve({ workspace: { id: "workspace-1", status: "closed" }, workspaceId: "workspace-1", lifecycleScriptWarnings: [] });
+        };
       }),
     );
     await closeWorkspace("workspace-1");
 
     expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
-    expect(rpcMocks.closeWorkspace).not.toHaveBeenCalled();
-
-    resolveList?.([
-      {
-        id: "workspace-entity-1",
-        instance: {
-          workspaceId: "workspace-1",
-          repoId: "repo-1",
-          name: "Feature A",
-          sourceBranch: "main",
-          branch: "feature-a",
-          worktreePath: "",
-          status: "active",
-        },
-      },
-    ]);
-    await vi.waitFor(() => {
-      expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
-        workspaceId: "workspace-entity-1",
-        removeBranch: undefined,
-      });
+    expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      organizationId: undefined,
+      projectId: "repo-1",
+      workspaceWorktreePath: undefined,
+      branch: "feature-a",
+      removeBranch: undefined,
     });
+
+    resolveClose?.();
   });
 
   it("refreshes git changes count through backend service", async () => {

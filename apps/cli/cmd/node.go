@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
 var nodeListCmd = &cobra.Command{
@@ -15,7 +16,7 @@ var nodeListCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().ListNodes(orgID)
+		response, err := cliruntime.APIClient().ListNodes(orgID)
 		if err != nil {
 			return err
 		}
@@ -69,7 +70,7 @@ var nodeCreateCmd = &cobra.Command{
 			input.Metadata = metadata
 		}
 
-		response, err := apiClient().CreateNode(orgID, input)
+		response, err := cliruntime.APIClient().CreateNode(orgID, input)
 		if err != nil {
 			return err
 		}
@@ -91,7 +92,7 @@ var nodeDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().DeleteNode(orgID, nodeID)
+		response, err := cliruntime.APIClient().DeleteNode(orgID, nodeID)
 		if err != nil {
 			return err
 		}

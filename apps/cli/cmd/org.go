@@ -8,13 +8,14 @@ import (
 	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/config"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
 var orgListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List organizations",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		response, err := apiClient().ListOrganizations()
+		response, err := cliruntime.APIClient().ListOrganizations()
 		if err != nil {
 			return err
 		}
@@ -41,7 +42,7 @@ var orgCreateCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().CreateOrganization(api.CreateOrganizationInput{
+		response, err := cliruntime.APIClient().CreateOrganization(api.CreateOrganizationInput{
 			Name:          name,
 			MemberUserIDs: memberUserIDs,
 		})
@@ -62,7 +63,7 @@ var orgDeleteCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().DeleteOrganization(orgID)
+		response, err := cliruntime.APIClient().DeleteOrganization(orgID)
 		if err != nil {
 			return err
 		}
@@ -88,7 +89,7 @@ var orgMemberAddCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().AddOrganizationMember(orgID, userID, role)
+		response, err := cliruntime.APIClient().AddOrganizationMember(orgID, userID, role)
 		if err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ var orgMemberRemoveCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().RemoveOrganizationMember(orgID, userID)
+		response, err := cliruntime.APIClient().RemoveOrganizationMember(orgID, userID)
 		if err != nil {
 			return err
 		}
@@ -148,7 +149,7 @@ var orgCurrentCmd = &cobra.Command{
 			return fmt.Errorf("no active org: run `yishan org use <org-id>`")
 		}
 
-		response, err := apiClient().ListOrganizations()
+		response, err := cliruntime.APIClient().ListOrganizations()
 		if err != nil {
 			return err
 		}

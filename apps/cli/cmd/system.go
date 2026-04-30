@@ -3,13 +3,14 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
 var healthCmd = &cobra.Command{
 	Use:   "health",
 	Short: "Check API health",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		response, err := apiClient().Health()
+		response, err := cliruntime.APIClient().Health()
 		if err != nil {
 			return err
 		}
@@ -23,7 +24,7 @@ var whoamiCmd = &cobra.Command{
 	Aliases: []string{"me"},
 	Short:   "Show current authenticated user",
 	RunE: func(_ *cobra.Command, _ []string) error {
-		response, err := apiClient().WhoAmI()
+		response, err := cliruntime.APIClient().WhoAmI()
 		if err != nil {
 			return err
 		}

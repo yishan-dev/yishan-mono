@@ -36,6 +36,14 @@ type OpenRequest struct {
 	Path string `json:"path"`
 }
 
+type CloseRequest struct {
+	WorkspaceID   string
+	Branch        string
+	RemoveBranch  bool
+	ForceWorktree bool
+	ForceBranch   bool
+}
+
 func (m *Manager) Open(req OpenRequest) (Workspace, error) {
 	if req.ID == "" || req.Path == "" {
 		return Workspace{}, NewRPCError(-32602, "id and path are required")
@@ -72,6 +80,41 @@ func (m *Manager) List() []Workspace {
 		out = append(out, ws)
 	}
 	return out
+}
+
+func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) error {
+	ws, err := m.getWorkspace(req.WorkspaceID)
+	if err != nil {
+		return err
+	}
+
+	mainWorktreePath, err := m.gits.MainWorktreePath(ctx, ws.Path)
+	if err != nil {
+		return err
+	}
+
+	branch := req.Branch
+	if req.RemoveBranch && branch == "" {
+		branch, err = m.gits.CurrentBranch(ctx, ws.Path)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := m.gits.RemoveWorktree(ctx, mainWorktreePath, ws.Path, req.ForceWorktree); err != nil {
+		return err
+	}
+	if req.RemoveBranch {
+		if err := m.gits.RemoveBranch(ctx, mainWorktreePath, branch, req.ForceBranch); err != nil {
+			return err
+		}
+	}
+
+	m.mu.Lock()
+	delete(m.workspaces, req.WorkspaceID)
+	m.mu.Unlock()
+
+	return nil
 }
 
 func (m *Manager) getWorkspace(id string) (Workspace, error) {

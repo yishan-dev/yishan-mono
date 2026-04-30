@@ -18,6 +18,7 @@ import (
 
 	"yishan/apps/cli/internal/buildinfo"
 	"yishan/apps/cli/internal/daemon/setup"
+	cliruntime "yishan/apps/cli/internal/runtime"
 	"yishan/apps/cli/internal/workspace"
 
 	"github.com/rs/zerolog/log"
@@ -28,14 +29,12 @@ var ErrNotRunning = errors.New("daemon is not running")
 const detachedEnvKey = "YISHAN_DAEMON_DETACHED"
 
 type RunConfig struct {
-	Host            string
-	Port            int
-	JWTSecret       string
-	JWTIssuer       string
-	JWTAudience     string
-	JWTRequired     bool
-	RegisterNode    func(NodeRegistration) error
-	CreateWorkspace func(context.Context, WorkspaceCreation) error
+	Host        string
+	Port        int
+	JWTSecret   string
+	JWTIssuer   string
+	JWTAudience string
+	JWTRequired bool
 }
 
 type StartConfig struct {
@@ -85,7 +84,7 @@ func Run(cfg RunConfig, statePath string) error {
 	currentPID := os.Getpid()
 
 	workspaceManager := workspace.NewManager()
-	handler := NewJSONRPCHandler(workspaceManager, daemonID, cfg.CreateWorkspace)
+	handler := NewJSONRPCHandler(workspaceManager, daemonID)
 	auth := NewJWTAuth(JWTAuthConfig{
 		Secret:   cfg.JWTSecret,
 		Issuer:   cfg.JWTIssuer,
@@ -130,9 +129,9 @@ func Run(cfg RunConfig, statePath string) error {
 		}
 	}()
 
-	if cfg.RegisterNode != nil {
+	if cliruntime.APIConfigured() {
 		agentDetectionStatus := ListAgentCLIDetectionStatuses()
-		if err := cfg.RegisterNode(NodeRegistration{
+		if err := registerRemoteNode(NodeRegistration{
 			ID:                   daemonID,
 			Endpoint:             "http://" + actualAddr,
 			AgentDetectionStatus: agentDetectionStatus,

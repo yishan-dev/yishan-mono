@@ -35,21 +35,6 @@ type BackendWorkspace = {
   worktreePath: string;
 };
 
-type WorkspaceListResponse = Array<{
-  id: string;
-  projectId?: string | null;
-  instance: {
-    workspaceId: string;
-    repoId: string;
-    projectId?: string;
-    name: string;
-    sourceBranch: string;
-    branch: string;
-    worktreePath: string;
-    status: string;
-  } | null;
-}>;
-
 type CreateWorkspaceResponse = {
   workspaceId: string;
   projectId?: string;
@@ -90,45 +75,24 @@ function formatWorkspaceCreateError(error: unknown): string {
   return daemonPrefixMatch?.[1]?.trim() || message;
 }
 
-/**
- * Resolves one workspace id from one workspace-instance id through overview rows.
- */
-function resolveWorkspaceIdByInstanceId(workspaces: WorkspaceListResponse, workspaceId: string): string | undefined {
-  for (const item of workspaces) {
-    if (item.instance?.workspaceId === workspaceId) {
-      return item.id;
-    }
-  }
-
-  return undefined;
-}
-
-/** Resolves one backend workspace id from one workspace-instance id. */
-async function resolveBackendWorkspaceId(
-  client: Awaited<ReturnType<typeof getDaemonClient>>,
-  workspaceId: string,
-): Promise<string | undefined> {
-  const workspaces = (await client.workspace.list({
-    orgId: "default",
-  })) as WorkspaceListResponse;
-  return resolveWorkspaceIdByInstanceId(workspaces, workspaceId);
-}
-
 /** Runs backend workspace-close cleanup without blocking UI state updates. */
 async function closeWorkspaceInBackground(input: {
   workspaceId: string;
   workspaceName: string;
+  organizationId?: string;
+  projectId?: string;
+  workspaceWorktreePath?: string;
+  branch?: string;
   removeBranch?: boolean;
 }): Promise<void> {
   const client = await getDaemonClient();
 
-  const backendWorkspaceId = await resolveBackendWorkspaceId(client, input.workspaceId);
-  if (!backendWorkspaceId) {
-    return;
-  }
-
   const closed = (await client.workspace.close({
-    workspaceId: backendWorkspaceId,
+    workspaceId: input.workspaceId,
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    workspaceWorktreePath: input.workspaceWorktreePath,
+    branch: input.branch,
     removeBranch: input.removeBranch,
   })) as CloseWorkspaceResponse | undefined;
   if (!closed) {
@@ -254,6 +218,10 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
   void closeWorkspaceInBackground({
     workspaceId,
     workspaceName: workspace.name,
+    organizationId: sessionStore.getState().selectedOrganizationId?.trim() || undefined,
+    projectId: workspace.projectId ?? workspace.repoId,
+    workspaceWorktreePath: workspace.worktreePath?.trim() || undefined,
+    branch: workspace.branch,
     removeBranch: options?.removeBranch,
   }).catch((error) => {
     console.error("Failed to close backend workspace", error);

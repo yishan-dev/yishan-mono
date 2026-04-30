@@ -12,7 +12,7 @@ import (
 )
 
 func TestServeAgentHookPublishesStartNotificationEvent(t *testing.T) {
-	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1", nil)
+	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1")
 	subscriptionID, events := handler.events.Subscribe()
 	defer handler.events.Unsubscribe(subscriptionID)
 
@@ -48,7 +48,7 @@ func TestServeAgentHookPublishesStartNotificationEvent(t *testing.T) {
 }
 
 func TestServeAgentHookPublishesFailedNotificationEvent(t *testing.T) {
-	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1", nil)
+	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1")
 	subscriptionID, events := handler.events.Subscribe()
 	defer handler.events.Unsubscribe(subscriptionID)
 
@@ -77,7 +77,7 @@ func TestServeAgentHookPublishesFailedNotificationEvent(t *testing.T) {
 }
 
 func TestServeAgentHookRejectsInvalidPayload(t *testing.T) {
-	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1", nil)
+	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1")
 	response := postHookPayload(t, handler, map[string]any{"event": "Start"})
 
 	if response.Code != http.StatusBadRequest {

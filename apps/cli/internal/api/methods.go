@@ -35,6 +35,13 @@ type CreateWorkspaceInput struct {
 	Branch    string
 }
 
+type CloseWorkspaceInput struct {
+	NodeID    string
+	LocalPath string
+	Kind      string
+	Branch    string
+}
+
 func (c *Client) Health() (HealthResponse, error) {
 	var response HealthResponse
 	err := c.DoDecode("GET", "/health", nil, &response)
@@ -176,6 +183,21 @@ func (c *Client) CreateWorkspace(orgID string, projectID string, input CreateWor
 
 	var response CreateWorkspaceResponse
 	err := c.DoDecode("POST", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces", payload, &response)
+	return response, err
+}
+
+func (c *Client) CloseWorkspace(orgID string, projectID string, input CloseWorkspaceInput) (CreateWorkspaceResponse, error) {
+	payload := map[string]string{
+		"nodeId":    input.NodeID,
+		"localPath": input.LocalPath,
+		"kind":      input.Kind,
+	}
+	if input.Branch != "" {
+		payload["branch"] = input.Branch
+	}
+
+	var response CreateWorkspaceResponse
+	err := c.DoDecode("PATCH", "/orgs/"+orgID+"/projects/"+projectID+"/workspaces/close", payload, &response)
 	return response, err
 }
 

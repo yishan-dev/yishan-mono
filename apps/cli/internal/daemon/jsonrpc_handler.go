@@ -11,22 +11,20 @@ import (
 )
 
 type JSONRPCHandler struct {
-	upgrader        websocket.Upgrader
-	manager         *workspace.Manager
-	nodeID          string
-	createWorkspace func(context.Context, WorkspaceCreation) error
-	events          *eventHub
+	upgrader websocket.Upgrader
+	manager  *workspace.Manager
+	nodeID   string
+	events   *eventHub
 }
 
-func NewJSONRPCHandler(manager *workspace.Manager, nodeID string, createWorkspace func(context.Context, WorkspaceCreation) error) *JSONRPCHandler {
+func NewJSONRPCHandler(manager *workspace.Manager, nodeID string) *JSONRPCHandler {
 	return &JSONRPCHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool { return true },
 		},
-		manager:         manager,
-		nodeID:          nodeID,
-		createWorkspace: createWorkspace,
-		events:          newEventHub(),
+		manager: manager,
+		nodeID:  nodeID,
+		events:  newEventHub(),
 	}
 }
 

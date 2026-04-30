@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
 var projectListCmd = &cobra.Command{
@@ -15,7 +16,7 @@ var projectListCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().ListProjects(orgID)
+		response, err := cliruntime.APIClient().ListProjects(orgID)
 		if err != nil {
 			return err
 		}
@@ -53,7 +54,7 @@ var projectCreateCmd = &cobra.Command{
 			return err
 		}
 
-		response, err := apiClient().CreateProject(orgID, api.CreateProjectInput{
+		response, err := cliruntime.APIClient().CreateProject(orgID, api.CreateProjectInput{
 			Name:           name,
 			SourceTypeHint: sourceTypeHint,
 			RepoURL:        repoURL,

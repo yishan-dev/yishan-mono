@@ -197,11 +197,39 @@ func TestGitServiceCreateAndRemoveWorktree(t *testing.T) {
 	if branch != "feature/worktree" {
 		t.Fatalf("expected worktree branch feature/worktree, got %q", branch)
 	}
+	currentBranch, err := svc.CurrentBranch(context.Background(), worktreePath)
+	if err != nil {
+		t.Fatalf("current branch: %v", err)
+	}
+	if currentBranch != "feature/worktree" {
+		t.Fatalf("expected current branch feature/worktree, got %q", currentBranch)
+	}
+	mainWorktreePath, err := svc.MainWorktreePath(context.Background(), worktreePath)
+	if err != nil {
+		t.Fatalf("main worktree path: %v", err)
+	}
+	expectedMainWorktreePath, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("resolve root symlink: %v", err)
+	}
+	actualMainWorktreePath, err := filepath.EvalSymlinks(mainWorktreePath)
+	if err != nil {
+		t.Fatalf("resolve main worktree symlink: %v", err)
+	}
+	if actualMainWorktreePath != expectedMainWorktreePath {
+		t.Fatalf("expected main worktree path %q, got %q", root, mainWorktreePath)
+	}
 
 	if err := svc.RemoveWorktree(context.Background(), root, worktreePath, true); err != nil {
 		t.Fatalf("remove worktree: %v", err)
 	}
 	if _, err := os.Stat(worktreePath); !os.IsNotExist(err) {
 		t.Fatalf("expected removed worktree path to not exist, err=%v", err)
+	}
+	if err := svc.RemoveBranch(context.Background(), root, "feature/worktree", true); err != nil {
+		t.Fatalf("remove worktree branch: %v", err)
+	}
+	if branches := strings.TrimSpace(runGit(t, root, "branch", "--list", "feature/worktree")); branches != "" {
+		t.Fatalf("expected worktree branch removed, got %q", branches)
 	}
 }

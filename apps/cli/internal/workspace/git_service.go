@@ -397,6 +397,34 @@ func (s *GitService) RenameBranch(ctx context.Context, root string, nextBranch s
 	return err
 }
 
+func (s *GitService) CurrentBranch(ctx context.Context, root string) (string, error) {
+	out, err := gitCommand(ctx, root, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	branch := strings.TrimSpace(out)
+	if branch == "" || branch == "HEAD" {
+		return "", NewRPCError(-32010, "workspace is not on a branch")
+	}
+	return branch, nil
+}
+
+func (s *GitService) MainWorktreePath(ctx context.Context, root string) (string, error) {
+	out, err := gitCommand(ctx, root, "worktree", "list", "--porcelain")
+	if err != nil {
+		return "", err
+	}
+	for line := range strings.SplitSeq(out, "\n") {
+		if path, ok := strings.CutPrefix(line, "worktree "); ok {
+			path = strings.TrimSpace(path)
+			if path != "" {
+				return path, nil
+			}
+		}
+	}
+	return "", NewRPCError(-32010, "main worktree not found")
+}
+
 func (s *GitService) RemoveBranch(ctx context.Context, root string, branch string, force bool) error {
 	if strings.TrimSpace(branch) == "" {
 		return NewRPCError(-32602, "branch is required")

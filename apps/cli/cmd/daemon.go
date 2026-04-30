@@ -1,21 +1,15 @@
 package cmd
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net"
 	"os"
-	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"yishan/apps/cli/internal/api"
-	"yishan/apps/cli/internal/buildinfo"
 	"yishan/apps/cli/internal/daemon"
 	"yishan/apps/cli/internal/output"
 )
@@ -70,14 +64,12 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 	}
 
 	return daemon.Run(daemon.RunConfig{
-		Host:            appConfig.Daemon.Host,
-		Port:            appConfig.Daemon.Port,
-		JWTSecret:       appConfig.Daemon.JWTSecret,
-		JWTIssuer:       appConfig.Daemon.JWTIssuer,
-		JWTAudience:     appConfig.Daemon.JWTAudience,
-		JWTRequired:     appConfig.Daemon.JWTRequired,
-		RegisterNode:    buildDaemonNodeRegistrar(),
-		CreateWorkspace: buildDaemonWorkspaceCreator(),
+		Host:        appConfig.Daemon.Host,
+		Port:        appConfig.Daemon.Port,
+		JWTSecret:   appConfig.Daemon.JWTSecret,
+		JWTIssuer:   appConfig.Daemon.JWTIssuer,
+		JWTAudience: appConfig.Daemon.JWTAudience,
+		JWTRequired: appConfig.Daemon.JWTRequired,
 	}, statePath)
 }
 
@@ -127,72 +119,6 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 
 	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon started")
 	return nil
-}
-
-func buildDaemonNodeRegistrar() func(daemon.NodeRegistration) error {
-	if strings.TrimSpace(appConfig.API.Token) == "" || strings.TrimSpace(appConfig.API.BaseURL) == "" {
-		return nil
-	}
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "local-daemon"
-	}
-
-	return func(registration daemon.NodeRegistration) error {
-		agentDetection := make([]map[string]any, 0, len(registration.AgentDetectionStatus))
-		for _, status := range registration.AgentDetectionStatus {
-			entry := map[string]any{
-				"agentKind": status.AgentKind,
-				"detected":  status.Detected,
-			}
-			if strings.TrimSpace(status.Version) != "" {
-				entry["version"] = status.Version
-			}
-			agentDetection = append(agentDetection, entry)
-		}
-
-		_, err := apiClient().RegisterNode(api.RegisterNodeInput{
-			NodeID:   registration.ID,
-			Name:     hostname,
-			Scope:    "private",
-			Endpoint: registration.Endpoint,
-			Metadata: map[string]any{
-				"os":      runtime.GOOS,
-				"version": buildinfo.Version,
-				"agents":  agentDetection,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("register node %q: %w", registration.ID, err)
-		}
-
-		return nil
-	}
-}
-
-func buildDaemonWorkspaceCreator() func(context.Context, daemon.WorkspaceCreation) error {
-	return func(ctx context.Context, creation daemon.WorkspaceCreation) error {
-		if strings.TrimSpace(appConfig.API.Token) == "" || strings.TrimSpace(appConfig.API.BaseURL) == "" {
-			return fmt.Errorf("API credentials are required to create remote workspace records")
-		}
-		orgID := strings.TrimSpace(creation.OrganizationID)
-		if orgID == "" {
-			return fmt.Errorf("organizationId is required")
-		}
-
-		_, err := apiClient().CreateWorkspace(orgID, creation.ProjectID, api.CreateWorkspaceInput{
-			NodeID:    creation.NodeID,
-			LocalPath: creation.LocalPath,
-			Kind:      creation.Kind,
-			Branch:    creation.Branch,
-		})
-		if err != nil {
-			return fmt.Errorf("create API workspace for project %q: %w", creation.ProjectID, err)
-		}
-
-		return nil
-	}
 }
 
 func stopDaemon(_ *cobra.Command, _ []string) error {

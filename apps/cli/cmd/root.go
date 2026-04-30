@@ -6,6 +6,7 @@ import (
 	"yishan/apps/cli/internal/config"
 	"yishan/apps/cli/internal/logx"
 	"yishan/apps/cli/internal/output"
+	cliruntime "yishan/apps/cli/internal/runtime"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -78,6 +79,7 @@ func initConfig() {
 		cobra.CheckErr(err)
 	}
 	appConfig = loaded
+	cliruntime.Configure(&appConfig)
 
 	if err := configureLogger(appConfig.LogLevel, appConfig.LogFormat); err != nil {
 		cobra.CheckErr(err)

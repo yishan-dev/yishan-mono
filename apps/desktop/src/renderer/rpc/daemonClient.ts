@@ -454,12 +454,22 @@ export class DaemonClient {
 
   private async closeWorkspace(input: Rpc.WorkspaceCloseExecutionInput): Promise<Rpc.WorkspaceCloseExecutionResponse> {
     const record = asRecord(input);
-    const workspaceId = readOptionalString(record?.workspaceId) || "";
-    return {
-      workspace: { id: workspaceId, status: "closed" },
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const organizationId = readOptionalString(record?.organizationId);
+    const projectId = readOptionalString(record?.projectId);
+    const worktreePath = readOptionalString(record?.workspaceWorktreePath);
+    const branch = readOptionalString(record?.branch);
+    const removeBranch = readOptionalBoolean(record?.removeBranch) ?? false;
+    return (await this.invoke("workspace.close", {
       workspaceId,
-      lifecycleScriptWarnings: [],
-    };
+      organizationId,
+      projectId,
+      branch,
+      worktreePath,
+      removeBranch,
+      forceWorktree: true,
+      forceBranch: true,
+    })) as Rpc.WorkspaceCloseExecutionResponse;
   }
 
   private async listFiles(input: Rpc.FileListInput): Promise<Rpc.FileListResponse> {

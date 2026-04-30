@@ -68,6 +68,11 @@ export type WorkspaceCreateInput = {
 
 export type WorkspaceCloseExecutionInput = {
   workspaceId: string;
+  organizationId?: string;
+  projectId?: string;
+  workspaceWorktreePath?: string;
+  branch?: string;
+  removeBranch?: boolean;
 };
 
 export type FileListInput = {

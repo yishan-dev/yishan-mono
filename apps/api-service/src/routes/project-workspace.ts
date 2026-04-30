@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 
-import { createWorkspaceHandler, listWorkspacesHandler } from "@/handlers/workspace";
+import { closeWorkspaceHandler, createWorkspaceHandler, listWorkspacesHandler } from "@/handlers/workspace";
 import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
 import { validationErrorResponse } from "@/validation/error-response";
-import { createWorkspaceBodySchema, projectWorkspaceParamsSchema } from "@/validation/project";
+import { closeWorkspaceBodySchema, createWorkspaceBodySchema, projectWorkspaceParamsSchema } from "@/validation/project";
 
 export const workspaceRouter = new Hono<AppEnv>();
 
@@ -22,4 +22,11 @@ workspaceRouter.post(
   zValidator("param", projectWorkspaceParamsSchema, validationErrorResponse),
   zValidator("json", createWorkspaceBodySchema, validationErrorResponse),
   (c) => createWorkspaceHandler(c, c.req.valid("param"), c.req.valid("json"))
+);
+
+workspaceRouter.patch(
+  "/close",
+  zValidator("param", projectWorkspaceParamsSchema, validationErrorResponse),
+  zValidator("json", closeWorkspaceBodySchema, validationErrorResponse),
+  (c) => closeWorkspaceHandler(c, c.req.valid("param"), c.req.valid("json"))
 );
