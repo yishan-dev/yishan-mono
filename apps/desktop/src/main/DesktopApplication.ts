@@ -1,13 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { BrowserWindow, app, dialog, ipcMain } from "electron";
 import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
-import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
+import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
 import { HOST_IPC_CHANNELS } from "./ipc";
 import { createDesktopNotificationHostAdapter } from "./notifications/service";
 import { isDevMode } from "./runtime/environment";
+import { startAutoUpdates } from "./updates/autoUpdateService";
 
 /**
  * Owns Electron desktop lifecycle and main window bootstrap.
@@ -44,6 +45,7 @@ export class DesktopApplication {
     this.registerHostIpcHandlers();
     this.registerAuthIpcHandlers();
     this.createMainWindow();
+    startAutoUpdates({ app });
 
     if (isDevMode()) {
       app.on("before-quit", (event) => {

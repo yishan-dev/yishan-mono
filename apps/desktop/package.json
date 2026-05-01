@@ -14,9 +14,9 @@
     "build:app": "bun run cli:build && bun run build && electron-builder --publish never",
     "build:app:dir": "bun run cli:build && bun run build && electron-builder --dir --publish never",
     "electron:build": "bun run electron:build:main && bun run electron:build:preload",
-    "electron:build:main": "esbuild src/main/main.ts --bundle --platform=node --format=cjs --outfile=dist/electron/main.cjs --external:electron",
+    "electron:build:main": "esbuild src/main/main.ts --bundle --platform=node --format=cjs --outfile=dist/electron/main.cjs --external:electron --external:electron-updater",
     "electron:build:preload": "esbuild src/main/preload.ts --bundle --platform=node --format=cjs --outfile=dist/electron/preload.js --external:electron",
-    "electron:watch:main": "esbuild src/main/main.ts --bundle --platform=node --format=cjs --outfile=dist/electron/main.cjs --external:electron --watch",
+    "electron:watch:main": "esbuild src/main/main.ts --bundle --platform=node --format=cjs --outfile=dist/electron/main.cjs --external:electron --external:electron-updater --watch",
     "electron:watch:preload": "esbuild src/main/preload.ts --bundle --platform=node --format=cjs --outfile=dist/electron/preload.js --external:electron --watch",
     "electron:dev": "cross-env ELECTRON_CHANNEL=dev NODE_ENV=development ELECTRON_RENDERER_URL=http://127.0.0.1:5173 wait-on tcp:5173 file:dist/electron/main.cjs file:dist/electron/preload.js && cross-env ELECTRON_CHANNEL=dev NODE_ENV=development ELECTRON_RENDERER_URL=http://127.0.0.1:5173 electron dist/electron/main.cjs",
     "check": "tsc --noEmit -p tsconfig.json"
@@ -110,10 +110,18 @@
     },
     "extraMetadata": {
       "main": "dist/electron/main.cjs"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "yishan-io",
+        "repo": "yishan-mono"
+      }
+    ]
   },
   "license": "Elastic-2.0",
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "node-pty": "^1.1.0"
   }
 }
