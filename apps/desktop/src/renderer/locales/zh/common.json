@@ -44,6 +44,7 @@
       "account": "账号",
       "agents": "智能体",
       "appearance": "外观",
+      "daemon": "守护进程",
       "notifications": "通知",
       "terminal": "终端",
       "workspace": "工作区"
@@ -98,6 +99,27 @@
           "dark": "深色",
           "system": "系统主题"
         }
+      }
+    },
+    "daemon": {
+      "title": "守护进程",
+      "description": "查看用于工作区、终端和后台服务的本地守护进程。",
+      "loadError": "加载守护进程状态失败。",
+      "actions": {
+        "refresh": "刷新"
+      },
+      "status": {
+        "running": "运行中",
+        "unavailable": "不可用"
+      },
+      "rows": {
+        "status": "状态",
+        "version": "版本",
+        "id": "守护进程 ID",
+        "websocket": "WebSocket 端点"
+      },
+      "values": {
+        "unknown": "未知"
       }
     },
     "terminal": {

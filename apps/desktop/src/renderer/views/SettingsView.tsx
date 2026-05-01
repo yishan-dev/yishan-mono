@@ -18,9 +18,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { SearchInput } from "../components/SearchInput";
 import { SettingsSectionHeader } from "../components/settings";
 import { ThemePreferencePicker } from "../components/settings/ThemePreferencePicker";
-import { useThemePreference } from "../hooks/useThemePreference";
 import { getRendererPlatform } from "../helpers/platform";
+import { useThemePreference } from "../hooks/useThemePreference";
 import { AgentSettingsView } from "./settings/AgentSettingsView";
+import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
@@ -92,6 +93,7 @@ export function SettingsView() {
       selectedTabParam === "account" ||
       selectedTabParam === "agents" ||
       selectedTabParam === "appearance" ||
+      selectedTabParam === "daemon" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
@@ -282,6 +284,8 @@ export function SettingsView() {
             darkLabel={t("settings.appearance.theme.options.dark")}
             systemLabel={t("settings.appearance.theme.options.system")}
           />
+        ) : selectedTab === "daemon" ? (
+          <DaemonSettingsView />
         ) : selectedTab === "terminal" ? (
           <TerminalSettingsView />
         ) : selectedTab === "workspace" ? (

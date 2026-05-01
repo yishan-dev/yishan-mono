@@ -5,7 +5,7 @@ import {
   type NotificationSettingsFocusItemId,
 } from "./notificationSettingsCatalog";
 
-export type SettingsTab = "account" | "agents" | "appearance" | "notifications" | "terminal" | "workspace";
+export type SettingsTab = "account" | "agents" | "appearance" | "daemon" | "notifications" | "terminal" | "workspace";
 
 export type SettingsNavSection = {
   titleKey: string;
@@ -33,6 +33,7 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
       { tab: "account", labelKey: "settings.items.account", icon: BiUser },
       { tab: "agents", labelKey: "settings.items.agents", icon: BiChip },
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
+      { tab: "daemon", labelKey: "settings.items.daemon", icon: BiChip },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
     ],
@@ -57,6 +58,24 @@ const TERMINAL_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
       "settings.terminal.columns.pid",
       "settings.terminal.columns.status",
       "settings.terminal.actions.kill",
+    ],
+  },
+];
+
+const DAEMON_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "daemon-runtime",
+    tab: "daemon",
+    icon: BiChip,
+    labelKey: "settings.daemon.title",
+    sectionLabelKey: "settings.items.daemon",
+    keywordKeys: [
+      "settings.daemon.description",
+      "settings.daemon.rows.status",
+      "settings.daemon.rows.version",
+      "settings.daemon.rows.id",
+      "settings.daemon.rows.websocket",
+      "settings.daemon.actions.refresh",
     ],
   },
 ];
@@ -148,6 +167,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...SETTINGS_TAB_SEARCH_ITEMS,
   ...AGENT_SEARCH_ITEMS,
   ...APPEARANCE_SEARCH_ITEMS,
+  ...DAEMON_SEARCH_ITEMS,
   ...GIT_WORKSPACE_SEARCH_ITEMS,
   ...TERMINAL_SEARCH_ITEMS,
   ...NOTIFICATION_SEARCH_ITEMS,

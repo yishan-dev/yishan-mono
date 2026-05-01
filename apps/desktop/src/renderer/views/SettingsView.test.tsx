@@ -13,6 +13,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("../helpers/platform", () => ({
+  getRendererPlatform: () => "linux",
+}));
+
 vi.mock("./settings/NotificationSettingsView", () => ({
   NotificationSettingsView: ({ focusItemId }: { focusItemId?: string | null }) => (
     <div data-testid="notification-settings-panel" data-focus-item-id={focusItemId ?? ""} />
@@ -25,6 +29,10 @@ vi.mock("./settings/AgentSettingsView", () => ({
 
 vi.mock("./settings/TerminalSettingsView", () => ({
   TerminalSettingsView: () => <div data-testid="terminal-settings-panel" />,
+}));
+
+vi.mock("./settings/DaemonSettingsView", () => ({
+  DaemonSettingsView: () => <div data-testid="daemon-settings-panel" />,
 }));
 
 vi.mock("./settings/GitWorkspaceSettingsView", () => ({
@@ -160,6 +168,40 @@ describe("SettingsView", () => {
     );
 
     expect(screen.getByTestId("terminal-settings-panel")).toBeTruthy();
+  });
+
+  it("renders daemon panel when daemon tab is selected", () => {
+    render(
+      <AppThemePreferenceProvider>
+        <MemoryRouter initialEntries={["/settings?tab=daemon"]}>
+          <Routes>
+            <Route path="/settings" element={<SettingsView />} />
+          </Routes>
+        </MemoryRouter>
+      </AppThemePreferenceProvider>,
+    );
+
+    expect(screen.getByTestId("daemon-settings-panel")).toBeTruthy();
+  });
+
+  it("matches daemon settings in search and opens daemon tab", () => {
+    render(
+      <AppThemePreferenceProvider>
+        <MemoryRouter initialEntries={["/settings?tab=notifications"]}>
+          <Routes>
+            <Route path="/settings" element={<SettingsView />} />
+          </Routes>
+        </MemoryRouter>
+      </AppThemePreferenceProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("settings.searchPlaceholder"), {
+      target: { value: "websocket" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /settings\.daemon\.title/ }));
+
+    expect(screen.getByTestId("daemon-settings-panel")).toBeTruthy();
   });
 
   it("renders git workspace settings panel when workspace tab is selected", () => {

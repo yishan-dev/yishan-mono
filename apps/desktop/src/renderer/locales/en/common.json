@@ -44,6 +44,7 @@
       "account": "Account",
       "agents": "Agents",
       "appearance": "Appearance",
+      "daemon": "Daemon",
       "notifications": "Notifications",
       "terminal": "Terminal",
       "workspace": "Workspace"
@@ -98,6 +99,27 @@
           "dark": "Dark",
           "system": "System theme"
         }
+      }
+    },
+    "daemon": {
+      "title": "Daemon",
+      "description": "Inspect the local daemon used for workspaces, terminals, and background services.",
+      "loadError": "Failed to load daemon status.",
+      "actions": {
+        "refresh": "Refresh"
+      },
+      "status": {
+        "running": "Running",
+        "unavailable": "Unavailable"
+      },
+      "rows": {
+        "status": "Status",
+        "version": "Version",
+        "id": "Daemon ID",
+        "websocket": "WebSocket endpoint"
+      },
+      "values": {
+        "unknown": "Unknown"
       }
     },
     "terminal": {
