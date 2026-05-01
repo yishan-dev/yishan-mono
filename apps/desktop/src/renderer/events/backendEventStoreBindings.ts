@@ -1,7 +1,15 @@
 import type { RpcFrontendMessagePayload } from "../../shared/contracts/rpcSchema";
-import type { NotificationEventType, NotificationPreferences } from "../../shared/notifications/notificationPreferences";
-import { dispatchNotification, getNotificationPreferences, playNotificationSound } from "../commands/notificationCommands";
+import type {
+  NotificationEventType,
+  NotificationPreferences,
+} from "../../shared/notifications/notificationPreferences";
+import {
+  dispatchNotification,
+  getNotificationPreferences,
+  playNotificationSound,
+} from "../commands/notificationCommands";
 import { type WorkspaceAgentStatus, type WorkspaceUnreadTone, chatStore } from "../store/chatStore";
+import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { subscribeBackendEvent } from "./backendEventPipeline";
 import { subscribeInAppNotificationEvent } from "./backendEventSubscriptions";
@@ -24,6 +32,7 @@ type BackendEventStoreBindingsDependencies = {
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
   getNotificationPreferences?: () => Promise<NotificationPreferences>;
+  isRelevantTerminalFocused?: (payload: NotificationEventPayload) => boolean;
 };
 
 const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindingsDependencies = {
@@ -65,6 +74,7 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
     await playNotificationSound(input);
   },
   getNotificationPreferences,
+  isRelevantTerminalFocused: isRelevantTerminalFocusedForNotification,
 };
 
 /**
@@ -130,12 +140,64 @@ function shouldDeliverPreferenceBackedNotification(
   );
 }
 
+function parseObserverSessionKey(sessionKey: string): { workspaceId: string; tabId: string; paneId: string } | null {
+  const [workspaceId, tabId, paneId] = sessionKey.split(":");
+  if (!workspaceId || !tabId || !paneId) {
+    return null;
+  }
+
+  return { workspaceId, tabId, paneId };
+}
+
+function isRelevantTerminalFocusedForNotification(payload: NotificationEventPayload): boolean {
+  if (typeof document === "undefined" || !document.hasFocus()) {
+    return false;
+  }
+
+  const observerStatus = payload.observerStatus;
+  if (!observerStatus) {
+    return false;
+  }
+
+  const sessionParts = parseObserverSessionKey(observerStatus.sessionKey.trim());
+  if (!sessionParts) {
+    return false;
+  }
+
+  const state = tabStore.getState();
+  if (state.selectedWorkspaceId !== sessionParts.workspaceId || state.selectedTabId !== sessionParts.tabId) {
+    return false;
+  }
+
+  return state.tabs.some((tab) => tab.id === sessionParts.tabId && tab.kind === "terminal");
+}
+
+function isNormalAgentCliExit(payload: NotificationEventPayload): boolean {
+  return (
+    payload.agent?.trim().toLowerCase() === "agent-cli" &&
+    payload.observerStatus?.normalizedEventType === "stop" &&
+    payload.tone === "success" &&
+    payload.notificationEventType === "run-finished"
+  );
+}
+
+function shouldSuppressNotificationEffects(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+): boolean {
+  return isNormalAgentCliExit(payload) || (dependencies.isRelevantTerminalFocused?.(payload) ?? false);
+}
+
 async function dispatchPreferenceBackedNotification(
   payload: NotificationEventPayload,
   dependencies: BackendEventStoreBindingsDependencies,
 ) {
   const eventType = payload.notificationEventType;
   if (!eventType || payload.silent === true) {
+    return;
+  }
+
+  if (shouldSuppressNotificationEffects(payload, dependencies)) {
     return;
   }
 
@@ -210,11 +272,13 @@ export function createBackendEventStoreBindings(
         }
       }
 
+      const suppressNotificationEffects = shouldSuppressNotificationEffects(payload, dependencies);
+
       if (payload.notificationEventType) {
         void dispatchPreferenceBackedNotification(payload, dependencies).catch(() => {
           // Preference resolution and delivery failures should not block store state updates.
         });
-      } else if (payload.showSystemNotification) {
+      } else if (payload.showSystemNotification && !suppressNotificationEffects) {
         void dependencies
           .dispatchSystemNotification({
             title: payload.title,
@@ -225,7 +289,7 @@ export function createBackendEventStoreBindings(
           });
       }
 
-      if (payload.soundToPlay) {
+      if (payload.soundToPlay && !suppressNotificationEffects) {
         void dependencies.playNotificationSound(payload.soundToPlay).catch(() => {
           // Sound playback failures should not block store state updates.
         });

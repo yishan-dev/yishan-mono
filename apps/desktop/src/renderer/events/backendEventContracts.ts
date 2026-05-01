@@ -71,6 +71,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === "boolean";
+}
+
 /**
  * Returns true when observer lifecycle metadata uses the expected runtime shape.
  */
@@ -99,24 +107,30 @@ function isNotificationObserverStatusPayload(
 function isNotificationEventPayload(
   payload: Record<string, unknown>,
 ): payload is RpcFrontendMessagePayload<"notificationEvent"> {
-  if (
-    typeof payload.id !== "string" ||
-    typeof payload.title !== "string" ||
-    (payload.body !== undefined && typeof payload.body !== "string") ||
-    (payload.tone !== "success" && payload.tone !== "error") ||
-    typeof payload.createdAt !== "string" ||
-    (payload.workspaceId !== undefined && typeof payload.workspaceId !== "string") ||
-    (payload.sessionId !== undefined && typeof payload.sessionId !== "string") ||
-    (payload.navigationPath !== undefined && typeof payload.navigationPath !== "string") ||
-    (payload.notificationEventType !== undefined && !isSupportedNotificationEventType(payload.notificationEventType)) ||
-    (payload.silent !== undefined && typeof payload.silent !== "boolean") ||
-    (payload.showSystemNotification !== undefined && typeof payload.showSystemNotification !== "boolean") ||
-    !isNotificationSoundPayload(payload.soundToPlay)
-  ) {
+  const hasRequiredFields =
+    typeof payload.id === "string" &&
+    typeof payload.title === "string" &&
+    (payload.tone === "success" || payload.tone === "error") &&
+    typeof payload.createdAt === "string";
+  if (!hasRequiredFields) {
     return false;
   }
 
-  if (payload.observerStatus !== undefined && !isNotificationObserverStatusPayload(payload.observerStatus)) {
+  const optionalStringFields = [
+    payload.body,
+    payload.agent,
+    payload.workspaceId,
+    payload.sessionId,
+    payload.navigationPath,
+  ];
+  const hasValidOptionalFields =
+    optionalStringFields.every(isOptionalString) &&
+    isOptionalBoolean(payload.silent) &&
+    isOptionalBoolean(payload.showSystemNotification) &&
+    isOptionalNotificationEventType(payload.notificationEventType) &&
+    isOptionalNotificationObserverStatusPayload(payload.observerStatus) &&
+    isNotificationSoundPayload(payload.soundToPlay);
+  if (!hasValidOptionalFields) {
     return false;
   }
 
@@ -125,6 +139,14 @@ function isNotificationEventPayload(
 
 function isSupportedNotificationEventType(value: unknown): boolean {
   return typeof value === "string" && (SUPPORTED_NOTIFICATION_EVENT_TYPES as readonly string[]).includes(value);
+}
+
+function isOptionalNotificationEventType(value: unknown): boolean {
+  return value === undefined || isSupportedNotificationEventType(value);
+}
+
+function isOptionalNotificationObserverStatusPayload(value: unknown): boolean {
+  return value === undefined || isNotificationObserverStatusPayload(value);
 }
 
 /** Returns true when one optional notification sound payload has the supported runtime shape. */

@@ -1,5 +1,5 @@
-import type { AppActionPayload } from "./actions";
 import type { NotificationEventType } from "../notifications/notificationPreferences";
+import type { AppActionPayload } from "./actions";
 
 export type RpcSchema = {
   toFrontend: {
@@ -23,6 +23,7 @@ export type RpcSchema = {
         body?: string;
         tone: "success" | "error";
         createdAt: string;
+        agent?: string;
         workspaceId?: string;
         sessionId?: string;
         navigationPath?: string;

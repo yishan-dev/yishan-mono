@@ -35,7 +35,7 @@ func TestServeAgentHookPublishesStartNotificationEvent(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected map payload, got %T", event.Payload)
 	}
-	if payload["title"] != "Run Started" || payload["workspaceId"] != "ws-1" || payload["silent"] != true {
+	if payload["title"] != "Run Started" || payload["agent"] != "codex" || payload["workspaceId"] != "ws-1" || payload["silent"] != true {
 		t.Fatalf("unexpected payload: %#v", payload)
 	}
 	observerStatus, ok := payload["observerStatus"].(map[string]string)

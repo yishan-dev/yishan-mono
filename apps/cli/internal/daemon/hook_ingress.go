@@ -136,6 +136,7 @@ func hookNotificationPayload(event normalizedHookEvent, title string, body strin
 		"body":        body,
 		"tone":        tone,
 		"createdAt":   time.Now().UTC().Format(time.RFC3339Nano),
+		"agent":       event.agent,
 		"workspaceId": event.workspaceID,
 		"silent":      silent,
 		"observerStatus": map[string]string{

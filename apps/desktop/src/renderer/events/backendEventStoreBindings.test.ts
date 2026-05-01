@@ -397,4 +397,127 @@ describe("createBackendEventStoreBindings", () => {
 
     stopBindings();
   });
+
+  it("suppresses preference-backed effects when the relevant terminal is focused", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: true,
+      volume: 0.4,
+      focusOnClick: true,
+      enabledEventTypes: ["run-finished" as const],
+      eventSounds: {
+        "run-finished": "zip" as const,
+        "run-failed": "alert" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+      isRelevantTerminalFocused: () => true,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run completed",
+      tone: "success",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-finished",
+      observerStatus: {
+        sessionKey: "workspace-1:tab-1:pane-1",
+        normalizedEventType: "stop",
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getNotificationPreferences).not.toHaveBeenCalled();
+    expect(dispatchSystemNotification).not.toHaveBeenCalled();
+    expect(playNotificationSound).not.toHaveBeenCalled();
+    expect(recordWorkspaceUnreadNotification).toHaveBeenCalledWith("workspace-1", "success");
+
+    stopBindings();
+  });
+
+  it("suppresses normal agent-cli exit system notifications and sounds", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: true,
+      volume: 0.4,
+      focusOnClick: true,
+      enabledEventTypes: ["run-finished" as const],
+      eventSounds: {
+        "run-finished": "zip" as const,
+        "run-failed": "alert" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+      isRelevantTerminalFocused: () => false,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      agent: "agent-cli",
+      title: "Run completed",
+      tone: "success",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-finished",
+      observerStatus: {
+        sessionKey: "workspace-1:tab-1:pane-1",
+        normalizedEventType: "stop",
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getNotificationPreferences).not.toHaveBeenCalled();
+    expect(dispatchSystemNotification).not.toHaveBeenCalled();
+    expect(playNotificationSound).not.toHaveBeenCalled();
+    expect(recordWorkspaceUnreadNotification).toHaveBeenCalledWith("workspace-1", "success");
+
+    stopBindings();
+  });
 });
