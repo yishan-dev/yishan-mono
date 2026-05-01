@@ -1,14 +1,20 @@
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { BrowserWindow, app, dialog, ipcMain } from "electron";
+import type { AppActionPayload } from "../shared/contracts/actions";
+import { configureApplicationMenu } from "./app/menu";
 import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
 import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
-import { HOST_IPC_CHANNELS } from "./ipc";
+import { DESKTOP_RPC_IPC_CHANNELS, HOST_IPC_CHANNELS } from "./ipc";
 import { createDesktopNotificationHostAdapter } from "./notifications/service";
 import { isDevMode } from "./runtime/environment";
 import { startAutoUpdates } from "./updates/autoUpdateService";
+
+type DispatchActionOptions = {
+  focusApp?: boolean;
+};
 
 /**
  * Owns Electron desktop lifecycle and main window bootstrap.
@@ -45,6 +51,12 @@ export class DesktopApplication {
     this.registerHostIpcHandlers();
     this.registerAuthIpcHandlers();
     this.createMainWindow();
+    configureApplicationMenu({
+      devMode: isDevMode(),
+      dispatchAction: (payload, options) => {
+        this.dispatchAction(payload, options);
+      },
+    });
     startAutoUpdates({ app });
 
     if (isDevMode()) {
@@ -196,6 +208,24 @@ export class DesktopApplication {
         played: true,
       };
     });
+  }
+
+  /** Focuses the main window when menu actions should bring the app forward. */
+  private focusMainWindow(): void {
+    this.mainWindow?.show();
+    this.mainWindow?.focus();
+  }
+
+  /** Forwards one native menu action to renderer listeners. */
+  private dispatchAction(payload: AppActionPayload, options?: DispatchActionOptions): void {
+    this.mainWindow?.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
+      method: "appAction",
+      payload,
+    });
+
+    if (options?.focusApp) {
+      this.focusMainWindow();
+    }
   }
 
   /**

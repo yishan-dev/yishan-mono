@@ -1,8 +1,4 @@
-import type {
-  DesktopBridge,
-  DesktopHostBridge,
-  DesktopRpcEventEnvelope,
-} from "../../main/ipc";
+import type { DesktopBridge, DesktopHostBridge, DesktopRpcEventEnvelope } from "../../main/ipc";
 import { DaemonClient } from "./daemonClient";
 import type { ApiNamespace } from "./daemonTypes";
 import { delay } from "./helpers";
@@ -25,6 +21,7 @@ const API_NAMESPACES = new Set<ApiNamespace>([
 ]);
 const desktopRpcEventListeners = new Set<DesktopRpcEventListener>();
 let backendEventsSubscription: { unsubscribe: () => void } | null = null;
+let desktopBridgeEventsUnsubscribe: (() => void) | null = null;
 let daemonRpcClientPromise: Promise<DaemonRpcClient> | null = null;
 let daemonTransportClientPromise: Promise<DaemonClient> | null = null;
 let daemonWsUrlPromise: Promise<string> | null = null;
@@ -311,6 +308,7 @@ async function ensureBackendEventsSubscription(): Promise<void> {
 /** Registers one raw desktop RPC listener and returns one unsubscribe callback. */
 export function subscribeDesktopRpcEvent(listener: DesktopRpcEventListener): () => void {
   desktopRpcEventListeners.add(listener);
+  desktopBridgeEventsUnsubscribe ??= getDesktopBridge()?.events.subscribe(emitDesktopRpcEvent) ?? null;
   void ensureBackendEventsSubscription();
 
   return () => {
@@ -318,6 +316,8 @@ export function subscribeDesktopRpcEvent(listener: DesktopRpcEventListener): () 
     if (desktopRpcEventListeners.size === 0) {
       backendEventsSubscription?.unsubscribe();
       backendEventsSubscription = null;
+      desktopBridgeEventsUnsubscribe?.();
+      desktopBridgeEventsUnsubscribe = null;
     }
   };
 }
@@ -326,5 +326,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeunload", () => {
     backendEventsSubscription?.unsubscribe();
     backendEventsSubscription = null;
+    desktopBridgeEventsUnsubscribe?.();
+    desktopBridgeEventsUnsubscribe = null;
   });
 }

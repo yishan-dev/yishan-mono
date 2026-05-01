@@ -1,6 +1,6 @@
 import type { WorkspaceEntryAppId } from "../shared/contracts/externalApps";
 import type { ExternalClipboardReadOutcome } from "../shared/contracts/rpcRequestTypes";
-import type {  NotificationSoundId } from "../shared/notifications/notificationPreferences";
+import type { NotificationSoundId } from "../shared/notifications/notificationPreferences";
 import type { NotificationDispatchResult, NotificationSoundPreviewResult } from "./notifications/types";
 
 export type DesktopRpcEventEnvelope = {
@@ -85,9 +85,18 @@ export type DesktopHostBridge = {
   getDaemonInfo: () => Promise<DaemonInfoResult>;
 };
 
+export type DesktopRpcEventBridge = {
+  subscribe: (listener: (envelope: DesktopRpcEventEnvelope) => void) => () => void;
+};
+
 export type DesktopBridge = {
   host: DesktopHostBridge;
+  events: DesktopRpcEventBridge;
 };
+
+export const DESKTOP_RPC_IPC_CHANNELS = {
+  event: "desktop:rpc/event",
+} as const;
 
 export const HOST_IPC_CHANNELS = {
   openLocalFolderDialog: "desktop:host/open-local-folder-dialog",
