@@ -37,8 +37,9 @@
     "searchPlaceholder": "Search settings...",
     "searchNoResults": "No matching settings.",
     "sections": {
-      "personal": "Personal",
-      "git": "Git"
+      "account": "Account",
+      "app": "App",
+      "advanced": "Advanced"
     },
     "items": {
       "account": "Account",

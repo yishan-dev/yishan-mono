@@ -28,19 +28,24 @@ export type SettingsSearchCatalogItem = {
 
 export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
-    titleKey: "settings.sections.personal",
+    titleKey: "settings.sections.account",
+    items: [{ tab: "account", labelKey: "settings.items.account", icon: BiUser }],
+  },
+  {
+    titleKey: "settings.sections.app",
     items: [
-      { tab: "account", labelKey: "settings.items.account", icon: BiUser },
-      { tab: "agents", labelKey: "settings.items.agents", icon: BiChip },
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
-      { tab: "daemon", labelKey: "settings.items.daemon", icon: BiChip },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
+      { tab: "agents", labelKey: "settings.items.agents", icon: BiChip },
     ],
   },
   {
-    titleKey: "settings.sections.git",
-    items: [{ tab: "workspace", labelKey: "settings.items.workspace", icon: BiGitBranch }],
+    titleKey: "settings.sections.advanced",
+    items: [
+      { tab: "workspace", labelKey: "settings.items.workspace", icon: BiGitBranch },
+      { tab: "daemon", labelKey: "settings.items.daemon", icon: BiChip },
+    ],
   },
 ];
 
