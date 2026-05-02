@@ -18,12 +18,14 @@ import { useVisibleFileTree } from "./useVisibleFileTree";
 
 const EMPTY_IGNORED_PATHS: string[] = [];
 const EMPTY_LOADED_DIRECTORY_PATHS: string[] = [];
+const EMPTY_EXPANDABLE_DIRECTORY_PATHS: string[] = [];
 
 /** Renders workspace files as one tree and exposes user intents to the owning view. */
 export function FileTree({
   files,
   ignoredPaths = EMPTY_IGNORED_PATHS,
   loadedDirectoryPaths = EMPTY_LOADED_DIRECTORY_PATHS,
+  expandableDirectoryPaths = EMPTY_EXPANDABLE_DIRECTORY_PATHS,
   expandedItems: expandedItemsOverride,
   selectionRequest,
   createEntryRequest,
@@ -54,6 +56,10 @@ export function FileTree({
   const loadedDirectoryPathSet = useMemo(
     () => new Set(loadedDirectoryPaths.map((path) => path.replace(/\/+$/, ""))),
     [loadedDirectoryPaths],
+  );
+  const expandableDirectoryPathSet = useMemo(
+    () => new Set(expandableDirectoryPaths.map((path) => path.replace(/\/+$/, "")).filter(Boolean)),
+    [expandableDirectoryPaths],
   );
 
   const { topLevelNodes, directoryPaths, expandedItems, setExpandedItems } = useVisibleFileTree({
@@ -480,6 +486,7 @@ export function FileTree({
             node={node}
             ignoredPathSet={ignoredPathSet}
             loadedDirectoryPathSet={loadedDirectoryPathSet}
+            expandableDirectoryPathSet={expandableDirectoryPathSet}
             editingPath={editingEntry?.path ?? ""}
             editingName={editingName}
             editingInputRef={editingInputRef}

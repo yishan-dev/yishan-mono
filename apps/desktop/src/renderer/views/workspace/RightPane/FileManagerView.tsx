@@ -20,15 +20,15 @@ import { FileTree } from "../../../components/FileTree";
 import { FileTreeToolbar } from "../../../components/FileTree/FileTreeToolbar";
 import { resolveDestinationDirectoryPath } from "../../../components/FileTree/treeUtils";
 import type { FileTreeContextMenuRequest } from "../../../components/FileTree/types";
+import { getRendererPlatform } from "../../../helpers/platform";
 import { useContextMenuState } from "../../../hooks/useContextMenuState";
 import { useSuppressNativeContextMenuWhileOpen } from "../../../hooks/useSuppressNativeContextMenuWhileOpen";
-import { getRendererPlatform } from "../../../helpers/platform";
 import { searchFiles } from "../../../search/fileSearch";
 import { tabStore } from "../../../store/tabStore";
 import { workspaceFileTreeStore } from "../../../store/workspaceFileTreeStore";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { buildWorkspaceFileTreeContextMenuItems } from "./buildWorkspaceFileTreeContextMenuItems";
-import { useFileTreeOperations } from "./useFileTreeOperations";
+import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
 
 const MAX_FILE_SEARCH_RESULTS = 100;
 
@@ -499,6 +499,7 @@ export function FileManagerView({
         files={visibleTreeFiles}
         ignoredPaths={ignoredRepoPaths}
         loadedDirectoryPaths={loadedDirectoryPaths}
+        expandableDirectoryPaths={CONTEXT_DIRECTORY_PATHS}
         expandedItems={expandedItems}
         selectionRequest={fileTreeSelectionRequest}
         createEntryRequest={createEntryRequest}

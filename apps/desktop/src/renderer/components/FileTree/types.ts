@@ -13,6 +13,7 @@ export type FileTreeProps = {
   files: string[];
   ignoredPaths?: string[];
   loadedDirectoryPaths?: string[];
+  expandableDirectoryPaths?: string[];
   expandedItems?: string[];
   selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
   createEntryRequest?: { kind: "file" | "folder"; basePath?: string; requestId: number } | null;

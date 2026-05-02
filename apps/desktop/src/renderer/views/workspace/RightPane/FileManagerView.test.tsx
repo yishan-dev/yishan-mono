@@ -200,6 +200,7 @@ function getFileTreeProps() {
   }
 
   return mocks.repoFileTreePropsRef.current as {
+    files: string[];
     expandedItems?: string[];
     loadedDirectoryPaths?: string[];
     selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
@@ -679,6 +680,48 @@ describe("FileManagerView lazy preload", () => {
           [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src/utils", recursive: false }],
         ]),
       );
+    });
+  });
+
+  it("loads .my-context children when expanded", async () => {
+    mocks.listFiles
+      .mockResolvedValueOnce({ files: asEntries([".my-context/", "src/"]) })
+      .mockResolvedValueOnce({ files: asEntries(["src/index.ts"]) })
+      .mockResolvedValueOnce({ files: asEntries([".my-context/brief.md", ".my-context/notes/"]) })
+      .mockResolvedValueOnce({ files: asEntries([".my-context/notes/todo.md"]) });
+
+    render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect(mocks.listFiles).toHaveBeenCalledWith({
+        workspaceWorktreePath: "/tmp/repo",
+        relativePath: "src",
+        recursive: false,
+      });
+    });
+
+    expect(mocks.listFiles.mock.calls).not.toContainEqual([
+      { workspaceWorktreePath: "/tmp/repo", relativePath: ".my-context", recursive: false },
+    ]);
+
+    await getFileTreeProps().onLoadDirectory?.(".my-context");
+
+    await waitFor(() => {
+      expect(getFileTreeProps().files).toEqual(
+        expect.arrayContaining([".my-context/", ".my-context/brief.md", ".my-context/notes/"]),
+      );
+      expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining(["", ".my-context"]));
+    });
+
+    await getFileTreeProps().onLoadDirectory?.(".my-context/notes");
+
+    await waitFor(() => {
+      expect(mocks.listFiles).toHaveBeenCalledWith({
+        workspaceWorktreePath: "/tmp/repo",
+        relativePath: ".my-context/notes",
+        recursive: false,
+      });
+      expect(getFileTreeProps().files).toEqual(expect.arrayContaining([".my-context/notes/todo.md"]));
     });
   });
 });

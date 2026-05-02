@@ -96,9 +96,14 @@ type WorkspaceTreeCacheEntry = {
   allRepoEntries: WorkspaceFileEntry[] | null;
 };
 
-const CONTEXT_DIRECTORY_PATHS = [".my-context", ".private-context"];
+export const CONTEXT_DIRECTORY_PATHS = [".my-context", ".private-context"];
 const EMPTY_CHANGED_RELATIVE_PATHS: string[] = [];
 const INVALID_DIRECTORY_LIST_PATH_ERROR_MESSAGE = "relativePath must point to a directory under rootPath";
+
+function isContextDirectoryPath(path: string): boolean {
+  const normalizedPath = normalizeRelativePath(path).replace(/\/+$/, "");
+  return CONTEXT_DIRECTORY_PATHS.includes(normalizedPath);
+}
 
 /** Resolves an absolute path by joining worktree root and relative file path. */
 function resolveWorkspaceAbsolutePath(worktreePath: string, relativePath: string): string {
@@ -237,7 +242,10 @@ function collectDirectChildDirectoryPaths(entries: WorkspaceFileEntry[], directo
   return entries
     .filter(
       (entry) =>
-        !entry.isIgnored && entry.path.endsWith("/") && isDirectChildPath(directoryPath, entry.path.replace(/\/+$/, "")),
+        !entry.isIgnored &&
+        entry.path.endsWith("/") &&
+        !isContextDirectoryPath(entry.path) &&
+        isDirectChildPath(directoryPath, entry.path.replace(/\/+$/, "")),
     )
     .map((entry) => entry.path.replace(/\/+$/, ""));
 }
@@ -626,9 +634,11 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
   const loadExpandedDirectory = useCallback(
     async (directoryPath: string): Promise<void> => {
       const normalizedDirectoryPath = normalizeRelativePath(directoryPath).replace(/\/+$/, "");
-      const directChildEntries = loadedDirectoryPathsRef.current.includes(normalizedDirectoryPath)
-        ? collectDirectChildEntries(repoEntriesRef.current, normalizedDirectoryPath)
-        : await loadDirectoryEntries(normalizedDirectoryPath);
+      const shouldForceReload = isContextDirectoryPath(normalizedDirectoryPath);
+      const directChildEntries =
+        !shouldForceReload && loadedDirectoryPathsRef.current.includes(normalizedDirectoryPath)
+          ? collectDirectChildEntries(repoEntriesRef.current, normalizedDirectoryPath)
+          : await loadDirectoryEntries(normalizedDirectoryPath, shouldForceReload);
 
       void preloadDirectories(collectDirectChildDirectoryPaths(directChildEntries, normalizedDirectoryPath));
     },

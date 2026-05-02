@@ -15,6 +15,7 @@ type TreeNodeItemProps = {
   node: TreeNode;
   ignoredPathSet: Set<string>;
   loadedDirectoryPathSet: Set<string>;
+  expandableDirectoryPathSet: Set<string>;
   expandedPathSet: Set<string>;
   editingPath: string;
   editingName: string;
@@ -110,6 +111,7 @@ export function TreeNodeItem({
   node,
   ignoredPathSet,
   loadedDirectoryPathSet,
+  expandableDirectoryPathSet,
   expandedPathSet,
   editingPath,
   editingName,
@@ -126,6 +128,7 @@ export function TreeNodeItem({
   const isDirectory = node.isDirectory || children.length > 0;
   const isIgnored = ignoredPathSet.has(node.path);
   const isLoadedDirectory = loadedDirectoryPathSet.has(node.path);
+  const isExpandableDirectory = expandableDirectoryPathSet.has(node.path);
   const isExpanded = expandedPathSet.has(node.path);
 
   if (!isDirectory) {
@@ -192,7 +195,7 @@ export function TreeNodeItem({
         onContextMenu(event, { basePath: node.path, targetPath: node.path, targetIsDirectory: true })
       }
     >
-      {!isLoadedDirectory && children.length === 0 ? (
+      {(!isLoadedDirectory || isExpandableDirectory) && children.length === 0 ? (
         <TreeItem itemId={`${node.path}::__placeholder`} label="" sx={{ display: "none" }} />
       ) : null}
       {children.map((child) => (
@@ -201,6 +204,7 @@ export function TreeNodeItem({
           node={child}
           ignoredPathSet={ignoredPathSet}
           loadedDirectoryPathSet={loadedDirectoryPathSet}
+          expandableDirectoryPathSet={expandableDirectoryPathSet}
           expandedPathSet={expandedPathSet}
           editingPath={editingPath}
           editingName={editingName}
