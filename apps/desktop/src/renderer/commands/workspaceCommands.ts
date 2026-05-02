@@ -57,13 +57,17 @@ type CloseWorkspaceResponse = {
  * shape. Handles both properly structured objects and legacy plain-string
  * warnings gracefully.
  */
-function normalizeLifecycleWarning(raw: unknown): WorkspaceLifecycleScriptWarning {
+function normalizeLifecycleWarning(
+  raw: unknown,
+  fallbackKind: "setup" | "post",
+  fallbackCommand: string,
+): WorkspaceLifecycleScriptWarning {
   if (typeof raw === "string") {
     return {
-      scriptKind: "setup",
+      scriptKind: fallbackKind,
       timedOut: false,
       message: raw,
-      command: "",
+      command: fallbackCommand,
       stdoutExcerpt: "",
       stderrExcerpt: "",
       exitCode: null,
@@ -74,10 +78,10 @@ function normalizeLifecycleWarning(raw: unknown): WorkspaceLifecycleScriptWarnin
 
   const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
-    scriptKind: record.scriptKind === "post" ? "post" : "setup",
+    scriptKind: record.scriptKind === "setup" || record.scriptKind === "post" ? record.scriptKind : fallbackKind,
     timedOut: Boolean(record.timedOut),
     message: typeof record.message === "string" ? record.message : "",
-    command: typeof record.command === "string" ? record.command : "",
+    command: typeof record.command === "string" && record.command ? record.command : fallbackCommand,
     stdoutExcerpt: typeof record.stdoutExcerpt === "string" ? record.stdoutExcerpt : "",
     stderrExcerpt: typeof record.stderrExcerpt === "string" ? record.stderrExcerpt : "",
     exitCode: typeof record.exitCode === "number" ? record.exitCode : null,
@@ -92,6 +96,8 @@ function normalizeLifecycleWarning(raw: unknown): WorkspaceLifecycleScriptWarnin
 function notifyLifecycleScriptWarnings(
   workspaceName: string,
   warnings: WorkspaceLifecycleScriptWarning[] | undefined,
+  fallbackKind: "setup" | "post",
+  fallbackCommand: string,
 ): void {
   if (!warnings || warnings.length === 0) {
     return;
@@ -99,7 +105,7 @@ function notifyLifecycleScriptWarnings(
 
   enqueueWorkspaceLifecycleWarnings({
     workspaceName,
-    warnings: warnings.map(normalizeLifecycleWarning),
+    warnings: warnings.map((w) => normalizeLifecycleWarning(w, fallbackKind, fallbackCommand)),
   });
 }
 
@@ -134,7 +140,12 @@ async function closeWorkspaceInBackground(input: {
   if (!closed) {
     return;
   }
-  notifyLifecycleScriptWarnings(input.workspaceName, closed.lifecycleScriptWarnings);
+  notifyLifecycleScriptWarnings(
+    input.workspaceName,
+    closed.lifecycleScriptWarnings,
+    "post",
+    input.postHook || "",
+  );
 }
 
 type WorkspaceStoreFacade = typeof workspaceStore & {
@@ -204,7 +215,12 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
       contextEnabled: project?.contextEnabled ?? true,
       setupHook: project?.setupScript?.trim() || undefined,
     })) as CreateWorkspaceResponse;
-    notifyLifecycleScriptWarnings(normalizedName, created.lifecycleScriptWarnings);
+    notifyLifecycleScriptWarnings(
+      normalizedName,
+      created.lifecycleScriptWarnings,
+      "setup",
+      project?.setupScript?.trim() || "",
+    );
 
     backendWorkspace = {
       id: created.workspaceId,
