@@ -268,10 +268,17 @@ const SHORTCUT_REGISTRY: readonly ShortcutRegistryItem[] = [
     scope: "workspace",
     keys: "ctrl+t,command+t",
     target: { command: "tabs.openTerminal" },
-    shouldRun: (context, event) =>
-      context.isWorkspaceRoute &&
-      Boolean(context.workspaceStoreState.selectedWorkspaceId) &&
-      !isEditableTarget(event.target),
+    shouldRun: (context, event) => {
+      if (!context.isWorkspaceRoute || !context.workspaceStoreState.selectedWorkspaceId) {
+        return false;
+      }
+
+      if (isWithinTerminalSurface(event.target)) {
+        return true;
+      }
+
+      return !isEditableTarget(event.target);
+    },
   },
   {
     id: "activate-repo-pane",

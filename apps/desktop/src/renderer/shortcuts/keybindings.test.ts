@@ -298,6 +298,64 @@ describe("getShortcutDefinitions", () => {
     });
   });
 
+  it("opens a new terminal tab from Cmd+T when focus is inside terminal surface", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const openTerminal = runtimeDefinitions.find((definition) => definition.id === "open-terminal");
+    expect(openTerminal).toBeTruthy();
+
+    const openTab = vi.fn();
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        openTab,
+      },
+    });
+
+    const terminalSurface = document.createElement("div");
+    terminalSurface.className = "xterm";
+    const helperTextarea = document.createElement("textarea");
+    terminalSurface.appendChild(helperTextarea);
+
+    openTerminal?.run(context, {
+      key: "t",
+      metaKey: true,
+      target: helperTextarea,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+
+    expect(openTab).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      kind: "terminal",
+      title: "terminal.title",
+      reuseExisting: false,
+    });
+  });
+
+  it("does not open terminal on Cmd+T when target is regular editable textarea", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const openTerminal = runtimeDefinitions.find((definition) => definition.id === "open-terminal");
+    expect(openTerminal).toBeTruthy();
+
+    const openTab = vi.fn();
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        openTab,
+      },
+    });
+
+    const regularTextarea = document.createElement("textarea");
+
+    openTerminal?.run(context, {
+      key: "t",
+      metaKey: true,
+      target: regularTextarea,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+
+    expect(openTab).not.toHaveBeenCalled();
+  });
+
   it("closes selected workspace from shortcut when focus is in repo/workspace list", () => {
     const runtimeDefinitions = getShortcutDefinitions();
     const closeSelectedWorkspace = runtimeDefinitions.find(
