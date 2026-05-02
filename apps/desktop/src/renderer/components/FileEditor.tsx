@@ -1,3 +1,4 @@
+import { indentWithTab } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { EditorState } from "@codemirror/state";
@@ -142,6 +143,7 @@ export function FileEditor({ path, content, focusRequestKey = 0, onContentChange
           onContentChangeRef.current?.(update.state.doc.toString());
         }),
         keymap.of([
+          indentWithTab,
           {
             key: "Mod-s",
             run: () => {

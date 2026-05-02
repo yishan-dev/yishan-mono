@@ -29,6 +29,10 @@ vi.mock("../helpers/editorLanguage", () => ({
   },
 }));
 
+vi.mock("@codemirror/commands", () => ({
+  indentWithTab: { __kind: "indentWithTab", key: "Tab" },
+}));
+
 vi.mock("@codemirror/state", () => ({
   EditorState: {
     create: (input: { extensions?: unknown[] }) => {
@@ -45,9 +49,11 @@ vi.mock("@codemirror/state", () => ({
         }
 
         if (record.__kind === "keymap") {
-          const binding = (record.bindings ?? [])[0] as { run?: () => boolean } | undefined;
-          if (binding?.run) {
-            mockStateRef.keymapRun = binding.run;
+          const saveBinding = (record.bindings ?? []).find(
+            (b) => (b as { key?: string }).key === "Mod-s",
+          ) as { run?: () => boolean } | undefined;
+          if (saveBinding?.run) {
+            mockStateRef.keymapRun = saveBinding.run;
           }
         }
       }
