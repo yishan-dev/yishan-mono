@@ -201,6 +201,227 @@ func TestFileServiceDirectListMarksGitIgnoredEntries(t *testing.T) {
 	}
 }
 
+func TestFileServiceListTreatsDirectorySymlinkAsDirectory(t *testing.T) {
+	root := t.TempDir()
+	svc := NewFileService()
+
+	contextDir := t.TempDir()
+	if err := os.MkdirAll(contextDir, 0o755); err != nil {
+		t.Fatalf("mkdir context target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, "notes.md"), []byte("notes"), 0o644); err != nil {
+		t.Fatalf("write context note: %v", err)
+	}
+	if err := os.Symlink(contextDir, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", false)
+	if err != nil {
+		t.Fatalf("list root: %v", err)
+	}
+	entryByPath := map[string]FileEntry{}
+	for _, entry := range entries {
+		entryByPath[entry.Path] = entry
+	}
+	contextEntry, ok := entryByPath[".my-context"]
+	if !ok {
+		t.Fatalf("expected .my-context entry, got %+v", entries)
+	}
+	if !contextEntry.IsDir {
+		t.Fatalf("expected .my-context symlink to be treated as a directory, got %+v", contextEntry)
+	}
+
+	childEntries, err := svc.List(root, ".my-context", false)
+	if err != nil {
+		t.Fatalf("list context symlink: %v", err)
+	}
+	if len(childEntries) != 1 || childEntries[0].Path != ".my-context/notes.md" {
+		t.Fatalf("expected context child entry, got %+v", childEntries)
+	}
+}
+
+func TestFileServiceWalkTreatsDirectorySymlinkAsDirectoryEntry(t *testing.T) {
+	root := t.TempDir()
+	svc := NewFileService()
+
+	contextDir := t.TempDir()
+	if err := os.MkdirAll(contextDir, 0o755); err != nil {
+		t.Fatalf("mkdir context target: %v", err)
+	}
+	if err := os.Symlink(contextDir, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.walkFiles(root, root)
+	if err != nil {
+		t.Fatalf("walk files: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Path != ".my-context" || !entries[0].IsDir {
+		t.Fatalf("expected .my-context directory entry, got %+v", entries)
+	}
+}
+
+func TestFileServiceRecursiveListIncludesContextSymlinkContents(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	contextDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(contextDir, "docs"), 0o755); err != nil {
+		t.Fatalf("mkdir context docs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, "docs", "brief.md"), []byte("brief"), 0o644); err != nil {
+		t.Fatalf("write context brief: %v", err)
+	}
+	if err := os.Symlink(contextDir, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", true)
+	if err != nil {
+		t.Fatalf("recursive list root: %v", err)
+	}
+	entryByPath := map[string]FileEntry{}
+	for _, entry := range entries {
+		entryByPath[entry.Path] = entry
+	}
+	for _, path := range []string{".my-context", ".my-context/docs", ".my-context/docs/brief.md"} {
+		if _, ok := entryByPath[path]; !ok {
+			t.Fatalf("expected %s in recursive list, got %+v", path, entries)
+		}
+	}
+	if !entryByPath[".my-context"].IsDir || !entryByPath[".my-context/docs"].IsDir {
+		t.Fatalf("expected context entries to be directories, got %+v", entryByPath)
+	}
+}
+
+func TestFileServiceRecursiveListHidesContextGitMetadata(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	contextDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(contextDir, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir context git metadata: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, ".git", "config"), []byte("[core]\n"), 0o644); err != nil {
+		t.Fatalf("write context git config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, "notes.md"), []byte("notes"), 0o644); err != nil {
+		t.Fatalf("write context note: %v", err)
+	}
+	if err := os.Symlink(contextDir, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", true)
+	if err != nil {
+		t.Fatalf("recursive list root: %v", err)
+	}
+	paths := map[string]bool{}
+	for _, entry := range entries {
+		paths[entry.Path] = true
+	}
+	if !paths[".my-context/notes.md"] {
+		t.Fatalf("expected visible context note, got %+v", entries)
+	}
+	if paths[".my-context/.git"] || paths[".my-context/.git/config"] {
+		t.Fatalf("expected context .git metadata to stay hidden, got %+v", entries)
+	}
+}
+
+func TestFileServiceRecursiveListHidesContextGitFile(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	contextDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(contextDir, ".git"), []byte("gitdir: ../actual.git\n"), 0o644); err != nil {
+		t.Fatalf("write context git file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(contextDir, "notes.md"), []byte("notes"), 0o644); err != nil {
+		t.Fatalf("write context note: %v", err)
+	}
+	if err := os.Symlink(contextDir, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", true)
+	if err != nil {
+		t.Fatalf("recursive list root: %v", err)
+	}
+	paths := map[string]bool{}
+	for _, entry := range entries {
+		paths[entry.Path] = true
+	}
+	if !paths[".my-context/notes.md"] {
+		t.Fatalf("expected visible context note, got %+v", entries)
+	}
+	if paths[".my-context/.git"] {
+		t.Fatalf("expected context .git file to stay hidden, got %+v", entries)
+	}
+}
+
+func TestFileServiceListLeavesUnrelatedDirectorySymlinkFileLike(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	targetDir := t.TempDir()
+	if err := os.Symlink(targetDir, filepath.Join(root, "linked-dir")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", false)
+	if err != nil {
+		t.Fatalf("list root: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Path != "linked-dir" || entries[0].IsDir {
+		t.Fatalf("expected unrelated directory symlink to stay file-like, got %+v", entries)
+	}
+
+	recursiveEntries, err := svc.List(root, "", true)
+	if err != nil {
+		t.Fatalf("recursive list root: %v", err)
+	}
+	entryByPath := map[string]FileEntry{}
+	for _, entry := range recursiveEntries {
+		entryByPath[entry.Path] = entry
+	}
+	linkedDir, ok := entryByPath["linked-dir"]
+	if !ok || linkedDir.IsDir {
+		t.Fatalf("expected unrelated directory symlink to stay file-like recursively, got %+v", recursiveEntries)
+	}
+}
+
+func TestFileServiceListBrokenContextSymlinkFallsBackToLinkMetadata(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	missingTarget := filepath.Join(t.TempDir(), "missing")
+	if err := os.Symlink(missingTarget, filepath.Join(root, ".my-context")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	entries, err := svc.List(root, "", false)
+	if err != nil {
+		t.Fatalf("list root: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Path != ".my-context" || entries[0].IsDir {
+		t.Fatalf("expected broken context symlink to fall back to file-like metadata, got %+v", entries)
+	}
+
+	recursiveEntries, err := svc.List(root, "", true)
+	if err != nil {
+		t.Fatalf("recursive list root: %v", err)
+	}
+	if len(recursiveEntries) != 1 || recursiveEntries[0].Path != ".my-context" || recursiveEntries[0].IsDir {
+		t.Fatalf("expected recursive list to preserve broken context symlink, got %+v", recursiveEntries)
+	}
+}
+
 func TestFileServiceReadDiff(t *testing.T) {
 	root := t.TempDir()
 	initGitRepo(t, root)

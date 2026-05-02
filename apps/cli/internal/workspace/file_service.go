@@ -34,10 +34,17 @@ func (s *FileService) List(root string, path string, recursive bool) ([]FileEntr
 
 	if recursive {
 		if entries, ok, err := s.listGitFiles(root, path); ok || err != nil {
-			return entries, err
+			if err != nil {
+				return entries, err
+			}
+			return withContextLinkEntries(root, path, entries)
 		}
 
-		return s.walkFiles(root, dir)
+		entries, err := s.walkFiles(root, dir)
+		if err != nil {
+			return nil, err
+		}
+		return withContextLinkEntries(root, path, entries)
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -50,11 +57,11 @@ func (s *FileService) List(root string, path string, recursive bool) ([]FileEntr
 		if entry.Name() == ".git" {
 			continue
 		}
-		info, err := entry.Info()
+		fullPath := filepath.Join(dir, entry.Name())
+		info, isDir, err := fileInfoForDirectoryEntry(entry, fullPath)
 		if err != nil {
 			return nil, err
 		}
-		fullPath := filepath.Join(dir, entry.Name())
 		relPath, err := filepath.Rel(root, fullPath)
 		if err != nil {
 			return nil, err
@@ -62,7 +69,7 @@ func (s *FileService) List(root string, path string, recursive bool) ([]FileEntr
 		out = append(out, FileEntry{
 			Path:  filepath.ToSlash(relPath),
 			Name:  entry.Name(),
-			IsDir: entry.IsDir(),
+			IsDir: isDir,
 			Size:  info.Size(),
 			Mode:  uint32(info.Mode()),
 		})
@@ -87,7 +94,7 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 			return nil
 		}
 
-		info, err := entry.Info()
+		info, isDir, err := fileInfoForDirectoryEntry(entry, fullPath)
 		if err != nil {
 			return err
 		}
@@ -98,7 +105,7 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 		out = append(out, FileEntry{
 			Path:  filepath.ToSlash(relPath),
 			Name:  entry.Name(),
-			IsDir: entry.IsDir(),
+			IsDir: isDir,
 			Size:  info.Size(),
 			Mode:  uint32(info.Mode()),
 		})
@@ -109,6 +116,155 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 	}
 
 	return out, nil
+}
+
+func fileInfoForDirectoryEntry(entry os.DirEntry, fullPath string) (os.FileInfo, bool, error) {
+	if entry.Name() != contextLinkName {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, false, err
+		}
+		return info, entry.IsDir(), nil
+	}
+	return contextPathFileInfo(fullPath)
+}
+
+func contextPathFileInfo(fullPath string) (os.FileInfo, bool, error) {
+	info, err := os.Stat(fullPath)
+	if err == nil {
+		return info, info.IsDir(), nil
+	}
+
+	// Fall back to link metadata for broken symlinks or other paths Stat cannot
+	// follow, so one bad context entry does not break the whole list.
+	info, infoErr := os.Lstat(fullPath)
+	if infoErr != nil {
+		return nil, false, infoErr
+	}
+	return info, info.IsDir(), nil
+}
+
+func withContextLinkEntries(root string, path string, entries []FileEntry) ([]FileEntry, error) {
+	contextEntries, err := listContextLinkEntries(root, path)
+	if err != nil {
+		return nil, err
+	}
+	if len(contextEntries) == 0 {
+		return entries, nil
+	}
+
+	entryByPath := make(map[string]FileEntry, len(entries)+len(contextEntries))
+	for _, entry := range entries {
+		entryByPath[entry.Path] = entry
+	}
+	for _, entry := range contextEntries {
+		entryByPath[entry.Path] = entry
+	}
+
+	merged := make([]FileEntry, 0, len(entryByPath))
+	for _, entry := range entryByPath {
+		merged = append(merged, entry)
+	}
+	sort.Slice(merged, func(left, right int) bool {
+		return merged[left].Path < merged[right].Path
+	})
+	return markIgnoredEntries(root, merged), nil
+}
+
+func listContextLinkEntries(root string, path string) ([]FileEntry, error) {
+	cleanPath := filepath.ToSlash(filepath.Clean(path))
+	if cleanPath == "." {
+		cleanPath = ""
+	}
+	if cleanPath != "" && cleanPath != contextLinkName && !strings.HasPrefix(cleanPath, contextLinkName+"/") {
+		return nil, nil
+	}
+
+	linkPath := filepath.Join(root, contextLinkName)
+	contextInfo, err := os.Stat(linkPath)
+	if err != nil {
+		return contextLinkFallbackEntry(linkPath, cleanPath), nil
+	}
+	if !contextInfo.IsDir() {
+		return contextLinkFallbackEntry(linkPath, cleanPath), nil
+	}
+
+	contextRoot, err := filepath.EvalSymlinks(linkPath)
+	if err != nil {
+		return contextLinkFallbackEntry(linkPath, cleanPath), nil
+	}
+
+	entries := []FileEntry{}
+	if cleanPath == "" || cleanPath == contextLinkName {
+		entries = append(entries, FileEntry{
+			Path:  contextLinkName,
+			Name:  contextLinkName,
+			IsDir: true,
+			Size:  contextInfo.Size(),
+			Mode:  uint32(contextInfo.Mode()),
+		})
+	}
+
+	if err := filepath.WalkDir(contextRoot, func(fullPath string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if fullPath == contextRoot {
+			return nil
+		}
+		if entry.Name() == ".git" {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		relTargetPath, err := filepath.Rel(contextRoot, fullPath)
+		if err != nil {
+			return err
+		}
+		contextRelPath := filepath.ToSlash(filepath.Join(contextLinkName, relTargetPath))
+		if cleanPath != "" && cleanPath != contextLinkName && contextRelPath != cleanPath && !strings.HasPrefix(contextRelPath, cleanPath+"/") {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		entries = append(entries, FileEntry{
+			Path:  contextRelPath,
+			Name:  entry.Name(),
+			IsDir: entry.IsDir(),
+			Size:  info.Size(),
+			Mode:  uint32(info.Mode()),
+		})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func contextLinkFallbackEntry(linkPath string, cleanPath string) []FileEntry {
+	if cleanPath != "" && cleanPath != contextLinkName {
+		return nil
+	}
+	info, err := os.Lstat(linkPath)
+	if err != nil {
+		return nil
+	}
+	return []FileEntry{{
+		Path:  contextLinkName,
+		Name:  contextLinkName,
+		IsDir: false,
+		Size:  info.Size(),
+		Mode:  uint32(info.Mode()),
+	}}
 }
 
 func markIgnoredEntries(root string, entries []FileEntry) []FileEntry {
@@ -213,7 +369,16 @@ func parentDirectoryPaths(path string) []string {
 
 func fileEntryForRelativePath(root string, relPath string) (FileEntry, error) {
 	fullPath := filepath.Join(root, filepath.FromSlash(relPath))
-	info, err := os.Stat(fullPath)
+	cleanRelPath := filepath.ToSlash(filepath.Clean(relPath))
+	var info os.FileInfo
+	var isDir bool
+	var err error
+	if cleanRelPath == contextLinkName {
+		info, isDir, err = contextPathFileInfo(fullPath)
+	} else {
+		info, err = os.Lstat(fullPath)
+		isDir = err == nil && info.IsDir()
+	}
 	if err != nil {
 		return FileEntry{}, err
 	}
@@ -221,7 +386,7 @@ func fileEntryForRelativePath(root string, relPath string) (FileEntry, error) {
 	return FileEntry{
 		Path:  filepath.ToSlash(relPath),
 		Name:  filepath.Base(relPath),
-		IsDir: info.IsDir(),
+		IsDir: isDir,
 		Size:  info.Size(),
 		Mode:  uint32(info.Mode()),
 	}, nil
