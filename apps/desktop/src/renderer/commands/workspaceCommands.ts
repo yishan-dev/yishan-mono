@@ -53,6 +53,40 @@ type CloseWorkspaceResponse = {
 };
 
 /**
+ * Normalizes a raw lifecycle script warning from the daemon into the expected
+ * shape. Handles both properly structured objects and legacy plain-string
+ * warnings gracefully.
+ */
+function normalizeLifecycleWarning(raw: unknown): WorkspaceLifecycleScriptWarning {
+  if (typeof raw === "string") {
+    return {
+      scriptKind: "setup",
+      timedOut: false,
+      message: raw,
+      command: "",
+      stdoutExcerpt: "",
+      stderrExcerpt: "",
+      exitCode: null,
+      signal: null,
+      logFilePath: null,
+    };
+  }
+
+  const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    scriptKind: record.scriptKind === "post" ? "post" : "setup",
+    timedOut: Boolean(record.timedOut),
+    message: typeof record.message === "string" ? record.message : "",
+    command: typeof record.command === "string" ? record.command : "",
+    stdoutExcerpt: typeof record.stdoutExcerpt === "string" ? record.stdoutExcerpt : "",
+    stderrExcerpt: typeof record.stderrExcerpt === "string" ? record.stderrExcerpt : "",
+    exitCode: typeof record.exitCode === "number" ? record.exitCode : null,
+    signal: typeof record.signal === "string" ? record.signal : null,
+    logFilePath: typeof record.logFilePath === "string" ? record.logFilePath : null,
+  };
+}
+
+/**
  * Enqueues in-app lifecycle script warning notices for one workspace.
  */
 function notifyLifecycleScriptWarnings(
@@ -65,7 +99,7 @@ function notifyLifecycleScriptWarnings(
 
   enqueueWorkspaceLifecycleWarnings({
     workspaceName,
-    warnings,
+    warnings: warnings.map(normalizeLifecycleWarning),
   });
 }
 
