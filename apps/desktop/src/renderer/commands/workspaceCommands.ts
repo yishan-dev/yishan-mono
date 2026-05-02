@@ -84,6 +84,7 @@ async function closeWorkspaceInBackground(input: {
   workspaceWorktreePath?: string;
   branch?: string;
   removeBranch?: boolean;
+  postHook?: string;
 }): Promise<void> {
   const client = await getDaemonClient();
 
@@ -94,6 +95,7 @@ async function closeWorkspaceInBackground(input: {
     workspaceWorktreePath: input.workspaceWorktreePath,
     branch: input.branch,
     removeBranch: input.removeBranch,
+    postHook: input.postHook,
   })) as CloseWorkspaceResponse | undefined;
   if (!closed) {
     return;
@@ -166,6 +168,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
       sourceBranch,
       targetBranch,
       contextEnabled: project?.contextEnabled ?? true,
+      setupHook: project?.setupScript?.trim() || undefined,
     })) as CreateWorkspaceResponse;
     notifyLifecycleScriptWarnings(normalizedName, created.lifecycleScriptWarnings);
 
@@ -211,8 +214,11 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
     return;
   }
 
-  store.deleteWorkspace({
-    repoId: workspace.projectId ?? workspace.repoId,
+  const projectId = workspace.projectId ?? workspace.repoId;
+  const project = store.projects.find((item) => item.id === projectId);
+
+  store.closeWorkspace({
+    repoId: projectId,
     workspaceId,
   });
   syncTabStoreWithWorkspace(previousWorkspaces);
@@ -222,10 +228,11 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
     workspaceName: workspace.name,
     organizationId:
       workspace.organizationId?.trim() || sessionStore.getState().selectedOrganizationId?.trim() || undefined,
-    projectId: workspace.projectId ?? workspace.repoId,
+    projectId,
     workspaceWorktreePath: workspace.worktreePath?.trim() || undefined,
     branch: workspace.branch,
     removeBranch: options?.removeBranch,
+    postHook: project?.postScript?.trim() || undefined,
   }).catch((error) => {
     console.error("Failed to close backend workspace", error);
   });

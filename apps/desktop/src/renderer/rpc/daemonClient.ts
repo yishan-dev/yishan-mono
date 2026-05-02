@@ -428,6 +428,8 @@ export class DaemonClient {
     const workspaceName = readOptionalString(record?.workspaceName) || workspaceId;
     const contextEnabled = readOptionalBoolean(record?.contextEnabled) ?? false;
 
+    const setupHook = readOptionalString(record?.setupHook) || "";
+
     const createdWorkspace = (await this.invoke("workspace.create", {
       id: workspaceId,
       organizationId,
@@ -438,11 +440,17 @@ export class DaemonClient {
       targetBranch,
       sourceBranch,
       contextEnabled,
-    })) as Rpc.DaemonWorkspace;
+      setupHook,
+    })) as Rpc.DaemonWorkspace & { setupHookResult?: { error?: string } };
 
     const createdWorktreePath = createdWorkspace.path || "";
     if (createdWorktreePath) {
       this.workspaceIdByWorktreePath.set(createdWorktreePath, workspaceId);
+    }
+
+    const lifecycleScriptWarnings: unknown[] = [];
+    if (createdWorkspace.setupHookResult?.error) {
+      lifecycleScriptWarnings.push(createdWorkspace.setupHookResult.error);
     }
 
     return {
@@ -453,7 +461,7 @@ export class DaemonClient {
       branch: targetBranch,
       worktreePath: createdWorktreePath,
       status: "active",
-      lifecycleScriptWarnings: [],
+      lifecycleScriptWarnings,
     };
   }
 
@@ -503,6 +511,7 @@ export class DaemonClient {
     const worktreePath = readOptionalString(record?.workspaceWorktreePath);
     const branch = readOptionalString(record?.branch);
     const removeBranch = readOptionalBoolean(record?.removeBranch) ?? false;
+    const postHook = readOptionalString(record?.postHook) || "";
     return (await this.invoke("workspace.close", {
       workspaceId,
       organizationId,
@@ -512,6 +521,7 @@ export class DaemonClient {
       removeBranch,
       forceWorktree: true,
       forceBranch: true,
+      postHook,
     })) as Rpc.WorkspaceCloseExecutionResponse;
   }
 

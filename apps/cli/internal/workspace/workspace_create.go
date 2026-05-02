@@ -18,6 +18,7 @@ type CreateRequest struct {
 	TargetBranch   string `json:"targetBranch"`
 	SourceBranch   string `json:"sourceBranch"`
 	ContextEnabled bool   `json:"contextEnabled,omitempty"`
+	SetupHook      string `json:"setupHook,omitempty"`
 }
 
 func (m *Manager) CreateWorkspace(ctx context.Context, req CreateRequest) (Workspace, error) {
@@ -72,6 +73,23 @@ func (m *Manager) CreateWorkspace(ctx context.Context, req CreateRequest) (Works
 	}
 
 	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath}
+
+	hookResult, hookErr := RunHook(ctx, HookRequest{
+		Command:       req.SetupHook,
+		WorkspaceID:   ws.ID,
+		WorkspacePath: ws.Path,
+		HookName:      "setup",
+	})
+	if hookErr != nil {
+		// System-level hook failure (e.g. shell not found). Treat as
+		// non-fatal: workspace was created successfully, surface the error
+		// in the result so callers can warn the user.
+		hookResult.Error = fmt.Sprintf("setup hook: %v", hookErr)
+		ws.SetupHookResult = &hookResult
+	} else if !hookResult.Skipped {
+		ws.SetupHookResult = &hookResult
+	}
+
 	m.mu.Lock()
 	m.workspaces[ws.ID] = ws
 	m.mu.Unlock()

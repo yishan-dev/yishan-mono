@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,8 +11,9 @@ import (
 )
 
 type Workspace struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID              string      `json:"id"`
+	Path            string      `json:"path"`
+	SetupHookResult *HookResult `json:"setupHookResult,omitempty"`
 }
 
 type Manager struct {
@@ -42,6 +44,7 @@ type CloseRequest struct {
 	RemoveBranch  bool
 	ForceWorktree bool
 	ForceBranch   bool
+	PostHook      string
 }
 
 func (m *Manager) Open(req OpenRequest) (Workspace, error) {
@@ -82,31 +85,55 @@ func (m *Manager) List() []Workspace {
 	return out
 }
 
-func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) error {
+// CloseResult captures the outcome of a workspace close operation, including
+// any post-hook execution result.
+type CloseResult struct {
+	PostHookResult *HookResult `json:"postHookResult,omitempty"`
+}
+
+func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) (CloseResult, error) {
 	ws, err := m.getWorkspace(req.WorkspaceID)
 	if err != nil {
-		return err
+		return CloseResult{}, err
+	}
+
+	var result CloseResult
+
+	// Run the post hook before tearing down the workspace so the hook can
+	// still access workspace files and git state. Hook failures are
+	// non-fatal: the close operation always proceeds.
+	hookResult, hookErr := RunHook(ctx, HookRequest{
+		Command:       req.PostHook,
+		WorkspaceID:   ws.ID,
+		WorkspacePath: ws.Path,
+		HookName:      "post",
+	})
+	if hookErr != nil {
+		hookResult.Error = fmt.Sprintf("post hook: %v", hookErr)
+		result.PostHookResult = &hookResult
+	} else if !hookResult.Skipped {
+		result.PostHookResult = &hookResult
 	}
 
 	mainWorktreePath, err := m.gits.MainWorktreePath(ctx, ws.Path)
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	branch := req.Branch
 	if req.RemoveBranch && branch == "" {
 		branch, err = m.gits.CurrentBranch(ctx, ws.Path)
 		if err != nil {
-			return err
+			return result, err
 		}
 	}
 
 	if err := m.gits.RemoveWorktree(ctx, mainWorktreePath, ws.Path, req.ForceWorktree); err != nil {
-		return err
+		return result, err
 	}
 	if req.RemoveBranch {
 		if err := m.gits.RemoveBranch(ctx, mainWorktreePath, branch, req.ForceBranch); err != nil {
-			return err
+			return result, err
 		}
 	}
 
@@ -114,7 +141,7 @@ func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) error {
 	delete(m.workspaces, req.WorkspaceID)
 	m.mu.Unlock()
 
-	return nil
+	return result, nil
 }
 
 func (m *Manager) getWorkspace(id string) (Workspace, error) {

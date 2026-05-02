@@ -74,6 +74,7 @@ export type WorkspaceCreateInput = {
   sourceBranch?: string;
   targetBranch?: string;
   contextEnabled?: boolean;
+  setupHook?: string;
 };
 
 export type WorkspaceSyncContextLinkInput = {
@@ -95,6 +96,7 @@ export type WorkspaceCloseExecutionInput = {
   workspaceWorktreePath?: string;
   branch?: string;
   removeBranch?: boolean;
+  postHook?: string;
 };
 
 export type FileListInput = {

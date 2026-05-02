@@ -225,7 +225,7 @@ describe("workspaceCommands", () => {
   });
 
   it("deletes local workspace immediately and closes backend workspace in background", async () => {
-    const deleteWorkspace = vi.fn().mockResolvedValue(undefined);
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     const retainWorkspaceTabs = vi.fn().mockReturnValue(["tab-1"]);
     const setSelectedWorkspaceId = vi.fn();
     const removeTabData = vi.fn();
@@ -246,11 +246,11 @@ describe("workspaceCommands", () => {
           worktreePath: "/tmp/worktrees/feature-a",
         },
       ],
-      deleteWorkspace,
+      closeWorkspace: closeWorkspaceAction,
     });
     await closeWorkspace("workspace-1");
 
-    expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
+    expect(closeWorkspaceAction).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
     expect(retainWorkspaceTabs).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
     expect(removeTabData).toHaveBeenCalledWith(["tab-1"]);
@@ -270,7 +270,7 @@ describe("workspaceCommands", () => {
   });
 
   it("shows system notification when close returns lifecycle script warning", async () => {
-    const deleteWorkspace = vi.fn().mockResolvedValue(undefined);
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     workspaceStore.setState({
       workspaces: [
         {
@@ -285,7 +285,7 @@ describe("workspaceCommands", () => {
           worktreePath: "/tmp/worktrees/feature-a",
         },
       ],
-      deleteWorkspace,
+      closeWorkspace: closeWorkspaceAction,
     });
     rpcMocks.closeWorkspace.mockResolvedValueOnce({
       workspace: { id: "workspace-1", status: "archived" },
@@ -328,7 +328,7 @@ describe("workspaceCommands", () => {
   });
 
   it("forwards removeBranch option to backend close", async () => {
-    const deleteWorkspace = vi.fn().mockResolvedValue(undefined);
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     workspaceStore.setState({
       workspaces: [
         {
@@ -343,7 +343,7 @@ describe("workspaceCommands", () => {
           worktreePath: "",
         },
       ],
-      deleteWorkspace,
+      closeWorkspace: closeWorkspaceAction,
     });
     await closeWorkspace("workspace-1", { removeBranch: true });
     await vi.waitFor(() => {
@@ -356,24 +356,24 @@ describe("workspaceCommands", () => {
         removeBranch: true,
       });
     });
-    expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
+    expect(closeWorkspaceAction).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
   });
 
   it("does nothing when closing a missing workspace", async () => {
-    const deleteWorkspace = vi.fn().mockResolvedValue(undefined);
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     workspaceStore.setState({
       workspaces: [],
-      deleteWorkspace,
+      closeWorkspace: closeWorkspaceAction,
     });
 
     await closeWorkspace("workspace-404");
 
     expect(rpcMocks.closeWorkspace).not.toHaveBeenCalled();
-    expect(deleteWorkspace).not.toHaveBeenCalled();
+    expect(closeWorkspaceAction).not.toHaveBeenCalled();
   });
 
   it("returns before backend close completes so UI is non-blocking", async () => {
-    const deleteWorkspace = vi.fn().mockResolvedValue(undefined);
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     workspaceStore.setState({
       workspaces: [
         {
@@ -388,7 +388,7 @@ describe("workspaceCommands", () => {
           worktreePath: "",
         },
       ],
-      deleteWorkspace,
+      closeWorkspace: closeWorkspaceAction,
     });
 
     let resolveClose: (() => void) | undefined;
@@ -401,7 +401,7 @@ describe("workspaceCommands", () => {
     );
     await closeWorkspace("workspace-1");
 
-    expect(deleteWorkspace).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
+    expect(closeWorkspaceAction).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
     expect(rpcMocks.closeWorkspace).toHaveBeenCalledWith({
       workspaceId: "workspace-1",
       organizationId: "org-1",

@@ -190,7 +190,7 @@ export type WorkspaceStoreState = {
     worktreePath?: string;
     workspaceId: string;
   }) => void;
-  deleteWorkspace: (input: {
+  closeWorkspace: (input: {
     projectId?: string;
     repoId?: string;
     workspaceId: string;
@@ -236,7 +236,7 @@ export type WorkspaceStoreActions = Pick<
   | "updateProjectConfig"
   | "incrementFileTreeRefreshVersion"
   | "addWorkspace"
-  | "deleteWorkspace"
+  | "closeWorkspace"
   | "renameWorkspace"
   | "renameWorkspaceBranch"
   | "setWorkspaceGitChangesCount"

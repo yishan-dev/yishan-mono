@@ -9,7 +9,7 @@ import { ProjectListView } from "./ProjectListView";
 const mocked = vi.hoisted(() => {
   const renameWorkspace = vi.fn();
   const renameWorkspaceBranch = vi.fn();
-  const deleteWorkspace = vi.fn();
+  const closeWorkspace = vi.fn();
   const deleteProject = vi.fn();
   const setSelectedRepoId = vi.fn();
   const setSelectedWorkspaceId = vi.fn();
@@ -49,7 +49,7 @@ const mocked = vi.hoisted(() => {
       setLastUsedExternalAppId: (appId: string) => void;
       renameWorkspace: (input: { repoId: string; workspaceId: string; name: string }) => Promise<void>;
       renameWorkspaceBranch: (input: { repoId: string; workspaceId: string; branch: string }) => Promise<void>;
-      deleteWorkspace: (input: { repoId: string; workspaceId: string }) => Promise<void>;
+      closeWorkspace: (input: { repoId: string; workspaceId: string }) => Promise<void>;
       deleteProject: (input: { repoId: string }) => Promise<void>;
       workspaceAgentStatusByWorkspaceId: Record<string, "running" | "waiting_input">;
       workspaceUnreadToneByWorkspaceId: Record<string, "success" | "error">;
@@ -69,7 +69,7 @@ const mocked = vi.hoisted(() => {
       setLastUsedExternalAppId,
       renameWorkspace: async () => undefined,
       renameWorkspaceBranch: async () => undefined,
-      deleteWorkspace: async () => undefined,
+      closeWorkspace: async () => undefined,
       deleteProject: async () => undefined,
       workspaceAgentStatusByWorkspaceId: {},
       workspaceUnreadToneByWorkspaceId: {},
@@ -93,7 +93,7 @@ const mocked = vi.hoisted(() => {
   return {
     renameWorkspace,
     renameWorkspaceBranch,
-    deleteWorkspace,
+    closeWorkspace,
     deleteProject,
     setSelectedRepoId,
     setSelectedWorkspaceId,
@@ -160,7 +160,7 @@ vi.mock("../../../hooks/useCommands", () => ({
     setSelectedWorkspaceId: mocked.setSelectedWorkspaceId,
     renameWorkspace: mocked.renameWorkspace,
     renameWorkspaceBranch: mocked.renameWorkspaceBranch,
-    closeWorkspace: mocked.deleteWorkspace,
+    closeWorkspace: mocked.closeWorkspace,
     deleteProject: mocked.deleteProject,
     openEntryInExternalApp: mocked.openEntryInExternalApp,
     setLastUsedExternalAppId: mocked.setLastUsedExternalAppId,
@@ -201,7 +201,7 @@ function renderRepoList(
 ) {
   mocked.renameWorkspace.mockResolvedValue(undefined);
   mocked.renameWorkspaceBranch.mockResolvedValue(undefined);
-  mocked.deleteWorkspace.mockResolvedValue(undefined);
+  mocked.closeWorkspace.mockResolvedValue(undefined);
   mocked.deleteProject.mockResolvedValue(undefined);
   mocked.openEntryInExternalApp.mockResolvedValue({ ok: true });
   mocked.stateRef.current = {
@@ -240,7 +240,7 @@ function renderRepoList(
     setLastUsedExternalAppId: mocked.setLastUsedExternalAppId,
     renameWorkspace: mocked.renameWorkspace,
     renameWorkspaceBranch: mocked.renameWorkspaceBranch,
-    deleteWorkspace: mocked.deleteWorkspace,
+    closeWorkspace: mocked.closeWorkspace,
     deleteProject: mocked.deleteProject,
     workspaceAgentStatusByWorkspaceId: {},
     workspaceUnreadToneByWorkspaceId: {},
@@ -388,7 +388,7 @@ describe("ProjectListView", () => {
       setLastUsedExternalAppId: mocked.setLastUsedExternalAppId,
       renameWorkspace: mocked.renameWorkspace,
       renameWorkspaceBranch: mocked.renameWorkspaceBranch,
-      deleteWorkspace: mocked.deleteWorkspace,
+      closeWorkspace: mocked.closeWorkspace,
       deleteProject: mocked.deleteProject,
       workspaceAgentStatusByWorkspaceId: {},
       workspaceUnreadToneByWorkspaceId: {},
@@ -470,7 +470,7 @@ describe("ProjectListView", () => {
     expect(screen.getByText("workspace.delete.confirm")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "workspace.actions.delete" }));
-    expect(mocked.deleteWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: true });
+    expect(mocked.closeWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: true });
   });
 
   it("opens rename dialog from workspace context menu", () => {
@@ -614,7 +614,7 @@ describe("ProjectListView", () => {
       true,
     );
     fireEvent.click(screen.getByRole("button", { name: "workspace.actions.delete" }));
-    expect(mocked.deleteWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: true });
+    expect(mocked.closeWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: true });
   });
 
   it("allows disabling branch removal in workspace delete confirmation", () => {
@@ -629,7 +629,7 @@ describe("ProjectListView", () => {
     expect((removeBranchCheckbox as HTMLInputElement).checked).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "workspace.actions.delete" }));
-    expect(mocked.deleteWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: false });
+    expect(mocked.closeWorkspace).toHaveBeenCalledWith("workspace-1", { removeBranch: false });
   });
 
   it("renders running spinner when workspace status is running", () => {

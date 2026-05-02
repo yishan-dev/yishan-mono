@@ -139,6 +139,7 @@ func (p *Provisioner) ensureWorkspaceProvisionedLocally(
 		TargetBranch:   workspaceItem.Branch,
 		SourceBranch:   sourceBranch,
 		ContextEnabled: project.ContextEnabled,
+		SetupHook:      project.SetupScript,
 	}); err != nil {
 		return fmt.Errorf("create workspace locally: %w", err)
 	}

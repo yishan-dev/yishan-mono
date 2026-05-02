@@ -81,6 +81,8 @@ type Project struct {
 	RepoKey        string `json:"repoKey"`
 	LocalPath      string `json:"localPath"`
 	ContextEnabled bool   `json:"contextEnabled"`
+	SetupScript    string `json:"setupScript"`
+	PostScript     string `json:"postScript"`
 	CreatedAt      string `json:"createdAt"`
 	UpdatedAt      string `json:"updatedAt"`
 }

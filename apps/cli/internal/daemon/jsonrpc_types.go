@@ -77,6 +77,7 @@ type workspaceCloseParams struct {
 	RemoveBranch   bool   `json:"removeBranch,omitempty"`
 	ForceWorktree  bool   `json:"forceWorktree,omitempty"`
 	ForceBranch    bool   `json:"forceBranch,omitempty"`
+	PostHook       string `json:"postHook,omitempty"`
 }
 
 type gitInspectParams struct {

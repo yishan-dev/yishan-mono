@@ -9,7 +9,7 @@ import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetSt
 type WorkspaceActions = Pick<
   WorkspaceStoreActions,
   | "addWorkspace"
-  | "deleteWorkspace"
+  | "closeWorkspace"
   | "renameWorkspace"
   | "renameWorkspaceBranch"
   | "setWorkspaceGitChangesCount"
@@ -51,7 +51,7 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         }),
       }));
     },
-    deleteWorkspace: ({ projectId, repoId, workspaceId }) => {
+    closeWorkspace: ({ projectId, repoId, workspaceId }) => {
       const resolvedProjectId = resolveProjectId({ projectId, repoId });
       if (!resolvedProjectId || !workspaceId) {
         return;

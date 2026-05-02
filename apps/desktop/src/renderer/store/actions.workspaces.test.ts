@@ -118,7 +118,7 @@ describe("createWorkspaceActions", () => {
     harness.actions.setWorkspaceGitChangesCount("workspace-1", 3);
     harness.actions.setWorkspaceGitChangeTotals("workspace-1", { additions: 7, deletions: 2 });
 
-    harness.actions.deleteWorkspace({
+    harness.actions.closeWorkspace({
       repoId: "repo-1",
       workspaceId: "workspace-1",
     });

@@ -61,7 +61,7 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
       updateProjectConfig: vi.fn(),
       incrementFileTreeRefreshVersion: vi.fn(),
       addWorkspace: vi.fn(),
-      deleteWorkspace: vi.fn(),
+      closeWorkspace: vi.fn(),
       renameWorkspace: vi.fn(),
       renameWorkspaceBranch: vi.fn(),
       setWorkspaceGitChangesCount: vi.fn(),

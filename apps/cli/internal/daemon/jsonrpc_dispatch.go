@@ -54,13 +54,15 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
-		if err := h.manager.CloseWorkspace(ctx, workspace.CloseRequest{
+		closeResult, err := h.manager.CloseWorkspace(ctx, workspace.CloseRequest{
 			WorkspaceID:   req.WorkspaceID,
 			Branch:        req.Branch,
 			RemoveBranch:  req.RemoveBranch,
 			ForceWorktree: req.ForceWorktree,
 			ForceBranch:   req.ForceBranch,
-		}); err != nil {
+			PostHook:      req.PostHook,
+		})
+		if err != nil {
 			return nil, err
 		}
 		if req.ProjectID != "" {
@@ -75,11 +77,19 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 				return nil, err
 			}
 		}
-		return map[string]any{
+		warnings := []any{}
+		if closeResult.PostHookResult != nil && closeResult.PostHookResult.Error != "" {
+			warnings = append(warnings, closeResult.PostHookResult.Error)
+		}
+		result := map[string]any{
 			"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
 			"workspaceId":             req.WorkspaceID,
-			"lifecycleScriptWarnings": []any{},
-		}, nil
+			"lifecycleScriptWarnings": warnings,
+		}
+		if closeResult.PostHookResult != nil {
+			result["postHookResult"] = closeResult.PostHookResult
+		}
+		return result, nil
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
 	case MethodFrontendEventsStream:
