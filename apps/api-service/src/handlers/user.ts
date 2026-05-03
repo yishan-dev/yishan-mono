@@ -4,11 +4,10 @@ import type { UpdateNotificationPreferencesBodyInput } from "@/validation/user";
 
 export async function meHandler(c: AppContext) {
   const user = c.get("sessionUser");
-  const preferences = await c.get("services").user.getNotificationPreferences(user.id);
   return c.json({
     user: {
       ...user,
-      notificationPreferences: normalizeNotificationPreferences(preferences),
+      notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences),
     },
   });
 }

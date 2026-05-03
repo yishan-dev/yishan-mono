@@ -5,7 +5,10 @@ import { sessions, users } from "@/db/schema";
 import { newId } from "@/lib/id";
 import { randomToken, sha256Hex } from "@/auth/security";
 
-export type SessionUser = Pick<typeof users.$inferSelect, "id" | "email" | "name" | "avatarUrl">;
+export type SessionUser = Pick<
+  typeof users.$inferSelect,
+  "id" | "email" | "name" | "avatarUrl" | "notificationPreferences"
+>;
 
 export async function createSession(
   db: AppDb,
@@ -39,7 +42,8 @@ export async function getSessionUser(db: AppDb, token: string): Promise<SessionU
       id: users.id,
       email: users.email,
       name: users.name,
-      avatarUrl: users.avatarUrl
+      avatarUrl: users.avatarUrl,
+      notificationPreferences: users.notificationPreferences,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))

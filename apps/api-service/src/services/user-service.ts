@@ -19,7 +19,8 @@ export class UserService {
         id: users.id,
         email: users.email,
         name: users.name,
-        avatarUrl: users.avatarUrl
+        avatarUrl: users.avatarUrl,
+        notificationPreferences: users.notificationPreferences,
       })
       .from(users)
       .where(eq(users.id, userId))
