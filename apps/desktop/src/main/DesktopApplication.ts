@@ -52,6 +52,11 @@ export class DesktopApplication {
   private async start(): Promise<void> {
     await app.whenReady();
 
+    // Override the runtime app name so native menus, About dialog, and
+    // other OS-level surfaces show "Yishan" instead of the scoped
+    // package name "@yishan/desktop".
+    app.setName("Yishan");
+
     // Pre-load daemon settings so before-quit has the correct value even
     // when the user never opens the Settings view during this session.
     try {
@@ -66,6 +71,7 @@ export class DesktopApplication {
     this.registerAuthIpcHandlers();
     this.createMainWindow();
     configureApplicationMenu({
+      appName: "Yishan",
       devMode: isDevMode(),
       dispatchAction: (payload, options) => {
         this.dispatchAction(payload, options);
