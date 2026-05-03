@@ -1,42 +1,73 @@
 import { Box } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 type ColumnSeparatorProps = {
   ariaLabel: string;
   baseWidth?: string;
   hoverWidth?: string;
   onResizeStart: (clientX: number) => void;
+  onResizeMove?: (clientX: number) => void;
+  onResizeEnd?: () => void;
 };
 
+/**
+ * Draggable column separator that uses pointer capture to ensure reliable
+ * resize behaviour even when the cursor passes over `-webkit-app-region: drag`
+ * zones (which swallow regular mouse events in production Electron builds).
+ */
 export function ColumnSeparator({
   ariaLabel,
   baseWidth = "3px",
   hoverWidth = "3px",
   onResizeStart,
+  onResizeMove,
+  onResizeEnd,
 }: ColumnSeparatorProps) {
   const [dragging, setDragging] = useState(false);
+  const separatorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!dragging) {
-      return;
-    }
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      // Only handle primary button (left click)
+      if (event.button !== 0) return;
 
-    const stopDragging = () => {
+      event.preventDefault();
+      setDragging(true);
+
+      // Capture the pointer so all subsequent pointer events are routed
+      // directly to this element, bypassing -webkit-app-region: drag zones.
+      event.currentTarget.setPointerCapture(event.pointerId);
+
+      onResizeStart(event.clientX);
+    },
+    [onResizeStart],
+  );
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragging) return;
+      onResizeMove?.(event.clientX);
+    },
+    [dragging, onResizeMove],
+  );
+
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragging) return;
+
       setDragging(false);
-    };
-
-    window.addEventListener("mouseup", stopDragging);
-    window.addEventListener("blur", stopDragging);
-    return () => {
-      window.removeEventListener("mouseup", stopDragging);
-      window.removeEventListener("blur", stopDragging);
-    };
-  }, [dragging]);
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      onResizeEnd?.();
+    },
+    [dragging, onResizeEnd],
+  );
 
   return (
     <Box
+      ref={separatorRef}
       role="separator"
       aria-label={ariaLabel}
+      className="electron-webkit-app-region-no-drag"
       data-dragging={dragging ? "true" : "false"}
       sx={{
         width: baseWidth,
@@ -48,6 +79,7 @@ export function ColumnSeparator({
         position: "relative",
         overflow: "visible",
         bgcolor: "transparent",
+        touchAction: "none",
         "&::before": {
           content: '""',
           position: "absolute",
@@ -85,11 +117,9 @@ export function ColumnSeparator({
           },
         },
       }}
-      onMouseDown={(event) => {
-        event.preventDefault();
-        setDragging(true);
-        onResizeStart(event.clientX);
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     />
   );
 }

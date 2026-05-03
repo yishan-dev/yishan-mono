@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
@@ -233,47 +233,45 @@ export function WorkspaceView() {
   const resolvedRightWidth = clamp(rightWidth, RIGHT_MIN_WIDTH, maxRightWidth);
   const hasProjects = projects.length > 0;
 
-  const resizeLeftStart = (clientXStart: number) => {
-    if (leftCollapsed) {
-      return;
-    }
+  // Refs to hold the drag origin so pointer-capture callbacks can compute deltas.
+  const leftDragRef = useRef({ startX: 0, startWidth: 0 });
+  const rightDragRef = useRef({ startX: 0, startWidth: 0 });
 
-    const startWidth = resolvedLeftWidth;
-    const onMouseMove = (event: MouseEvent) => {
-      const delta = event.clientX - clientXStart;
+  const resizeLeftStart = useCallback(
+    (clientXStart: number) => {
+      if (leftCollapsed) return;
+      leftDragRef.current = { startX: clientXStart, startWidth: resolvedLeftWidth };
+    },
+    [leftCollapsed, resolvedLeftWidth],
+  );
+
+  const resizeLeftMove = useCallback(
+    (clientX: number) => {
+      const { startX, startWidth } = leftDragRef.current;
+      const delta = clientX - startX;
       const nextWidth = clamp(startWidth + delta, LEFT_MIN_WIDTH, maxLeftWidth);
       cmd.setLeftWidth(nextWidth);
-    };
+    },
+    [cmd, maxLeftWidth],
+  );
 
-    const onMouseUp = () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
+  const resizeRightStart = useCallback(
+    (clientXStart: number) => {
+      if (rightCollapsed) return;
+      rightDragRef.current = { startX: clientXStart, startWidth: resolvedRightWidth };
+    },
+    [rightCollapsed, resolvedRightWidth],
+  );
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  };
-
-  const resizeRightStart = (clientXStart: number) => {
-    if (rightCollapsed) {
-      return;
-    }
-
-    const startWidth = resolvedRightWidth;
-    const onMouseMove = (event: MouseEvent) => {
-      const delta = clientXStart - event.clientX;
+  const resizeRightMove = useCallback(
+    (clientX: number) => {
+      const { startX, startWidth } = rightDragRef.current;
+      const delta = startX - clientX;
       const nextWidth = clamp(startWidth + delta, RIGHT_MIN_WIDTH, maxRightWidth);
       cmd.setRightWidth(nextWidth);
-    };
-
-    const onMouseUp = () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  };
+    },
+    [cmd, maxRightWidth],
+  );
 
   if (!hasProjects) {
     return (
@@ -295,7 +293,9 @@ export function WorkspaceView() {
         leftResizeLabel={t("layout.resize.left")}
         rightResizeLabel={t("layout.resize.right")}
         onResizeLeftStart={resizeLeftStart}
+        onResizeLeftMove={resizeLeftMove}
         onResizeRightStart={resizeRightStart}
+        onResizeRightMove={resizeRightMove}
         left={
           <Box sx={{ width: resolvedLeftWidth, minWidth: resolvedLeftWidth, height: "100%" }}>
             <LeftPaneView

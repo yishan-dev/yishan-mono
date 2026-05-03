@@ -15,7 +15,11 @@ type ThreeColumnLayoutProps = {
   leftResizeLabel: string;
   rightResizeLabel: string;
   onResizeLeftStart: (clientX: number) => void;
+  onResizeLeftMove?: (clientX: number) => void;
+  onResizeLeftEnd?: () => void;
   onResizeRightStart: (clientX: number) => void;
+  onResizeRightMove?: (clientX: number) => void;
+  onResizeRightEnd?: () => void;
 };
 
 /**
@@ -31,7 +35,11 @@ export function ThreeColumnLayout({
   leftResizeLabel,
   rightResizeLabel,
   onResizeLeftStart,
+  onResizeLeftMove,
+  onResizeLeftEnd,
   onResizeRightStart,
+  onResizeRightMove,
+  onResizeRightEnd,
 }: ThreeColumnLayoutProps) {
   return (
     <Box
@@ -49,13 +57,13 @@ export function ThreeColumnLayout({
     >
       <Box sx={{ display: leftCollapsed ? "none" : "block", minWidth: 0 }}>{left}</Box>
       <Box sx={{ display: leftCollapsed ? "none" : "block" }}>
-        <ColumnSeparator ariaLabel={leftResizeLabel} onResizeStart={onResizeLeftStart} />
+        <ColumnSeparator ariaLabel={leftResizeLabel} onResizeStart={onResizeLeftStart} onResizeMove={onResizeLeftMove} onResizeEnd={onResizeLeftEnd} />
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>{main}</Box>
 
       <Box sx={{ display: rightCollapsed ? "none" : "block" }}>
-        <ColumnSeparator ariaLabel={rightResizeLabel} onResizeStart={onResizeRightStart} />
+        <ColumnSeparator ariaLabel={rightResizeLabel} onResizeStart={onResizeRightStart} onResizeMove={onResizeRightMove} onResizeEnd={onResizeRightEnd} />
       </Box>
       <Box sx={{ display: rightCollapsed ? "none" : "block", minWidth: 0 }}>{right}</Box>
     </Box>
