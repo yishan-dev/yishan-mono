@@ -37,7 +37,7 @@ export const AGENT_SETTINGS_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, string> 
   gemini: "settings.agents.items.gemini",
   pi: "settings.agents.items.pi",
   copilot: "settings.agents.items.copilot",
-  "cursor-agent": "settings.agents.items.cursor",
+  cursor: "settings.agents.items.cursor",
 };
 
 export const AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, string> = {
@@ -47,7 +47,7 @@ export const AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND: Record<DesktopAgentKind, s
   gemini: "tabs.createMenu.gemini",
   pi: "tabs.createMenu.pi",
   copilot: "tabs.createMenu.copilot",
-  "cursor-agent": "tabs.createMenu.cursor",
+  cursor: "tabs.createMenu.cursor",
 };
 
 const AGENT_ICON_SRC_BY_KIND: Record<DesktopAgentKind, string> = {
@@ -55,9 +55,9 @@ const AGENT_ICON_SRC_BY_KIND: Record<DesktopAgentKind, string> = {
   codex: "app-icons/preset-icons/codex.svg",
   claude: "app-icons/preset-icons/claude.svg",
   gemini: "app-icons/preset-icons/gemini.svg",
-  pi: "app-icons/preset-icons/opencode.svg",
+  pi: "app-icons/preset-icons/pi.svg",
   copilot: "material-icons/copilot.svg",
-  "cursor-agent": "app-icons/preset-icons/cursor.svg",
+  cursor: "app-icons/preset-icons/cursor.svg",
 };
 
 const AGENT_ICON_SLOT_SIZE_BY_CONTEXT: Record<AgentIconContext, number> = {
@@ -90,7 +90,7 @@ const AGENT_ICON_SIZE_RATIO_BY_KIND: Record<DesktopAgentKind, AgentIconSizeRatio
     width: 1,
     height: 1,
   },
-  "cursor-agent": {
+  cursor: {
     width: 1,
     height: 1,
   },
@@ -103,7 +103,7 @@ const AGENT_ICON_SCALE_BY_KIND: Record<DesktopAgentKind, number> = {
   gemini: 1,
   pi: 1,
   copilot: 1.1,
-  "cursor-agent": 1,
+  cursor: 1,
 };
 
 const AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND: Partial<Record<DesktopAgentKind, string>> = {
@@ -112,13 +112,18 @@ const AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND: Partial<Record<DesktopAgentKind, str
 
 /**
  * Returns centralized agent icon asset and sizing presentation for one UI context.
+ * Returns `null` when the agent kind or context has no matching configuration.
  */
 export function getAgentIconPresentation(
   agentKind: DesktopAgentKind,
   context: AgentIconContext,
-): AgentIconPresentation {
+): AgentIconPresentation | null {
   const slotSize = AGENT_ICON_SLOT_SIZE_BY_CONTEXT[context];
   const sizeRatio = AGENT_ICON_SIZE_RATIO_BY_KIND[agentKind];
+  if (!sizeRatio || !slotSize) {
+    console.warn(`[getAgentIconPresentation] Missing icon config for agent "${agentKind}" in context "${context}"`);
+    return null;
+  }
   const lightModeFilter = AGENT_ICON_LIGHT_MODE_FILTER_BY_KIND[agentKind];
   return {
     src: AGENT_ICON_SRC_BY_KIND[agentKind],

@@ -16,7 +16,7 @@ import type { BiCog } from "react-icons/bi";
 import { RxExit } from "react-icons/rx";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { SearchInput } from "../components/SearchInput";
-import { SettingsSectionHeader } from "../components/settings";
+import { SettingsErrorBoundary, SettingsSectionHeader } from "../components/settings";
 import { ThemePreferencePicker } from "../components/settings/ThemePreferencePicker";
 import { getRendererPlatform } from "../helpers/platform";
 import { useThemePreference } from "../hooks/useThemePreference";
@@ -276,7 +276,9 @@ export function SettingsView() {
         ) : selectedTab === "account" ? (
           <AccountSettingsView />
         ) : selectedTab === "agents" ? (
-          <AgentSettingsView />
+          <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
+            <AgentSettingsView />
+          </SettingsErrorBoundary>
         ) : selectedTab === "appearance" ? (
           <ThemePreferencePicker
             preference={themePreference}

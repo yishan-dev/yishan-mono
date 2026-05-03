@@ -53,7 +53,7 @@ const agentTerminalConfigs: Record<
     title: "Copilot",
     command: "copilot",
   },
-  "cursor-agent": {
+  cursor: {
     title: "Cursor",
     command: "cursor",
   },

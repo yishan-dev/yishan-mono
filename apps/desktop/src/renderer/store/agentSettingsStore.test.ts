@@ -14,7 +14,7 @@ describe("agentSettingsStore", () => {
         gemini: true,
         pi: true,
         copilot: true,
-        "cursor-agent": true,
+        cursor: true,
       },
     });
   });
@@ -41,7 +41,7 @@ describe("agentSettingsStore", () => {
       gemini: true,
       pi: true,
       copilot: true,
-      "cursor-agent": true,
+      cursor: true,
     });
   });
 

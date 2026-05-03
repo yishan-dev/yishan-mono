@@ -10,10 +10,15 @@ export type AgentIconProps = {
 
 /**
  * Renders one centralized agent icon variant with shared asset, ratio, and scale rules.
+ * Returns null gracefully when agent icon configuration is unavailable.
  */
 export function AgentIcon({ agentKind, context, label, decorative = false }: AgentIconProps) {
   const theme = useTheme();
   const icon = getAgentIconPresentation(agentKind, context);
+
+  if (!icon) {
+    return null;
+  }
 
   return (
     <Box
