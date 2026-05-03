@@ -33,15 +33,13 @@ function renderLabel(node: TreeNode, isIgnored: boolean, isExpanded: boolean) {
   const icon = getFileTreeIcon(node.path, node.isDirectory || node.children.size > 0, isExpanded);
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, whiteSpace: "nowrap" }}>
       <Box component="img" src={icon} alt="" sx={{ width: 16, height: 16, flexShrink: 0 }} />
       <Box
         component="span"
         data-ignored={isIgnored ? "true" : "false"}
         style={{ userSelect: "none", WebkitUserSelect: "none" }}
         sx={{
-          overflow: "hidden",
-          textOverflow: "ellipsis",
           color: isIgnored ? "text.disabled" : "text.primary",
         }}
       >

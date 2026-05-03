@@ -541,7 +541,7 @@ export function FileManagerView({
         onItemContextMenu={(request) => {
           openContextMenu(request);
         }}
-      />
+        />
       <ContextMenu
         open={Boolean(contextMenu)}
         onClose={closeContextMenu}

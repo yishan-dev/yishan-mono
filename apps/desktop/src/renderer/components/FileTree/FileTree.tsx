@@ -413,7 +413,7 @@ export function FileTree({
     <Box
       ref={treeAreaRef}
       data-testid="repo-file-tree-area"
-      sx={{ flex: 1, minHeight: 0, px: 1.5, py: 1, overflowY: "auto" }}
+      sx={{ flex: 1, minHeight: 0, px: 1.5, py: 1, overflowY: "auto", overflowX: "auto" }}
       onContextMenu={handleEmptyAreaContextMenu}
       onKeyDown={(event) => {
         void handleTreeKeyDown(event);
@@ -470,7 +470,8 @@ export function FileTree({
           });
         }}
         sx={{
-          minWidth: 0,
+          width: "max-content",
+          minWidth: "100%",
           "& .MuiTreeItem-content": {
             minHeight: 28,
             borderRadius: 1,
