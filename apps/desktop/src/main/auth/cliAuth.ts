@@ -45,10 +45,11 @@ function resolveCliInvocation(): CliInvocation {
     const configuredDevCliDir = process.env.YISHAN_CLI_DEV_DIR?.trim();
     const candidateDir = configuredDevCliDir || resolve(process.cwd(), "..", "cli");
     const cliDir = existsSync(candidateDir) ? candidateDir : undefined;
+    const devApiBaseUrl = process.env.VITE_API_BASE_URL?.trim() || "http://localhost:8787";
 
     return {
       executablePath: "go",
-      prefixArgs: ["run", ".", "--profile", "dev"],
+      prefixArgs: ["run", ".", "--profile", "dev", "--api-base-url", devApiBaseUrl],
       cwd: cliDir,
     };
   }

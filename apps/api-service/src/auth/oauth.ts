@@ -105,7 +105,16 @@ async function exchangeGoogleToken(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to exchange Google OAuth code");
+    let details = "";
+    try {
+      details = await response.text();
+    } catch {
+      // ignore response parse failures
+    }
+
+    throw new Error(
+      `Failed to exchange Google OAuth code (status=${response.status}${details ? `, body=${details}` : ""})`
+    );
   }
 
   return (await response.json()) as TokenResponse;

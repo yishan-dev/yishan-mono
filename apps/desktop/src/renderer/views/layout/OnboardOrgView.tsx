@@ -2,8 +2,9 @@ import { Box, Button, Paper, Stack, TextField, Typography } from "@mui/material"
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuBuilding2 } from "react-icons/lu";
-import { createOrganization, listOrganizations } from "../../api";
+import { createOrganization } from "../../api";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
+import { rendererQueryClient } from "../../queryClient";
 import { sessionStore } from "../../store/sessionStore";
 import { AppMenuView } from "./AppMenuView";
 
@@ -26,14 +27,18 @@ export function OnboardOrgView() {
     void (async () => {
       try {
         const createdOrganization = await createOrganization(normalizedOrganizationName);
-        const nextOrganizations = await listOrganizations();
         const currentUser = sessionStore.getState().currentUser;
 
         sessionStore.getState().setSessionData({
           currentUser,
-          organizations: nextOrganizations,
+          organizations: [createdOrganization],
           selectedOrganizationId: createdOrganization.id,
         });
+
+        // Invalidate the cached session-bootstrap query so any subsequent
+        // re-bootstrap fetches fresh data instead of the stale pre-creation
+        // response that contained an empty organization list.
+        rendererQueryClient.invalidateQueries({ queryKey: ["session-bootstrap"] });
 
         setOrganizationName("");
         await loadWorkspaceFromBackend();
@@ -119,7 +124,7 @@ export function OnboardOrgView() {
                 fullWidth
                 size="small"
                 placeholder={t("org.menu.newOrganizationPrompt")}
-                inputProps={{ "aria-label": t("org.menu.newOrganizationPrompt") }}
+                slotProps={{ htmlInput: { "aria-label": t("org.menu.newOrganizationPrompt") } }}
                 value={organizationName}
                 onChange={(event) => {
                   setOrganizationName(event.currentTarget.value);

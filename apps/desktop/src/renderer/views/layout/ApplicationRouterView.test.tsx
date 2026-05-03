@@ -5,7 +5,8 @@ import { cleanup } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api";
-import { createOrganization, listOrganizations } from "../../api";
+import { createOrganization } from "../../api";
+import { RestApiError } from "../../api/restClient";
 import { getSessionBootstrapData } from "../../api/sessionApi";
 import { getAuthStatus, getDaemonInfo } from "../../commands/appCommands";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
@@ -61,7 +62,6 @@ vi.mock("../../commands/projectCommands", () => ({
 
 vi.mock("../../api", () => ({
   createOrganization: vi.fn(async () => ({ id: "org-2", name: "New Organization" })),
-  listOrganizations: vi.fn(async () => [{ id: "org-2", name: "New Organization" }]),
   api: {
     node: {
       listByOrg: vi.fn(async () => []),
@@ -95,6 +95,10 @@ vi.mock("../WorkspaceView", async () => {
 
 vi.mock("../LoginView", () => ({
   LoginView: () => <div data-testid="login-view">login-view</div>,
+}));
+
+vi.mock("./AppBootstrapLoadingView", () => ({
+  AppBootstrapLoadingView: () => <div data-testid="bootstrap-loading-view">bootstrap-loading</div>,
 }));
 
 vi.mock("./AppMenuView", () => ({
@@ -179,7 +183,6 @@ describe("ApplicationRouterView", () => {
     vi.mocked(loadWorkspaceFromBackend).mockResolvedValue(undefined);
     vi.mocked(api.node.listByOrg).mockResolvedValue([]);
     vi.mocked(createOrganization).mockResolvedValue({ id: "org-2", name: "New Organization" });
-    vi.mocked(listOrganizations).mockResolvedValue([{ id: "org-2", name: "New Organization" }]);
   });
 
   afterEach(() => {
@@ -267,7 +270,123 @@ describe("ApplicationRouterView", () => {
 
     expect(await screen.findByTestId("workspace-input")).toBeTruthy();
     expect(createOrganization).toHaveBeenCalledWith("Acme");
-    expect(listOrganizations).toHaveBeenCalled();
+  });
+
+  it("uses created organization directly from create response without extra list call", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockResolvedValueOnce({
+      currentUser: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
+      },
+      organizations: [],
+    });
+
+    renderApplicationRouter("/");
+
+    const input = (await screen.findByRole("textbox", { name: "org.menu.newOrganizationPrompt" })) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Acme" } });
+    fireEvent.click(screen.getByRole("button", { name: "onboarding.firstOrganization.submit" }));
+
+    expect(await screen.findByTestId("workspace-input")).toBeTruthy();
+    expect(createOrganization).toHaveBeenCalledWith("Acme");
+
+    // Session store should contain exactly the created organization from the
+    // create response — no separate list call needed.
+    const { organizations, selectedOrganizationId } = sessionStore.getState();
+    expect(organizations).toEqual([{ id: "org-2", name: "New Organization" }]);
+    expect(selectedOrganizationId).toBe("org-2");
+  });
+
+  it("invalidates session-bootstrap cache after org creation", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockResolvedValueOnce({
+      currentUser: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
+      },
+      organizations: [],
+    });
+
+    renderApplicationRouter("/");
+
+    const input = (await screen.findByRole("textbox", { name: "org.menu.newOrganizationPrompt" })) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Acme" } });
+    fireEvent.click(screen.getByRole("button", { name: "onboarding.firstOrganization.submit" }));
+
+    await screen.findByTestId("workspace-input");
+
+    // After org creation, the stale session-bootstrap query should be invalidated
+    // so that any subsequent re-fetch returns fresh data.
+    const queryState = rendererQueryClient.getQueryState(["session-bootstrap"]);
+    expect(queryState?.isInvalidated).toBe(true);
+  });
+
+  it("does not flash bootstrap loading view when transitioning from org creation to workspace", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockResolvedValueOnce({
+      currentUser: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        avatarUrl: null,
+        notificationPreferences: {
+          enabled: true,
+          osEnabled: true,
+          soundEnabled: true,
+          volume: 1,
+          focusOnClick: true,
+          enabledEventTypes: ["run-finished", "run-failed"],
+          eventSounds: {
+            "run-finished": "chime",
+            "run-failed": "alert",
+          },
+          enabledCategories: ["ai-task"],
+        },
+      },
+      organizations: [],
+    });
+
+    renderApplicationRouter("/");
+
+    const input = (await screen.findByRole("textbox", { name: "org.menu.newOrganizationPrompt" })) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Acme" } });
+    fireEvent.click(screen.getByRole("button", { name: "onboarding.firstOrganization.submit" }));
+
+    // After org creation, workspace view should appear without the bootstrap
+    // loading view flashing in between.
+    await screen.findByTestId("workspace-input");
+    expect(screen.queryByTestId("bootstrap-loading-view")).toBeNull();
   });
 
   it("keeps workspace mounted while showing settings overlay", async () => {
@@ -317,5 +436,16 @@ describe("ApplicationRouterView", () => {
     renderApplicationRouter("/");
 
     expect(await screen.findByTestId("workspace-input")).toBeTruthy();
+  });
+
+  it("returns to login view when session bootstrap fails with 401", async () => {
+    authStore.setState({ isAuthenticated: true, authStatusResolved: true });
+    vi.mocked(getSessionBootstrapData).mockRejectedValue(new RestApiError("Unauthorized", 401));
+
+    renderApplicationRouter("/");
+
+    expect(await screen.findByTestId("login-view")).toBeTruthy();
+    expect(screen.queryByTestId("bootstrap-loading-view")).toBeNull();
+    expect(screen.queryByTestId("workspace-input")).toBeNull();
   });
 });

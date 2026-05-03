@@ -5,26 +5,42 @@ type RendererHostBridge = {
   getAuthTokens?: () => Promise<{
     authenticated: boolean;
     accessToken?: string;
+    refreshToken?: string;
   }>;
 };
 
-async function resolveAuthHeader(): Promise<string | undefined> {
+type AuthTokens = {
+  accessToken: string;
+  refreshToken?: string;
+};
+
+/** In-memory cached access token from a successful refresh so subsequent requests reuse it. */
+let cachedAccessToken: string | undefined;
+
+function getRendererHostBridge(): RendererHostBridge | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
 
-  const bridge = (window as typeof window & { __YISHAN__?: { host?: RendererHostBridge } }).__YISHAN__;
-  if (!bridge?.host?.getAuthTokens) {
+  return (window as typeof window & { __YISHAN__?: { host?: RendererHostBridge } }).__YISHAN__?.host ?? undefined;
+}
+
+async function resolveAuthTokens(): Promise<AuthTokens | undefined> {
+  const bridge = getRendererHostBridge();
+  if (!bridge?.getAuthTokens) {
     return undefined;
   }
 
   try {
-    const authTokens = await bridge.host.getAuthTokens();
+    const authTokens = await bridge.getAuthTokens();
     if (!authTokens.authenticated || !authTokens.accessToken) {
       return undefined;
     }
 
-    return `Bearer ${authTokens.accessToken}`;
+    return {
+      accessToken: cachedAccessToken ?? authTokens.accessToken,
+      refreshToken: authTokens.refreshToken,
+    };
   } catch {
     return undefined;
   }
@@ -37,6 +53,30 @@ function resolveApiBaseUrl(): string {
   }
 
   return import.meta.env.DEV ? DEFAULT_DEV_REMOTE_API_BASE_URL : DEFAULT_REMOTE_API_BASE_URL;
+}
+
+/** Attempts to refresh the access token using the refresh token via the API. */
+async function refreshAccessToken(refreshToken: string): Promise<string | undefined> {
+  const baseUrl = resolveApiBaseUrl();
+  const url = new URL("/auth/refresh", baseUrl);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      return undefined;
+    }
+
+    const payload = (await response.json()) as { accessToken?: string };
+    return payload.accessToken?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class RestApiError extends Error {
@@ -57,15 +97,15 @@ export async function requestJson<T>(
     body?: unknown;
   },
 ): Promise<T> {
+  const tokens = await resolveAuthTokens();
   const baseUrl = resolveApiBaseUrl();
   const url = new URL(path, baseUrl);
-  const authHeader = await resolveAuthHeader();
   const headers: Record<string, string> = {};
   if (input?.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
-  if (authHeader) {
-    headers.Authorization = authHeader;
+  if (tokens?.accessToken) {
+    headers.Authorization = `Bearer ${tokens.accessToken}`;
   }
 
   const response = await fetch(url.toString(), {
@@ -74,6 +114,43 @@ export async function requestJson<T>(
     credentials: "include",
     body: input?.body === undefined ? undefined : JSON.stringify(input.body),
   });
+
+  // On 401, attempt to refresh the access token and retry the request once.
+  if (response.status === 401 && tokens?.refreshToken) {
+    const freshAccessToken = await refreshAccessToken(tokens.refreshToken);
+    if (freshAccessToken) {
+      cachedAccessToken = freshAccessToken;
+
+      const retryHeaders: Record<string, string> = {};
+      if (input?.body !== undefined) {
+        retryHeaders["Content-Type"] = "application/json";
+      }
+      retryHeaders.Authorization = `Bearer ${freshAccessToken}`;
+
+      const retryResponse = await fetch(url.toString(), {
+        method: input?.method ?? "GET",
+        headers: retryHeaders,
+        credentials: "include",
+        body: input?.body === undefined ? undefined : JSON.stringify(input.body),
+      });
+
+      if (!retryResponse.ok) {
+        let message = `Request failed with status ${retryResponse.status}`;
+        try {
+          const payload = (await retryResponse.json()) as { error?: string };
+          if (payload?.error?.trim()) {
+            message = payload.error;
+          }
+        } catch {
+          // ignore parse errors and keep fallback message
+        }
+
+        throw new RestApiError(message, retryResponse.status);
+      }
+
+      return (await retryResponse.json()) as T;
+    }
+  }
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;

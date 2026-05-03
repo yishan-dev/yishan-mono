@@ -3,16 +3,17 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate } from "react-router-dom";
 import { api } from "../../api";
+import { RestApiError } from "../../api/restClient";
 import { getSessionBootstrapData } from "../../api/sessionApi";
 import { getAuthStatus, getDaemonInfo } from "../../commands/appCommands";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
 import { rendererQueryClient } from "../../queryClient";
 import { authStore } from "../../store/authStore";
 import { sessionStore } from "../../store/sessionStore";
-import { AppBootstrapLoadingView } from "./AppBootstrapLoadingView";
-import { OnboardOrgView } from "./OnboardOrgView";
 import { LoginView } from "../LoginView";
 import { WorkspaceView } from "../WorkspaceView";
+import { AppBootstrapLoadingView } from "./AppBootstrapLoadingView";
+import { OnboardOrgView } from "./OnboardOrgView";
 
 const WORKSPACE_ROUTE = "/";
 
@@ -131,15 +132,24 @@ export function ApplicationRouterView() {
     const bootstrapSession = async () => {
       let bootstrappedSessionData = false;
       try {
-        setAppBootstrapReady(false);
+        const sessionState = sessionStore.getState();
+        const sessionAlreadyLoaded = sessionState.loaded;
+
+        // Only reset bootstrap readiness when loading session data for the first
+        // time. When session data is already loaded (e.g. after org creation in
+        // OnboardOrgView), avoid flashing the loading screen while workspace data
+        // refreshes in the background.
+        if (!sessionAlreadyLoaded) {
+          setAppBootstrapReady(false);
+        }
         setAppBootstrapError(null);
 
-        const sessionState = sessionStore.getState();
-        if (!sessionState.loaded) {
+        if (!sessionAlreadyLoaded) {
           const sessionData = await rendererQueryClient.fetchQuery({
             queryKey: ["session-bootstrap"],
             queryFn: getSessionBootstrapData,
             staleTime: 30_000,
+            retry: false,
           });
           if (disposed) {
             return;
@@ -172,11 +182,21 @@ export function ApplicationRouterView() {
         if (!disposed) {
           setAppBootstrapReady(true);
         }
-      } catch {
+      } catch (error) {
         if (!disposed) {
           if (bootstrappedSessionData) {
             sessionStore.getState().clearSessionData();
           }
+
+          // A 401 from the API means the session token is invalid or expired.
+          // Transition back to the login view instead of showing a retry screen.
+          if (error instanceof RestApiError && error.status === 401) {
+            authStore.getState().setAuthState(false, true);
+            sessionStore.getState().clearSessionData();
+            rendererQueryClient.clear();
+            return;
+          }
+
           setAppBootstrapReady(false);
           setAppBootstrapError("failed");
         }
