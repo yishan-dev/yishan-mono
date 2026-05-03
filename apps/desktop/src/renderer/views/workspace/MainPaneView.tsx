@@ -198,7 +198,7 @@ export function MainPaneView() {
           ...(hasWorkspaceTabs
             ? {
                 bgcolor: (theme: Theme) =>
-                  darken(theme.palette.background.default, theme.palette.mode === "dark" ? 0.1 : 0.2),
+                  darken(theme.palette.background.default, 0.2),
               }
             : {}),
         }}

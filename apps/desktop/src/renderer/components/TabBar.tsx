@@ -253,6 +253,8 @@ export function TabBar({
     alignItems: "center",
     bgcolor: active ? "background.default" : "transparent",
     px: 2,
+    minWidth: 150,
+    maxWidth: 240,
     flexShrink: 0,
     position: "relative",
     zIndex: active ? 1 : 0,
@@ -262,6 +264,8 @@ export function TabBar({
     borderColor: "divider",
     ...(active
       ? {
+          borderLeft: "1px solid",
+          borderLeftColor: "primary.main",
           "&::after": {
             content: '""',
             position: "absolute",
@@ -550,7 +554,11 @@ export function TabBar({
                       }}
                     />
                   ) : null}
-                  <Box component="span" style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}>
+                  <Box
+                    component="span"
+                    style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
+                    sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
                     {tab.title || untitledLabel}
                   </Box>
                 </ButtonBase>
@@ -732,7 +740,11 @@ export function TabBar({
                         }}
                       />
                     ) : null}
-                    <Box component="span" style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}>
+                    <Box
+                      component="span"
+                      style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
+                      sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
                       {tab.title || untitledLabel}
                     </Box>
                   </ButtonBase>
