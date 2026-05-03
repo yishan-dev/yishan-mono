@@ -212,8 +212,21 @@ export function ApplicationRouterView() {
 
   if (!authStatusResolved) {
     return (
-      <Box sx={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress size={28} />
+      <Box sx={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <Box
+          component="header"
+          className="electron-webkit-app-region-drag"
+          sx={{
+            height: 42,
+            minHeight: 42,
+            px: 1,
+            display: "flex",
+            alignItems: "center",
+          }}
+        />
+        <Box sx={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <CircularProgress size={28} />
+        </Box>
       </Box>
     );
   }

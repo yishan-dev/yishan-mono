@@ -1,10 +1,10 @@
 {
   "app": {
-    "title": "Yishan",
+    "title": "移山",
     "update": {
       "readyTitle": "有可用更新",
       "readyTitleWithVersion": "发现新版本 {{version}}",
-      "readyDescription": "立即重启 Yishan 以安装最新版本。",
+      "readyDescription": "立即重启移山以安装最新版本。",
       "restartAction": "重启并更新",
       "closeAria": "关闭更新通知"
     },
@@ -16,8 +16,8 @@
   },
   "auth": {
     "login": {
-      "title": "欢迎使用 Yishan",
-      "description": "请先使用 Google 登录，再继续进入桌面工作区。",
+      "title": "欢迎使用移山",
+      "description": "让开发工作变得更轻松。",
       "remoteStatus": {
         "checking": "正在检查远程 API 状态...",
         "online": "远程 API 连接正常。",
@@ -93,7 +93,7 @@
     "appearance": {
       "theme": {
         "title": "主题",
-        "description": "选择 Yishan 的界面外观。",
+        "description": "选择移山的界面外观。",
         "options": {
           "light": "浅色",
           "dark": "深色",
@@ -265,7 +265,7 @@
   "onboarding": {
     "firstOrganization": {
       "title": "创建你的第一个组织",
-      "description": "组织用于管理项目、工作区和共享节点。创建一个组织即可开始使用 Yishan。",
+      "description": "组织用于管理项目、工作区和共享节点。创建一个组织即可开始使用移山。",
       "submit": "创建组织",
       "creating": "创建中..."
     },

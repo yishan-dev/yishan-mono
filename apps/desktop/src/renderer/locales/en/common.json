@@ -17,7 +17,7 @@
   "auth": {
     "login": {
       "title": "Welcome to Yishan",
-      "description": "Sign in with Google to continue to your desktop workspace.",
+      "description": "Make development work feel lighter.",
       "remoteStatus": {
         "checking": "Checking remote API status...",
         "online": "Remote API is reachable.",
