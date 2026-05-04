@@ -18,7 +18,12 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
-		return h.manager.Open(req)
+		ws, err := h.manager.Open(req)
+		if err != nil {
+			return nil, err
+		}
+		h.watchers.Watch(ws.Path)
+		return ws, nil
 	case MethodList:
 		return h.manager.List(), nil
 	case MethodWorkspaceCreate:
@@ -43,6 +48,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 				return nil, err
 			}
 		}
+		h.watchers.Watch(created.Path)
 		warnings := []any{}
 		if created.SetupHookResult != nil && created.SetupHookResult.Error != "" {
 			warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult))
@@ -64,6 +70,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err := decodeParams(params, &req); err != nil {
 			return nil, err
 		}
+		ws, wsErr := h.manager.GetWorkspace(req.WorkspaceID)
 		closeResult, err := h.manager.CloseWorkspace(ctx, workspace.CloseRequest{
 			WorkspaceID:   req.WorkspaceID,
 			Branch:        req.Branch,
@@ -74,6 +81,9 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		})
 		if err != nil {
 			return nil, err
+		}
+		if wsErr == nil {
+			h.watchers.Unwatch(ws.Path)
 		}
 		if req.ProjectID != "" {
 			if err := closeRemoteWorkspace(ctx, WorkspaceClose{

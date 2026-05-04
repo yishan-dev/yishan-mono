@@ -155,6 +155,10 @@ func (m *Manager) getWorkspace(id string) (Workspace, error) {
 	return ws, nil
 }
 
+func (m *Manager) GetWorkspace(id string) (Workspace, error) {
+	return m.getWorkspace(id)
+}
+
 func (m *Manager) TerminalStart(ctx context.Context, req TerminalStartRequest) (TerminalStartResponse, error) {
 	ws, err := m.getWorkspace(req.WorkspaceID)
 	if err != nil {
