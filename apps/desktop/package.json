@@ -112,8 +112,12 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "identity": null,
-      "icon": "src/assets/icons/yishan.icns"
+      "icon": "src/assets/icons/yishan.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "icon": "src/assets/images/yishan-app-icon.png",
