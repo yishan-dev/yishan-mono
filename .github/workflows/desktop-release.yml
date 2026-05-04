@@ -153,7 +153,7 @@ jobs:
       - name: List release artifacts
         run: ls -lhR artifacts/
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -161,6 +161,17 @@ jobs:
           set -euo pipefail
           version="${{ needs.resolve-version.outputs.version }}"
           tag="desktop-v${version}"
+
+          # Collect release files
+          shopt -s nullglob
+          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
+          shopt -u nullglob
+
+          # Delete existing release for this tag (re-runs / retries)
+          if gh release view "$tag" &>/dev/null; then
+            echo "Deleting existing release for $tag"
+            gh release delete "$tag" --yes --cleanup-tag=false
+          fi
 
           args=(
             "$tag"
@@ -175,15 +186,10 @@ jobs:
             args+=(--draft)
           fi
 
-          # Ensure tag exists for tag-triggered runs; create for dispatch runs
+          # For dispatch runs the tag may not exist yet
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             args+=(--target "${{ github.sha }}")
           fi
-
-          # Collect release files
-          shopt -s nullglob
-          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
-          shopt -u nullglob
 
           if [[ ${#files[@]} -gt 0 ]]; then
             gh release create "${args[@]}" "${files[@]}"
