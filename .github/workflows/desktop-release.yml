@@ -133,6 +133,7 @@ jobs:
             apps/desktop/release/*.zip
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
+            apps/desktop/release/*.rpm
             apps/desktop/release/*.snap
             apps/desktop/release/*.yml
             apps/desktop/release/*.yaml
@@ -164,7 +165,7 @@ jobs:
 
           # Collect release files
           shopt -s nullglob
-          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
+          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.rpm artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
           shopt -u nullglob
 
           # Delete existing release for this tag (re-runs / retries)

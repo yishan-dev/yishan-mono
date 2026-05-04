@@ -128,7 +128,9 @@
     "linux": {
       "icon": "src/assets/images/yishan-app-icon.png",
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb",
+        "rpm"
       ]
     },
     "extraMetadata": {
