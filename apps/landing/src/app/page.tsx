@@ -1,3 +1,5 @@
+import { HeroImage } from "./hero-image";
+
 const logoUrl =
   "https://raw.githubusercontent.com/yishan-io/yishan-mono/main/apps/desktop/src/assets/images/yishan-transparent.png";
 
@@ -82,15 +84,12 @@ export default function LandingPage() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-[#2A342F] bg-[#0D1110]/82 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center">
+          <div className="flex items-center gap-1">
+            <div className="flex h-20 w-20 items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt="Yishan logo" className="h-full w-full object-contain" />
             </div>
-            <div>
-              <div className="text-lg font-semibold tracking-wide text-[#E8ECE8]">Yishan</div>
-              <div className="text-xs text-[#A5B0A8]">Workspace layer for agent-driven development</div>
-            </div>
+            <div className="text-lg font-semibold tracking-wide text-[#E8ECE8]">Yishan</div>
           </div>
 
           <nav className="hidden items-center gap-8 text-sm text-[#A5B0A8] md:flex">
@@ -167,14 +166,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="mt-16">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/app.png"
-              alt="Yishan desktop app screenshot"
-              className="h-auto w-full rounded-lg shadow-[0_32px_100px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]"
-            />
-          </div>
+          <HeroImage />
         </section>
 
         {/* Agents marquee */}
