@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaGoogle } from "react-icons/fa";
 import logo from "../../assets/images/yishan-transparent.png";
+import { resetAuthExpiredState } from "../api/restClient";
 import { login } from "../commands/appCommands";
 import { authStore } from "../store/authStore";
 
@@ -24,6 +25,7 @@ export function LoginView() {
         return;
       }
 
+      resetAuthExpiredState();
       setAuthState(true, true);
     } catch {
       setErrorMessage(t("auth.login.errors.unexpected"));

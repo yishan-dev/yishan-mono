@@ -14,8 +14,57 @@ type AuthTokens = {
   refreshToken?: string;
 };
 
+// ---------------------------------------------------------------------------
+// Auth-expired event bus
+// ---------------------------------------------------------------------------
+
+type AuthExpiredListener = () => void;
+const authExpiredListeners = new Set<AuthExpiredListener>();
+
+/** Register a callback invoked when token refresh fails and the session is expired. Returns an unsubscribe function. */
+export function onAuthExpired(listener: AuthExpiredListener): () => void {
+  authExpiredListeners.add(listener);
+  return () => {
+    authExpiredListeners.delete(listener);
+  };
+}
+
+/** Tracks whether auth-expired has already been emitted in this session to avoid repeated notifications. */
+let authExpiredEmitted = false;
+
+function emitAuthExpired(): void {
+  if (authExpiredEmitted) {
+    return;
+  }
+  authExpiredEmitted = true;
+
+  for (const listener of authExpiredListeners) {
+    try {
+      listener();
+    } catch {
+      // best-effort delivery; do not block remaining listeners
+    }
+  }
+}
+
+/** Resets the auth-expired emission flag (called after successful re-authentication). */
+export function resetAuthExpiredState(): void {
+  authExpiredEmitted = false;
+  cachedAccessToken = undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Token management with mutex-guarded refresh
+// ---------------------------------------------------------------------------
+
 /** In-memory cached access token from a successful refresh so subsequent requests reuse it. */
 let cachedAccessToken: string | undefined;
+
+/**
+ * Pending refresh promise. When a refresh is already in-flight, subsequent
+ * callers await the same promise instead of issuing duplicate refresh calls.
+ */
+let activeRefreshPromise: Promise<string | undefined> | undefined;
 
 function getRendererHostBridge(): RendererHostBridge | undefined {
   if (typeof window === "undefined") {
@@ -56,7 +105,7 @@ function resolveApiBaseUrl(): string {
 }
 
 /** Attempts to refresh the access token using the refresh token via the API. */
-async function refreshAccessToken(refreshToken: string): Promise<string | undefined> {
+async function refreshAccessTokenRequest(refreshToken: string): Promise<string | undefined> {
   const baseUrl = resolveApiBaseUrl();
   const url = new URL("/auth/refresh", baseUrl);
 
@@ -79,6 +128,30 @@ async function refreshAccessToken(refreshToken: string): Promise<string | undefi
   }
 }
 
+/**
+ * Mutex-guarded token refresh. If a refresh is already in progress, all
+ * concurrent callers share the same pending promise so only one network
+ * request is issued. When the refresh fails, an auth-expired event is
+ * emitted so the UI can prompt re-authentication.
+ */
+async function refreshAccessToken(refreshToken: string): Promise<string | undefined> {
+  if (activeRefreshPromise) {
+    return activeRefreshPromise;
+  }
+
+  activeRefreshPromise = refreshAccessTokenRequest(refreshToken);
+
+  try {
+    const result = await activeRefreshPromise;
+    if (result) {
+      cachedAccessToken = result;
+    }
+    return result;
+  } finally {
+    activeRefreshPromise = undefined;
+  }
+}
+
 export class RestApiError extends Error {
   readonly status: number;
 
@@ -87,6 +160,47 @@ export class RestApiError extends Error {
     this.name = "RestApiError";
     this.status = status;
   }
+}
+
+/** Builds the standard headers for a JSON request. */
+function buildHeaders(accessToken: string | undefined, hasBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (hasBody) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return headers;
+}
+
+/** Executes a single fetch call to the remote api-service. */
+async function executeFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: unknown | undefined,
+): Promise<Response> {
+  return fetch(url, {
+    method,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
+    credentials: "include",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/** Reads an error message from a failed response body, falling back to a generic status message. */
+async function readErrorMessage(response: Response): Promise<string> {
+  let message = `Request failed with status ${response.status}`;
+  try {
+    const payload = (await response.json()) as { error?: string };
+    if (payload?.error?.trim()) {
+      message = payload.error;
+    }
+  } catch {
+    // ignore parse errors and keep fallback message
+  }
+  return message;
 }
 
 /** Sends one JSON request to remote api-service and returns parsed JSON response body. */
@@ -99,70 +213,41 @@ export async function requestJson<T>(
 ): Promise<T> {
   const tokens = await resolveAuthTokens();
   const baseUrl = resolveApiBaseUrl();
-  const url = new URL(path, baseUrl);
-  const headers: Record<string, string> = {};
-  if (input?.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (tokens?.accessToken) {
-    headers.Authorization = `Bearer ${tokens.accessToken}`;
-  }
+  const url = new URL(path, baseUrl).toString();
+  const method = input?.method ?? "GET";
+  const hasBody = input?.body !== undefined;
+  const headers = buildHeaders(tokens?.accessToken, hasBody);
 
-  const response = await fetch(url.toString(), {
-    method: input?.method ?? "GET",
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
-    credentials: "include",
-    body: input?.body === undefined ? undefined : JSON.stringify(input.body),
-  });
+  const response = await executeFetch(url, method, headers, input?.body);
 
   // On 401, attempt to refresh the access token and retry the request once.
-  if (response.status === 401 && tokens?.refreshToken) {
-    const freshAccessToken = await refreshAccessToken(tokens.refreshToken);
-    if (freshAccessToken) {
-      cachedAccessToken = freshAccessToken;
+  if (response.status === 401) {
+    if (tokens?.refreshToken) {
+      const freshAccessToken = await refreshAccessToken(tokens.refreshToken);
+      if (freshAccessToken) {
+        const retryHeaders = buildHeaders(freshAccessToken, hasBody);
+        const retryResponse = await executeFetch(url, method, retryHeaders, input?.body);
 
-      const retryHeaders: Record<string, string> = {};
-      if (input?.body !== undefined) {
-        retryHeaders["Content-Type"] = "application/json";
-      }
-      retryHeaders.Authorization = `Bearer ${freshAccessToken}`;
-
-      const retryResponse = await fetch(url.toString(), {
-        method: input?.method ?? "GET",
-        headers: retryHeaders,
-        credentials: "include",
-        body: input?.body === undefined ? undefined : JSON.stringify(input.body),
-      });
-
-      if (!retryResponse.ok) {
-        let message = `Request failed with status ${retryResponse.status}`;
-        try {
-          const payload = (await retryResponse.json()) as { error?: string };
-          if (payload?.error?.trim()) {
-            message = payload.error;
-          }
-        } catch {
-          // ignore parse errors and keep fallback message
+        if (!retryResponse.ok) {
+          const message = await readErrorMessage(retryResponse);
+          throw new RestApiError(message, retryResponse.status);
         }
 
-        throw new RestApiError(message, retryResponse.status);
+        return (await retryResponse.json()) as T;
       }
-
-      return (await retryResponse.json()) as T;
     }
+
+    // Either no refresh token is available or the refresh itself failed.
+    // The session is expired — notify listeners so the UI can transition
+    // to a re-authentication state, then throw so the caller knows the
+    // request was not completed.
+    emitAuthExpired();
+    const message = await readErrorMessage(response);
+    throw new RestApiError(message, 401);
   }
 
   if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
-    try {
-      const payload = (await response.json()) as { error?: string };
-      if (payload?.error?.trim()) {
-        message = payload.error;
-      }
-    } catch {
-      // ignore parse errors and keep fallback message
-    }
-
+    const message = await readErrorMessage(response);
     throw new RestApiError(message, response.status);
   }
 

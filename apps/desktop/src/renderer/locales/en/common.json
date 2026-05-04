@@ -29,6 +29,12 @@
         "commandFailed": "Unable to complete login with the local CLI.",
         "unexpected": "Something went wrong while signing in."
       }
+    },
+    "sessionExpired": {
+      "title": "Session expired",
+      "description": "Your authentication session has expired. Please sign in again to continue.",
+      "signInAction": "Sign in",
+      "dismissAria": "Dismiss session expired notification"
     }
   },
   "settings": {

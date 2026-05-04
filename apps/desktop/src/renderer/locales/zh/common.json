@@ -29,6 +29,12 @@
         "commandFailed": "无法通过本地 CLI 完成登录。",
         "unexpected": "登录时发生错误，请稍后重试。"
       }
+    },
+    "sessionExpired": {
+      "title": "会话已过期",
+      "description": "你的认证会话已过期，请重新登录以继续使用。",
+      "signInAction": "登录",
+      "dismissAria": "关闭会话过期通知"
     }
   },
   "settings": {

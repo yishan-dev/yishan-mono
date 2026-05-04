@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { AppUpdateSnackbar } from "./components/AppUpdateSnackbar";
+import { AuthSessionExpiredSnackbar } from "./components/AuthSessionExpiredSnackbar";
 import { WorkspaceOverlay } from "./components/WorkspaceOverlay";
 import { startBackendEventPipeline, startBackendEventStoreBindings } from "./events";
 import { AppThemePreferenceProvider, useThemePreference } from "./hooks/useThemePreference";
@@ -64,6 +65,7 @@ function AppRoot() {
           </Routes>
         </HashRouter>
         <AppUpdateSnackbar />
+        <AuthSessionExpiredSnackbar />
       </ThemeProvider>
     </QueryClientProvider>
   );
