@@ -25,6 +25,7 @@ export class DesktopApplication {
   private mainWindow: BrowserWindow | null = null;
   private readonly daemonManager = new DaemonManager();
   private hasProcessedBeforeQuit = false;
+  private isQuitting = false;
   private pendingUpdateReady: DesktopUpdateEventPayload | null = null;
   private cachedDaemonQuitOnExit: boolean | null = null;
 
@@ -87,53 +88,38 @@ export class DesktopApplication {
       },
     });
 
-    if (isDevMode()) {
-      app.on("before-quit", (event) => {
-        if (this.hasProcessedBeforeQuit) {
-          return;
-        }
+    app.on("before-quit", (event) => {
+      this.isQuitting = true;
 
-        event.preventDefault();
-        this.hasProcessedBeforeQuit = true;
-        void this.daemonManager
-          .stop()
-          .catch((error: unknown) => {
+      if (this.hasProcessedBeforeQuit) {
+        return;
+      }
+
+      event.preventDefault();
+      this.hasProcessedBeforeQuit = true;
+
+      const shouldStopDaemon = isDevMode() || (this.cachedDaemonQuitOnExit ?? false);
+      const cleanup = shouldStopDaemon
+        ? this.daemonManager.stop().catch((error: unknown) => {
             console.warn("Failed to stop daemon service during desktop shutdown", error);
           })
-          .finally(() => {
-            app.quit();
-          });
-      });
-    } else {
-      app.on("before-quit", async (event) => {
-        if (this.hasProcessedBeforeQuit) {
-          return;
-        }
+        : Promise.resolve();
 
-        event.preventDefault();
-        this.hasProcessedBeforeQuit = true;
-
-        const quitOnExit = this.cachedDaemonQuitOnExit ?? false;
-        if (quitOnExit) {
-          try {
-            await this.daemonManager.stop();
-          } catch (error: unknown) {
-            console.warn("Failed to stop daemon service during desktop shutdown", error);
-          }
-        }
-
+      void cleanup.finally(() => {
         app.quit();
       });
-    }
+    });
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
+      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+        this.mainWindow.show();
+      } else {
         this.createMainWindow();
       }
     });
 
     app.on("window-all-closed", () => {
-      if (process.platform !== "darwin") {
+      if (process.platform !== "darwin" || this.isQuitting) {
         app.quit();
       }
     });
@@ -464,6 +450,24 @@ export class DesktopApplication {
         contextIsolation: true,
         nodeIntegration: false,
       },
+    });
+
+    // On macOS, intercept the window close to hide instead of destroy,
+    // allowing the app to stay in the Dock. During a quit flow, allow
+    // the close to proceed so the app can fully terminate.
+    if (process.platform === "darwin") {
+      mainWindow.on("close", (event) => {
+        if (!this.isQuitting) {
+          event.preventDefault();
+          mainWindow.hide();
+        }
+      });
+    }
+
+    mainWindow.on("closed", () => {
+      if (this.mainWindow === mainWindow) {
+        this.mainWindow = null;
+      }
     });
 
     const rendererUrl = process.env.ELECTRON_RENDERER_URL;
