@@ -648,7 +648,9 @@
   },
   "common": {
     "actions": {
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving..."
     }
   }
 }

@@ -632,7 +632,9 @@
   },
   "common": {
     "actions": {
-      "cancel": "取消"
+      "cancel": "取消",
+      "save": "保存",
+      "saving": "保存中..."
     }
   }
 }

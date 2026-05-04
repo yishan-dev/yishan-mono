@@ -7,7 +7,10 @@ type AutoUpdaterLike = {
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
   checkForUpdatesAndNotify: () => Promise<unknown>;
+  checkForUpdates: () => Promise<unknown>;
   on: (event: string, listener: (...args: unknown[]) => void) => unknown;
+  once: (event: string, listener: (...args: unknown[]) => void) => unknown;
+  removeListener: (event: string, listener: (...args: unknown[]) => void) => unknown;
 };
 
 type AutoUpdateLogger = Pick<Console, "info" | "warn">;
@@ -77,4 +80,80 @@ export function startAutoUpdates({
   });
 
   return { enabled: true };
+}
+
+export type ManualUpdateCheckResult =
+  | { status: "update-available"; version?: string }
+  | { status: "up-to-date" }
+  | { status: "error"; message: string }
+  | { status: "not-available"; reason: "development" | "unpackaged" };
+
+type CheckForUpdatesManuallyInput = {
+  app: Pick<App, "isPackaged">;
+  updater?: AutoUpdaterLike;
+  devMode?: boolean;
+  logger?: AutoUpdateLogger;
+};
+
+/** Performs a one-shot manual update check and returns the outcome. */
+export async function checkForUpdatesManually({
+  app,
+  updater: inputUpdater,
+  devMode = isDevMode(),
+  logger = console,
+}: CheckForUpdatesManuallyInput): Promise<ManualUpdateCheckResult> {
+  if (devMode) {
+    return { status: "not-available", reason: "development" };
+  }
+
+  if (!app.isPackaged) {
+    return { status: "not-available", reason: "unpackaged" };
+  }
+
+  const updater = inputUpdater ?? (autoUpdater as unknown as AutoUpdaterLike);
+
+  return new Promise<ManualUpdateCheckResult>((resolve) => {
+    let settled = false;
+
+    const settle = (result: ManualUpdateCheckResult) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onUpdateAvailable = (info: unknown) => {
+      const version = readUpdateVersion(info);
+      logger.info("Manual update check: update available", version);
+      settle({ status: "update-available", version });
+    };
+
+    const onUpdateNotAvailable = () => {
+      logger.info("Manual update check: already up to date");
+      settle({ status: "up-to-date" });
+    };
+
+    const onError = (error: unknown) => {
+      const message = error instanceof Error ? error.message : "Update check failed";
+      logger.warn("Manual update check failed", error);
+      settle({ status: "error", message });
+    };
+
+    const cleanup = () => {
+      updater.removeListener("update-available", onUpdateAvailable);
+      updater.removeListener("update-not-available", onUpdateNotAvailable);
+      updater.removeListener("error", onError);
+    };
+
+    updater.once("update-available", onUpdateAvailable);
+    updater.once("update-not-available", onUpdateNotAvailable);
+    updater.once("error", onError);
+
+    updater.checkForUpdates().catch((error: unknown) => {
+      settle({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to check for updates",
+      });
+    });
+  });
 }

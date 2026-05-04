@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { BrowserWindow, app, dialog, ipcMain } from "electron";
+import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import type { AppActionPayload } from "../shared/contracts/actions";
 import { configureApplicationMenu } from "./app/menu";
@@ -12,7 +12,7 @@ import { readExternalClipboardSourcePathsFromSystem } from "./integrations/exter
 import { DESKTOP_RPC_IPC_CHANNELS, type DesktopUpdateEventPayload, HOST_IPC_CHANNELS } from "./ipc";
 import { createDesktopNotificationHostAdapter } from "./notifications/service";
 import { isDevMode } from "./runtime/environment";
-import { startAutoUpdates } from "./updates/autoUpdateService";
+import { checkForUpdatesManually, startAutoUpdates } from "./updates/autoUpdateService";
 
 type DispatchActionOptions = {
   focusApp?: boolean;
@@ -75,6 +75,9 @@ export class DesktopApplication {
       devMode: isDevMode(),
       dispatchAction: (payload, options) => {
         this.dispatchAction(payload, options);
+      },
+      checkForUpdates: () => {
+        void this.handleManualUpdateCheck();
       },
     });
     startAutoUpdates({
@@ -325,6 +328,125 @@ export class DesktopApplication {
       method: "desktopUpdateReady",
       payload,
     });
+  }
+
+  /** Handles a manual "Check for Updates" request from the native menu. */
+  private async handleManualUpdateCheck(): Promise<void> {
+    const parentWindow = this.mainWindow ?? undefined;
+
+    // Disable the menu item while checking to provide visual feedback.
+    this.setUpdateMenuItemEnabled(false, "Checking for Updates…");
+
+    try {
+      const result = await checkForUpdatesManually({ app });
+
+      // Restore the menu item before showing the result dialog.
+      this.setUpdateMenuItemEnabled(true);
+
+      switch (result.status) {
+        case "update-available": {
+          const versionLabel = result.version ? ` ${result.version}` : "";
+          const options: Electron.MessageBoxOptions = {
+            type: "info",
+            buttons: ["Download and Install", "Later"],
+            defaultId: 0,
+            cancelId: 1,
+            title: "Update Available",
+            message: `A new version${versionLabel} is available.`,
+            detail: "Would you like to download and install it now? The app will restart to apply the update.",
+          };
+          const response = parentWindow
+            ? await dialog.showMessageBox(parentWindow, options)
+            : await dialog.showMessageBox(options);
+
+          if (response.response === 0) {
+            autoUpdater.quitAndInstall();
+          }
+          break;
+        }
+        case "up-to-date": {
+          const options: Electron.MessageBoxOptions = {
+            type: "info",
+            buttons: ["OK"],
+            title: "No Updates Available",
+            message: "You're up to date!",
+            detail: `Yishan ${app.getVersion()} is the latest version.`,
+          };
+          if (parentWindow) {
+            await dialog.showMessageBox(parentWindow, options);
+          } else {
+            await dialog.showMessageBox(options);
+          }
+          break;
+        }
+        case "error": {
+          const options: Electron.MessageBoxOptions = {
+            type: "error",
+            buttons: ["OK"],
+            title: "Update Check Failed",
+            message: "Unable to check for updates.",
+            detail: result.message,
+          };
+          if (parentWindow) {
+            await dialog.showMessageBox(parentWindow, options);
+          } else {
+            await dialog.showMessageBox(options);
+          }
+          break;
+        }
+        case "not-available": {
+          const reason =
+            result.reason === "development"
+              ? "Update checking is not available in development mode."
+              : "Update checking is not available for unpackaged builds.";
+          const options: Electron.MessageBoxOptions = {
+            type: "info",
+            buttons: ["OK"],
+            title: "Updates Not Available",
+            message: "Cannot check for updates.",
+            detail: reason,
+          };
+          if (parentWindow) {
+            await dialog.showMessageBox(parentWindow, options);
+          } else {
+            await dialog.showMessageBox(options);
+          }
+          break;
+        }
+      }
+    } catch (error: unknown) {
+      this.setUpdateMenuItemEnabled(true);
+      const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+      const options: Electron.MessageBoxOptions = {
+        type: "error",
+        buttons: ["OK"],
+        title: "Update Check Failed",
+        message: "Unable to check for updates.",
+        detail: message,
+      };
+      if (parentWindow) {
+        await dialog.showMessageBox(parentWindow, options);
+      } else {
+        await dialog.showMessageBox(options);
+      }
+    }
+  }
+
+  /** Updates the "Check for Updates" menu item's enabled state and label. */
+  private setUpdateMenuItemEnabled(enabled: boolean, label = "Check for Updates"): void {
+    const menu = Menu.getApplicationMenu();
+    if (!menu) return;
+
+    const appMenu = menu.items[0]?.submenu;
+    if (!appMenu) return;
+
+    const updateItem = appMenu.items.find(
+      (item) => item.label === "Check for Updates" || item.label === "Checking for Updates…",
+    );
+    if (updateItem) {
+      updateItem.enabled = enabled;
+      updateItem.label = label;
+    }
   }
 
   /**

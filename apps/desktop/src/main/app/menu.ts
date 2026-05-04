@@ -15,6 +15,7 @@ type ApplicationMenuApi = {
 
 type ConfigureApplicationMenuInput = {
   dispatchAction?: (payload: AppActionPayload, options?: DispatchAppActionOptions) => void;
+  checkForUpdates?: () => void;
   platform?: NodeJS.Platform;
   locale?: string;
   menuApi?: ApplicationMenuApi;
@@ -109,7 +110,12 @@ export function buildApplicationMenuTemplate(input: ConfigureApplicationMenuInpu
             input.dispatchAction?.({ action: ACTIONS.NAVIGATE, path: "/settings" }, { focusApp: true });
           },
         },
-        { label: "Check for Updates" },
+        {
+          label: "Check for Updates",
+          click: () => {
+            input.checkForUpdates?.();
+          },
+        },
         { type: "separator" },
         { role: "hide" },
         { role: "hideOthers" },
