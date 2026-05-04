@@ -67,6 +67,8 @@ func (m *Manager) Open(req OpenRequest) (Workspace, error) {
 
 	ws := Workspace{ID: req.ID, Path: absPath}
 
+	ensureGitExclude(absPath, contextLinkName)
+
 	m.mu.Lock()
 	m.workspaces[req.ID] = ws
 	m.mu.Unlock()

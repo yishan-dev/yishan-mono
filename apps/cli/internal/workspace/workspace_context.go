@@ -112,12 +112,12 @@ func ensureContextLink(contextPath string, worktreePath string) error {
 		return fmt.Errorf("ensure context dir: %w", err)
 	}
 
+	ensureGitExclude(worktreePath, contextLinkName)
+
 	linkPath := filepath.Join(worktreePath, contextLinkName)
 	info, err := os.Lstat(linkPath)
 	if err == nil {
-		// Path exists. Only manage it if it is a symlink we own.
 		if info.Mode()&os.ModeSymlink == 0 {
-			// Non-symlink (likely a real folder/file the user created); leave alone.
 			return nil
 		}
 		existingTarget, readErr := os.Readlink(linkPath)
@@ -132,9 +132,6 @@ func ensureContextLink(contextPath string, worktreePath string) error {
 	}
 
 	if err := os.Symlink(contextPath, linkPath); err != nil {
-		// On Windows, os.Symlink requires either Developer Mode or
-		// SeCreateSymbolicLinkPrivilege. Surface a hint so the user knows the
-		// fix is in their OS settings rather than in Yishan.
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf(
 				"create context symlink: %w (on Windows, enable Developer Mode or grant SeCreateSymbolicLinkPrivilege)",
@@ -144,6 +141,71 @@ func ensureContextLink(contextPath string, worktreePath string) error {
 		return fmt.Errorf("create context symlink: %w", err)
 	}
 	return nil
+}
+
+// ensureGitExclude appends pattern to the repository's .git/info/exclude so
+// the entry stays local (not committed via .gitignore). It resolves the common
+// git directory for both regular repos and worktrees, and is idempotent.
+func ensureGitExclude(worktreePath string, pattern string) {
+	gitEntry := filepath.Join(worktreePath, ".git")
+
+	info, err := os.Lstat(gitEntry)
+	if err != nil {
+		return
+	}
+
+	var commonDir string
+	if info.Mode().IsRegular() {
+		content, err := os.ReadFile(gitEntry)
+		if err != nil {
+			return
+		}
+		line := strings.TrimSpace(string(content))
+		gitDirPath, ok := strings.CutPrefix(line, "gitdir: ")
+		if !ok {
+			return
+		}
+		commonDir = filepath.Clean(filepath.Join(gitDirPath, "..", ".."))
+	} else if info.IsDir() {
+		commonDir = gitEntry
+	} else {
+		return
+	}
+
+	appendExcludePattern(filepath.Join(commonDir, "info", "exclude"), pattern)
+}
+
+// appendExcludePattern appends a single pattern line to the exclude file if it
+// is not already present. The file and its parent directory are created on
+// demand.
+func appendExcludePattern(excludePath string, pattern string) {
+	content, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return
+	}
+
+	for line := range strings.SplitSeq(string(content), "\n") {
+		if strings.TrimSpace(line) == pattern {
+			return
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
+		return
+	}
+
+	f, err := os.OpenFile(excludePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	line := pattern + "\n"
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		line = "\n" + line
+	}
+
+	f.WriteString(line)
 }
 
 // removeContextLink removes `<worktreePath>/.my-context` only if it is a
