@@ -624,8 +624,12 @@ export class DaemonClient {
     if (!relativePath) {
       throw new Error("relativePath is required");
     }
-    const diffText = await this.invoke("file.diff", { workspaceId, path: relativePath });
-    return { oldContent: "", newContent: typeof diffText === "string" ? diffText : "" };
+    const result = await this.invoke("file.diff", { workspaceId, path: relativePath });
+    const data = typeof result === "object" && result !== null ? (result as Record<string, unknown>) : {};
+    return {
+      oldContent: typeof data.oldContent === "string" ? data.oldContent : "",
+      newContent: typeof data.newContent === "string" ? data.newContent : "",
+    };
   }
 
   private async listGitChanges(input: Rpc.GitWorktreeInput): Promise<Rpc.GitChangesBySection> {

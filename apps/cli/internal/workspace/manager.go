@@ -225,10 +225,10 @@ func (m *Manager) FileMkdir(workspaceID string, path string, parents bool, mode 
 	return m.files.Mkdir(ws.Path, path, parents, mode)
 }
 
-func (m *Manager) FileReadDiff(ctx context.Context, workspaceID string, path string) (string, error) {
+func (m *Manager) FileReadDiff(ctx context.Context, workspaceID string, path string) (GitDiffContent, error) {
 	ws, err := m.getWorkspace(workspaceID)
 	if err != nil {
-		return "", err
+		return GitDiffContent{}, err
 	}
 	return m.files.ReadDiff(ctx, ws.Path, path)
 }

@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -517,27 +518,28 @@ func (s *FileService) Stat(root string, path string) (FileEntry, error) {
 	}, nil
 }
 
-func (s *FileService) ReadDiff(ctx context.Context, root string, path string) (string, error) {
+func (s *FileService) ReadDiff(ctx context.Context, root string, path string) (GitDiffContent, error) {
 	fullPath, err := safeJoin(root, path)
 	if err != nil {
-		return "", err
+		return GitDiffContent{}, err
 	}
 
 	relPath, err := filepath.Rel(root, fullPath)
 	if err != nil {
-		return "", err
+		return GitDiffContent{}, err
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "-C", root, "diff", "--", relPath)
-	out, err := cmd.Output()
-	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
-			return string(out), nil
+	oldContent, _ := gitCommand(ctx, root, "show", fmt.Sprintf("HEAD:%s", relPath))
+
+	newBytes, readErr := os.ReadFile(fullPath)
+	if readErr != nil {
+		if os.IsNotExist(readErr) {
+			return GitDiffContent{OldContent: oldContent, NewContent: ""}, nil
 		}
-		return "", err
+		return GitDiffContent{}, readErr
 	}
 
-	return string(out), nil
+	return GitDiffContent{OldContent: oldContent, NewContent: string(newBytes)}, nil
 }
 
 func safeJoin(root string, p string) (string, error) {

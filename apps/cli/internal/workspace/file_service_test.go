@@ -441,8 +441,59 @@ func TestFileServiceReadDiff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read diff: %v", err)
 	}
-	if !strings.Contains(diff, "diff --git") {
-		t.Fatalf("expected git diff output, got: %q", diff)
+	if diff.OldContent != "v1\n" {
+		t.Fatalf("expected oldContent %q, got %q", "v1\\n", diff.OldContent)
+	}
+	if diff.NewContent != "v2\n" {
+		t.Fatalf("expected newContent %q, got %q", "v2\\n", diff.NewContent)
+	}
+}
+
+func TestFileServiceReadDiffNewFile(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	if err := os.WriteFile(filepath.Join(root, "new.txt"), []byte("brand new\n"), 0o644); err != nil {
+		t.Fatalf("write new file: %v", err)
+	}
+
+	diff, err := svc.ReadDiff(context.Background(), root, "new.txt")
+	if err != nil {
+		t.Fatalf("read diff: %v", err)
+	}
+	if diff.OldContent != "" {
+		t.Fatalf("expected empty oldContent for new file, got %q", diff.OldContent)
+	}
+	if diff.NewContent != "brand new\n" {
+		t.Fatalf("expected newContent %q, got %q", "brand new\\n", diff.NewContent)
+	}
+}
+
+func TestFileServiceReadDiffDeletedFile(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewFileService()
+
+	if err := os.WriteFile(filepath.Join(root, "gone.txt"), []byte("was here\n"), 0o644); err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+	runGit(t, root, "add", "gone.txt")
+	runGit(t, root, "commit", "-m", "seed")
+
+	if err := os.Remove(filepath.Join(root, "gone.txt")); err != nil {
+		t.Fatalf("remove file: %v", err)
+	}
+
+	diff, err := svc.ReadDiff(context.Background(), root, "gone.txt")
+	if err != nil {
+		t.Fatalf("read diff: %v", err)
+	}
+	if diff.OldContent != "was here\n" {
+		t.Fatalf("expected oldContent %q, got %q", "was here\\n", diff.OldContent)
+	}
+	if diff.NewContent != "" {
+		t.Fatalf("expected empty newContent for deleted file, got %q", diff.NewContent)
 	}
 }
 
