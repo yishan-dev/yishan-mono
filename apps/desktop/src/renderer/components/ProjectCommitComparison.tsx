@@ -1,4 +1,5 @@
-import { Autocomplete, Box, LinearProgress, TextField, Typography } from "@mui/material";
+import { Autocomplete, type AutocompleteRenderInputParams, Box, LinearProgress, TextField, Typography } from "@mui/material";
+import { memo, useCallback, useMemo, useState } from "react";
 import { LuArrowRight } from "react-icons/lu";
 
 export type ProjectCommitComparisonCommit = {
@@ -100,8 +101,34 @@ function buildComparisonScopeOptions(comparison: ProjectCommitComparisonData): P
   return scopeOptions;
 }
 
+const getOptionLabel = (option: ProjectComparisonScopeOption) => option.label;
+
+const isOptionEqual = (option: ProjectComparisonScopeOption, value: ProjectComparisonScopeOption) =>
+  option.value === value.value;
+
+const listboxSlotProps = {
+  sx: {
+    "& .MuiAutocomplete-option": {
+      minHeight: 28,
+      fontSize: 12,
+    },
+  },
+} as const;
+
+const autocompleteSx = {
+  minWidth: 0,
+  mt: 1,
+  "& .MuiOutlinedInput-root": {
+    minHeight: 28,
+    py: 0,
+  },
+  "& .MuiInputBase-input": {
+    fontSize: 12,
+  },
+} as const;
+
 /** Renders one compact current-to-target branch comparison control group in the Changes tab. */
-export function ProjectCommitComparison({
+export const ProjectCommitComparison = memo(function ProjectCommitComparison({
   comparison,
   targetBranch,
   selectedComparison,
@@ -112,50 +139,72 @@ export function ProjectCommitComparison({
   comparisonScopeAriaLabel = "Change scope",
 }: ProjectCommitComparisonProps) {
   const normalizedTargetBranch = targetBranch.trim();
+
+  const comparisonScopeOptions = useMemo(() => buildComparisonScopeOptions(comparison), [comparison]);
+
+  const selectedScopeOption = useMemo(
+    () => comparisonScopeOptions.find((option) => option.value === selectedComparison) ?? comparisonScopeOptions[0],
+    [comparisonScopeOptions, selectedComparison],
+  );
+
+  const [open, setOpen] = useState(false);
+
+  /** Handles compact scope selection and forwards it to the appropriate callback. */
+  const handleSelectComparisonScope = useCallback(
+    (_event: unknown, option: ProjectComparisonScopeOption | null) => {
+      if (!option) {
+        return;
+      }
+
+      setOpen(false);
+
+      if (option.value === "uncommitted") {
+        onSelectUncommitted?.();
+        return;
+      }
+
+      if (option.value === "all") {
+        onSelectAll?.();
+        return;
+      }
+
+      const commit = comparison.commits.find((candidate) => candidate.hash === option.value);
+      if (commit) {
+        onSelectCommit?.(commit);
+      }
+    },
+    [comparison.commits, onSelectUncommitted, onSelectAll, onSelectCommit],
+  );
+
+  const handleOpen = useCallback(() => setOpen(true), []);
+  const handleClose = useCallback(() => setOpen(false), []);
+
+  const slotProps = useMemo(
+    () => ({
+      listbox: listboxSlotProps,
+    }),
+    [],
+  );
+
+  const renderInput = useCallback(
+    (params: AutocompleteRenderInputParams) => (
+      <TextField
+        {...params}
+        placeholder={comparisonScopeAriaLabel}
+        slotProps={{
+          htmlInput: {
+            ...params.inputProps,
+            "aria-label": comparisonScopeAriaLabel,
+          },
+        }}
+      />
+    ),
+    [comparisonScopeAriaLabel],
+  );
+
   if (!normalizedTargetBranch) {
     return null;
   }
-
-  /** Selects one commit row so the changes list can render files for that commit. */
-  const handleSelectCommit = (commit: ProjectCommitComparisonCommit) => {
-    onSelectCommit?.(commit);
-  };
-
-  /** Selects the uncommitted workspace changes in the lower list. */
-  const handleSelectUncommitted = () => {
-    onSelectUncommitted?.();
-  };
-
-  /** Selects one aggregated view that includes all commit-file changes. */
-  const handleSelectAll = () => {
-    onSelectAll?.();
-  };
-
-  const comparisonScopeOptions = buildComparisonScopeOptions(comparison);
-  const selectedScopeOption =
-    comparisonScopeOptions.find((option) => option.value === selectedComparison) ?? comparisonScopeOptions[0];
-
-  /** Handles compact scope selection and forwards it to the appropriate callback. */
-  const handleSelectComparisonScope = (_event: unknown, option: ProjectComparisonScopeOption | null) => {
-    if (!option) {
-      return;
-    }
-
-    if (option.value === "uncommitted") {
-      handleSelectUncommitted();
-      return;
-    }
-
-    if (option.value === "all") {
-      handleSelectAll();
-      return;
-    }
-
-    const commit = comparison.commits.find((candidate) => candidate.hash === option.value);
-    if (commit) {
-      handleSelectCommit(commit);
-    }
-  };
 
   return (
     <Box sx={{ mt: 1, minWidth: 0 }}>
@@ -211,46 +260,20 @@ export function ProjectCommitComparison({
 
       <Autocomplete
         size="small"
+        open={open}
+        onOpen={handleOpen}
+        onClose={handleClose}
         options={comparisonScopeOptions}
         value={selectedScopeOption}
         disableClearable
+        disableCloseOnSelect
         data-testid="commit-comparison-scope-select"
-        getOptionLabel={(option) => option.label}
-        isOptionEqualToValue={(option, value) => option.value === value.value}
+        getOptionLabel={getOptionLabel}
+        isOptionEqualToValue={isOptionEqual}
         onChange={handleSelectComparisonScope}
-        slotProps={{
-          listbox: {
-            sx: {
-              "& .MuiAutocomplete-option": {
-                minHeight: 28,
-                fontSize: 12,
-              },
-            },
-          },
-        }}
-        sx={{
-          minWidth: 0,
-          mt: 1,
-          "& .MuiOutlinedInput-root": {
-            minHeight: 28,
-            py: 0,
-          },
-          "& .MuiInputBase-input": {
-            fontSize: 12,
-          },
-        }}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder={comparisonScopeAriaLabel}
-            slotProps={{
-              htmlInput: {
-                ...params.inputProps,
-                "aria-label": comparisonScopeAriaLabel,
-              },
-            }}
-          />
-        )}
+        slotProps={slotProps}
+        sx={autocompleteSx}
+        renderInput={renderInput}
       />
 
       {isTargetBranchLoading ? (
@@ -263,4 +286,4 @@ export function ProjectCommitComparison({
       ) : null}
     </Box>
   );
-}
+});

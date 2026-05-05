@@ -491,6 +491,18 @@ export function ChangesTabView() {
     };
   }, [loadRepoChanges, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
 
+  const handleSelectUncommitted = useCallback(() => {
+    setSelectedComparison("uncommitted");
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedComparison("all");
+  }, []);
+
+  const handleSelectCommit = useCallback((commit: ProjectCommitComparisonCommit) => {
+    setSelectedComparison((previous) => (previous === commit.hash ? "uncommitted" : commit.hash));
+  }, []);
+
   return (
     <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
       {isRepoChangesLoading ? (
@@ -514,15 +526,9 @@ export function ChangesTabView() {
               comparison={repoCommitComparison}
               targetBranch={selectedWorkspaceSourceBranch ?? ""}
               selectedComparison={selectedComparison}
-              onSelectUncommitted={() => {
-                setSelectedComparison("uncommitted");
-              }}
-              onSelectAll={() => {
-                setSelectedComparison("all");
-              }}
-              onSelectCommit={(commit) => {
-                setSelectedComparison((previous) => (previous === commit.hash ? "uncommitted" : commit.hash));
-              }}
+              onSelectUncommitted={handleSelectUncommitted}
+              onSelectAll={handleSelectAll}
+              onSelectCommit={handleSelectCommit}
               isTargetBranchLoading={isCommitComparisonLoading}
               comparisonScopeAriaLabel={t("files.git.changeScope")}
             />

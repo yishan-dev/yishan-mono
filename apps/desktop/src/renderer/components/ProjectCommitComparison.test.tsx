@@ -111,6 +111,158 @@ describe("ProjectCommitComparison", () => {
     expect(screen.queryByText(/No commits ahead of/i)).toBeNull();
   });
 
+  it("highlights the selected 'all' option when dropdown opens with selectedComparison='all'", () => {
+    render(
+      <ProjectCommitComparison
+        comparison={{
+          currentBranch: "feature/work",
+          targetBranch: "main",
+          allChangedFiles: ["src/a.ts", "src/b.ts"],
+          commits: [
+            {
+              hash: "abc123456",
+              shortHash: "abc1234",
+              authorName: "Pat",
+              committedAt: "2026-03-23T08:00:00+00:00",
+              subject: "feat: improve flow",
+              changedFiles: ["src/a.ts"],
+            },
+          ],
+        }}
+        targetBranch="main"
+        comparisonScopeAriaLabel="Change scope"
+        selectedComparison="all"
+      />,
+    );
+
+    const scopeInput = screen.getByRole("combobox", { name: "Change scope" });
+    fireEvent.mouseDown(scopeInput);
+
+    const allOption = screen.getByRole("option", { name: "All changes (2)" });
+    const uncommittedOption = screen.getByRole("option", { name: "Uncommitted" });
+
+    expect(allOption.getAttribute("aria-selected")).toBe("true");
+    expect(uncommittedOption.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("highlights a specific commit option when dropdown opens with that commit selected", () => {
+    render(
+      <ProjectCommitComparison
+        comparison={{
+          currentBranch: "feature/work",
+          targetBranch: "main",
+          allChangedFiles: ["src/a.ts", "src/b.ts"],
+          commits: [
+            {
+              hash: "abc123456",
+              shortHash: "abc1234",
+              authorName: "Pat",
+              committedAt: "2026-03-23T08:00:00+00:00",
+              subject: "feat: improve flow",
+              changedFiles: ["src/a.ts"],
+            },
+            {
+              hash: "def789012",
+              shortHash: "def7890",
+              authorName: "Sam",
+              committedAt: "2026-03-22T08:00:00+00:00",
+              subject: "fix: resolve issue",
+              changedFiles: ["src/b.ts"],
+            },
+          ],
+        }}
+        targetBranch="main"
+        comparisonScopeAriaLabel="Change scope"
+        selectedComparison="def789012"
+      />,
+    );
+
+    const scopeInput = screen.getByRole("combobox", { name: "Change scope" });
+    fireEvent.mouseDown(scopeInput);
+
+    const commitOption = screen.getByRole("option", { name: "def7890 fix: resolve issue" });
+    const uncommittedOption = screen.getByRole("option", { name: "Uncommitted" });
+    const allOption = screen.getByRole("option", { name: "All changes (2)" });
+
+    expect(commitOption.getAttribute("aria-selected")).toBe("true");
+    expect(uncommittedOption.getAttribute("aria-selected")).toBe("false");
+    expect(allOption.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("highlights 'uncommitted' only when it is actually the selected comparison", () => {
+    render(
+      <ProjectCommitComparison
+        comparison={{
+          currentBranch: "feature/work",
+          targetBranch: "main",
+          allChangedFiles: ["src/a.ts"],
+          commits: [
+            {
+              hash: "abc123456",
+              shortHash: "abc1234",
+              authorName: "Pat",
+              committedAt: "2026-03-23T08:00:00+00:00",
+              subject: "feat: improve flow",
+              changedFiles: ["src/a.ts"],
+            },
+          ],
+        }}
+        targetBranch="main"
+        comparisonScopeAriaLabel="Change scope"
+        selectedComparison="uncommitted"
+      />,
+    );
+
+    const scopeInput = screen.getByRole("combobox", { name: "Change scope" });
+    fireEvent.mouseDown(scopeInput);
+
+    const uncommittedOption = screen.getByRole("option", { name: "Uncommitted" });
+    const allOption = screen.getByRole("option", { name: "All changes (1)" });
+
+    expect(uncommittedOption.getAttribute("aria-selected")).toBe("true");
+    expect(allOption.getAttribute("aria-selected")).toBe("false");
+  });
+
+  it("maintains correct focus after keyboard open (focus then arrow keys)", () => {
+    render(
+      <ProjectCommitComparison
+        comparison={{
+          currentBranch: "feature/work",
+          targetBranch: "main",
+          allChangedFiles: ["src/a.ts", "src/b.ts"],
+          commits: [
+            {
+              hash: "abc123456",
+              shortHash: "abc1234",
+              authorName: "Pat",
+              committedAt: "2026-03-23T08:00:00+00:00",
+              subject: "feat: improve flow",
+              changedFiles: ["src/a.ts"],
+            },
+          ],
+        }}
+        targetBranch="main"
+        comparisonScopeAriaLabel="Change scope"
+        selectedComparison="all"
+      />,
+    );
+
+    const scopeInput = screen.getByRole("combobox", { name: "Change scope" });
+
+    // Open via keyboard (ArrowDown opens the popup)
+    fireEvent.keyDown(scopeInput, { key: "ArrowDown" });
+
+    const allOption = screen.getByRole("option", { name: "All changes (2)" });
+    expect(allOption.getAttribute("aria-selected")).toBe("true");
+
+    // Close and verify re-open still shows correct selection
+    fireEvent.keyDown(scopeInput, { key: "Escape" });
+    fireEvent.mouseDown(scopeInput);
+
+    const allOptionAgain = screen.getByRole("option", { name: "All changes (2)" });
+    expect(allOptionAgain.getAttribute("aria-selected")).toBe("true");
+  });
+
   it("truncates long current branch labels to avoid widening the panel", () => {
     const longBranch =
       "feature/super-long-branch-name-that-should-be-truncated-in-commit-comparison-header-to-keep-layout-stable";
