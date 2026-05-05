@@ -14,7 +14,7 @@ import (
 
 const managedBinDirEnvKey = "MANAGED_BIN_DIR"
 
-const loginShellPathTimeout = 1 * time.Second
+const loginShellPathTimeout = 3 * time.Second
 
 var versionPattern = regexp.MustCompile(`\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
 
@@ -76,7 +76,7 @@ func resolveDetectionPathValue() string {
 }
 
 func readLoginShellPath(timeout time.Duration) string {
-	shellPath := strings.TrimSpace(os.Getenv("SHELL"))
+	shellPath := resolveUserShell()
 	if shellPath == "" {
 		return ""
 	}
@@ -91,6 +91,26 @@ func readLoginShellPath(timeout time.Duration) string {
 	}
 
 	return strings.TrimSpace(string(output))
+}
+
+// resolveUserShell returns the user's login shell path. It checks the SHELL
+// environment variable first, then falls back to well-known shell paths on
+// macOS/Linux. This fallback is essential when the daemon is launched from a
+// packaged Electron app (e.g. via macOS Dock/Finder) which inherits a minimal
+// environment without SHELL set.
+func resolveUserShell() string {
+	if shellPath := strings.TrimSpace(os.Getenv("SHELL")); shellPath != "" {
+		return shellPath
+	}
+
+	// On macOS/Linux, try well-known shell paths in preference order.
+	for _, candidate := range []string{"/bin/zsh", "/bin/bash", "/bin/sh"} {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 func commonUserBinDirectories() []string {

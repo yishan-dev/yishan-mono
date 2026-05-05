@@ -167,6 +167,50 @@ func TestListAgentCLIDetectionStatusesWithOptionsSkipsExcludedDirectories(t *tes
 	}
 }
 
+func TestResolveUserShellUsesEnvVariable(t *testing.T) {
+	t.Setenv("SHELL", "/bin/custom-shell")
+
+	result := resolveUserShell()
+
+	if result != "/bin/custom-shell" {
+		t.Fatalf("expected /bin/custom-shell, got %q", result)
+	}
+}
+
+func TestResolveUserShellFallsBackToKnownShells(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test targets unix-style shells")
+	}
+
+	t.Setenv("SHELL", "")
+
+	result := resolveUserShell()
+
+	// On any unix system at least /bin/sh should exist.
+	if result == "" {
+		t.Fatal("expected a fallback shell path, got empty string")
+	}
+
+	knownShells := map[string]bool{"/bin/zsh": true, "/bin/bash": true, "/bin/sh": true}
+	if !knownShells[result] {
+		t.Fatalf("expected one of /bin/zsh, /bin/bash, /bin/sh, got %q", result)
+	}
+}
+
+func TestResolveUserShellReturnsEmptyWhenNothingAvailable(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("on unix systems fallback shells always exist")
+	}
+
+	t.Setenv("SHELL", "")
+
+	result := resolveUserShell()
+
+	if result != "" {
+		t.Fatalf("expected empty string on windows, got %q", result)
+	}
+}
+
 func writeExecutableScript(t *testing.T, dir string, commandName string, version string) {
 	t.Helper()
 
