@@ -135,7 +135,7 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
       convertEol: true,
       allowProposedApi: true,
       fontFamily: '"MesloLGS NF", "JetBrains Mono", "SF Mono", Menlo, monospace',
-      fontSize: 12,
+      fontSize: 13,
       lineHeight: 1.4,
       scrollback: 5_000,
       fastScrollSensitivity: 5,
