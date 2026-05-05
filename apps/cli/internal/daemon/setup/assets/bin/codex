@@ -27,7 +27,11 @@ if [ -n "${MANAGED_BIN_DIR:-}" ]; then
     managed_root_dir="${managed_bin_dir%/bin}"
     managed_contexts_dir="${managed_root_dir}/contexts"
     if [ -d "$managed_contexts_dir" ]; then
-      extra_dir_args+=(--add-dir "$managed_contexts_dir")
+      # --add-dir grants write access and requires workspace-write or
+      # danger-full-access sandbox mode.  Ensure at least workspace-write is
+      # set so the flag is not rejected.  If the caller passes an explicit
+      # --sandbox later via "$@", that will take precedence.
+      extra_dir_args+=(--sandbox workspace-write --add-dir "$managed_contexts_dir")
     fi
   fi
 fi
