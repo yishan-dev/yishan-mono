@@ -19,6 +19,7 @@ export function renameTabState(
   state: WorkspaceTabStateSlice,
   tabId: string,
   title: string,
+  options?: { userRenamed?: boolean },
 ): Partial<WorkspaceTabStateSlice> | null {
   const targetTab = state.tabs.find((tab) => tab.id === tabId);
   if (!targetTab || targetTab.title === title) {
@@ -26,11 +27,47 @@ export function renameTabState(
   }
 
   return {
+    tabs: state.tabs.map((tab) => {
+      if (tab.id !== tabId) {
+        return tab;
+      }
+      if (options?.userRenamed && tab.kind === "terminal") {
+        return { ...tab, title, data: { ...tab.data, userRenamed: true } };
+      }
+      return { ...tab, title };
+    }),
+  };
+}
+
+/** Renames one open file tab path and keeps title synced to the basename. */
+export function renameFileTabPathState(
+  state: WorkspaceTabStateSlice,
+  tabId: string,
+  nextPath: string,
+): Partial<WorkspaceTabStateSlice> | null {
+  const normalizedPath = nextPath.trim();
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const targetTab = state.tabs.find((tab) => tab.id === tabId && tab.kind === "file");
+  if (!targetTab || targetTab.data.path === normalizedPath) {
+    return null;
+  }
+
+  const segments = normalizedPath.split("/").filter(Boolean);
+  const nextTitle = segments.at(-1) ?? normalizedPath;
+
+  return {
     tabs: state.tabs.map((tab) =>
-      tab.id === tabId
+      tab.id === tabId && tab.kind === "file"
         ? {
             ...tab,
-            title,
+            title: nextTitle,
+            data: {
+              ...tab.data,
+              path: normalizedPath,
+            },
           }
         : tab,
     ),

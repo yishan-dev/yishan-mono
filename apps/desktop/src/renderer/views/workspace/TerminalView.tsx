@@ -56,9 +56,23 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     writeTerminalInput,
   } = useCommands();
 
+  /** Returns true when the user has manually renamed this terminal tab. */
+  const isUserRenamed = useCallback((): boolean => {
+    const tab = tabStore
+      .getState()
+      .tabs.find(
+        (candidate): candidate is Extract<WorkspaceTab, { kind: "terminal" }> =>
+          candidate.id === tabId && candidate.kind === "terminal",
+      );
+    return tab?.data.userRenamed === true;
+  }, [tabId]);
+
   /** Applies one readable command-derived title to this terminal tab. */
   const updateTerminalTabTitleFromCommand = useCallback(
     (command: string): void => {
+      if (isUserRenamed()) {
+        return;
+      }
       const title = formatTerminalCommandTitle(command);
       if (!title || title === lastAppliedTitleRef.current) {
         return;
@@ -67,12 +81,15 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       lastAppliedTitleRef.current = title;
       renameTab(tabId, title);
     },
-    [renameTab, tabId],
+    [renameTab, tabId, isUserRenamed],
   );
 
   /** Applies one readable current-directory title to this terminal tab. */
   const updateTerminalTabTitleFromPath = useCallback(
     (path: string | undefined): void => {
+      if (isUserRenamed()) {
+        return;
+      }
       const title = formatTerminalPathTitle(path);
       if (!title || title === lastAppliedTitleRef.current) {
         return;
@@ -81,7 +98,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       lastAppliedTitleRef.current = title;
       renameTab(tabId, title);
     },
-    [renameTab, tabId],
+    [renameTab, tabId, isUserRenamed],
   );
 
   /** Clears current search decorations in the active terminal session. */

@@ -166,8 +166,13 @@ export function reorderTab(draggedTabId: string, targetTabId: string, position: 
 }
 
 /** Renames one tab title. */
-export function renameTab(tabId: string, title: string) {
-  readTabStoreState().renameTab(tabId, title);
+export function renameTab(tabId: string, title: string, options?: { userRenamed?: boolean }) {
+  readTabStoreState().renameTab(tabId, title, options);
+}
+
+/** Updates one file tab path after a successful file-system rename. */
+export function renameFileTabPath(tabId: string, nextPath: string) {
+  readTabStoreState().renameFileTabPath(tabId, nextPath);
 }
 
 /** Updates one file tab content and dirtiness state. */
