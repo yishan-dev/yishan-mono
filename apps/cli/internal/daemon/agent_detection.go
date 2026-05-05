@@ -81,10 +81,15 @@ func readLoginShellPath(timeout time.Duration) string {
 		return ""
 	}
 
+	// Use -il (interactive login) so that both login profile files (.zprofile)
+	// and interactive config files (.zshrc/.bashrc) are sourced. Many tools
+	// like nvm, pyenv, and rbenv add their PATH entries in .zshrc which is
+	// only loaded for interactive shells.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	command := exec.CommandContext(ctx, shellPath, "-l", "-c", `printf %s "$PATH"`)
+	command := exec.CommandContext(ctx, shellPath, "-lic", `printf %s "$PATH"`)
+	command.Stdin = nil
 	output, err := command.Output()
 	if err != nil {
 		return ""
