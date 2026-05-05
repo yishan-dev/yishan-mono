@@ -2,6 +2,11 @@
   "name": "@yishan/desktop",
   "version": "0.1.0",
   "description": "Yishan desktop application",
+  "homepage": "https://github.com/yishan-io/yishan-mono",
+  "author": {
+    "name": "Yishan",
+    "email": "support@yishan.io"
+  },
   "type": "module",
   "main": "dist/electron/main.cjs",
   "scripts": {
