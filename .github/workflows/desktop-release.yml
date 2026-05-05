@@ -135,9 +135,6 @@ jobs:
             apps/desktop/release/*.deb
             apps/desktop/release/*.rpm
             apps/desktop/release/*.snap
-            apps/desktop/release/*.yml
-            apps/desktop/release/*.yaml
-            apps/desktop/release/latest*.json
           if-no-files-found: warn
 
   release:
@@ -165,7 +162,7 @@ jobs:
 
           # Collect release files
           shopt -s nullglob
-          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.rpm artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
+          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.rpm artifacts/*.snap)
           shopt -u nullglob
 
           # Delete existing release for this tag (re-runs / retries)
