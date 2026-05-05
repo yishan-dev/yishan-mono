@@ -15,11 +15,18 @@ import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
  * Batches terminal output writes so multiple WebSocket notifications within
  * one animation frame are coalesced into a single `terminal.write()` call.
  * This dramatically reduces xterm parser/render overhead during fast output.
+ *
+ * Uses array-based buffering (O(1) amortized push) instead of string
+ * concatenation (O(n) per append) to avoid quadratic cost during bursts.
  */
 class TerminalWriteBatcher {
-  private pending = "";
+  private chunks: string[] = [];
+  private pendingBytes = 0;
   private frameId: number | null = null;
   private readonly terminal: Terminal;
+
+  /** Flush immediately when buffered data reaches this threshold. */
+  private static readonly IMMEDIATE_FLUSH_BYTES = 128 * 1024; // 128 KB
 
   constructor(terminal: Terminal) {
     this.terminal = terminal;
@@ -27,7 +34,16 @@ class TerminalWriteBatcher {
 
   /** Enqueues output data and schedules a batched write on the next animation frame. */
   write(data: string): void {
-    this.pending += data;
+    this.chunks.push(data);
+    this.pendingBytes += data.length;
+
+    // Flush immediately for large bursts (e.g. `cat` of big file) to keep
+    // xterm's internal write buffer fed without waiting for the next frame.
+    if (this.pendingBytes >= TerminalWriteBatcher.IMMEDIATE_FLUSH_BYTES) {
+      this.flush();
+      return;
+    }
+
     if (this.frameId !== null) {
       return;
     }
@@ -36,17 +52,18 @@ class TerminalWriteBatcher {
     });
   }
 
-  /** Immediately writes all pending data (used for session restore). */
+  /** Immediately writes all pending data to xterm. */
   flush(): void {
     if (this.frameId !== null) {
       cancelAnimationFrame(this.frameId);
       this.frameId = null;
     }
-    if (this.pending.length === 0) {
+    if (this.chunks.length === 0) {
       return;
     }
-    const data = this.pending;
-    this.pending = "";
+    const data = this.chunks.join("");
+    this.chunks.length = 0;
+    this.pendingBytes = 0;
     if (isTerminalAttached(this.terminal)) {
       this.terminal.write(data);
     }
@@ -57,7 +74,8 @@ class TerminalWriteBatcher {
       cancelAnimationFrame(this.frameId);
       this.frameId = null;
     }
-    this.pending = "";
+    this.chunks.length = 0;
+    this.pendingBytes = 0;
   }
 }
 
@@ -184,6 +202,7 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
     const terminal = new Terminal({
       cursorBlink: true,
       convertEol: true,
+      allowProposedApi: true,
       fontFamily: '"MesloLGS NF", "JetBrains Mono", "SF Mono", Menlo, monospace',
       fontSize: 12,
       lineHeight: 1.4,
@@ -239,14 +258,19 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
         return;
       }
 
-      const commandInput = collectExecutedTerminalCommand(pendingCommandInputRef.current, data);
-      pendingCommandInputRef.current = commandInput.buffer;
-      if (commandInput.executedCommand) {
-        updateTerminalTabTitleFromCommand(commandInput.executedCommand);
-      }
-
+      // Send input to PTY immediately — this is the latency-critical path.
       void writeTerminalInput({ sessionId, data }).catch((error) => {
         reportTerminalAsyncError("write terminal input", error);
+      });
+
+      // Defer command title extraction off the hot path so it doesn't
+      // compete with the keystroke dispatch for CPU time.
+      requestAnimationFrame(() => {
+        const commandInput = collectExecutedTerminalCommand(pendingCommandInputRef.current, data);
+        pendingCommandInputRef.current = commandInput.buffer;
+        if (commandInput.executedCommand) {
+          updateTerminalTabTitleFromCommand(commandInput.executedCommand);
+        }
       });
     });
 

@@ -8,6 +8,7 @@ import type {
 } from "../rpc/daemonTypes";
 import type { TerminalDetectedPort } from "../rpc/daemonTypes";
 import { getDaemonClient } from "../rpc/rpcTransport";
+import type { DaemonRpcClient } from "../rpc/types";
 
 export type { TerminalDetectedPort } from "../rpc/daemonTypes";
 
@@ -15,15 +16,28 @@ type TerminalCreateSessionParams = TerminalCreateSessionInput;
 
 export type TerminalOutputEvent = TerminalStreamEvent;
 
+/**
+ * Cached daemon client reference for the terminal input hot path.
+ * Avoids awaiting the (already-resolved) `getDaemonClient()` promise
+ * on every keystroke, eliminating one microtask per input event.
+ */
+let cachedDaemonClient: DaemonRpcClient | null = null;
+
 /** Creates one PTY-backed terminal session and returns resolved dimensions. */
 export async function createTerminalSession(params?: TerminalCreateSessionParams) {
   const client = await getDaemonClient();
+  cachedDaemonClient = client;
   return client.terminal.createSession(params ?? {});
 }
 
 /** Writes one raw keystroke/input chunk to one terminal session. */
 export async function writeTerminalInput(params: { sessionId: string; data: string }) {
+  // Fast path: use cached client to avoid microtask overhead on every keystroke.
+  if (cachedDaemonClient) {
+    return cachedDaemonClient.terminal.writeInput(params);
+  }
   const client = await getDaemonClient();
+  cachedDaemonClient = client;
   return client.terminal.writeInput(params);
 }
 

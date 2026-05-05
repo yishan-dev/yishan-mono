@@ -16,7 +16,17 @@ export type TerminalAddons = {
 };
 
 /**
+ * Once WebGL fails to initialize on any terminal, all subsequent terminals
+ * skip the WebGL attempt and use the default DOM renderer. This avoids
+ * repeated GPU context creation failures (mirrors VS Code behavior).
+ */
+let suggestedRendererType: "webgl" | "dom" = "webgl";
+
+/**
  * Loads stable terminal addons and returns the fit/search addons used by the view.
+ *
+ * WebGL is deferred to a `requestAnimationFrame` callback so it does not race
+ * xterm's internal viewport initialization that runs synchronously after `open()`.
  */
 export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger: Logger = console): TerminalAddons {
   const fitAddon = new FitAddon();
@@ -26,7 +36,6 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
 
   loadAddonSafely(terminal, fitAddon, logger, "fit");
   loadAddonSafely(terminal, searchAddon, logger, "search");
-  loadWebglAddonWithFallback(terminal, logger);
   loadAddonSafely(terminal, new ClipboardAddon(), logger, "clipboard");
   loadAddonSafely(terminal, new ImageAddon(), logger, "image");
   loadAddonSafely(terminal, new WebFontsAddon(), logger, "web-fonts");
@@ -36,6 +45,13 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
     logger,
     "web-links",
   );
+
+  // Defer WebGL to next animation frame to avoid racing xterm's post-open viewport sync.
+  // This prevents a flash/stall at terminal creation.
+  requestAnimationFrame(() => {
+    loadWebglAddonWithFallback(terminal, logger);
+  });
+
   return {
     fitAddon,
     searchAddon,
@@ -45,25 +61,32 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
 /**
  * Loads the WebGL renderer addon with automatic context-loss recovery.
  * When the WebGL context is lost, the addon is disposed and a new instance
- * is loaded after a brief delay. This avoids falling back to the slow DOM renderer.
+ * is loaded after a brief delay. If WebGL has previously failed on any terminal,
+ * skips the attempt entirely and falls back to the DOM renderer.
  */
 function loadWebglAddonWithFallback(terminal: Pick<Terminal, "loadAddon">, logger: Logger): void {
-  const loadWebgl = () => {
-    const webglAddon = new WebglAddon();
-    webglAddon.onContextLoss(() => {
-      logger.warn("xterm WebGL context lost, reloading WebGL addon");
-      try {
-        webglAddon.dispose();
-      } catch {
-        // Ignore dispose errors during context loss.
-      }
-      // Re-create after a short delay to allow GPU recovery.
-      setTimeout(() => loadWebgl(), 500);
-    });
-    loadAddonSafely(terminal, webglAddon, logger, "webgl");
-  };
+  if (suggestedRendererType !== "webgl") {
+    return;
+  }
 
-  loadWebgl();
+  const webglAddon = new WebglAddon();
+  webglAddon.onContextLoss(() => {
+    logger.warn("xterm WebGL context lost, reloading WebGL addon");
+    try {
+      webglAddon.dispose();
+    } catch {
+      // Ignore dispose errors during context loss.
+    }
+    // Re-create after a short delay to allow GPU recovery.
+    setTimeout(() => {
+      loadWebglAddonWithFallback(terminal, logger);
+    }, 500);
+  });
+
+  if (!loadAddonSafely(terminal, webglAddon, logger, "webgl")) {
+    // WebGL failed to initialize — mark globally so other terminals skip it.
+    suggestedRendererType = "dom";
+  }
 }
 
 /** Safely loads an addon and logs a warning when the addon fails to initialize. */

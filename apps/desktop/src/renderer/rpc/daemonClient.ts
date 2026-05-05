@@ -273,6 +273,27 @@ export class DaemonClient {
     });
   }
 
+  /**
+   * Sends a JSON-RPC 2.0 request without waiting for the response.
+   * The message includes an `id` so the daemon can route it normally,
+   * but we discard any response that comes back instead of blocking.
+   * Used for high-frequency messages like terminal input where
+   * request/response round-trip latency is unacceptable.
+   */
+  private sendFireAndForget(method: string, params?: unknown): void {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    try {
+      socket.send(JSON.stringify(buildRequest(method, params)));
+    } catch {
+      // Best-effort: silently drop if socket is in a bad state.
+      // The user will notice if input stops working and can re-focus the terminal.
+    }
+  }
+
   private resolveNamespaceHandler(
     namespace: Rpc.ApiNamespace,
     method: string,
@@ -778,10 +799,19 @@ export class DaemonClient {
   private async writeTerminalInput(input: Rpc.TerminalWriteInput): Promise<Rpc.TerminalMutationOkResponse> {
     const record = asRecord(input);
     const data = typeof record?.data === "string" ? record.data : "";
-    await this.invoke("terminal.send", {
-      sessionId: readOptionalString(record?.sessionId) || "",
-      input: data,
-    });
+    const sessionId = readOptionalString(record?.sessionId) || "";
+
+    // Fast path: fire-and-forget when socket is already open.
+    // Sends the request but does not wait for the daemon's response,
+    // eliminating round-trip latency on every keystroke.
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.sendFireAndForget("terminal.send", { sessionId, input: data });
+      return { ok: true };
+    }
+
+    // Fallback: socket is not open yet (rare — e.g. reconnection in progress).
+    // Use full request/response to ensure the connection is re-established.
+    await this.invoke("terminal.send", { sessionId, input: data });
     return { ok: true };
   }
 
