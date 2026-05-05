@@ -36,8 +36,9 @@ jobs:
         working-directory: apps/landing
         run: bun run build
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy apps/landing/out --project-name=yishan-landing
+          workingDirectory: apps/landing
+          command: deploy
