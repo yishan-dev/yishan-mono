@@ -11,6 +11,59 @@ import { workspaceStore } from "../../store/workspaceStore";
 import { loadTerminalAddons } from "./terminalAddons";
 import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
 
+/**
+ * Batches terminal output writes so multiple WebSocket notifications within
+ * one animation frame are coalesced into a single `terminal.write()` call.
+ * This dramatically reduces xterm parser/render overhead during fast output.
+ */
+class TerminalWriteBatcher {
+  private pending = "";
+  private frameId: number | null = null;
+  private readonly terminal: Terminal;
+
+  constructor(terminal: Terminal) {
+    this.terminal = terminal;
+  }
+
+  /** Enqueues output data and schedules a batched write on the next animation frame. */
+  write(data: string): void {
+    this.pending += data;
+    if (this.frameId !== null) {
+      return;
+    }
+    this.frameId = requestAnimationFrame(() => {
+      this.flush();
+    });
+  }
+
+  /** Immediately writes all pending data (used for session restore). */
+  flush(): void {
+    if (this.frameId !== null) {
+      cancelAnimationFrame(this.frameId);
+      this.frameId = null;
+    }
+    if (this.pending.length === 0) {
+      return;
+    }
+    const data = this.pending;
+    this.pending = "";
+    if (isTerminalAttached(this.terminal)) {
+      this.terminal.write(data);
+    }
+  }
+
+  dispose(): void {
+    if (this.frameId !== null) {
+      cancelAnimationFrame(this.frameId);
+      this.frameId = null;
+    }
+    this.pending = "";
+  }
+}
+
+/** Resize debounce interval in milliseconds. */
+const RESIZE_DEBOUNCE_MS = 50;
+
 type TerminalViewProps = {
   tabId: string;
   focusRequestKey?: number;
@@ -36,6 +89,7 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const outputSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const writeBatcherRef = useRef<TerminalWriteBatcher | null>(null);
   const pendingCommandInputRef = useRef("");
   const readIndexRef = useRef(0);
   const didRequestCloseRef = useRef(false);
@@ -133,6 +187,9 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
       fontFamily: '"MesloLGS NF", "JetBrains Mono", "SF Mono", Menlo, monospace',
       fontSize: 12,
       lineHeight: 1.4,
+      scrollback: 5_000,
+      fastScrollSensitivity: 5,
+      rescaleOverlappingGlyphs: true,
       theme: {
         background: "#292e36",
         foreground: "#e7ebf0",
@@ -142,9 +199,11 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
     terminal.open(host);
     safeFitTerminalToHost(terminal, fitAddon);
 
+    const writeBatcher = new TerminalWriteBatcher(terminal);
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
+    writeBatcherRef.current = writeBatcher;
 
     terminal.attachCustomKeyEventHandler((event) => {
       if (shouldReleaseCommandWForTabCloseShortcut(event)) {
@@ -191,20 +250,31 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
       });
     });
 
+    let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
     const resizeObserver = new ResizeObserver(() => {
       if (disposed) {
         return;
       }
 
-      safeFitTerminalToHost(terminal, fitAddon);
-      const sessionId = sessionIdRef.current;
-      if (!sessionId) {
-        return;
+      if (resizeTimerId !== null) {
+        clearTimeout(resizeTimerId);
       }
+      resizeTimerId = setTimeout(() => {
+        resizeTimerId = null;
+        if (disposed) {
+          return;
+        }
 
-      void resizeTerminal({ sessionId, cols: terminal.cols, rows: terminal.rows }).catch((error) => {
-        reportTerminalAsyncError("resize terminal", error);
-      });
+        safeFitTerminalToHost(terminal, fitAddon);
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          return;
+        }
+
+        void resizeTerminal({ sessionId, cols: terminal.cols, rows: terminal.rows }).catch((error) => {
+          reportTerminalAsyncError("resize terminal", error);
+        });
+      }, RESIZE_DEBOUNCE_MS);
     });
     resizeObserver.observe(host);
 
@@ -213,7 +283,12 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
       writeDisposable.dispose();
       outputSubscriptionRef.current?.unsubscribe();
       outputSubscriptionRef.current = null;
+      if (resizeTimerId !== null) {
+        clearTimeout(resizeTimerId);
+      }
       resizeObserver.disconnect();
+      writeBatcher.dispose();
+      writeBatcherRef.current = null;
       terminal.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
@@ -359,11 +434,7 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
             readIndexRef.current = payload.nextIndex;
             updateTerminalTabTitleFromPath(extractPathTitleFromTerminalOutput(payload.chunk));
             if (payload.chunk.length > 0) {
-              if (!isTerminalAttached(terminal)) {
-                return;
-              }
-
-              terminal.write(payload.chunk);
+              writeBatcherRef.current?.write(payload.chunk);
             }
             return;
           }

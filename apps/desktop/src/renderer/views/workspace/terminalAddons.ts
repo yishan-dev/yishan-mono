@@ -26,7 +26,7 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
 
   loadAddonSafely(terminal, fitAddon, logger, "fit");
   loadAddonSafely(terminal, searchAddon, logger, "search");
-  loadAddonSafely(terminal, new WebglAddon(), logger, "webgl");
+  loadWebglAddonWithFallback(terminal, logger);
   loadAddonSafely(terminal, new ClipboardAddon(), logger, "clipboard");
   loadAddonSafely(terminal, new ImageAddon(), logger, "image");
   loadAddonSafely(terminal, new WebFontsAddon(), logger, "web-fonts");
@@ -40,6 +40,30 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
     fitAddon,
     searchAddon,
   };
+}
+
+/**
+ * Loads the WebGL renderer addon with automatic context-loss recovery.
+ * When the WebGL context is lost, the addon is disposed and a new instance
+ * is loaded after a brief delay. This avoids falling back to the slow DOM renderer.
+ */
+function loadWebglAddonWithFallback(terminal: Pick<Terminal, "loadAddon">, logger: Logger): void {
+  const loadWebgl = () => {
+    const webglAddon = new WebglAddon();
+    webglAddon.onContextLoss(() => {
+      logger.warn("xterm WebGL context lost, reloading WebGL addon");
+      try {
+        webglAddon.dispose();
+      } catch {
+        // Ignore dispose errors during context loss.
+      }
+      // Re-create after a short delay to allow GPU recovery.
+      setTimeout(() => loadWebgl(), 500);
+    });
+    loadAddonSafely(terminal, webglAddon, logger, "webgl");
+  };
+
+  loadWebgl();
 }
 
 /** Safely loads an addon and logs a warning when the addon fails to initialize. */

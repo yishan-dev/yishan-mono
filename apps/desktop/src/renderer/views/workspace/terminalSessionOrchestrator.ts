@@ -77,7 +77,17 @@ export class TerminalSessionOrchestrator {
     }
     if (resolvedSession.snapshot.chunks.length > 0) {
       try {
-        input.terminal.write(resolvedSession.snapshot.chunks.join(""));
+        const fullOutput = resolvedSession.snapshot.chunks.join("");
+        // Write buffered output in chunks to avoid blocking the main thread
+        // for sessions with large output history.
+        const RESTORE_CHUNK_SIZE = 64 * 1024; // 64 KB per chunk
+        if (fullOutput.length <= RESTORE_CHUNK_SIZE) {
+          input.terminal.write(fullOutput);
+        } else {
+          for (let offset = 0; offset < fullOutput.length; offset += RESTORE_CHUNK_SIZE) {
+            input.terminal.write(fullOutput.slice(offset, offset + RESTORE_CHUNK_SIZE));
+          }
+        }
       } catch {
         // Ignore write races during teardown; live subscription still restores output.
       }
