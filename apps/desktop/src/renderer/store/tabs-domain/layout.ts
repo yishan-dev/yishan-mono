@@ -19,7 +19,12 @@ export function renameTabState(
   state: WorkspaceTabStateSlice,
   tabId: string,
   title: string,
-): Partial<WorkspaceTabStateSlice> {
+): Partial<WorkspaceTabStateSlice> | null {
+  const targetTab = state.tabs.find((tab) => tab.id === tabId);
+  if (!targetTab || targetTab.title === title) {
+    return null;
+  }
+
   return {
     tabs: state.tabs.map((tab) =>
       tab.id === tabId

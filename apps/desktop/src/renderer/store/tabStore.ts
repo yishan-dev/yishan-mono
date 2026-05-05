@@ -231,7 +231,7 @@ export const tabStore = create<TabStoreState>()(
       set((state) => reorderTabState(state, draggedTabId, targetTabId, position) ?? state);
     },
     renameTab: (tabId, title) => {
-      set((state) => renameTabState(state, tabId, title));
+      set((state) => renameTabState(state, tabId, title) ?? state);
     },
     updateFileTabContent: (tabId, content) => {
       set((state) => updateFileTabContentState(state, tabId, content));
