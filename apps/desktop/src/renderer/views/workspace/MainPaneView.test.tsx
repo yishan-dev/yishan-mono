@@ -75,8 +75,8 @@ vi.mock("../../commands/fileCommands", () => ({
   writeFile: vi.fn(),
 }));
 
-vi.mock("../../components/ProjectDiffViewer", () => ({
-  ProjectDiffViewer: () => <div data-testid="repo-diff-viewer" />,
+vi.mock("../../components/FileDiffViewer", () => ({
+  FileDiffViewer: () => <div data-testid="repo-diff-viewer" />,
 }));
 
 vi.mock("../../components/fileTreeIcons", () => ({
