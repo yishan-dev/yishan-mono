@@ -154,7 +154,21 @@ export function ChangesTabView() {
     state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId),
   );
   const selectedWorkspaceWorktreePath = selectedWorkspace?.worktreePath;
-  const selectedWorkspaceSourceBranch = selectedWorkspace?.sourceBranch?.trim();
+  const selectedWorkspaceBranch = selectedWorkspace?.branch?.trim();
+  const selectedWorkspaceSourceBranch = useMemo(() => {
+    const sourceBranch = selectedWorkspace?.sourceBranch?.trim();
+    if (!sourceBranch) {
+      return undefined;
+    }
+
+    // When the workspace branch matches its source branch (e.g., both are "main"),
+    // compare against the remote tracking branch to show unpushed commits.
+    if (selectedWorkspaceBranch && selectedWorkspaceBranch === sourceBranch) {
+      return `origin/${sourceBranch}`;
+    }
+
+    return sourceBranch;
+  }, [selectedWorkspace?.sourceBranch, selectedWorkspaceBranch]);
   const workspaceGitRefreshVersion = workspaceStore((state) => {
     if (!selectedWorkspaceWorktreePath) {
       return 0;
