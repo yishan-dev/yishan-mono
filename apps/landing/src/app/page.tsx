@@ -1,4 +1,9 @@
+"use client";
+
+import { useI18n } from "@/i18n";
+import { DownloadButton } from "./download-button";
 import { HeroImage } from "./hero-image";
+import { LanguageSwitcher } from "./language-switcher";
 
 const logoUrl =
   "https://raw.githubusercontent.com/yishan-io/yishan-mono/main/apps/desktop/src/assets/images/yishan-transparent.png";
@@ -12,57 +17,6 @@ const agents: { name: string; icon: string; size?: string }[] = [
   { name: "Pi", icon: "/pi.svg" },
 ];
 
-const pillars = [
-  {
-    title: "Workspace continuity",
-    desc: "Keep context, next steps, and project state attached to the work instead of reconstructing it every session.",
-  },
-  {
-    title: "Local-first execution",
-    desc: "Run terminal, git, filesystem, and agent workflows close to the machine where development actually happens.",
-  },
-  {
-    title: "Bring your own agents",
-    desc: "Use the CLIs you already trust and let Yishan sit above them as the workspace layer.",
-  },
-];
-
-const cards = [
-  {
-    eyebrow: "Context",
-    title: "A stable place for work to live",
-    desc: "Repos, notes, task context, and execution trails stay aligned so work remains resumable.",
-  },
-  {
-    eyebrow: "Execution",
-    title: "Closer to the real dev environment",
-    desc: "Yishan is built for actual engineering workflows, not isolated AI chat sessions.",
-  },
-  {
-    eyebrow: "Flow",
-    title: "Lower reset cost between sessions",
-    desc: "Switch tasks, return later, and keep enough project state to continue without reloading everything into your head.",
-  },
-];
-
-const workflow = [
-  {
-    num: "01",
-    title: "Open a workspace",
-    desc: "Start from a repo, a task, or an existing workstream with a stable home for context.",
-  },
-  {
-    num: "02",
-    title: "Connect local execution",
-    desc: "Work with your terminal, repo, and preferred agent CLI without replacing your stack.",
-  },
-  {
-    num: "03",
-    title: "Resume cleanly",
-    desc: "Continue with the current state, recent activity, and next moves already attached to the work.",
-  },
-];
-
 function GitHubIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-current">
@@ -72,8 +26,10 @@ function GitHubIcon() {
 }
 
 export default function LandingPage() {
+  const { t } = useI18n();
+
   return (
-    <div className="min-h-screen bg-[#0D1110] text-[#E8ECE8]">
+    <div className="min-h-screen overflow-x-hidden bg-[#0D1110] text-[#E8ECE8]">
       {/* Background blurs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute left-[-10rem] top-[-6rem] h-[28rem] w-[28rem] rounded-full bg-[#1B2420]/70 blur-3xl" />
@@ -94,32 +50,27 @@ export default function LandingPage() {
 
           <nav className="hidden items-center gap-8 text-sm text-[#A5B0A8] md:flex">
             <a href="#pillars" className="transition hover:text-[#E8ECE8]">
-              Overview
+              {t("nav.overview")}
             </a>
             <a href="#product" className="transition hover:text-[#E8ECE8]">
-              Product
+              {t("nav.product")}
             </a>
             <a href="#workflow" className="transition hover:text-[#E8ECE8]">
-              Workflow
+              {t("nav.workflow")}
             </a>
             <a href="https://github.com/yishan-io/yishan-mono/blob/main/CHANGELOG.md" className="transition hover:text-[#E8ECE8]">
-              Changelog
+              {t("nav.changelog")}
             </a>
           </nav>
 
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <a
               href="https://github.com/yishan-io/yishan-mono"
               className="inline-flex items-center gap-2 rounded-2xl border border-[#2A342F] bg-[#151B18] px-4 py-2 text-sm text-[#E8ECE8] transition hover:bg-[#1B2420]"
             >
               <GitHubIcon />
-              GitHub
-            </a>
-            <a
-              href="#"
-              className="rounded-2xl bg-[#9DDB72] px-4 py-2 text-sm font-medium text-[#0D1110] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_8px_24px_rgba(157,219,114,0.22)] transition hover:translate-y-[-1px] hover:bg-[#B2EB8A]"
-            >
-              Download for macOS
+              {t("nav.github")}
             </a>
           </div>
         </div>
@@ -131,37 +82,31 @@ export default function LandingPage() {
         <section className="mx-auto max-w-7xl px-6 pb-20 pt-16 lg:px-8 lg:pb-28 lg:pt-24">
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#2A342F] bg-[#151B18] px-3 py-1 text-xs text-[#D1B06A]">
-              Workspace-first &bull; Local execution &bull; BYO agent CLI
+              {t("hero.badge")}
             </div>
 
             <h1 className="mt-6 text-5xl font-semibold leading-tight tracking-tight text-[#E8ECE8] md:text-6xl lg:text-7xl">
-              A desktop workspace for modern dev flow.
+              {t("hero.title")}
             </h1>
 
             <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-[#2A342F] bg-[#151B18] px-4 py-2 text-sm text-[#A5B0A8]">
               <span className="font-semibold text-[#E8ECE8]">Yishan</span>
               <span className="text-[#8FCB99]">/</span>
-              <span>Keep context, execution, and agent workflows in one place</span>
+              <span>{t("hero.tagline")}</span>
             </div>
 
             <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-[#A5B0A8] md:text-lg">
-              Built for developers who work across repos, terminals, and agent CLIs. Yishan helps reduce reset cost
-              between sessions by keeping the right project state close to the work.
+              {t("hero.desc")}
             </p>
 
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <a
-                href="#"
-                className="rounded-2xl bg-[#9DDB72] px-6 py-3 text-sm font-medium text-[#0D1110] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_28px_rgba(157,219,114,0.24)] transition hover:translate-y-[-1px] hover:bg-[#B2EB8A]"
-              >
-                Download for macOS
-              </a>
+              <DownloadButton />
               <a
                 href="https://github.com/yishan-io/yishan-mono"
                 className="inline-flex items-center gap-2 rounded-2xl border border-[#2A342F] bg-[#151B18] px-6 py-3 text-sm text-[#E8ECE8] transition hover:bg-[#1B2420]"
               >
                 <GitHubIcon />
-                View on GitHub
+                {t("hero.github")}
               </a>
             </div>
           </div>
@@ -173,13 +118,12 @@ export default function LandingPage() {
         <section className="mx-auto max-w-7xl px-6 py-6 lg:px-8 lg:py-10">
           <div className="rounded-[32px] border border-[#2A342F] bg-[#121715] p-8 lg:p-10 overflow-hidden">
             <div className="max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">Works with agents</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">{t("agents.label")}</div>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8ECE8] md:text-4xl">
-                Bring your own agent stack.
+                {t("agents.title")}
               </h2>
               <p className="mt-4 text-base leading-8 text-[#A5B0A8]">
-                Yishan works alongside the agent tools developers already use, instead of forcing a closed runtime or a
-                brand new workflow.
+                {t("agents.desc")}
               </p>
             </div>
 
@@ -211,10 +155,10 @@ export default function LandingPage() {
         {/* Pillars */}
         <section id="pillars" className="mx-auto max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
           <div className="grid gap-5 md:grid-cols-3">
-            {pillars.map((pillar) => (
-              <div key={pillar.title} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6 shadow-sm">
-                <h3 className="text-xl font-semibold text-[#E8ECE8]">{pillar.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{pillar.desc}</p>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6 shadow-sm">
+                <h3 className="text-xl font-semibold text-[#E8ECE8]">{t(`pillars.${i}.title`)}</h3>
+                <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{t(`pillars.${i}.desc`)}</p>
               </div>
             ))}
           </div>
@@ -223,22 +167,21 @@ export default function LandingPage() {
         {/* Product */}
         <section id="product" className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
           <div className="max-w-2xl">
-            <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">Product direction</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">{t("product.label")}</div>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8ECE8] md:text-4xl">
-              Closer to a real dev environment.
+              {t("product.title")}
             </h2>
             <p className="mt-4 text-base leading-8 text-[#A5B0A8]">
-              Yishan keeps the interface dark and tool-like, aligning the palette with the product identity rather than
-              drifting into a separate design system.
+              {t("product.desc")}
             </p>
           </div>
 
           <div className="mt-10 grid gap-5 md:grid-cols-3">
-            {cards.map((card) => (
-              <div key={card.title} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6">
-                <div className="text-xs uppercase tracking-[0.22em] text-[#D1B06A]">{card.eyebrow}</div>
-                <h3 className="mt-4 text-xl font-semibold leading-8 text-[#E8ECE8]">{card.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{card.desc}</p>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6">
+                <div className="text-xs uppercase tracking-[0.22em] text-[#D1B06A]">{t(`cards.${i}.eyebrow`)}</div>
+                <h3 className="mt-4 text-xl font-semibold leading-8 text-[#E8ECE8]">{t(`cards.${i}.title`)}</h3>
+                <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{t(`cards.${i}.desc`)}</p>
               </div>
             ))}
           </div>
@@ -248,22 +191,21 @@ export default function LandingPage() {
         <section id="workflow" className="mx-auto max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
           <div className="rounded-[36px] border border-[#2A342F] bg-[#121715] px-8 py-10 text-[#E8ECE8] lg:px-10">
             <div className="max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">Workflow</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">{t("workflow.label")}</div>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8ECE8] md:text-4xl">
-                Keep real development work moving.
+                {t("workflow.title")}
               </h2>
               <p className="mt-4 text-base leading-8 text-[#A5B0A8]">
-                Yishan is designed for multi-step engineering work that needs context, execution, and continuity to stay
-                connected.
+                {t("workflow.desc")}
               </p>
             </div>
 
             <div className="mt-10 grid gap-5 md:grid-cols-3">
-              {workflow.map((item) => (
-                <div key={item.num} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6">
-                  <div className="text-sm font-medium text-[#D1B06A]">{item.num}</div>
-                  <h3 className="mt-4 text-xl font-semibold text-[#E8ECE8]">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{item.desc}</p>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-[28px] border border-[#2A342F] bg-[#151B18] p-6">
+                  <div className="text-sm font-medium text-[#D1B06A]">{`0${i + 1}`}</div>
+                  <h3 className="mt-4 text-xl font-semibold text-[#E8ECE8]">{t(`workflow.${i}.title`)}</h3>
+                  <p className="mt-3 text-sm leading-7 text-[#A5B0A8]">{t(`workflow.${i}.desc`)}</p>
                 </div>
               ))}
             </div>
@@ -274,29 +216,23 @@ export default function LandingPage() {
         <section className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:px-8">
           <div className="flex flex-col gap-8 rounded-[36px] border border-[#2A342F] bg-[#151B18] p-8 lg:flex-row lg:items-end lg:justify-between lg:p-10">
             <div className="max-w-2xl">
-              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">Get started</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-[#A5B0A8]">{t("cta.label")}</div>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[#E8ECE8] md:text-4xl">
-                Built for developers who want less fragmentation.
+                {t("cta.title")}
               </h2>
               <p className="mt-4 text-base leading-8 text-[#A5B0A8]">
-                Keep context closer to the work, make sessions more resumable, and let agent workflows fit real project
-                environments.
+                {t("cta.desc")}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-4">
-              <a
-                href="#"
-                className="rounded-2xl bg-[#9DDB72] px-6 py-3 text-sm font-medium text-[#0D1110] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_28px_rgba(157,219,114,0.24)] transition hover:translate-y-[-1px] hover:bg-[#B2EB8A]"
-              >
-                Download for macOS
-              </a>
+              <DownloadButton />
               <a
                 href="https://github.com/yishan-io/yishan-mono"
                 className="inline-flex items-center gap-2 rounded-2xl border border-[#2A342F] bg-[#151B18] px-6 py-3 text-sm text-[#E8ECE8] transition hover:bg-[#1B2420]"
               >
                 <GitHubIcon />
-                View on GitHub
+                {t("cta.github")}
               </a>
             </div>
           </div>
@@ -314,56 +250,56 @@ export default function LandingPage() {
               </div>
               <div>
                 <div className="text-base font-semibold tracking-wide text-[#E8ECE8]">Yishan</div>
-                <div className="text-xs text-[#A5B0A8]">Workspace layer for agent-driven development</div>
+                <div className="text-xs text-[#A5B0A8]">{t("footer.tagline")}</div>
               </div>
             </div>
             <p className="mt-4 text-sm leading-7 text-[#A5B0A8]">
-              Built for developers who want less fragmentation, lower reset cost, and a calmer way to work with agents.
+              {t("footer.desc")}
             </p>
           </div>
 
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">Product</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">{t("footer.product")}</div>
               <div className="mt-4 space-y-3 text-sm text-[#A5B0A8]">
                 <a href="#pillars" className="block transition hover:text-[#E8ECE8]">
-                  Overview
+                  {t("nav.overview")}
                 </a>
                 <a href="#product" className="block transition hover:text-[#E8ECE8]">
-                  Product
+                  {t("nav.product")}
                 </a>
                 <a href="#workflow" className="block transition hover:text-[#E8ECE8]">
-                  Workflow
+                  {t("nav.workflow")}
                 </a>
               </div>
             </div>
 
             <div>
-              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">Links</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">{t("footer.links")}</div>
               <div className="mt-4 space-y-3 text-sm text-[#A5B0A8]">
                 <a href="#" className="block transition hover:text-[#E8ECE8]">
-                  Download for macOS
+                  {t("footer.download")}
                 </a>
                 <a href="https://github.com/yishan-io/yishan-mono" className="block transition hover:text-[#E8ECE8]">
                   GitHub
                 </a>
                 <a href="https://github.com/yishan-io/yishan-mono/blob/main/CHANGELOG.md" className="block transition hover:text-[#E8ECE8]">
-                  Changelog
+                  {t("nav.changelog")}
                 </a>
               </div>
             </div>
 
             <div>
-              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">Company</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-[#A5B0A8]">{t("footer.company")}</div>
               <div className="mt-4 space-y-3 text-sm text-[#A5B0A8]">
                 <a href="#" className="block transition hover:text-[#E8ECE8]">
-                  About
+                  {t("footer.about")}
                 </a>
                 <a href="#" className="block transition hover:text-[#E8ECE8]">
-                  Contact
+                  {t("footer.contact")}
                 </a>
                 <a href="#" className="block transition hover:text-[#E8ECE8]">
-                  Privacy
+                  {t("footer.privacy")}
                 </a>
               </div>
             </div>
@@ -372,8 +308,8 @@ export default function LandingPage() {
 
         <div className="border-t border-[#2A342F]">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4 text-sm text-[#A5B0A8] lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <div>&copy; 2026 Yishan. All rights reserved.</div>
-            <div>Make development work feel lighter.</div>
+            <div>{t("footer.copyright")}</div>
+            <div>{t("footer.slogan")}</div>
           </div>
         </div>
       </footer>

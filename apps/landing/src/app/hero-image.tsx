@@ -27,17 +27,19 @@ export function HeroImage() {
   }, []);
 
   return (
-    <div
-      ref={ref}
-      className="mt-16 transition-transform duration-100 ease-out will-change-transform origin-[center_30%]"
-      style={{ transform: `scale(${scale})` }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/app.png"
-        alt="Yishan desktop app screenshot"
-        className="h-auto w-full rounded-lg shadow-[0_32px_100px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]"
-      />
+    <div className="mx-auto mt-16 w-[92%]">
+      <div
+        ref={ref}
+        className="transition-transform duration-100 ease-out will-change-transform origin-[center_30%]"
+        style={{ transform: `scale(${scale})` }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/app.png"
+          alt="Yishan desktop app screenshot"
+          className="h-auto w-full rounded-lg shadow-[0_32px_100px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.04)]"
+        />
+      </div>
     </div>
   );
 }
