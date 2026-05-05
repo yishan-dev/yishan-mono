@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { createSoundPlayer } from "./soundRuntime";
 import { createElectrobunNotificationDriver } from "./electrobunNotificationDriver";
 import { resolveDesktopSoundDirectory } from "./soundDirectory";
@@ -34,6 +35,11 @@ export function createDesktopNotificationHostAdapter(
       soundDirectoryPath,
       soundId,
     });
+
+    if (!existsSync(filePath)) {
+      throw new Error(`Notification sound file not found: ${filePath}`);
+    }
+
     await player.play({
       filePath,
       volume,

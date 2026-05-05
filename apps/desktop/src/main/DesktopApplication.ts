@@ -268,15 +268,23 @@ export class DesktopApplication {
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.playNotificationSound, async (_event, input) => {
-      await notificationAdapter.playSound({
-        eventType: "run-finished",
-        soundId: input.soundId,
-        volume: input.volume,
-      });
+      try {
+        await notificationAdapter.playSound({
+          eventType: "run-finished",
+          soundId: input.soundId,
+          volume: input.volume,
+        });
 
-      return {
-        played: true,
-      };
+        return {
+          played: true,
+        };
+      } catch (error) {
+        console.error("Notification sound playback failed:", error);
+        return {
+          played: false,
+          reason: "sound-player-unavailable" as const,
+        };
+      }
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.getPendingUpdate, async () => {

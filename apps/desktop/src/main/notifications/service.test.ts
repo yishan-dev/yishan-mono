@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createSoundPlayerMock = vi.fn();
 const createElectrobunNotificationDriverMock = vi.fn();
 const resolveDesktopSoundDirectoryMock = vi.fn(() => "/sounds");
+const existsSyncMock = vi.fn(() => true);
+
+vi.mock("node:fs", () => ({
+  existsSync: existsSyncMock,
+}));
 
 vi.mock("./soundRuntime", () => ({
   createSoundPlayer: createSoundPlayerMock,
@@ -22,6 +27,8 @@ describe("createDesktopNotificationHostAdapter", () => {
     createElectrobunNotificationDriverMock.mockReset();
     resolveDesktopSoundDirectoryMock.mockReset();
     resolveDesktopSoundDirectoryMock.mockReturnValue("/sounds");
+    existsSyncMock.mockReset();
+    existsSyncMock.mockReturnValue(true);
   });
 
   it("returns desktop notification driver and click-action callback", async () => {
@@ -68,6 +75,31 @@ describe("createDesktopNotificationHostAdapter", () => {
       filePath: "/sounds/ding-dong.wav",
       volume: 0.7,
     });
+  });
+
+  it("throws when sound file does not exist on disk", async () => {
+    existsSyncMock.mockReturnValue(false);
+    const play = vi.fn(async () => undefined);
+
+    createElectrobunNotificationDriverMock.mockReturnValue({
+      show: vi.fn(async () => ({ notificationId: "notification-1" })),
+    });
+    createSoundPlayerMock.mockReturnValue({
+      play,
+    });
+
+    const { createDesktopNotificationHostAdapter } = await import("./service");
+    const adapter = createDesktopNotificationHostAdapter();
+
+    await expect(
+      adapter.playSound({
+        soundId: "chime",
+        volume: 0.7,
+        eventType: "run-finished",
+      }),
+    ).rejects.toThrow("Notification sound file not found: /sounds/ding-dong.wav");
+
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("uses windows separators when desktop sound root uses windows paths", async () => {
