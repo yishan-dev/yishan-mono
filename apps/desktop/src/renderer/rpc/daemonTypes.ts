@@ -355,7 +355,7 @@ export type TerminalStreamEvent =
   | {
       type: "output";
       sessionId: string;
-      chunk: string;
+      chunk: string | Uint8Array;
       nextIndex: number;
     }
   | {

@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -8,6 +9,12 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 	"yishan/apps/cli/internal/workspace"
+)
+
+const (
+	// Binary frame opcodes for terminal I/O fast-path.
+	binOpcodeTerminalInput  byte = 0x01
+	binOpcodeTerminalOutput byte = 0x02
 )
 
 type JSONRPCHandler struct {
@@ -41,12 +48,18 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer connState.Close()
 
 	for {
-		_, payload, err := conn.ReadMessage()
+		msgType, payload, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Error().Err(err).Msg("websocket read failed")
 			}
 			return
+		}
+
+		// Binary frames are terminal I/O fast-path — skip JSON-RPC entirely.
+		if msgType == websocket.BinaryMessage {
+			h.handleBinaryFrame(connState, payload)
+			continue
 		}
 
 		resp := h.handleRequest(r.Context(), connState, payload)
@@ -58,6 +71,33 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Error().Err(err).Msg("websocket write failed")
 			return
 		}
+	}
+}
+
+// handleBinaryFrame processes a binary WebSocket frame for terminal I/O.
+// Frame format: [1 byte opcode] [session ID (null-terminated)] [payload]
+func (h *JSONRPCHandler) handleBinaryFrame(_ *wsConnState, payload []byte) {
+	if len(payload) < 3 { // minimum: opcode + at least 1 char session ID + null terminator
+		return
+	}
+
+	opcode := payload[0]
+	rest := payload[1:]
+
+	switch opcode {
+	case binOpcodeTerminalInput:
+		// Find the null-terminated session ID.
+		nullIdx := bytes.IndexByte(rest, 0)
+		if nullIdx < 0 {
+			return
+		}
+		sessionID := string(rest[:nullIdx])
+		inputData := rest[nullIdx+1:]
+		if len(inputData) == 0 {
+			return
+		}
+		// Write raw bytes directly to PTY — avoids JSON unmarshal + string conversion.
+		h.manager.TerminalSendRaw(sessionID, inputData)
 	}
 }
 

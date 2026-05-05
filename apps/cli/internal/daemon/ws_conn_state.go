@@ -33,6 +33,14 @@ func (c *wsConnState) WriteJSON(v any) error {
 	return c.conn.WriteJSON(v)
 }
 
+// WriteBinary sends a binary WebSocket frame. Used for terminal I/O fast-path
+// to avoid JSON marshal overhead on every PTY output chunk.
+func (c *wsConnState) WriteBinary(data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.conn.WriteMessage(websocket.BinaryMessage, data)
+}
+
 func (c *wsConnState) Notify(method string, params any) error {
 	return c.WriteJSON(notification{JSONRPC: "2.0", Method: method, Params: params})
 }
@@ -68,14 +76,22 @@ func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64
 		for event := range events {
 			switch event.Type {
 			case "output":
-				if err := c.Notify("terminal.output", map[string]any{
-					"sessionId": event.SessionID,
-					"chunk":     event.Chunk,
-				}); err != nil {
-					c.DetachSubscription(sessionID)
-					return
+				// Fast path: send PTY output as binary WebSocket frame.
+				// Frame format: [0x02] [sessionID + '\0'] [raw PTY bytes]
+				if len(event.RawChunk) > 0 {
+					sid := []byte(event.SessionID)
+					frame := make([]byte, 1+len(sid)+1+len(event.RawChunk))
+					frame[0] = 0x02 // opcode: terminal output
+					copy(frame[1:], sid)
+					frame[1+len(sid)] = 0 // null terminator
+					copy(frame[1+len(sid)+1:], event.RawChunk)
+					if err := c.WriteBinary(frame); err != nil {
+						c.DetachSubscription(sessionID)
+						return
+					}
 				}
 			case "exit":
+				// Exit events remain as JSON-RPC — they are infrequent control messages.
 				if err := c.Notify("terminal.exit", map[string]any{
 					"sessionId": event.SessionID,
 					"exitCode":  event.ExitCode,

@@ -11,74 +11,6 @@ import { workspaceStore } from "../../store/workspaceStore";
 import { loadTerminalAddons } from "./terminalAddons";
 import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
 
-/**
- * Batches terminal output writes so multiple WebSocket notifications within
- * one animation frame are coalesced into a single `terminal.write()` call.
- * This dramatically reduces xterm parser/render overhead during fast output.
- *
- * Uses array-based buffering (O(1) amortized push) instead of string
- * concatenation (O(n) per append) to avoid quadratic cost during bursts.
- */
-class TerminalWriteBatcher {
-  private chunks: string[] = [];
-  private pendingBytes = 0;
-  private frameId: number | null = null;
-  private readonly terminal: Terminal;
-
-  /** Flush immediately when buffered data reaches this threshold. */
-  private static readonly IMMEDIATE_FLUSH_BYTES = 128 * 1024; // 128 KB
-
-  constructor(terminal: Terminal) {
-    this.terminal = terminal;
-  }
-
-  /** Enqueues output data and schedules a batched write on the next animation frame. */
-  write(data: string): void {
-    this.chunks.push(data);
-    this.pendingBytes += data.length;
-
-    // Flush immediately for large bursts (e.g. `cat` of big file) to keep
-    // xterm's internal write buffer fed without waiting for the next frame.
-    if (this.pendingBytes >= TerminalWriteBatcher.IMMEDIATE_FLUSH_BYTES) {
-      this.flush();
-      return;
-    }
-
-    if (this.frameId !== null) {
-      return;
-    }
-    this.frameId = requestAnimationFrame(() => {
-      this.flush();
-    });
-  }
-
-  /** Immediately writes all pending data to xterm. */
-  flush(): void {
-    if (this.frameId !== null) {
-      cancelAnimationFrame(this.frameId);
-      this.frameId = null;
-    }
-    if (this.chunks.length === 0) {
-      return;
-    }
-    const data = this.chunks.join("");
-    this.chunks.length = 0;
-    this.pendingBytes = 0;
-    if (isTerminalAttached(this.terminal)) {
-      this.terminal.write(data);
-    }
-  }
-
-  dispose(): void {
-    if (this.frameId !== null) {
-      cancelAnimationFrame(this.frameId);
-      this.frameId = null;
-    }
-    this.chunks.length = 0;
-    this.pendingBytes = 0;
-  }
-}
-
 /** Resize debounce interval in milliseconds. */
 const RESIZE_DEBOUNCE_MS = 50;
 
@@ -107,7 +39,6 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const outputSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
-  const writeBatcherRef = useRef<TerminalWriteBatcher | null>(null);
   const pendingCommandInputRef = useRef("");
   const readIndexRef = useRef(0);
   const didRequestCloseRef = useRef(false);
@@ -218,11 +149,9 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
     terminal.open(host);
     safeFitTerminalToHost(terminal, fitAddon);
 
-    const writeBatcher = new TerminalWriteBatcher(terminal);
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
-    writeBatcherRef.current = writeBatcher;
 
     terminal.attachCustomKeyEventHandler((event) => {
       if (shouldReleaseCommandWForTabCloseShortcut(event)) {
@@ -311,8 +240,6 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
         clearTimeout(resizeTimerId);
       }
       resizeObserver.disconnect();
-      writeBatcher.dispose();
-      writeBatcherRef.current = null;
       terminal.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
@@ -456,9 +383,19 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
             }
 
             readIndexRef.current = payload.nextIndex;
-            updateTerminalTabTitleFromPath(extractPathTitleFromTerminalOutput(payload.chunk));
-            if (payload.chunk.length > 0) {
-              writeBatcherRef.current?.write(payload.chunk);
+            const { chunk } = payload;
+            if (!isTerminalAttached(terminal)) {
+              return;
+            }
+            if (chunk instanceof Uint8Array) {
+              // Binary fast-path: pass raw bytes directly to xterm.
+              if (chunk.byteLength > 0) {
+                terminal.write(chunk);
+              }
+            } else if (typeof chunk === "string" && chunk.length > 0) {
+              // JSON-RPC fallback: string data.
+              updateTerminalTabTitleFromPath(extractPathTitleFromTerminalOutput(chunk));
+              terminal.write(chunk);
             }
             return;
           }

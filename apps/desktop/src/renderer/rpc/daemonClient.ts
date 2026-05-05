@@ -216,8 +216,15 @@ export class DaemonClient {
     this.socketOpenPromise = this.openSocket()
       .then((socket) => {
         this.socket = socket;
+        // Enable binary frame reception as ArrayBuffer for terminal output fast-path.
+        socket.binaryType = "arraybuffer";
 
         socket.addEventListener("message", (event) => {
+          // Binary frames are terminal output — route directly to subscriber.
+          if (event.data instanceof ArrayBuffer) {
+            this.handleBinaryFrame(event.data);
+            return;
+          }
           this.handleSocketMessage(event.data);
         });
 
@@ -274,23 +281,77 @@ export class DaemonClient {
   }
 
   /**
-   * Sends a JSON-RPC 2.0 request without waiting for the response.
-   * The message includes an `id` so the daemon can route it normally,
-   * but we discard any response that comes back instead of blocking.
-   * Used for high-frequency messages like terminal input where
-   * request/response round-trip latency is unacceptable.
+   * Sends terminal input as a binary WebSocket frame, bypassing JSON
+   * serialization entirely. Frame format: [0x01] [sessionId + '\0'] [input bytes]
    */
-  private sendFireAndForget(method: string, params?: unknown): void {
+  private sendTerminalInputBinary(sessionId: string, data: string): void {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
     try {
-      socket.send(JSON.stringify(buildRequest(method, params)));
+      const encoder = new TextEncoder();
+      const sessionIdBytes = encoder.encode(sessionId);
+      const inputBytes = encoder.encode(data);
+      const frame = new Uint8Array(1 + sessionIdBytes.length + 1 + inputBytes.length);
+      frame[0] = 0x01; // opcode: terminal input
+      frame.set(sessionIdBytes, 1);
+      frame[1 + sessionIdBytes.length] = 0; // null terminator
+      frame.set(inputBytes, 1 + sessionIdBytes.length + 1);
+      socket.send(frame);
     } catch {
       // Best-effort: silently drop if socket is in a bad state.
-      // The user will notice if input stops working and can re-focus the terminal.
+    }
+  }
+
+  /**
+   * Handles an incoming binary WebSocket frame (terminal output fast-path).
+   * Frame format: [0x02] [sessionId + '\0'] [raw PTY bytes]
+   */
+  private handleBinaryFrame(buffer: ArrayBuffer): void {
+    const data = new Uint8Array(buffer);
+    if (data.length < 3) {
+      return;
+    }
+
+    const opcode = data[0];
+    if (opcode !== 0x02) {
+      return; // Only terminal output is expected as binary.
+    }
+
+    // Find null terminator after session ID.
+    let nullIdx = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i] === 0) {
+        nullIdx = i;
+        break;
+      }
+    }
+    if (nullIdx < 0) {
+      return;
+    }
+
+    const sessionId = new TextDecoder().decode(data.subarray(1, nullIdx));
+    const chunk = data.subarray(nullIdx + 1);
+    if (chunk.length === 0) {
+      return;
+    }
+
+    // Dispatch as a terminal output event to matching subscribers.
+    // The subscription handler in startSubscription() manages nextIndex tracking.
+    for (const subscription of this.subscriptionsById.values()) {
+      if (subscription.method !== "terminal.subscribe") {
+        continue;
+      }
+      const expectedSessionId = readOptionalString(asRecord(subscription.params)?.sessionId);
+      if (expectedSessionId && expectedSessionId !== sessionId) {
+        continue;
+      }
+      subscription.onNotification({
+        method: "terminal.output",
+        payload: { sessionId, chunk },
+      });
     }
   }
 
@@ -801,11 +862,9 @@ export class DaemonClient {
     const data = typeof record?.data === "string" ? record.data : "";
     const sessionId = readOptionalString(record?.sessionId) || "";
 
-    // Fast path: fire-and-forget when socket is already open.
-    // Sends the request but does not wait for the daemon's response,
-    // eliminating round-trip latency on every keystroke.
+    // Fast path: send as binary WebSocket frame — zero JSON overhead.
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.sendFireAndForget("terminal.send", { sessionId, input: data });
+      this.sendTerminalInputBinary(sessionId, data);
       return { ok: true };
     }
 
@@ -911,7 +970,9 @@ export class DaemonClient {
           if (event.method === "terminal.output") {
             const payload = asRecord(event.payload) ?? {};
             const eventSessionId = readOptionalString(payload.sessionId) || sessionId;
-            const chunk = typeof payload.chunk === "string" ? payload.chunk : "";
+            // Accept both string (JSON-RPC) and Uint8Array (binary fast-path) chunks.
+            const rawChunk = payload.chunk;
+            const chunk = rawChunk instanceof Uint8Array ? rawChunk : (typeof rawChunk === "string" ? rawChunk : "");
             const nextIndex = (this.terminalNextIndexBySessionId.get(eventSessionId) ?? 0) + 1;
             this.terminalNextIndexBySessionId.set(eventSessionId, nextIndex);
             options.onNotification({

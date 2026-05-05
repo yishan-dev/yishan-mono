@@ -385,6 +385,12 @@ func (m *Manager) TerminalSend(req TerminalSendRequest) (TerminalSendResponse, e
 	return m.terminals.Send(req)
 }
 
+// TerminalSendRaw writes raw bytes directly to a PTY session,
+// bypassing JSON serialization for the binary WebSocket fast-path.
+func (m *Manager) TerminalSendRaw(sessionID string, data []byte) {
+	m.terminals.SendRaw(sessionID, data)
+}
+
 func (m *Manager) TerminalListSessions(req TerminalListSessionsRequest) []TerminalSessionSummary {
 	return m.terminals.ListSessions(req)
 }

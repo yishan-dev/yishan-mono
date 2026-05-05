@@ -226,6 +226,19 @@ func (m *Manager) Send(req SendRequest) (SendResponse, error) {
 	return SendResponse{Written: n}, nil
 }
 
+// SendRaw writes raw bytes directly to a PTY session without any
+// string conversion. Used by the binary WebSocket fast-path.
+func (m *Manager) SendRaw(sessionID string, data []byte) {
+	s, err := m.session(sessionID)
+	if err != nil {
+		return
+	}
+	if !s.running.Load() {
+		return
+	}
+	_, _ = s.pty.Write(data)
+}
+
 func (m *Manager) Read(req ReadRequest) (ReadResponse, error) {
 	s, err := m.session(req.SessionID)
 	if err != nil {
@@ -341,11 +354,14 @@ func (s *session) capture() {
 	for {
 		n, err := s.pty.Read(buf)
 		if n > 0 {
-			chunk := string(buf[:n])
+			// Copy the raw bytes for binary delivery before converting to string.
+			raw := make([]byte, n)
+			copy(raw, buf[:n])
+			chunk := string(raw)
 			s.outputMu.Lock()
 			_, _ = s.output.WriteString(chunk)
 			s.outputMu.Unlock()
-			s.broadcast(Event{SessionID: s.id, Type: "output", Chunk: chunk})
+			s.broadcast(Event{SessionID: s.id, Type: "output", Chunk: chunk, RawChunk: raw})
 		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {

@@ -94,6 +94,9 @@ type Event struct {
 	Type      string `json:"type"`
 	Chunk     string `json:"chunk,omitempty"`
 	ExitCode  *int   `json:"exitCode,omitempty"`
+	// RawChunk carries the original PTY bytes for binary WebSocket delivery,
+	// avoiding the []byte → string → JSON marshal overhead on the hot path.
+	RawChunk []byte `json:"-"`
 }
 
 type Subscription struct {
