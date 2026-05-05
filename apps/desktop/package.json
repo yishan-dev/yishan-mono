@@ -113,7 +113,8 @@
         "AppImage",
         "deb",
         "rpm"
-      ]
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "extraMetadata": {
       "main": "dist/electron/main.cjs"
