@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFileExtension, getLanguageExtension, getSupportedExtensions, isLanguageSupported } from "./editorLanguage";
+import { getFileExtension, getLanguageId, getSupportedExtensions, isLanguageSupported } from "./editorLanguage";
 
 describe("editorLanguage", () => {
   describe("getFileExtension", () => {
@@ -103,33 +103,53 @@ describe("editorLanguage", () => {
     });
   });
 
-  describe("getLanguageExtension", () => {
+  describe("getLanguageId", () => {
     it("returns null for unsupported file types", () => {
-      expect(getLanguageExtension("file.unknown")).toBeNull();
+      expect(getLanguageId("file.unknown")).toBeNull();
     });
 
     it("returns null for files without extension", () => {
-      expect(getLanguageExtension("Makefile")).toBeNull();
+      expect(getLanguageId("Makefile")).toBeNull();
     });
 
-    it("returns an extension for TypeScript files", () => {
-      expect(getLanguageExtension("main.ts")).not.toBeNull();
+    it("returns 'typescript' for TypeScript files", () => {
+      expect(getLanguageId("main.ts")).toBe("typescript");
     });
 
-    it("returns an extension for Python files", () => {
-      expect(getLanguageExtension("script.py")).not.toBeNull();
+    it("returns 'typescript' for TSX files", () => {
+      expect(getLanguageId("app.tsx")).toBe("typescript");
     });
 
-    it("returns an extension for Go files", () => {
-      expect(getLanguageExtension("main.go")).not.toBeNull();
+    it("returns 'javascript' for JS files", () => {
+      expect(getLanguageId("index.js")).toBe("javascript");
     });
 
-    it("returns an extension for Rust files", () => {
-      expect(getLanguageExtension("lib.rs")).not.toBeNull();
+    it("returns 'python' for Python files", () => {
+      expect(getLanguageId("script.py")).toBe("python");
+    });
+
+    it("returns 'go' for Go files", () => {
+      expect(getLanguageId("main.go")).toBe("go");
+    });
+
+    it("returns 'rust' for Rust files", () => {
+      expect(getLanguageId("lib.rs")).toBe("rust");
+    });
+
+    it("returns 'html' for HTML files", () => {
+      expect(getLanguageId("index.html")).toBe("html");
+    });
+
+    it("returns 'json' for JSON files", () => {
+      expect(getLanguageId("package.json")).toBe("json");
+    });
+
+    it("returns 'markdown' for Markdown files", () => {
+      expect(getLanguageId("README.md")).toBe("markdown");
     });
 
     it("resolves Windows-style paths correctly", () => {
-      expect(getLanguageExtension("C:\\Users\\dev\\project\\main.go")).not.toBeNull();
+      expect(getLanguageId("C:\\Users\\dev\\project\\main.go")).toBe("go");
     });
   });
 });

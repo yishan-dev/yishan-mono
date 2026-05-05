@@ -1,103 +1,101 @@
-import { angular } from "@codemirror/lang-angular";
-import { cpp } from "@codemirror/lang-cpp";
-import { css } from "@codemirror/lang-css";
-import { go } from "@codemirror/lang-go";
-import { html } from "@codemirror/lang-html";
-import { java } from "@codemirror/lang-java";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { less } from "@codemirror/lang-less";
-import { markdown } from "@codemirror/lang-markdown";
-import { php } from "@codemirror/lang-php";
-import { python } from "@codemirror/lang-python";
-import { rust } from "@codemirror/lang-rust";
-import { sass } from "@codemirror/lang-sass";
-import { sql } from "@codemirror/lang-sql";
-import { vue } from "@codemirror/lang-vue";
-import { wast } from "@codemirror/lang-wast";
-import { xml } from "@codemirror/lang-xml";
-import { yaml } from "@codemirror/lang-yaml";
-import type { Extension } from "@codemirror/state";
-
-type LanguageFactory = () => Extension;
-
 /**
- * Maps file extensions to CodeMirror language support factories.
+ * Maps file extensions to Monaco Editor language identifiers.
  *
- * Each factory is called once per editor instance to produce a fresh
- * extension. Factories (rather than pre-built instances) are used because
- * some language packs accept configuration options (e.g. jsx, typescript).
+ * Monaco ships with built-in tokenizers for all languages listed here, so no
+ * extra language packs need to be imported.
  */
-const LANGUAGE_FACTORIES: Record<string, LanguageFactory> = {
+const LANGUAGE_MAP: Record<string, string> = {
   // JavaScript / TypeScript
-  js: () => javascript(),
-  jsx: () => javascript({ jsx: true }),
-  ts: () => javascript({ typescript: true }),
-  tsx: () => javascript({ jsx: true, typescript: true }),
-  mjs: () => javascript(),
-  mts: () => javascript({ typescript: true }),
-  cjs: () => javascript(),
-  cts: () => javascript({ typescript: true }),
+  js: "javascript",
+  jsx: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  ts: "typescript",
+  tsx: "typescript",
+  mts: "typescript",
+  cts: "typescript",
 
   // HTML
-  html: () => html(),
-  htm: () => html(),
+  html: "html",
+  htm: "html",
 
   // CSS
-  css: () => css(),
-  scss: () => sass({ indented: false }),
-  sass: () => sass({ indented: true }),
-  less: () => less(),
+  css: "css",
+  scss: "scss",
+  sass: "scss",
+  less: "less",
 
   // Data / Config
-  json: () => json(),
-  yaml: () => yaml(),
-  yml: () => yaml(),
-  xml: () => xml(),
-  svg: () => xml(),
+  json: "json",
+  yaml: "yaml",
+  yml: "yaml",
+  xml: "xml",
+  svg: "xml",
 
   // Markdown
-  md: () => markdown(),
-  mdx: () => markdown(),
+  md: "markdown",
+  mdx: "markdown",
 
   // Python
-  py: () => python(),
-  pyi: () => python(),
-  pyw: () => python(),
+  py: "python",
+  pyi: "python",
+  pyw: "python",
 
   // Rust
-  rs: () => rust(),
+  rs: "rust",
 
   // Go
-  go: () => go(),
+  go: "go",
 
   // Java
-  java: () => java(),
+  java: "java",
 
   // C / C++
-  c: () => cpp(),
-  h: () => cpp(),
-  cpp: () => cpp(),
-  cc: () => cpp(),
-  cxx: () => cpp(),
-  hpp: () => cpp(),
-  hxx: () => cpp(),
+  c: "c",
+  h: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  hpp: "cpp",
+  hxx: "cpp",
 
   // SQL
-  sql: () => sql(),
+  sql: "sql",
 
   // PHP
-  php: () => php(),
+  php: "php",
 
   // WebAssembly Text
-  wat: () => wast(),
-  wast: () => wast(),
+  wat: "wasm",
+  wast: "wasm",
 
-  // Vue
-  vue: () => vue(),
+  // Vue (Monaco doesn't have a built-in Vue mode; fall back to HTML)
+  vue: "html",
 
-  // Angular
-  ng: () => angular(),
+  // Angular (fall back to HTML)
+  ng: "html",
+
+  // Shell
+  sh: "shell",
+  bash: "shell",
+  zsh: "shell",
+
+  // Ruby
+  rb: "ruby",
+
+  // Swift
+  swift: "swift",
+
+  // Kotlin
+  kt: "kotlin",
+  kts: "kotlin",
+
+  // Dockerfile
+  dockerfile: "dockerfile",
+
+  // GraphQL
+  graphql: "graphql",
+  gql: "graphql",
 };
 
 /**
@@ -116,21 +114,20 @@ export function getFileExtension(path: string): string {
 }
 
 /**
- * Returns the CodeMirror language extension for the given file path,
- * or `null` when no language pack is available (graceful fallback).
+ * Returns the Monaco language identifier for the given file path,
+ * or `null` when no language mapping is available (graceful fallback).
  */
-export function getLanguageExtension(path: string): Extension | null {
+export function getLanguageId(path: string): string | null {
   const ext = getFileExtension(path);
-  const factory = LANGUAGE_FACTORIES[ext];
-  return factory ? factory() : null;
+  return LANGUAGE_MAP[ext] ?? null;
 }
 
 /** Returns true when the registry has support for the given file path's extension. */
 export function isLanguageSupported(path: string): boolean {
-  return getFileExtension(path) in LANGUAGE_FACTORIES;
+  return getFileExtension(path) in LANGUAGE_MAP;
 }
 
 /** Returns the list of supported file extensions. Mainly useful for tests. */
 export function getSupportedExtensions(): string[] {
-  return Object.keys(LANGUAGE_FACTORIES);
+  return Object.keys(LANGUAGE_MAP);
 }

@@ -6,162 +6,114 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppTheme } from "../theme";
 import { FileEditor } from "./FileEditor";
 
-const mockStateRef: {
-  latestExtensions: unknown[];
-  editorDocText: string;
-  editorStateCreateCount: number;
+const mockEditorState: {
+  editorValue: string;
   editorFocus: () => void;
-  updateListener: null | ((update: { docChanged: boolean; state: { doc: { toString: () => string } } }) => void);
-  keymapRun: null | (() => boolean);
+  addCommandCalls: Array<{ keybinding: number; handler: () => void }>;
+  contentChangeListener: null | (() => void);
+  disposeCount: number;
+  createCount: number;
+  createOptions: unknown;
+  lastModelLanguage: string | undefined;
+  lastModelUri: unknown;
 } = {
-  latestExtensions: [],
-  editorDocText: "",
-  editorStateCreateCount: 0,
+  editorValue: "",
   editorFocus: vi.fn(),
-  updateListener: null,
-  keymapRun: null,
+  addCommandCalls: [],
+  contentChangeListener: null,
+  disposeCount: 0,
+  createCount: 0,
+  createOptions: null,
+  lastModelLanguage: undefined,
+  lastModelUri: null,
 };
 
-vi.mock("../helpers/editorLanguage", () => ({
-  getLanguageExtension: (path: string) => {
-    if (path.endsWith(".unknown")) return null;
-    return { __kind: "languageExtension" };
-  },
-}));
+vi.mock("../helpers/monacoSetup", () => ({
+  monaco: {
+    KeyMod: { CtrlCmd: 2048 },
+    KeyCode: { KeyS: 49 },
+    Uri: {
+      file: (path: string) => ({ scheme: "file", path }),
+    },
+    editor: {
+      create: (container: HTMLElement, options: Record<string, unknown>) => {
+        mockEditorState.createCount += 1;
+        mockEditorState.createOptions = options;
 
-vi.mock("@codemirror/commands", () => ({
-  indentWithTab: { __kind: "indentWithTab", key: "Tab" },
-}));
-
-vi.mock("@codemirror/state", () => ({
-  EditorState: {
-    create: (input: { extensions?: unknown[] }) => {
-      mockStateRef.editorStateCreateCount += 1;
-      mockStateRef.latestExtensions = input.extensions ?? [];
-      for (const extension of mockStateRef.latestExtensions) {
-        const record = extension as {
-          __kind?: string;
-          listener?: typeof mockStateRef.updateListener;
-          bindings?: unknown[];
+        return {
+          getValue: () => mockEditorState.editorValue,
+          setValue: (value: string) => {
+            mockEditorState.editorValue = value;
+          },
+          focus: () => mockEditorState.editorFocus(),
+          addCommand: (keybinding: number, handler: () => void) => {
+            mockEditorState.addCommandCalls.push({ keybinding, handler });
+          },
+          onDidChangeModelContent: (listener: () => void) => {
+            mockEditorState.contentChangeListener = listener;
+            return { dispose: vi.fn() };
+          },
+          dispose: () => {
+            mockEditorState.disposeCount += 1;
+          },
         };
-        if (record.__kind === "updateListener" && typeof record.listener === "function") {
-          mockStateRef.updateListener = record.listener;
-        }
-
-        if (record.__kind === "keymap") {
-          const saveBinding = (record.bindings ?? []).find(
-            (b) => (b as { key?: string }).key === "Mod-s",
-          ) as { run?: () => boolean } | undefined;
-          if (saveBinding?.run) {
-            mockStateRef.keymapRun = saveBinding.run;
-          }
-        }
-      }
-      return {
-        doc: {
-          toString: () => mockStateRef.editorDocText,
-        },
-      };
-    },
-  },
-}));
-
-vi.mock("@codemirror/language", () => ({
-  HighlightStyle: {
-    define: (styles: unknown[]) => ({ __kind: "highlightStyle", styles }),
-  },
-  syntaxHighlighting: (style: unknown) => ({ __kind: "syntaxHighlighting", style }),
-}));
-
-vi.mock("@lezer/highlight", () => {
-  const passthrough = new Proxy(
-    {},
-    {
-      get: (_target, property) => String(property),
-    },
-  );
-
-  return {
-    tags: new Proxy(passthrough, {
-      get: (_target, property) => {
-        if (
-          property === "function" ||
-          property === "constant" ||
-          property === "standard" ||
-          property === "special" ||
-          property === "definition"
-        ) {
-          return (value: unknown) => value;
-        }
-
-        return String(property);
       },
-    }),
-  };
-});
-
-vi.mock("@codemirror/view", () => ({
-  keymap: {
-    of: (bindings: unknown[]) => ({ __kind: "keymap", bindings }),
+      createModel: (value: string, language?: string, uri?: unknown) => {
+        mockEditorState.editorValue = value;
+        mockEditorState.lastModelLanguage = language;
+        mockEditorState.lastModelUri = uri;
+        return {
+          setValue: (v: string) => {
+            mockEditorState.editorValue = v;
+          },
+          dispose: vi.fn(),
+        };
+      },
+      getModel: () => null,
+      setModelLanguage: vi.fn(),
+      defineTheme: vi.fn(),
+      setTheme: vi.fn(),
+    },
   },
 }));
 
-vi.mock("codemirror", () => {
-  class MockEditorView {
-    static lineWrapping = { __kind: "lineWrapping" };
-
-    static updateListener = {
-      of: (listener: (update: { docChanged: boolean; state: { doc: { toString: () => string } } }) => void) => ({
-        __kind: "updateListener",
-        listener,
-      }),
-    };
-
-    static theme() {
-      return { __kind: "theme" };
-    }
-
-    state: { doc: { toString: () => string } };
-
-    constructor(input: { state: { doc: { toString: () => string } } }) {
-      this.state = input.state;
-    }
-
-    dispatch() {
-      return undefined;
-    }
-
-    focus() {
-      mockStateRef.editorFocus();
-    }
-
-    destroy() {
-      return undefined;
-    }
-  }
-
-  return {
-    EditorView: MockEditorView,
-    basicSetup: { __kind: "basicSetup" },
-  };
-});
+vi.mock("../helpers/editorLanguage", () => ({
+  getLanguageId: (path: string) => {
+    if (path.endsWith(".unknown")) return null;
+    if (path.endsWith(".ts")) return "typescript";
+    if (path.endsWith(".py")) return "python";
+    return "plaintext";
+  },
+}));
 
 afterEach(() => {
   cleanup();
-  mockStateRef.latestExtensions = [];
-  mockStateRef.editorDocText = "";
-  mockStateRef.editorStateCreateCount = 0;
-  mockStateRef.editorFocus = vi.fn();
-  mockStateRef.updateListener = null;
-  mockStateRef.keymapRun = null;
+  mockEditorState.editorValue = "";
+  mockEditorState.editorFocus = vi.fn();
+  mockEditorState.addCommandCalls = [];
+  mockEditorState.contentChangeListener = null;
+  mockEditorState.disposeCount = 0;
+  mockEditorState.createCount = 0;
+  mockEditorState.createOptions = null;
+  mockEditorState.lastModelLanguage = undefined;
+  mockEditorState.lastModelUri = null;
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
 describe("FileEditor", () => {
-  it("triggers save callback on Mod+S binding", () => {
+  it("creates a Monaco editor on mount", () => {
+    render(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor path="src/a.ts" content="initial" />
+      </ThemeProvider>,
+    );
+
+    expect(mockEditorState.createCount).toBe(1);
+  });
+
+  it("triggers save callback on Cmd+S binding", () => {
     const onSave = vi.fn();
-    mockStateRef.editorDocText = "saved text";
 
     render(
       <ThemeProvider theme={createAppTheme("dark")}>
@@ -169,10 +121,13 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.keymapRun).toBeTruthy();
-    const handled = mockStateRef.keymapRun?.();
+    // Simulate the user editing the document after mount.
+    mockEditorState.editorValue = "saved text";
 
-    expect(handled).toBe(true);
+    const saveCommand = mockEditorState.addCommandCalls.find((c) => c.keybinding === (2048 | 49));
+    expect(saveCommand).toBeTruthy();
+    saveCommand?.handler();
+
     expect(onSave).toHaveBeenCalledWith("saved text");
   });
 
@@ -185,79 +140,63 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.updateListener).toBeTruthy();
-    mockStateRef.updateListener?.({
-      docChanged: true,
-      state: {
-        doc: {
-          toString: () => "next text",
-        },
-      },
-    });
+    // Simulate the user editing the document after mount.
+    mockEditorState.editorValue = "next text";
+
+    expect(mockEditorState.contentChangeListener).toBeTruthy();
+    mockEditorState.contentChangeListener?.();
 
     expect(onContentChange).toHaveBeenCalledWith("next text");
   });
 
-  it("registers syntax highlighting extension", () => {
+  it("creates model with the correct language for supported files", () => {
     render(
       <ThemeProvider theme={createAppTheme("dark")}>
         <FileEditor path="src/a.ts" content="initial" />
       </ThemeProvider>,
     );
 
-    const hasSyntaxHighlighting = mockStateRef.latestExtensions.some(
-      (extension) => (extension as { __kind?: string }).__kind === "syntaxHighlighting",
-    );
-
-    expect(hasSyntaxHighlighting).toBe(true);
+    expect(mockEditorState.lastModelLanguage).toBe("typescript");
   });
 
-  it("includes the language extension for supported files", () => {
-    render(
-      <ThemeProvider theme={createAppTheme("dark")}>
-        <FileEditor path="src/a.ts" content="initial" />
-      </ThemeProvider>,
-    );
-
-    const hasLangExtension = mockStateRef.latestExtensions.some(
-      (extension) => (extension as { __kind?: string }).__kind === "languageExtension",
-    );
-
-    expect(hasLangExtension).toBe(true);
-  });
-
-  it("renders without language extension for unsupported files", () => {
+  it("creates model without language for unsupported files", () => {
     render(
       <ThemeProvider theme={createAppTheme("dark")}>
         <FileEditor path="data/file.unknown" content="initial" />
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorStateCreateCount).toBe(1);
-
-    const hasLangExtension = mockStateRef.latestExtensions.some(
-      (extension) => (extension as { __kind?: string }).__kind === "languageExtension",
-    );
-    expect(hasLangExtension).toBe(false);
+    expect(mockEditorState.lastModelLanguage).toBeUndefined();
   });
 
-  it("keeps one editor instance across rerenders in same theme", () => {
-    const onContentChange = vi.fn();
-    const { rerender } = render(
+  it("creates model with file:// URI matching the path", () => {
+    render(
       <ThemeProvider theme={createAppTheme("dark")}>
-        <FileEditor path="src/a.ts" content="initial" onContentChange={onContentChange} />
+        <FileEditor path="/Users/dev/project/main.ts" content="initial" />
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorStateCreateCount).toBe(1);
+    expect(mockEditorState.lastModelUri).toEqual({ scheme: "file", path: "/Users/dev/project/main.ts" });
+  });
 
-    rerender(
+  it("uses dark theme when MUI theme is dark", () => {
+    render(
       <ThemeProvider theme={createAppTheme("dark")}>
-        <FileEditor path="src/a.ts" content="next" onContentChange={onContentChange} />
+        <FileEditor path="src/a.ts" content="initial" />
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorStateCreateCount).toBe(1);
+    expect((mockEditorState.createOptions as { theme?: string })?.theme).toBe("yishan-dark");
+  });
+
+  it("uses light theme when MUI theme is light", () => {
+    render(
+      <ThemeProvider theme={createAppTheme("light")}>
+        <FileEditor path="src/a.ts" content="initial" />
+      </ThemeProvider>,
+    );
+
+    expect((mockEditorState.createOptions as { theme?: string })?.theme).toBe("yishan-light");
   });
 
   it("focuses the editor when requested", () => {
@@ -273,7 +212,7 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorFocus).not.toHaveBeenCalled();
+    expect(mockEditorState.editorFocus).not.toHaveBeenCalled();
 
     rerender(
       <ThemeProvider theme={createAppTheme("dark")}>
@@ -281,7 +220,7 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorFocus).toHaveBeenCalledTimes(1);
+    expect(mockEditorState.editorFocus).toHaveBeenCalledTimes(1);
   });
 
   it("recreates editor when path changes", () => {
@@ -291,7 +230,7 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorStateCreateCount).toBe(1);
+    expect(mockEditorState.createCount).toBe(1);
 
     rerender(
       <ThemeProvider theme={createAppTheme("dark")}>
@@ -299,6 +238,17 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    expect(mockStateRef.editorStateCreateCount).toBe(2);
+    expect(mockEditorState.createCount).toBe(2);
+    expect(mockEditorState.disposeCount).toBe(1);
+  });
+
+  it("displays the file path in the header", () => {
+    const { getByText } = render(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor path="src/components/App.tsx" content="initial" />
+      </ThemeProvider>,
+    );
+
+    expect(getByText("src/components/App.tsx")).toBeTruthy();
   });
 });

@@ -89,7 +89,7 @@ function createFileContent(path: string): string {
   }
 
   if (extension === "md") {
-    return [`# ${fileName}`, "", `Opened from ${path}`, "", "This is mock file content rendered in CodeMirror."].join(
+    return [`# ${fileName}`, "", `Opened from ${path}`, "", "This is mock file content rendered in Monaco Editor."].join(
       "\n",
     );
   }
