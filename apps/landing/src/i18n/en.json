@@ -56,7 +56,7 @@
   "cta.github": "View on GitHub",
 
   "footer.tagline": "Workspace layer for agent-driven development",
-  "footer.desc": "Built for developers who want less fragmentation, lower reset cost, and a calmer way to work with agents.",
+  "footer.desc": "Built for developers who want less fragmentation, lower reset cost, and a calmer way to work with agents",
   "footer.product": "Product",
   "footer.links": "Links",
   "footer.company": "Company",
@@ -64,6 +64,6 @@
   "footer.about": "About",
   "footer.contact": "Contact",
   "footer.privacy": "Privacy",
-  "footer.copyright": "\u00a9 2026 Yishan. All rights reserved.",
-  "footer.slogan": "Make development work feel lighter."
+  "footer.copyright": "\u00a9 2026 Yishan. All rights reserved",
+  "footer.slogan": "Make development work feel lighter"
 }

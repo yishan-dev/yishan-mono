@@ -56,7 +56,7 @@
   "cta.github": "在 GitHub 查看",
 
   "footer.tagline": "为 Agent 驱动开发打造的工作区层",
-  "footer.desc": "为希望减少碎片化、降低重置成本、以更平静的方式与 Agent 工作的开发者而构建。",
+  "footer.desc": "为希望减少碎片化、降低重置成本、以更平静的方式与 Agent 工作的开发者而构建",
   "footer.product": "产品",
   "footer.links": "链接",
   "footer.company": "公司",
@@ -64,6 +64,6 @@
   "footer.about": "关于",
   "footer.contact": "联系我们",
   "footer.privacy": "隐私政策",
-  "footer.copyright": "© 2026 Yishan。保留所有权利。",
-  "footer.slogan": "让开发工作更轻松。"
+  "footer.copyright": "© 2026 Yishan。保留所有权利",
+  "footer.slogan": "让开发工作更轻松"
 }
