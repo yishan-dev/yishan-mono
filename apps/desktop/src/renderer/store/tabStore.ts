@@ -9,7 +9,7 @@ import {
   failSessionTabInitState,
   markFileTabSavedState,
   openTabState,
-  renameFileTabPathState,
+  renameTabsForEntryRenameState,
   renameTabState,
   reorderTabState,
   resolveSessionTabState,
@@ -47,7 +47,7 @@ export type TabStoreState = {
   toggleTabPinned: (tabId: string) => void;
   reorderTab: (draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
   renameTab: (tabId: string, title: string, options?: { userRenamed?: boolean }) => void;
-  renameFileTabPath: (tabId: string, nextPath: string) => void;
+  renameTabsForEntryRename: (workspaceId: string, fromPath: string, toPath: string) => void;
   updateFileTabContent: (tabId: string, content: string) => void;
   markFileTabSaved: (tabId: string) => void;
 };
@@ -235,8 +235,8 @@ export const tabStore = create<TabStoreState>()(
     renameTab: (tabId, title, options) => {
       set((state) => renameTabState(state, tabId, title, options) ?? state);
     },
-    renameFileTabPath: (tabId, nextPath) => {
-      set((state) => renameFileTabPathState(state, tabId, nextPath) ?? state);
+    renameTabsForEntryRename: (workspaceId, fromPath, toPath) => {
+      set((state) => renameTabsForEntryRenameState(state, workspaceId, fromPath, toPath) ?? state);
     },
     updateFileTabContent: (tabId, content) => {
       set((state) => updateFileTabContentState(state, tabId, content));

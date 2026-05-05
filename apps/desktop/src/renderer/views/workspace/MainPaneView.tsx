@@ -106,7 +106,7 @@ export function MainPaneView() {
     toggleTabPinned,
     reorderTab,
     renameTab,
-    renameFileTabPath,
+    renameTabsForEntryRename,
     renameEntry,
     updateFileTabContent,
     markFileTabSaved,
@@ -241,7 +241,7 @@ export function MainPaneView() {
                 fromRelativePath: tab.data.path,
                 toRelativePath: targetPath,
               });
-              renameFileTabPath(tabId, targetPath);
+              renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
             } catch (error) {
               console.error("Failed to rename workspace file from tab", error);
             }

@@ -69,7 +69,7 @@ import {
   createTab as createTabCommand,
   markFileTabSaved as markFileTabSavedCommand,
   openTab as openTabCommand,
-  renameFileTabPath as renameFileTabPathCommand,
+  renameTabsForEntryRename as renameTabsForEntryRenameCommand,
   renameTab as renameTabCommand,
   reorderTab as reorderTabCommand,
   setSelectedTab as setSelectedTabCommand,
@@ -214,7 +214,7 @@ export type Commands = {
   toggleTabPinned: typeof toggleTabPinnedCommand;
   reorderTab: typeof reorderTabCommand;
   renameTab: typeof renameTabCommand;
-  renameFileTabPath: typeof renameFileTabPathCommand;
+  renameTabsForEntryRename: typeof renameTabsForEntryRenameCommand;
   updateFileTabContent: typeof updateFileTabContentCommand;
   markFileTabSaved: typeof markFileTabSavedCommand;
 };
@@ -310,7 +310,7 @@ export function useCommands(): Commands {
       toggleTabPinned: toggleTabPinnedCommand,
       reorderTab: reorderTabCommand,
       renameTab: renameTabCommand,
-      renameFileTabPath: renameFileTabPathCommand,
+      renameTabsForEntryRename: renameTabsForEntryRenameCommand,
       updateFileTabContent: updateFileTabContentCommand,
       markFileTabSaved: markFileTabSavedCommand,
       refreshWorkspaceGitChanges: refreshWorkspaceGitChangesCommand,

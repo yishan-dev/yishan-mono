@@ -170,9 +170,9 @@ export function renameTab(tabId: string, title: string, options?: { userRenamed?
   readTabStoreState().renameTab(tabId, title, options);
 }
 
-/** Updates one file tab path after a successful file-system rename. */
-export function renameFileTabPath(tabId: string, nextPath: string) {
-  readTabStoreState().renameFileTabPath(tabId, nextPath);
+/** Applies a file-tree rename mapping to related open tabs. */
+export function renameTabsForEntryRename(workspaceId: string, fromPath: string, toPath: string) {
+  readTabStoreState().renameTabsForEntryRename(workspaceId, fromPath, toPath);
 }
 
 /** Updates one file tab content and dirtiness state. */

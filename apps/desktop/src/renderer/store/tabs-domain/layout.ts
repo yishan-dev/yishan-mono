@@ -1,5 +1,16 @@
 import type { WorkspaceTabStateSlice } from "./types";
 
+function remapPathByRename(path: string, fromPath: string, toPath: string): string | null {
+  if (path === fromPath) {
+    return toPath;
+  }
+  const prefix = `${fromPath}/`;
+  if (!path.startsWith(prefix)) {
+    return null;
+  }
+  return `${toPath}/${path.slice(prefix.length)}`;
+}
+
 /** Toggles pinned state for one tab id. */
 export function toggleTabPinnedState(state: WorkspaceTabStateSlice, tabId: string): Partial<WorkspaceTabStateSlice> {
   return {
@@ -39,39 +50,48 @@ export function renameTabState(
   };
 }
 
-/** Renames one open file tab path and keeps title synced to the basename. */
-export function renameFileTabPathState(
+/** Applies one file-tree rename to open file and diff tabs in one workspace. */
+export function renameTabsForEntryRenameState(
   state: WorkspaceTabStateSlice,
-  tabId: string,
-  nextPath: string,
+  workspaceId: string,
+  fromPath: string,
+  toPath: string,
 ): Partial<WorkspaceTabStateSlice> | null {
-  const normalizedPath = nextPath.trim();
-  if (!normalizedPath) {
+  if (!workspaceId || !fromPath || !toPath || fromPath === toPath) {
     return null;
   }
 
-  const targetTab = state.tabs.find((tab) => tab.id === tabId && tab.kind === "file");
-  if (!targetTab || targetTab.data.path === normalizedPath) {
+  let didChange = false;
+  const tabs = state.tabs.map((tab) => {
+    if (tab.workspaceId !== workspaceId) {
+      return tab;
+    }
+    if (tab.kind !== "file" && tab.kind !== "diff") {
+      return tab;
+    }
+
+    const remappedPath = remapPathByRename(tab.data.path, fromPath, toPath);
+    if (!remappedPath || remappedPath === tab.data.path) {
+      return tab;
+    }
+
+    const nextTitle = remappedPath.split("/").filter(Boolean).at(-1) ?? remappedPath;
+    didChange = true;
+    return {
+      ...tab,
+      title: nextTitle,
+      data: {
+        ...tab.data,
+        path: remappedPath,
+      },
+    };
+  });
+
+  if (!didChange) {
     return null;
   }
 
-  const segments = normalizedPath.split("/").filter(Boolean);
-  const nextTitle = segments.at(-1) ?? normalizedPath;
-
-  return {
-    tabs: state.tabs.map((tab) =>
-      tab.id === tabId && tab.kind === "file"
-        ? {
-            ...tab,
-            title: nextTitle,
-            data: {
-              ...tab.data,
-              path: normalizedPath,
-            },
-          }
-        : tab,
-    ),
-  };
+  return { tabs };
 }
 
 /** Updates editable content for one file tab and recomputes dirty state. */
