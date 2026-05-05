@@ -60,6 +60,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       YISHAN_CLI_VERSION: ${{ needs.resolve-version.outputs.version }}
+      YISHAN_APP_VERSION: ${{ needs.resolve-version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -122,7 +123,11 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bunx electron-builder --publish never -c.electronVersion=${{ steps.electron.outputs.version }}
+        run: >-
+          bunx electron-builder
+          --publish never
+          -c.electronVersion=${{ steps.electron.outputs.version }}
+          -c.extraMetadata.version=${{ needs.resolve-version.outputs.version }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
