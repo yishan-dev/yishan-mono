@@ -1,0 +1,9 @@
+name = "yishan-landing"
+compatibility_date = "2025-04-01"
+
+[[routes]]
+pattern = "yishan.io"
+custom_domain = true
+
+[assets]
+directory = "./out"
