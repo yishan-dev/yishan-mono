@@ -303,7 +303,7 @@ describe("tabCommands", () => {
     expect(openTabState).toHaveBeenCalledWith({ workspaceId: "workspace-1", kind: "file", path: "a.ts", content: "x" });
     expect(toggleTabPinnedState).toHaveBeenCalledWith("tab-1");
     expect(reorderTabState).toHaveBeenCalledWith("tab-1", "tab-2", "after");
-    expect(renameTabState).toHaveBeenCalledWith("tab-1", "Renamed");
+    expect(renameTabState).toHaveBeenCalledWith("tab-1", "Renamed", undefined);
     expect(updateFileTabContentState).toHaveBeenCalledWith("tab-1", "next");
     expect(markFileTabSavedState).toHaveBeenCalledWith("tab-1");
   });

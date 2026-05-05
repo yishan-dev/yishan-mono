@@ -422,7 +422,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
 
     return state.fileTreeChangedRelativePathsByWorktreePath?.[workspaceWorktreePath] ?? EMPTY_CHANGED_RELATIVE_PATHS;
   });
-  const { openTab, closeTab, setLastUsedExternalAppId } = useCommands();
+  const { openTab, closeTab, renameTabsForEntryRename, setLastUsedExternalAppId } = useCommands();
   const tabs = tabStore((state) => state.tabs);
   const repoFiles = useMemo(() => mapWorkspaceEntryPaths(repoEntries), [repoEntries]);
   const ignoredRepoPaths = useMemo(() => mapIgnoredWorkspaceEntryPaths(repoEntries), [repoEntries]);
@@ -1105,6 +1105,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
             fromRelativePath: latestUndoAction.toPath,
             toRelativePath: latestUndoAction.fromPath,
           });
+          renameTabsForEntryRename(selectedWorkspaceId, latestUndoAction.toPath, latestUndoAction.fromPath);
           break;
         }
         case "move": {
@@ -1143,7 +1144,15 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
     } finally {
       isApplyingUndoRef.current = false;
     }
-  }, [closeTab, reloadVisibleTree, selectedWorkspaceWorktreePath, tabs, undoStack]);
+  }, [
+    closeTab,
+    reloadVisibleTree,
+    renameTabsForEntryRename,
+    selectedWorkspaceId,
+    selectedWorkspaceWorktreePath,
+    tabs,
+    undoStack,
+  ]);
 
   /** Deletes one entry immediately and records undo state for files. */
   const handleDeleteEntry = useCallback(
@@ -1275,6 +1284,8 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
           toRelativePath: targetPath,
         });
 
+        renameTabsForEntryRename(selectedWorkspaceId, path, targetPath);
+
         pushUndoAction({
           kind: "rename",
           fromPath: path,
@@ -1285,7 +1296,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
         console.error("Failed to rename workspace entry", error);
       }
     },
-    [pushUndoAction, reloadVisibleTree, selectedWorkspaceWorktreePath],
+    [pushUndoAction, reloadVisibleTree, renameTabsForEntryRename, selectedWorkspaceId, selectedWorkspaceWorktreePath],
   );
 
   const onCopyPath = useCallback(

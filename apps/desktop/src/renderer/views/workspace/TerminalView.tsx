@@ -3,7 +3,7 @@ import type { FitAddon } from "@xterm/addon-fit";
 import type { ISearchOptions, SearchAddon } from "@xterm/addon-search";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useCommands } from "../../hooks/useCommands";
 import { tabStore } from "../../store/tabStore";
 import type { WorkspaceTab } from "../../store/types";
@@ -31,7 +31,7 @@ const ASCII_BELL_CODE = 7;
 const ASCII_STRING_TERMINATOR_CODE = 156;
 
 /** Renders an xterm instance and binds it to a daemon-backed terminal session. */
-export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
+export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -42,6 +42,7 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
   const pendingCommandInputRef = useRef("");
   const readIndexRef = useRef(0);
   const didRequestCloseRef = useRef(false);
+  const lastAppliedTitleRef = useRef<string>("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -55,30 +56,49 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
     writeTerminalInput,
   } = useCommands();
 
+  /** Returns true when the user has manually renamed this terminal tab. */
+  const isUserRenamed = useCallback((): boolean => {
+    const tab = tabStore
+      .getState()
+      .tabs.find(
+        (candidate): candidate is Extract<WorkspaceTab, { kind: "terminal" }> =>
+          candidate.id === tabId && candidate.kind === "terminal",
+      );
+    return tab?.data.userRenamed === true;
+  }, [tabId]);
+
   /** Applies one readable command-derived title to this terminal tab. */
   const updateTerminalTabTitleFromCommand = useCallback(
     (command: string): void => {
+      if (isUserRenamed()) {
+        return;
+      }
       const title = formatTerminalCommandTitle(command);
-      if (!title) {
+      if (!title || title === lastAppliedTitleRef.current) {
         return;
       }
 
+      lastAppliedTitleRef.current = title;
       renameTab(tabId, title);
     },
-    [renameTab, tabId],
+    [renameTab, tabId, isUserRenamed],
   );
 
   /** Applies one readable current-directory title to this terminal tab. */
   const updateTerminalTabTitleFromPath = useCallback(
     (path: string | undefined): void => {
+      if (isUserRenamed()) {
+        return;
+      }
       const title = formatTerminalPathTitle(path);
-      if (!title) {
+      if (!title || title === lastAppliedTitleRef.current) {
         return;
       }
 
+      lastAppliedTitleRef.current = title;
       renameTab(tabId, title);
     },
-    [renameTab, tabId],
+    [renameTab, tabId, isUserRenamed],
   );
 
   /** Clears current search decorations in the active terminal session. */
@@ -538,11 +558,11 @@ export function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) 
           >
             Close
           </IconButton>
-        </Stack>
+         </Stack>
       ) : null}
     </Box>
   );
-}
+});
 
 /** Reports one terminal async error without breaking render lifecycle. */
 function reportTerminalAsyncError(action: string, error: unknown): void {

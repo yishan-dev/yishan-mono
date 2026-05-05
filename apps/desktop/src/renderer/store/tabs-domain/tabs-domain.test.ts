@@ -7,6 +7,8 @@ import {
   createSessionTabOptimisticState,
   markFileTabSavedState,
   openTabState,
+  renameTabsForEntryRenameState,
+  renameTabState,
   reorderTabState,
   resolveSessionTabState,
   updateFileTabContentState,
@@ -343,5 +345,100 @@ describe("tabs-domain layout and session", () => {
 
     expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.savedContent : undefined).toBe("a2");
     expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.isDirty : undefined).toBe(false);
+  });
+});
+
+describe("tabs-domain rename", () => {
+  it("renames a tab and returns updated tabs", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "session-1", "New Title");
+
+    expect(patch).toBeTruthy();
+    const renamedTab = patch?.tabs?.find((tab) => tab.id === "session-1");
+    expect(renamedTab?.title).toBe("New Title");
+  });
+
+  it("returns null when title is unchanged", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "session-1", "Untitled 1");
+
+    expect(patch).toBeNull();
+  });
+
+  it("returns null for non-existent tab id", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "non-existent", "New Title");
+
+    expect(patch).toBeNull();
+  });
+
+  it("does not modify other tabs when renaming one tab", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "session-1", "Renamed");
+
+    expect(patch).toBeTruthy();
+    const unchanged = patch?.tabs?.find((tab) => tab.id === "file-1");
+    expect(unchanged?.title).toBe("a.ts");
+  });
+
+  it("sets userRenamed on terminal tabs when option is provided", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "terminal-1", "Custom Name", { userRenamed: true });
+
+    expect(patch).toBeTruthy();
+    const renamedTab = patch?.tabs?.find((tab) => tab.id === "terminal-1");
+    expect(renamedTab?.title).toBe("Custom Name");
+    expect(renamedTab?.kind === "terminal" ? renamedTab.data.userRenamed : undefined).toBe(true);
+  });
+
+  it("does not set userRenamed on non-terminal tabs", () => {
+    const state = createBaseState();
+    const patch = renameTabState(state, "session-1", "New Title", { userRenamed: true });
+
+    expect(patch).toBeTruthy();
+    const renamedTab = patch?.tabs?.find((tab) => tab.id === "session-1");
+    expect(renamedTab?.title).toBe("New Title");
+    expect("userRenamed" in (renamedTab as any)?.data === false || (renamedTab as any)?.data?.userRenamed === undefined).toBe(true);
+  });
+
+  it("renames one file tab path and syncs title via entry-rename mapping", () => {
+    const state = createBaseState();
+    const patch = renameTabsForEntryRenameState(state, "workspace-1", "src/a.ts", "src/new-name.ts");
+
+    expect(patch).toBeTruthy();
+    const renamedTab = patch?.tabs?.find((tab) => tab.id === "file-1");
+    expect(renamedTab?.title).toBe("new-name.ts");
+    expect(renamedTab && renamedTab.kind === "file" ? renamedTab.data.path : undefined).toBe("src/new-name.ts");
+  });
+
+  it("updates open file and diff tabs when a file-tree path is renamed", () => {
+    const state = createBaseState();
+    const expanded: WorkspaceTabStateSlice = {
+      ...state,
+      tabs: [
+        ...state.tabs,
+        {
+          id: "diff-1",
+          workspaceId: "workspace-1",
+          title: "a.ts",
+          pinned: false,
+          kind: "diff",
+          data: {
+            path: "src/a.ts",
+            oldContent: "old",
+            newContent: "new",
+          },
+        },
+      ],
+    };
+
+    const patch = renameTabsForEntryRenameState(expanded, "workspace-1", "src/a.ts", "src/b.ts");
+    const renamedFile = patch?.tabs?.find((tab) => tab.id === "file-1");
+    const renamedDiff = patch?.tabs?.find((tab) => tab.id === "diff-1");
+
+    expect(renamedFile && renamedFile.kind === "file" ? renamedFile.data.path : undefined).toBe("src/b.ts");
+    expect(renamedFile?.title).toBe("b.ts");
+    expect(renamedDiff && renamedDiff.kind === "diff" ? renamedDiff.data.path : undefined).toBe("src/b.ts");
+    expect(renamedDiff?.title).toBe("b.ts");
   });
 });

@@ -102,6 +102,7 @@ export function TabBar({
   const tabItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const editingRef = useRef<HTMLDivElement | null>(null);
   const editingDraftRef = useRef("");
+  const renameCancelledRef = useRef(false);
 
   useEffect(() => {
     if (!editingTabId || !editingRef.current) {
@@ -155,7 +156,9 @@ export function TabBar({
   const beginRename = (tab: WorkspaceTab) => {
     setEditingTabId(tab.id);
     editingDraftRef.current = tab.title || untitledLabel;
-    onSelectTab(tab.id);
+    if (tab.id !== selectedTabId) {
+      onSelectTab(tab.id);
+    }
   };
 
   const commitRename = (tab: WorkspaceTab) => {
@@ -163,13 +166,23 @@ export function TabBar({
     if (nextTitle && nextTitle !== tab.title) {
       onRenameTab(tab.id, nextTitle);
     }
+    renameCancelledRef.current = true;
     setEditingTabId("");
     editingDraftRef.current = "";
   };
 
   const cancelRename = () => {
+    renameCancelledRef.current = true;
     setEditingTabId("");
     editingDraftRef.current = "";
+  };
+
+  const handleRenameBlur = (tab: WorkspaceTab) => {
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
+    commitRename(tab);
   };
 
   const closeContextMenu = () => {
@@ -184,7 +197,9 @@ export function TabBar({
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>, tab: WorkspaceTab) => {
     event.preventDefault();
     event.stopPropagation();
-    onSelectTab(tab.id);
+    if (tab.id !== selectedTabId) {
+      onSelectTab(tab.id);
+    }
     setContextMenu({
       mouseX: event.clientX,
       mouseY: event.clientY,
@@ -506,7 +521,7 @@ export function TabBar({
                     onInput={(event) => {
                       editingDraftRef.current = event.currentTarget.textContent ?? "";
                     }}
-                    onBlur={cancelRename}
+                    onBlur={() => handleRenameBlur(tab)}
                     sx={{
                       typography: "body2",
                       color: active ? "text.primary" : "text.secondary",
@@ -692,7 +707,7 @@ export function TabBar({
                       onInput={(event) => {
                         editingDraftRef.current = event.currentTarget.textContent ?? "";
                       }}
-                      onBlur={cancelRename}
+                      onBlur={() => handleRenameBlur(tab)}
                       sx={{
                         typography: "body2",
                         color: active ? "text.primary" : "text.secondary",
@@ -840,6 +855,7 @@ export function TabBar({
       <Menu
         open={Boolean(contextMenu)}
         onClose={closeContextMenu}
+        disableRestoreFocus
         anchorReference="anchorPosition"
         anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
       >

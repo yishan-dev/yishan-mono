@@ -1,6 +1,7 @@
 import { closeAllTabsState, closeOtherTabsState, closeTabState } from "./close";
 import {
   markFileTabSavedState,
+  renameTabsForEntryRenameState,
   renameTabState,
   reorderTabState,
   toggleTabPinnedState,
@@ -17,6 +18,7 @@ export {
   markFileTabSavedState,
   failSessionTabInitState,
   openTabState,
+  renameTabsForEntryRenameState,
   renameTabState,
   reorderTabState,
   resolveSessionTabState,

@@ -106,6 +106,8 @@ export function MainPaneView() {
     toggleTabPinned,
     reorderTab,
     renameTab,
+    renameTabsForEntryRename,
+    renameEntry,
     updateFileTabContent,
     markFileTabSaved,
     writeFile,
@@ -140,9 +142,6 @@ export function MainPaneView() {
 
   const handleSelectTab = (tabId: string) => {
     setSelectedTabId(tabId);
-    if (tabId === selectedTabId) {
-      setFocusContentRequestKey((requestKey) => requestKey + 1);
-    }
   };
 
   useEffect(() => {
@@ -213,7 +212,40 @@ export function MainPaneView() {
           onTogglePinTab={toggleTabPinned}
           onReorderTab={reorderTab}
           onCreateTab={handleCreateTab}
-          onRenameTab={renameTab}
+          onRenameTab={async (tabId, title) => {
+            const tab = workspaceTabs.find((item) => item.id === tabId);
+            if (!tab) {
+              return;
+            }
+
+            if (tab.kind !== "file") {
+              renameTab(tabId, title, { userRenamed: true });
+              return;
+            }
+
+            const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+            if (!workspaceWorktreePath) {
+              return;
+            }
+
+            const pathSegments = tab.data.path.split("/").filter(Boolean);
+            const parentPath = pathSegments.slice(0, -1).join("/");
+            const targetPath = parentPath ? `${parentPath}/${title}` : title;
+            if (targetPath === tab.data.path) {
+              return;
+            }
+
+            try {
+              await renameEntry({
+                workspaceWorktreePath,
+                fromRelativePath: tab.data.path,
+                toRelativePath: targetPath,
+              });
+              renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
+            } catch (error) {
+              console.error("Failed to rename workspace file from tab", error);
+            }
+          }}
           enabledAgentKinds={enabledAgentKinds}
           getTabIcon={(tab) => {
             const fullTab = workspaceTabs.find((item) => item.id === tab.id);

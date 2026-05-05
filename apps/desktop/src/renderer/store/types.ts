@@ -81,6 +81,8 @@ export type WorkspaceTabDataByKind = {
     sessionId?: string;
     launchCommand?: string;
     agentKind?: DesktopAgentKind;
+    /** When true, auto-rename from terminal commands/paths is suppressed. */
+    userRenamed?: boolean;
   };
 };
 
