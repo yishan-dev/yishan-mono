@@ -135,6 +135,8 @@ jobs:
             apps/desktop/release/*.deb
             apps/desktop/release/*.rpm
             apps/desktop/release/*.snap
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.yaml
           if-no-files-found: warn
 
   release:
@@ -160,9 +162,9 @@ jobs:
           version="${{ needs.resolve-version.outputs.version }}"
           tag="desktop-v${version}"
 
-          # Collect release files
+          # Collect release files (installers + auto-update manifests)
           shopt -s nullglob
-          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.rpm artifacts/*.snap)
+          files=(artifacts/*.dmg artifacts/*.zip artifacts/*.AppImage artifacts/*.deb artifacts/*.rpm artifacts/*.snap artifacts/*.yml artifacts/*.yaml)
           shopt -u nullglob
 
           # Delete existing release for this tag (re-runs / retries)
@@ -194,4 +196,9 @@ jobs:
           else
             gh release create "${args[@]}"
             echo "::warning::No distributable artifacts found to attach."
+          fi
+
+          # Verify auto-update manifests were uploaded
+          if ! gh release view "$tag" --json assets --jq '.assets[].name' | grep -qE '\.yml$'; then
+            echo "::warning::No .yml auto-update manifest found in release assets. Auto-update may not work."
           fi
