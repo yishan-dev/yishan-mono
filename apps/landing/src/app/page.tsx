@@ -45,7 +45,7 @@ export default function LandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt="Yishan logo" className="h-full w-full object-contain" />
             </div>
-            <div className="text-lg font-semibold tracking-wide text-[#E8ECE8]">Yishan</div>
+            <div className="text-lg font-semibold tracking-wide text-[#E8ECE8]">{t("brand")}</div>
           </div>
 
           <nav className="hidden items-center gap-8 text-sm text-[#A5B0A8] md:flex">
@@ -90,7 +90,7 @@ export default function LandingPage() {
             </h1>
 
             <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-[#2A342F] bg-[#151B18] px-4 py-2 text-sm text-[#A5B0A8]">
-              <span className="font-semibold text-[#E8ECE8]">Yishan</span>
+              <span className="font-semibold text-[#E8ECE8]">{t("brand")}</span>
               <span className="text-[#8FCB99]">/</span>
               <span>{t("hero.tagline")}</span>
             </div>
@@ -249,7 +249,7 @@ export default function LandingPage() {
                 <img src={logoUrl} alt="Yishan logo" className="h-full w-full object-contain" />
               </div>
               <div>
-                <div className="text-base font-semibold tracking-wide text-[#E8ECE8]">Yishan</div>
+                <div className="text-base font-semibold tracking-wide text-[#E8ECE8]">{t("brand")}</div>
                 <div className="text-xs text-[#A5B0A8]">{t("footer.tagline")}</div>
               </div>
             </div>

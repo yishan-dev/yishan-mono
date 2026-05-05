@@ -5,22 +5,30 @@ import { useI18n } from "@/i18n";
 
 type Platform = "mac-arm" | "mac-intel" | "linux-appimage" | "linux-deb" | "linux-rpm";
 
-interface PlatformInfo {
+interface PlatformOption {
   key: Platform;
   label: string;
   labelZh: string;
-  url: string;
+  pattern: RegExp;
 }
 
-const REPO = "https://github.com/yishan-io/yishan-mono/releases/latest/download";
-
-const platforms: PlatformInfo[] = [
-  { key: "mac-arm", label: "macOS (Apple Silicon)", labelZh: "macOS (Apple Silicon)", url: `${REPO}/Yishan-arm64.dmg` },
-  { key: "mac-intel", label: "macOS (Intel)", labelZh: "macOS (Intel)", url: `${REPO}/Yishan-x64.dmg` },
-  { key: "linux-appimage", label: "Linux (AppImage)", labelZh: "Linux (AppImage)", url: `${REPO}/Yishan-x86_64.AppImage` },
-  { key: "linux-deb", label: "Linux (.deb)", labelZh: "Linux (.deb)", url: `${REPO}/yishan_amd64.deb` },
-  { key: "linux-rpm", label: "Linux (.rpm)", labelZh: "Linux (.rpm)", url: `${REPO}/yishan-x86_64.rpm` },
+const platformOptions: PlatformOption[] = [
+  { key: "mac-arm", label: "macOS (Apple Silicon)", labelZh: "macOS (Apple Silicon)", pattern: /arm64\.dmg$/ },
+  { key: "mac-intel", label: "macOS (Intel)", labelZh: "macOS (Intel)", pattern: /x64\.dmg$/ },
+  { key: "linux-appimage", label: "Linux (AppImage)", labelZh: "Linux (AppImage)", pattern: /\.AppImage$/ },
+  { key: "linux-deb", label: "Linux (.deb)", labelZh: "Linux (.deb)", pattern: /\.deb$/ },
+  { key: "linux-rpm", label: "Linux (.rpm)", labelZh: "Linux (.rpm)", pattern: /\.rpm$/ },
 ];
+
+interface ReleaseAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface ReleaseInfo {
+  tag_name: string;
+  assets: ReleaseAsset[];
+}
 
 function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return "mac-arm";
@@ -29,11 +37,8 @@ function detectPlatform(): Platform {
   const platform = (navigator.platform || "").toLowerCase();
 
   if (ua.includes("mac") || platform.includes("mac")) {
-    // Detect Apple Silicon via WebGL renderer or platform hint
-    // navigator.userAgentData is available in some browsers
     const uaData = (navigator as unknown as { userAgentData?: { architecture?: string } }).userAgentData;
     if (uaData?.architecture === "arm") return "mac-arm";
-    // Fallback: newer Macs are mostly ARM
     return "mac-arm";
   }
 
@@ -41,8 +46,27 @@ function detectPlatform(): Platform {
     return "linux-appimage";
   }
 
-  // Default to macOS ARM
   return "mac-arm";
+}
+
+function resolveDownloadUrls(assets: ReleaseAsset[]): Record<Platform, string> {
+  const fallback = "https://github.com/yishan-io/yishan-mono/releases/latest";
+  const urls: Record<Platform, string> = {
+    "mac-arm": fallback,
+    "mac-intel": fallback,
+    "linux-appimage": fallback,
+    "linux-deb": fallback,
+    "linux-rpm": fallback,
+  };
+
+  for (const option of platformOptions) {
+    const asset = assets.find((a) => option.pattern.test(a.name));
+    if (asset) {
+      urls[option.key] = asset.browser_download_url;
+    }
+  }
+
+  return urls;
 }
 
 function DownloadIcon() {
@@ -61,14 +85,37 @@ function ChevronIcon() {
   );
 }
 
+// Cache the fetch globally so multiple DownloadButton instances share the same request
+let releasePromise: Promise<ReleaseInfo | null> | null = null;
+
+function fetchLatestRelease(): Promise<ReleaseInfo | null> {
+  if (!releasePromise) {
+    releasePromise = fetch("https://api.github.com/repos/yishan-io/yishan-mono/releases/latest")
+      .then((res) => (res.ok ? (res.json() as Promise<ReleaseInfo>) : null))
+      .catch(() => null);
+  }
+  return releasePromise;
+}
+
 export function DownloadButton({ variant = "primary" }: { variant?: "primary" | "compact" }) {
   const { locale } = useI18n();
   const [detected, setDetected] = useState<Platform>("mac-arm");
   const [open, setOpen] = useState(false);
+  const [urls, setUrls] = useState<Record<Platform, string> | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDetected(detectPlatform());
+
+    fetchLatestRelease().then((release) => {
+      if (release) {
+        setUrls(resolveDownloadUrls(release.assets));
+        // Strip "desktop-v" or "v" prefix from tag name
+        const ver = release.tag_name.replace(/^desktop-v|^v/, "");
+        setVersion(ver);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -81,8 +128,10 @@ export function DownloadButton({ variant = "primary" }: { variant?: "primary" | 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const current = platforms.find((p) => p.key === detected) ?? platforms[0]!;
-  const label = locale === "zh" ? current.labelZh : current.label;
+  const fallbackUrl = "https://github.com/yishan-io/yishan-mono/releases/latest";
+  const currentUrl = urls?.[detected] ?? fallbackUrl;
+  const currentOption = platformOptions.find((p) => p.key === detected) ?? platformOptions[0]!;
+  const label = locale === "zh" ? currentOption.labelZh : currentOption.label;
   const downloadLabel = locale === "zh" ? "下载" : "Download";
 
   const isPrimary = variant === "primary";
@@ -90,7 +139,7 @@ export function DownloadButton({ variant = "primary" }: { variant?: "primary" | 
   return (
     <div ref={ref} className="relative inline-flex">
       <a
-        href={current.url}
+        href={currentUrl}
         className={
           isPrimary
             ? "inline-flex items-center gap-2 rounded-l-2xl bg-[#9DDB72] px-6 py-3 text-sm font-medium text-[#0D1110] shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_10px_28px_rgba(157,219,114,0.24)] transition hover:translate-y-[-1px] hover:bg-[#B2EB8A]"
@@ -99,6 +148,7 @@ export function DownloadButton({ variant = "primary" }: { variant?: "primary" | 
       >
         <DownloadIcon />
         {downloadLabel} {label}
+        {version && <span className="opacity-60">v{version}</span>}
       </a>
       <button
         type="button"
@@ -113,19 +163,30 @@ export function DownloadButton({ variant = "primary" }: { variant?: "primary" | 
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 z-50 mt-2 min-w-[200px] rounded-xl border border-[#2A342F] bg-[#151B18] p-1 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
-          {platforms.map((p) => (
-            <a
-              key={p.key}
-              href={p.url}
-              onClick={() => setOpen(false)}
-              className={`block rounded-lg px-3 py-2 text-sm transition ${
-                p.key === detected ? "bg-[#2A342F] text-[#E8ECE8]" : "text-[#A5B0A8] hover:bg-[#1B2420] hover:text-[#E8ECE8]"
-              }`}
-            >
-              {locale === "zh" ? p.labelZh : p.label}
-            </a>
-          ))}
+        <div className="absolute top-full right-0 z-50 mt-2 min-w-[220px] rounded-xl border border-[#2A342F] bg-[#151B18] p-1 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+          {version && (
+            <div className="px-3 py-1.5 text-xs text-[#A5B0A8]">v{version}</div>
+          )}
+          {platformOptions.map((p) => {
+            const url = urls?.[p.key] ?? fallbackUrl;
+            const isActive = urls?.[p.key] != null;
+            return (
+              <a
+                key={p.key}
+                href={url}
+                onClick={() => setOpen(false)}
+                className={`block rounded-lg px-3 py-2 text-sm transition ${
+                  p.key === detected
+                    ? "bg-[#2A342F] text-[#E8ECE8]"
+                    : isActive
+                      ? "text-[#A5B0A8] hover:bg-[#1B2420] hover:text-[#E8ECE8]"
+                      : "pointer-events-none text-[#A5B0A8]/40"
+                }`}
+              >
+                {locale === "zh" ? p.labelZh : p.label}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>
