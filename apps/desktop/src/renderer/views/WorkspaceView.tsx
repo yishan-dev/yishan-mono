@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
 import { THREE_COL_GAP_PX, THREE_COL_SPLITTER_PX, ThreeColumnLayout } from "../components/ThreeColumnLayout";
 import { subscribeAppActionEvent } from "../events";
+import { useAllWorkspacesGitSync } from "../hooks/useAllWorkspacesGitSync";
 import { useCommands } from "../hooks/useCommands";
 import { WorkspacePaneVisibilityProvider, useWorkspacePaneVisibility } from "../hooks/useWorkspacePaneVisibility";
 import { parseWorkspaceSessionNavigationPath } from "../navigation/workspaceNavigation";
@@ -64,6 +65,7 @@ export function WorkspaceView() {
     return state.gitRefreshVersionByWorktreePath?.[selectedWorkspaceWorktreePath] ?? 0;
   });
   const cmd = useCommands();
+  useAllWorkspacesGitSync();
   const [terminalRecoveryCoordinator] = useState(() => new TerminalRecoveryCoordinator());
   const { leftCollapsed, rightCollapsed, onToggleLeftPane, onToggleRightPane } = paneVisibility;
 
