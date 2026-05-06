@@ -173,13 +173,21 @@ export function ChangesTabView() {
       return undefined;
     }
 
+    if (sourceBranch.startsWith("origin/")) {
+      return sourceBranch;
+    }
+
+    if (sourceBranch.includes("/")) {
+      return sourceBranch;
+    }
+
     // When the workspace branch matches its source branch (e.g., both are "main"),
     // compare against the remote tracking branch to show unpushed commits.
     if (selectedWorkspaceBranch && selectedWorkspaceBranch === sourceBranch) {
       return `origin/${sourceBranch}`;
     }
 
-    return sourceBranch;
+    return `origin/${sourceBranch}`;
   }, [selectedWorkspace?.sourceBranch, selectedWorkspaceBranch]);
   const workspaceGitRefreshVersion = workspaceStore((state) => {
     if (!selectedWorkspaceWorktreePath) {
