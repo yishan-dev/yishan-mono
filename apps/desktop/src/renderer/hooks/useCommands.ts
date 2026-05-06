@@ -190,13 +190,7 @@ export type Commands = {
     gitUrl?: string;
   }) => Promise<void>;
   deleteProject: (repoId: string) => Promise<void>;
-  updateProjectConfig: (
-    repoId: string,
-    config: Pick<
-      WorkspaceProjectRecord,
-      "name" | "worktreePath" | "contextEnabled" | "icon" | "color" | "setupScript" | "postScript"
-    >,
-  ) => Promise<void>;
+  updateProjectConfig: typeof updateProjectConfigCommand;
   createWorkspace: (input: {
     projectId: string;
     name: string;

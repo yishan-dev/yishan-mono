@@ -33,6 +33,7 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
       toggleTabPinned: vi.fn(),
       reorderTab: vi.fn(),
       renameTab: vi.fn(),
+      renameTabsForEntryRename: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
     } as TabStoreState,

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"net/url"
@@ -65,7 +66,7 @@ var loginCmd = &cobra.Command{
 			if callbackErr := query.Get("error"); callbackErr != "" {
 				resultCh <- loginCallbackResult{err: fmt.Errorf("oauth callback error: %s", callbackErr)}
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte("Login failed. You can close this window."))
+				_, _ = w.Write([]byte(buildDesktopRedirectHTML("error", callbackErr)))
 				return
 			}
 
@@ -83,7 +84,7 @@ var loginCmd = &cobra.Command{
 
 			resultCh <- result
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("Login successful. You can close this window."))
+			_, _ = w.Write([]byte(buildDesktopRedirectHTML("success", "")))
 		})
 
 		server := &http.Server{
@@ -208,6 +209,39 @@ func openBrowser(targetURL string) error {
 	}
 
 	return exec.Command(command, args...).Start()
+}
+
+func buildDesktopRedirectHTML(status string, reason string) string {
+	deepLink := "yishan://auth/callback?status=" + url.QueryEscape(status)
+	if reason != "" {
+		deepLink += "&reason=" + url.QueryEscape(reason)
+	}
+
+	escapedDeepLink := html.EscapeString(deepLink)
+	statusText := "Login successful"
+	if status != "success" {
+		statusText = "Login failed"
+	}
+
+	return fmt.Sprintf(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>%s</title>
+  </head>
+  <body>
+    <p>%s. Returning to Yishan…</p>
+    <p>If nothing happens, <a href="%s">open Yishan</a>.</p>
+    <script>
+      window.location.replace(%q);
+      setTimeout(function () {
+        window.close();
+      }, 300);
+    </script>
+  </body>
+</html>
+`, statusText, statusText, escapedDeepLink, deepLink)
 }
 
 // registerLocalNodeAfterLogin registers the local daemon node with the API

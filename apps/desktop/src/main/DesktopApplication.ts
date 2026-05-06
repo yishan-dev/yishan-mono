@@ -26,6 +26,7 @@ export class DesktopApplication {
   private readonly daemonManager = new DaemonManager();
   private hasProcessedBeforeQuit = false;
   private isQuitting = false;
+  private pendingProtocolUrl: string | null = null;
   private pendingUpdateReady: DesktopUpdateEventPayload | null = null;
   private cachedDaemonQuitOnExit: boolean | null = null;
 
@@ -34,6 +35,21 @@ export class DesktopApplication {
    */
   static run() {
     const desktopApplication = new DesktopApplication();
+
+    const gotSingleInstanceLock = app.requestSingleInstanceLock();
+    if (!gotSingleInstanceLock) {
+      app.quit();
+      return;
+    }
+
+    desktopApplication.pendingProtocolUrl = desktopApplication.extractAuthCallbackUrlFromArgv(process.argv);
+
+    app.on("second-instance", (_event, argv) => {
+      const callbackUrl = desktopApplication.extractAuthCallbackUrlFromArgv(argv);
+      if (callbackUrl) {
+        desktopApplication.handleProtocolCallbackUrl(callbackUrl);
+      }
+    });
 
     desktopApplication.start().catch(async (error: unknown) => {
       console.error("Failed to start desktop application", error);
@@ -52,6 +68,13 @@ export class DesktopApplication {
    */
   private async start(): Promise<void> {
     await app.whenReady();
+
+    const defaultAppEntry = process.argv[1];
+    if (process.defaultApp && defaultAppEntry) {
+      app.setAsDefaultProtocolClient("yishan", process.execPath, [resolve(defaultAppEntry)]);
+    } else {
+      app.setAsDefaultProtocolClient("yishan");
+    }
 
     // Override the runtime app name so native menus, About dialog, and
     // other OS-level surfaces show "Yishan" instead of the scoped
@@ -118,11 +141,40 @@ export class DesktopApplication {
       }
     });
 
+    app.on("open-url", (event, callbackUrl) => {
+      event.preventDefault();
+      this.handleProtocolCallbackUrl(callbackUrl);
+    });
+
     app.on("window-all-closed", () => {
       if (process.platform !== "darwin" || this.isQuitting) {
         app.quit();
       }
     });
+
+    if (this.pendingProtocolUrl) {
+      const callbackUrl = this.pendingProtocolUrl;
+      this.pendingProtocolUrl = null;
+      this.handleProtocolCallbackUrl(callbackUrl);
+    }
+  }
+
+  private extractAuthCallbackUrlFromArgv(argv: string[]): string | null {
+    for (const argument of argv) {
+      if (argument.startsWith("yishan://auth/callback")) {
+        return argument;
+      }
+    }
+
+    return null;
+  }
+
+  private handleProtocolCallbackUrl(callbackUrl: string): void {
+    if (!callbackUrl.startsWith("yishan://auth/callback")) {
+      return;
+    }
+
+    this.focusMainWindow();
   }
 
   /** Registers desktop auth IPC endpoints backed by the bundled CLI login/status commands. */

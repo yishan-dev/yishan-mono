@@ -111,14 +111,9 @@ describe("TerminalSettingsView", () => {
     mocked.listTerminalSessions.mockResolvedValue([
       {
         sessionId: "term_1",
-        workspaceId: null,
-        cwd: "/tmp/repo",
+        workspaceId: "",
         pid: 12345,
-        cols: 120,
-        rows: 36,
         status: "running",
-        exitCode: null,
-        signalCode: null,
       },
     ]);
 
@@ -133,14 +128,9 @@ describe("TerminalSettingsView", () => {
       type: "session.exited",
       session: {
         sessionId: "term_1",
-        workspaceId: null,
-        cwd: "/tmp/repo",
+        workspaceId: "",
         pid: 12345,
-        cols: 120,
-        rows: 36,
         status: "exited",
-        exitCode: 0,
-        signalCode: null,
       },
     });
 
