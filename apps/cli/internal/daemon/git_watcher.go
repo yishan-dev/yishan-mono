@@ -18,15 +18,16 @@ const watcherDebounce = 200 * time.Millisecond
 const contextLinkName = ".my-context"
 
 type worktreeWatcher struct {
-	mu            sync.Mutex
-	path          string
-	contextDir    string // resolved absolute path of the context symlink target (empty if none)
-	fw            *fsnotify.Watcher
-	events        *eventHub
-	fileTimer     *time.Timer
-	gitTimer      *time.Timer
-	changedPaths  []string
-	done          chan struct{}
+	mu             sync.Mutex
+	path           string
+	contextDir     string // resolved absolute path of the context symlink target (empty if none)
+	resolvedGitDir string // actual git directory (may differ from .git when using git worktrees)
+	fw             *fsnotify.Watcher
+	events         *eventHub
+	fileTimer      *time.Timer
+	gitTimer       *time.Timer
+	changedPaths   []string
+	done           chan struct{}
 }
 
 type workspaceWatchers struct {
@@ -42,6 +43,46 @@ func newWorkspaceWatchers(events *eventHub) *workspaceWatchers {
 	}
 }
 
+// resolveGitDir returns the actual git directory for a worktree path.
+// For standard repositories, .git is a directory and is returned directly.
+// For git worktrees, .git is a file containing "gitdir: <path>" pointing to
+// the real git directory (e.g., /repo/.git/worktrees/<name>).
+func resolveGitDir(worktreePath string) string {
+	gitEntry := filepath.Join(worktreePath, ".git")
+	info, err := os.Lstat(gitEntry)
+	if err != nil {
+		return gitEntry
+	}
+
+	if info.IsDir() {
+		return gitEntry
+	}
+
+	// .git is a file — read the gitdir pointer
+	content, err := os.ReadFile(gitEntry)
+	if err != nil {
+		return gitEntry
+	}
+
+	line := strings.TrimSpace(string(content))
+	gitDirPath, ok := strings.CutPrefix(line, "gitdir: ")
+	if !ok {
+		return gitEntry
+	}
+
+	// Resolve relative paths against the worktree directory
+	if !filepath.IsAbs(gitDirPath) {
+		gitDirPath = filepath.Join(worktreePath, gitDirPath)
+	}
+
+	resolved := filepath.Clean(gitDirPath)
+	if _, err := os.Stat(resolved); err != nil {
+		return gitEntry
+	}
+
+	return resolved
+}
+
 func (ws *workspaceWatchers) Watch(worktreePath string) {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
@@ -50,10 +91,12 @@ func (ws *workspaceWatchers) Watch(worktreePath string) {
 		return
 	}
 
-	gitDir := filepath.Join(worktreePath, ".git")
-	if _, err := os.Stat(gitDir); err != nil {
+	gitEntry := filepath.Join(worktreePath, ".git")
+	if _, err := os.Stat(gitEntry); err != nil {
 		return
 	}
+
+	resolvedGitDir := resolveGitDir(worktreePath)
 
 	fw, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -62,32 +105,37 @@ func (ws *workspaceWatchers) Watch(worktreePath string) {
 	}
 
 	entry := &worktreeWatcher{
-		path:   worktreePath,
-		fw:     fw,
-		events: ws.events,
-		done:   make(chan struct{}),
+		path:           worktreePath,
+		resolvedGitDir: resolvedGitDir,
+		fw:             fw,
+		events:         ws.events,
+		done:           make(chan struct{}),
 	}
 
 	if err := fw.Add(worktreePath); err != nil {
 		log.Debug().Err(err).Str("target", worktreePath).Msg("failed to watch worktree root")
 	}
 
-	gitTargets := []string{gitDir, filepath.Join(gitDir, "HEAD"), filepath.Join(gitDir, "index")}
-	gitRefsDir := filepath.Join(gitDir, "refs")
+	gitTargets := []string{
+		resolvedGitDir,
+		filepath.Join(resolvedGitDir, "HEAD"),
+		filepath.Join(resolvedGitDir, "index"),
+	}
+	gitRefsDir := filepath.Join(resolvedGitDir, "refs")
 	if fi, err := os.Stat(gitRefsDir); err == nil && fi.IsDir() {
 		gitTargets = append(gitTargets, gitRefsDir)
 	}
 
-	seen := make(map[string]bool)
+	watchedTargets := make(map[string]bool)
 	for _, t := range gitTargets {
-		if seen[t] {
-			continue
-		}
-		seen[t] = true
 		addTarget := t
 		if fi, err := os.Stat(t); err == nil && !fi.IsDir() {
 			addTarget = filepath.Dir(t)
 		}
+		if watchedTargets[addTarget] {
+			continue
+		}
+		watchedTargets[addTarget] = true
 		if err := fw.Add(addTarget); err != nil {
 			log.Debug().Err(err).Str("target", addTarget).Msg("failed to watch git target")
 		}
@@ -135,7 +183,7 @@ func (ws *workspaceWatchers) Close() {
 }
 
 func (w *worktreeWatcher) consume() {
-	gitDir := filepath.Join(w.path, ".git")
+	gitEntry := filepath.Join(w.path, ".git")
 	for {
 		select {
 		case <-w.done:
@@ -144,7 +192,11 @@ func (w *worktreeWatcher) consume() {
 			if !ok {
 				return
 			}
-			isGit := strings.HasPrefix(event.Name, gitDir)
+			// Classify as a git event if the changed path is inside the .git
+			// entry (standard repos) or inside the resolved git directory
+			// (git worktrees where .git is a file pointing elsewhere).
+			isGit := strings.HasPrefix(event.Name, gitEntry) ||
+				(w.resolvedGitDir != gitEntry && strings.HasPrefix(event.Name, w.resolvedGitDir))
 			if isGit {
 				w.scheduleGitEmit()
 			} else if w.contextDir != "" && (event.Name == w.contextDir || strings.HasPrefix(event.Name, w.contextDir+string(filepath.Separator))) {
