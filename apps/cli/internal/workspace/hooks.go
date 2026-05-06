@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"yishan/apps/cli/internal/workspace/shellenv"
 )
 
 // DefaultHookTimeout is the maximum duration a lifecycle hook is allowed to
@@ -60,6 +63,12 @@ type HookResult struct {
 // workspace directory with relevant environment variables. It enforces a
 // timeout so hooks cannot hang workspace lifecycle indefinitely.
 //
+// The hook is executed via the user's login shell (zsh, bash, etc.) with
+// the -lic flags so that shell profile files (.zprofile, .zshrc, .bashrc,
+// etc.) are sourced. This ensures user-installed tools (bun, nvm,
+// homebrew, etc.) are available on PATH even when the daemon process was
+// launched from a packaged Electron app with a minimal environment.
+//
 // When req.Command is empty the call is a no-op and returns Skipped=true.
 // Hook failures are captured in HookResult rather than returned as errors;
 // only unexpected system-level problems (e.g. cannot start shell) are returned
@@ -78,13 +87,15 @@ func RunHook(ctx context.Context, req HookRequest) (HookResult, error) {
 	hookCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(hookCtx, "sh", "-c", command)
+	shellPath, shellArgs := resolveHookShell(command)
+	cmd := exec.CommandContext(hookCtx, shellPath, shellArgs...)
 	cmd.Dir = req.WorkspacePath
 
-	cmd.Env = append(cmd.Environ(),
-		"YISHAN_WORKSPACE_ID="+req.WorkspaceID,
-		"YISHAN_WORKSPACE_PATH="+req.WorkspacePath,
-		"YISHAN_HOOK_NAME="+req.HookName,
+	cmd.Env = resolveHookEnv(
+		os.Environ(),
+		req.WorkspaceID,
+		req.WorkspacePath,
+		req.HookName,
 	)
 
 	var stdout, stderr bytes.Buffer
@@ -116,4 +127,58 @@ func RunHook(ctx context.Context, req HookRequest) (HookResult, error) {
 	}
 
 	return result, nil
+}
+
+// resolveHookShell returns the shell binary and arguments to use for executing
+// a hook command. It uses the user's login shell (from $SHELL or well-known
+// fallbacks) with -lic flags to ensure profile files are sourced and the full
+// user PATH is available.
+func resolveHookShell(command string) (string, []string) {
+	shell := resolveHookUserShell()
+	// -l = login shell (sources .zprofile/.bash_profile)
+	// -i = interactive (sources .zshrc/.bashrc where nvm/bun/etc. add PATH)
+	// -c = execute the following command string
+	return shell, []string{"-lic", command}
+}
+
+// resolveHookUserShell returns the user's login shell path. It checks the
+// SHELL environment variable first, then falls back to well-known shell paths.
+// This fallback is essential when the daemon is launched from a packaged
+// Electron app which inherits a minimal environment without SHELL set.
+func resolveHookUserShell() string {
+	return shellenv.ResolveUserShell(os.Getenv("SHELL"))
+}
+
+// resolveHookEnv builds the environment variable slice for a hook process.
+// It starts from the base process environment, ensures common user binary
+// directories are on PATH (homebrew, bun, npm, go, etc.), prepends the
+// managed ~/.yishan/bin directory, and injects hook-specific variables.
+func resolveHookEnv(baseEnv []string, workspaceID, workspacePath, hookName string) []string {
+	env := append([]string{}, baseEnv...)
+	env = ensureCommonPathDirectories(env)
+	env = append(env,
+		"YISHAN_WORKSPACE_ID="+workspaceID,
+		"YISHAN_WORKSPACE_PATH="+workspacePath,
+		"YISHAN_HOOK_NAME="+hookName,
+	)
+	return env
+}
+
+// ensureCommonPathDirectories appends well-known user binary directories to
+// PATH if they exist on disk and are not already present. This provides a
+// safety net for finding tools like bun, node, go, etc. even if the login
+// shell profile doesn't fully initialize (e.g. non-interactive fallback).
+func ensureCommonPathDirectories(env []string) []string {
+	return shellenv.EnsurePathHasExistingDirectories(env, shellenv.CommonUserBinDirectories())
+}
+
+// hookEnvValue returns the value of an environment variable from the given
+// env slice, or empty string if not found.
+func hookEnvValue(env []string, key string) string {
+	return shellenv.EnvValueOrDefault(env, key, "")
+}
+
+// hookUpsertEnv sets or replaces an environment variable in the given slice.
+func hookUpsertEnv(env []string, key, value string) []string {
+	return shellenv.UpsertEnv(env, key, value)
 }
