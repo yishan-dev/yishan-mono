@@ -13,9 +13,14 @@ import (
 
 const watcherDebounce = 200 * time.Millisecond
 
+// contextLinkName is the symlink directory inside a worktree that points to the
+// shared per-repo context folder (e.g. ~/.yishan/contexts/<repoKey>).
+const contextLinkName = ".my-context"
+
 type worktreeWatcher struct {
 	mu            sync.Mutex
 	path          string
+	contextDir    string // resolved absolute path of the context symlink target (empty if none)
 	fw            *fsnotify.Watcher
 	events        *eventHub
 	fileTimer     *time.Timer
@@ -88,6 +93,20 @@ func (ws *workspaceWatchers) Watch(worktreePath string) {
 		}
 	}
 
+	// Watch the .my-context symlink target directory so that file changes inside
+	// the shared context folder (which lives outside the worktree) trigger file
+	// tree refresh events.
+	contextLinkPath := filepath.Join(worktreePath, contextLinkName)
+	if target, err := filepath.EvalSymlinks(contextLinkPath); err == nil {
+		if fi, err := os.Stat(target); err == nil && fi.IsDir() {
+			if err := fw.Add(target); err != nil {
+				log.Debug().Err(err).Str("target", target).Msg("failed to watch context directory")
+			} else {
+				entry.contextDir = target
+			}
+		}
+	}
+
 	go entry.consume()
 	ws.entries[worktreePath] = entry
 }
@@ -128,6 +147,18 @@ func (w *worktreeWatcher) consume() {
 			isGit := strings.HasPrefix(event.Name, gitDir)
 			if isGit {
 				w.scheduleGitEmit()
+			} else if w.contextDir != "" && (event.Name == w.contextDir || strings.HasPrefix(event.Name, w.contextDir+string(filepath.Separator))) {
+				// Event from the shared context directory: compute a relative
+				// path prefixed with the context link name so the frontend can
+				// resolve it within the worktree tree.
+				relPath, err := filepath.Rel(w.contextDir, event.Name)
+				if err != nil {
+					relPath = filepath.Base(event.Name)
+				}
+				if relPath == "." {
+					relPath = ""
+				}
+				w.scheduleFileEmit(filepath.ToSlash(filepath.Join(contextLinkName, relPath)))
 			} else {
 				relPath, err := filepath.Rel(w.path, event.Name)
 				if err != nil {
