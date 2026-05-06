@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContextMenu, type ContextMenuEntry } from "./ContextMenu";
 
 function ContextMenuHarness(input: { items: ContextMenuEntry[] }) {
@@ -19,6 +19,11 @@ function ContextMenuHarness(input: { items: ContextMenuEntry[] }) {
     />
   );
 }
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("ContextMenu", () => {
   it("renders nested submenu items and runs nested selection handler", () => {
@@ -53,6 +58,7 @@ describe("ContextMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "WebStorm" }));
 
     expect(onJetBrainsSelect).toHaveBeenCalledTimes(1);
+    cleanup();
     expect(screen.queryByRole("menuitem", { name: "Open in" })).toBeNull();
   });
 
