@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkForUpdatesManually, startAutoUpdates } from "./autoUpdateService";
+import { checkForUpdatesManually, downloadUpdate, startAutoUpdates } from "./autoUpdateService";
 
 function createUpdater() {
   return {
     autoDownload: false,
     autoInstallOnAppQuit: false,
-    checkForUpdatesAndNotify: vi.fn().mockResolvedValue(undefined),
+    forceDevUpdateConfig: false,
+    updateConfigPath: undefined as string | undefined,
+    allowDowngrade: false,
     checkForUpdates: vi.fn().mockResolvedValue(undefined),
+    downloadUpdate: vi.fn().mockResolvedValue(undefined),
     on: vi.fn(),
     once: vi.fn(),
     removeListener: vi.fn(),
@@ -24,7 +27,24 @@ describe("startAutoUpdates", () => {
     });
 
     expect(result).toEqual({ enabled: false, reason: "development" });
-    expect(updater.checkForUpdatesAndNotify).not.toHaveBeenCalled();
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
+  });
+
+  it("allows update checks during development when explicitly enabled", () => {
+    const updater = createUpdater();
+
+    const result = startAutoUpdates({
+      app: { isPackaged: false },
+      updater,
+      devMode: true,
+      allowDevUpdates: true,
+    });
+
+    expect(result).toEqual({ enabled: true });
+    expect(updater.forceDevUpdateConfig).toBe(true);
+    expect(updater.updateConfigPath).toContain("dev-app-update.yml");
+    expect(updater.allowDowngrade).toBe(true);
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
   });
 
   it("does not check for updates from unpackaged builds", () => {
@@ -37,7 +57,7 @@ describe("startAutoUpdates", () => {
     });
 
     expect(result).toEqual({ enabled: false, reason: "unpackaged" });
-    expect(updater.checkForUpdatesAndNotify).not.toHaveBeenCalled();
+    expect(updater.checkForUpdates).not.toHaveBeenCalled();
   });
 
   it("enables background update checks for packaged production builds", () => {
@@ -50,30 +70,69 @@ describe("startAutoUpdates", () => {
     });
 
     expect(result).toEqual({ enabled: true });
-    expect(updater.autoDownload).toBe(true);
-    expect(updater.autoInstallOnAppQuit).toBe(true);
+    expect(updater.autoDownload).toBe(false);
+    expect(updater.autoInstallOnAppQuit).toBe(false);
     expect(updater.on).toHaveBeenCalledWith("error", expect.any(Function));
-    expect(updater.checkForUpdatesAndNotify).toHaveBeenCalledTimes(1);
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
   });
 
-  it("notifies the renderer when an update is downloaded", () => {
+  it("notifies the renderer when an update is available", () => {
     const updater = createUpdater();
-    const notifyUpdateReady = vi.fn();
+    const notifyUpdateEvent = vi.fn();
 
     startAutoUpdates({
       app: { isPackaged: true },
       updater,
       devMode: false,
-      notifyUpdateReady,
+      notifyUpdateEvent,
     });
 
     const availableListener = updater.on.mock.calls.find(([event]) => event === "update-available")?.[1];
+
+    availableListener?.({ version: "1.2.3" });
+
+    expect(notifyUpdateEvent).toHaveBeenCalledWith({ status: "available", source: "auto", version: "1.2.3" });
+  });
+
+  it("notifies the renderer while downloading and when ready", () => {
+    const updater = createUpdater();
+    const notifyUpdateEvent = vi.fn();
+
+    startAutoUpdates({
+      app: { isPackaged: true },
+      updater,
+      devMode: false,
+      notifyUpdateEvent,
+    });
+
+    const availableListener = updater.on.mock.calls.find(([event]) => event === "update-available")?.[1];
+    const progressListener = updater.on.mock.calls.find(([event]) => event === "download-progress")?.[1];
     const downloadedListener = updater.on.mock.calls.find(([event]) => event === "update-downloaded")?.[1];
 
     availableListener?.({ version: "1.2.3" });
+    progressListener?.({ percent: 42, transferred: 420, total: 1000, bytesPerSecond: 10 });
     downloadedListener?.({});
 
-    expect(notifyUpdateReady).toHaveBeenCalledWith({ version: "1.2.3" });
+    expect(notifyUpdateEvent).toHaveBeenCalledWith({
+      status: "downloading",
+      version: "1.2.3",
+      percent: 42,
+      transferred: 420,
+      total: 1000,
+      bytesPerSecond: 10,
+    });
+    expect(notifyUpdateEvent).toHaveBeenCalledWith({ status: "downloaded", version: "1.2.3" });
+  });
+});
+
+describe("downloadUpdate", () => {
+  it("starts the update download on user request", async () => {
+    const updater = createUpdater();
+
+    const result = await downloadUpdate({ updater });
+
+    expect(result).toEqual({ ok: true });
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -85,6 +144,27 @@ describe("checkForUpdatesManually", () => {
     });
 
     expect(result).toEqual({ status: "not-available", reason: "development" });
+  });
+
+  it("allows manual checks in development when explicitly enabled", async () => {
+    const updater = createUpdater();
+    updater.checkForUpdates.mockImplementation(() => {
+      const listener = updater.once.mock.calls.find(([event]) => event === "update-not-available")?.[1];
+      listener?.();
+      return Promise.resolve();
+    });
+
+    const result = await checkForUpdatesManually({
+      app: { isPackaged: false },
+      updater,
+      devMode: true,
+      allowDevUpdates: true,
+    });
+
+    expect(result).toEqual({ status: "up-to-date" });
+    expect(updater.forceDevUpdateConfig).toBe(true);
+    expect(updater.updateConfigPath).toContain("dev-app-update.yml");
+    expect(updater.allowDowngrade).toBe(true);
   });
 
   it("returns not-available for unpackaged builds", async () => {

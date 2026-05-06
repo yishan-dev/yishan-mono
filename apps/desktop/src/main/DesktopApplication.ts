@@ -12,7 +12,7 @@ import { readExternalClipboardSourcePathsFromSystem } from "./integrations/exter
 import { DESKTOP_RPC_IPC_CHANNELS, type DesktopUpdateEventPayload, HOST_IPC_CHANNELS } from "./ipc";
 import { createDesktopNotificationHostAdapter } from "./notifications/service";
 import { isDevMode } from "./runtime/environment";
-import { checkForUpdatesManually, startAutoUpdates } from "./updates/autoUpdateService";
+import { checkForUpdatesManually, downloadUpdate, startAutoUpdates } from "./updates/autoUpdateService";
 
 type DispatchActionOptions = {
   focusApp?: boolean;
@@ -106,8 +106,8 @@ export class DesktopApplication {
     });
     startAutoUpdates({
       app,
-      notifyUpdateReady: (payload) => {
-        this.dispatchUpdateReady(payload);
+      notifyUpdateEvent: (payload) => {
+        this.dispatchUpdateEvent(payload);
       },
     });
 
@@ -343,6 +343,19 @@ export class DesktopApplication {
       return this.pendingUpdateReady;
     });
 
+    ipcMain.handle(HOST_IPC_CHANNELS.checkForUpdates, async () => {
+      await this.handleManualUpdateCheck();
+      return { ok: true as const };
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.downloadUpdate, async () => {
+      const result = await downloadUpdate();
+      if (!result.ok) {
+        this.dispatchUpdateEvent({ status: "error", source: "download", message: result.error });
+      }
+      return result;
+    });
+
     ipcMain.handle(HOST_IPC_CHANNELS.installUpdate, async () => {
       autoUpdater.quitAndInstall();
       return { ok: true };
@@ -367,77 +380,38 @@ export class DesktopApplication {
     }
   }
 
-  /** Forwards a downloaded app update event to renderer update prompts. */
-  private dispatchUpdateReady(payload: DesktopUpdateEventPayload): void {
-    this.pendingUpdateReady = payload;
+  /** Forwards app update events to renderer update prompts. */
+  private dispatchUpdateEvent(payload: DesktopUpdateEventPayload): void {
+    this.pendingUpdateReady = payload.status === "not-available" || payload.status === "error" ? null : payload;
     this.mainWindow?.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
-      method: "desktopUpdateReady",
+      method: "desktopUpdate",
       payload,
     });
   }
 
   /** Handles a manual "Check for Updates" request from the native menu. */
   private async handleManualUpdateCheck(): Promise<void> {
-    const parentWindow = this.mainWindow ?? undefined;
-
     // Disable the menu item while checking to provide visual feedback.
     this.setUpdateMenuItemEnabled(false, "Checking for Updates…");
+    this.focusMainWindow();
+    this.dispatchUpdateEvent({ status: "checking", source: "manual" });
 
     try {
       const result = await checkForUpdatesManually({ app });
 
-      // Restore the menu item before showing the result dialog.
       this.setUpdateMenuItemEnabled(true);
 
       switch (result.status) {
         case "update-available": {
-          const versionLabel = result.version ? ` ${result.version}` : "";
-          const options: Electron.MessageBoxOptions = {
-            type: "info",
-            buttons: ["Download and Install", "Later"],
-            defaultId: 0,
-            cancelId: 1,
-            title: "Update Available",
-            message: `A new version${versionLabel} is available.`,
-            detail: "Would you like to download and install it now? The app will restart to apply the update.",
-          };
-          const response = parentWindow
-            ? await dialog.showMessageBox(parentWindow, options)
-            : await dialog.showMessageBox(options);
-
-          if (response.response === 0) {
-            autoUpdater.quitAndInstall();
-          }
+          this.dispatchUpdateEvent({ status: "available", source: "manual", version: result.version });
           break;
         }
         case "up-to-date": {
-          const options: Electron.MessageBoxOptions = {
-            type: "info",
-            buttons: ["OK"],
-            title: "No Updates Available",
-            message: "You're up to date!",
-            detail: `Yishan ${app.getVersion()} is the latest version.`,
-          };
-          if (parentWindow) {
-            await dialog.showMessageBox(parentWindow, options);
-          } else {
-            await dialog.showMessageBox(options);
-          }
+          this.dispatchUpdateEvent({ status: "not-available", source: "manual" });
           break;
         }
         case "error": {
-          const options: Electron.MessageBoxOptions = {
-            type: "error",
-            buttons: ["OK"],
-            title: "Update Check Failed",
-            message: "Unable to check for updates.",
-            detail: result.message,
-          };
-          if (parentWindow) {
-            await dialog.showMessageBox(parentWindow, options);
-          } else {
-            await dialog.showMessageBox(options);
-          }
+          this.dispatchUpdateEvent({ status: "error", source: "manual", message: result.message });
           break;
         }
         case "not-available": {
@@ -445,36 +419,14 @@ export class DesktopApplication {
             result.reason === "development"
               ? "Update checking is not available in development mode."
               : "Update checking is not available for unpackaged builds.";
-          const options: Electron.MessageBoxOptions = {
-            type: "info",
-            buttons: ["OK"],
-            title: "Updates Not Available",
-            message: "Cannot check for updates.",
-            detail: reason,
-          };
-          if (parentWindow) {
-            await dialog.showMessageBox(parentWindow, options);
-          } else {
-            await dialog.showMessageBox(options);
-          }
+          this.dispatchUpdateEvent({ status: "error", source: "manual", message: reason });
           break;
         }
       }
     } catch (error: unknown) {
       this.setUpdateMenuItemEnabled(true);
       const message = error instanceof Error ? error.message : "An unexpected error occurred.";
-      const options: Electron.MessageBoxOptions = {
-        type: "error",
-        buttons: ["OK"],
-        title: "Update Check Failed",
-        message: "Unable to check for updates.",
-        detail: message,
-      };
-      if (parentWindow) {
-        await dialog.showMessageBox(parentWindow, options);
-      } else {
-        await dialog.showMessageBox(options);
-      }
+      this.dispatchUpdateEvent({ status: "error", source: "manual", message });
     }
   }
 

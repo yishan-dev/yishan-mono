@@ -39,9 +39,20 @@ export type PlayNotificationSoundInput = {
   volume: number;
 };
 
-export type DesktopUpdateEventPayload = {
-  version?: string;
-};
+export type DesktopUpdateEventPayload =
+  | { status: "checking"; source: "auto" | "manual" }
+  | { status: "available"; source: "auto" | "manual"; version?: string }
+  | { status: "not-available"; source: "manual" }
+  | { status: "error"; source: "manual" | "download"; message: string }
+  | {
+      status: "downloading";
+      version?: string;
+      percent?: number;
+      transferred?: number;
+      total?: number;
+      bytesPerSecond?: number;
+    }
+  | { status: "downloaded"; version?: string };
 
 export type MainWindowFullscreenState = {
   isFullscreen: boolean;
@@ -88,6 +99,8 @@ export type DesktopHostBridge = {
   dispatchNotification: (input: DispatchNotificationInput) => Promise<NotificationDispatchResult>;
   playNotificationSound: (input: PlayNotificationSoundInput) => Promise<NotificationSoundPreviewResult>;
   getPendingUpdate: () => Promise<DesktopUpdateEventPayload | null>;
+  checkForUpdates: () => Promise<{ ok: true }>;
+  downloadUpdate: () => Promise<{ ok: true } | { ok: false; error: string }>;
   installUpdate: () => Promise<{ ok: true }>;
   getAuthStatus: () => Promise<AuthStatusResult>;
   login: () => Promise<AuthLoginResult>;
@@ -121,6 +134,8 @@ export const HOST_IPC_CHANNELS = {
   dispatchNotification: "desktop:host/dispatch-notification",
   playNotificationSound: "desktop:host/play-notification-sound",
   getPendingUpdate: "desktop:host/get-pending-update",
+  checkForUpdates: "desktop:host/check-for-updates",
+  downloadUpdate: "desktop:host/download-update",
   installUpdate: "desktop:host/install-update",
   getAuthStatus: "desktop:host/get-auth-status",
   login: "desktop:host/login",

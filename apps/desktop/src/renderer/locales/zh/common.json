@@ -2,10 +2,23 @@
   "app": {
     "title": "移山",
     "update": {
-      "readyTitle": "有可用更新",
-      "readyTitleWithVersion": "发现新版本 {{version}}",
-      "readyDescription": "立即重启移山以安装最新版本。",
+      "checkingTitle": "正在检查更新",
+      "checkingDescription": "正在查找最新的移山版本...",
+      "availableTitle": "有可用更新",
+      "availableTitleWithVersion": "发现新版本 {{version}}",
+      "availableDescription": "准备好后再下载更新。移山不会在你确认前重启。",
+      "downloadAction": "下载更新",
+      "downloadingTitle": "正在下载更新",
+      "downloadingDescription": "下载更新时请保持移山打开。",
+      "downloadProgress": "已下载 {{percent}}%",
+      "downloadFailed": "下载更新失败",
+      "readyTitle": "更新已准备好安装",
+      "readyTitleWithVersion": "版本 {{version}} 已准备好",
+      "readyDescription": "准备好后重启移山以应用更新。终端会话会继续运行。",
       "restartAction": "重启并更新",
+      "upToDateTitle": "移山已是最新版本",
+      "upToDateDescription": "你已经在运行最新版本。",
+      "errorTitle": "更新检查失败",
       "closeAria": "关闭更新通知"
     },
     "bootstrap": {

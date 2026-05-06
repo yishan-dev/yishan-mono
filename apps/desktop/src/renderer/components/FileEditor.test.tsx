@@ -29,6 +29,9 @@ const mockEditorState: {
 };
 
 vi.mock("../helpers/monacoSetup", () => ({
+  YISHAN_THEME_DARK: "yishan-dark",
+  YISHAN_THEME_LIGHT: "yishan-light",
+  ensureEditorThemes: vi.fn(),
   monaco: {
     KeyMod: { CtrlCmd: 2048 },
     KeyCode: { KeyS: 49 },

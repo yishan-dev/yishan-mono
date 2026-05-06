@@ -1,27 +1,76 @@
-import { Box, Button, IconButton, Paper, Slide, Snackbar, Stack, Typography } from "@mui/material";
+import { Box, Button, IconButton, LinearProgress, Paper, Slide, Snackbar, Stack, Typography } from "@mui/material";
 import type { SlideProps } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DesktopUpdateEventPayload } from "../../main/ipc";
 import { getDesktopBridge, getDesktopHostBridge } from "../rpc/rpcTransport";
 
-function isDesktopUpdateReadyPayload(value: unknown): value is DesktopUpdateEventPayload {
-  return (
-    !value ||
-    (typeof value === "object" &&
-      (!("version" in value) || typeof (value as { version?: unknown }).version === "string"))
-  );
+function isDesktopUpdatePayload(value: unknown): value is DesktopUpdateEventPayload {
+  return Boolean(value && typeof value === "object" && "status" in value);
 }
 
 function SlideTransition(props: SlideProps) {
   return <Slide {...props} direction="up" />;
 }
 
-/** Shows a bottom-right in-app prompt when a downloaded desktop update is ready to install. */
+function resolveUpdateTitle(input: {
+  update: DesktopUpdateEventPayload | null;
+  versionLabel: string | undefined;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}): string {
+  const { update, versionLabel, t } = input;
+
+  switch (update?.status) {
+    case "checking":
+      return t("app.update.checkingTitle");
+    case "not-available":
+      return t("app.update.upToDateTitle");
+    case "error":
+      return t("app.update.errorTitle");
+    case "downloading":
+      return t("app.update.downloadingTitle");
+    case "downloaded":
+      return versionLabel
+        ? t("app.update.readyTitleWithVersion", { version: versionLabel })
+        : t("app.update.readyTitle");
+    case "available":
+      return versionLabel
+        ? t("app.update.availableTitleWithVersion", { version: versionLabel })
+        : t("app.update.availableTitle");
+    default:
+      return t("app.update.availableTitle");
+  }
+}
+
+function resolveUpdateDescription(input: {
+  update: DesktopUpdateEventPayload | null;
+  t: (key: string) => string;
+}): string {
+  const { update, t } = input;
+
+  switch (update?.status) {
+    case "checking":
+      return t("app.update.checkingDescription");
+    case "not-available":
+      return t("app.update.upToDateDescription");
+    case "error":
+      return update.message;
+    case "downloading":
+      return t("app.update.downloadingDescription");
+    case "downloaded":
+      return t("app.update.readyDescription");
+    case "available":
+      return t("app.update.availableDescription");
+    default:
+      return t("app.update.availableDescription");
+  }
+}
+
+/** Shows a bottom-right in-app prompt for the full desktop update flow. */
 export function AppUpdateSnackbar() {
   const { t } = useTranslation();
   const [update, setUpdate] = useState<DesktopUpdateEventPayload | null>(null);
-  const [isInstalling, setIsInstalling] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -42,11 +91,11 @@ export function AppUpdateSnackbar() {
     }
 
     const unsubscribe = bridge?.events.subscribe((event) => {
-      if (event.method !== "desktopUpdateReady" || !isDesktopUpdateReadyPayload(event.payload)) {
+      if (event.method !== "desktopUpdate" || !isDesktopUpdatePayload(event.payload)) {
         return;
       }
 
-      setUpdate(event.payload ?? {});
+      setUpdate(event.payload);
     });
 
     return () => {
@@ -55,10 +104,10 @@ export function AppUpdateSnackbar() {
     };
   }, []);
 
-  const versionLabel = update?.version?.trim();
-  const title = versionLabel
-    ? t("app.update.readyTitleWithVersion", { version: versionLabel })
-    : t("app.update.readyTitle");
+  const versionLabel = update && "version" in update ? update.version?.trim() : undefined;
+  const title = resolveUpdateTitle({ update, versionLabel, t });
+  const description = resolveUpdateDescription({ update, t });
+  const progressValue = update?.status === "downloading" ? Math.max(0, Math.min(100, update.percent ?? 0)) : 0;
 
   return (
     <Snackbar
@@ -86,7 +135,7 @@ export function AppUpdateSnackbar() {
                 {title}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {t("app.update.readyDescription")}
+                {description}
               </Typography>
             </Box>
             <IconButton
@@ -100,26 +149,53 @@ export function AppUpdateSnackbar() {
               ×
             </IconButton>
           </Box>
-          <Box>
+          {update?.status === "downloading" ? (
+            <Box>
+              <LinearProgress
+                variant={update.percent === undefined ? "indeterminate" : "determinate"}
+                value={progressValue}
+                sx={{ height: 8, borderRadius: 999 }}
+              />
+              {update.percent !== undefined ? (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+                  {t("app.update.downloadProgress", { percent: Math.round(progressValue) })}
+                </Typography>
+              ) : null}
+            </Box>
+          ) : null}
+          {update?.status === "available" || update?.status === "downloaded" ? (
             <Button
               variant="contained"
               size="small"
-              disabled={isInstalling}
+              disabled={isBusy}
               onClick={() => {
-                setIsInstalling(true);
-                void getDesktopHostBridge()
-                  .installUpdate()
-                  .catch((error: unknown) => {
-                    setIsInstalling(false);
-                    if (import.meta.env.DEV) {
-                      console.debug("[AppUpdateSnackbar] failed to install update", error);
+                setIsBusy(true);
+                const request =
+                  update.status === "downloaded" ? getDesktopHostBridge().installUpdate() : getDesktopHostBridge().downloadUpdate();
+                void request
+                  .then((result) => {
+                    if ("ok" in result && !result.ok) {
+                      setUpdate({ status: "error", source: "download", message: result.error });
                     }
+                  })
+                  .catch((error: unknown) => {
+                    setUpdate({
+                      status: "error",
+                      source: "download",
+                      message: error instanceof Error ? error.message : t("app.update.downloadFailed"),
+                    });
+                    if (import.meta.env.DEV) {
+                      console.debug("[AppUpdateSnackbar] update action failed", error);
+                    }
+                  })
+                  .finally(() => {
+                    setIsBusy(false);
                   });
               }}
             >
-              {t("app.update.restartAction")}
+              {update.status === "downloaded" ? t("app.update.restartAction") : t("app.update.downloadAction")}
             </Button>
-          </Box>
+          ) : null}
         </Stack>
       </Paper>
     </Snackbar>

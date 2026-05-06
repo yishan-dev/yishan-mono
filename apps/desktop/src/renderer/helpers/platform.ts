@@ -1,3 +1,3 @@
 export function getRendererPlatform(): NodeJS.Platform {
-  return window.desktop.platform;
+  return window.desktop?.platform ?? "darwin";
 }

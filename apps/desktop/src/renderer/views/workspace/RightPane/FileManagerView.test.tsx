@@ -54,6 +54,7 @@ const mocks = vi.hoisted(() => {
   const subscribeWorkspaceGitChanged = vi.fn<(listener: unknown) => () => void>(() => () => {});
   const openTab = vi.fn();
   const closeTab = vi.fn();
+  const renameTabsForEntryRename = vi.fn();
   const setLastUsedExternalAppId = vi.fn();
   const repoFileTreePropsRef: { current: Record<string, unknown> | null } = { current: null };
 
@@ -68,6 +69,7 @@ const mocks = vi.hoisted(() => {
       tabs: Array<Record<string, unknown>>;
       openTab: typeof openTab;
       closeTab: typeof closeTab;
+      renameTabsForEntryRename: typeof renameTabsForEntryRename;
       setLastUsedExternalAppId: typeof setLastUsedExternalAppId;
     };
   } = {
@@ -81,6 +83,7 @@ const mocks = vi.hoisted(() => {
       tabs: [],
       openTab,
       closeTab,
+      renameTabsForEntryRename,
       setLastUsedExternalAppId,
     },
   };
@@ -103,6 +106,7 @@ const mocks = vi.hoisted(() => {
     subscribeWorkspaceGitChanged,
     openTab,
     closeTab,
+    renameTabsForEntryRename,
     setLastUsedExternalAppId,
     repoFileTreePropsRef,
     stateRef,

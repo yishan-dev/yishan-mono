@@ -22,7 +22,7 @@ describe("token version exports", () => {
     expect(SEMANTIC_COLOR_TOKENS.light.background.app).toBe("#f7f8fa");
     expect(SEMANTIC_COLOR_TOKENS.dark.background.app).toBe("#2b3038");
     expect(SEMANTIC_COLOR_TOKENS.light.primary).toBe("#9f5f06");
-    expect(SEMANTIC_COLOR_TOKENS.dark.primary).toBe("#f7bc59");
+    expect(SEMANTIC_COLOR_TOKENS.dark.primary).toBe("#9ddb72");
   });
 });
 
