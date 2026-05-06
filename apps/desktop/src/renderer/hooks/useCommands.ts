@@ -196,7 +196,7 @@ export type Commands = {
     name: string;
     sourceBranch?: string;
     targetBranch?: string;
-  }) => Promise<void>;
+  }) => Promise<string | undefined>;
   closeWorkspace: (workspaceId: string, options?: { removeBranch?: boolean }) => Promise<void>;
   refreshWorkspaceGitChanges: (workspaceId: string, workspaceWorktreePath: string) => Promise<void>;
   setSelectedTabId: typeof setSelectedTabCommand;

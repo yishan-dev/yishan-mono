@@ -172,7 +172,7 @@ function readWorkspaceStoreState(): WorkspaceStoreState {
 }
 
 /** Creates one workspace by calling backend service when available, then appending it in store state. */
-export async function createWorkspace(input: CreateWorkspaceInput): Promise<void> {
+export async function createWorkspace(input: CreateWorkspaceInput): Promise<string | undefined> {
   const store = readWorkspaceStoreState();
   const { normalizedName } = normalizeCreateWorkspaceInput(input);
   const projectId = input.projectId;
@@ -252,6 +252,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
     organizationId,
   });
   tabStore.getState().setSelectedWorkspaceId(readWorkspaceStoreState().selectedWorkspaceId);
+  return backendWorkspace.id;
 }
 
 /** Closes one workspace immediately in UI and schedules backend cleanup asynchronously. */
