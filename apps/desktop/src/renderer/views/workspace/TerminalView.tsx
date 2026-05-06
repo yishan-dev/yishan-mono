@@ -158,6 +158,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       fontSize: 13,
       lineHeight: 1.4,
       scrollback: 5_000,
+      smoothScrollDuration: 125,
+      scrollSensitivity: 1,
       fastScrollSensitivity: 5,
       rescaleOverlappingGlyphs: true,
       theme: {
@@ -165,8 +167,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         foreground: "#e7ebf0",
       },
     });
-    const { fitAddon, searchAddon } = loadTerminalAddons(terminal);
     terminal.open(host);
+    const { fitAddon, searchAddon } = loadTerminalAddons(terminal);
     safeFitTerminalToHost(terminal, fitAddon);
 
     xtermRef.current = terminal;
@@ -473,7 +475,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         bgcolor: "#2b3038",
         height: "100%",
         "& .xterm-viewport": {
-          overflowY: "auto",
+          overflowY: "hidden",
         },
       }}
     >

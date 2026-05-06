@@ -26,7 +26,7 @@ vi.mock("@xterm/addon-web-links", () => ({
 import { loadTerminalAddons } from "./terminalAddons";
 
 describe("loadTerminalAddons", () => {
-  it("loads fit addon first and attempts all stable addons", () => {
+  it("loads fit addon first and attempts all addons including webgl", () => {
     const terminal = {
       loadAddon: vi.fn(),
     };
@@ -47,7 +47,7 @@ describe("loadTerminalAddons", () => {
       loadAddon: vi.fn(() => {
         attempt += 1;
         if (attempt === 3) {
-          throw new Error("no webgl support");
+          throw new Error("clipboard init failed");
         }
       }),
     };
@@ -59,6 +59,29 @@ describe("loadTerminalAddons", () => {
 
     expect(terminal.loadAddon).toHaveBeenCalledTimes(7);
     expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Failed to load xterm clipboard addon",
+      expect.objectContaining({ message: "clipboard init failed" }),
+    );
+  });
+
+  it("logs and falls back to DOM when webgl addon fails", () => {
+    let attempt = 0;
+    const terminal = {
+      loadAddon: vi.fn(() => {
+        attempt += 1;
+        if (attempt === 7) {
+          throw new Error("no webgl support");
+        }
+      }),
+    };
+    const logger = {
+      warn: vi.fn(),
+    };
+
+    loadTerminalAddons(terminal, logger);
+
+    expect(terminal.loadAddon).toHaveBeenCalledTimes(7);
     expect(logger.warn).toHaveBeenCalledWith(
       "Failed to load xterm webgl addon",
       expect.objectContaining({ message: "no webgl support" }),

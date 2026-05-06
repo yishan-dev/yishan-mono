@@ -23,10 +23,10 @@ export type TerminalAddons = {
 let suggestedRendererType: "webgl" | "dom" = "webgl";
 
 /**
- * Loads stable terminal addons and returns the fit/search addons used by the view.
+ * Loads all terminal addons and returns the fit/search addons used by the view.
  *
- * WebGL is deferred to a `requestAnimationFrame` callback so it does not race
- * xterm's internal viewport initialization that runs synchronously after `open()`.
+ * IMPORTANT: Must be called **after** `terminal.open()` so xterm's internal
+ * viewport and link layer are fully initialized before addons access them.
  */
 export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger: Logger = console): TerminalAddons {
   const fitAddon = new FitAddon();
@@ -45,12 +45,7 @@ export function loadTerminalAddons(terminal: Pick<Terminal, "loadAddon">, logger
     logger,
     "web-links",
   );
-
-  // Defer WebGL to next animation frame to avoid racing xterm's post-open viewport sync.
-  // This prevents a flash/stall at terminal creation.
-  requestAnimationFrame(() => {
-    loadWebglAddonWithFallback(terminal, logger);
-  });
+  loadWebglAddonWithFallback(terminal, logger);
 
   return {
     fitAddon,
