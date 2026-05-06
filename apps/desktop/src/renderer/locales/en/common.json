@@ -37,6 +37,11 @@
       "dismissAria": "Dismiss session expired notification"
     }
   },
+  "daemon": {
+    "connection": {
+      "reconnecting": "Reconnecting to daemon..."
+    }
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",

@@ -5,9 +5,10 @@ import { delay } from "./helpers";
 import type { ApiSubscriptionHandlers, DaemonRpcClient } from "./types";
 
 type DesktopRpcEventListener = (envelope: DesktopRpcEventEnvelope) => void;
+type DaemonConnectionStatus = "connected" | "connecting" | "disconnected";
 
-const SOCKET_CONNECT_RETRY_COUNT = 6;
-const SOCKET_CONNECT_RETRY_DELAY_MS = 250;
+const SOCKET_CONNECT_RETRY_COUNT = 30;
+const SOCKET_CONNECT_RETRY_DELAY_MS = 500;
 const API_NAMESPACES = new Set<ApiNamespace>([
   "app",
   "workspace",
@@ -20,11 +21,29 @@ const API_NAMESPACES = new Set<ApiNamespace>([
   "events",
 ]);
 const desktopRpcEventListeners = new Set<DesktopRpcEventListener>();
+const daemonConnectionStatusListeners = new Set<(status: DaemonConnectionStatus) => void>();
 let backendEventsSubscription: { unsubscribe: () => void } | null = null;
 let desktopBridgeEventsUnsubscribe: (() => void) | null = null;
 let daemonRpcClientPromise: Promise<DaemonRpcClient> | null = null;
 let daemonTransportClientPromise: Promise<DaemonClient> | null = null;
 let daemonWsUrlPromise: Promise<string> | null = null;
+let daemonConnectionStatus: DaemonConnectionStatus = "connecting";
+
+function emitDaemonConnectionStatus(status: DaemonConnectionStatus): void {
+  daemonConnectionStatus = status;
+  for (const listener of daemonConnectionStatusListeners) {
+    listener(status);
+  }
+
+  emitDesktopRpcEvent({
+    method: "daemon.connection.status",
+    payload: { status },
+  });
+}
+
+function invalidateDaemonDiscovery(): void {
+  daemonWsUrlPromise = null;
+}
 
 async function getDaemonWsUrl(): Promise<string> {
   if (!daemonWsUrlPromise) {
@@ -51,6 +70,7 @@ async function openSocketWithRetry(): Promise<WebSocket> {
 
   for (let attempt = 0; attempt <= SOCKET_CONNECT_RETRY_COUNT; attempt += 1) {
     try {
+      invalidateDaemonDiscovery();
       const wsUrl = await getDaemonWsUrl();
       return await new Promise<WebSocket>((resolvePromise, rejectPromise) => {
         const socket = new WebSocket(wsUrl);
@@ -102,6 +122,21 @@ async function getDaemonTransportClient(): Promise<DaemonClient> {
     daemonTransportClientPromise = Promise.resolve(
       new DaemonClient({
         openSocket: openSocketWithRetry,
+        onConnectionEvent: (event) => {
+          if (event === "connected") {
+            emitDaemonConnectionStatus("connected");
+            void refreshDaemonIdentity();
+            return;
+          }
+
+          if (event === "connecting") {
+            emitDaemonConnectionStatus("connecting");
+            return;
+          }
+
+          invalidateDaemonDiscovery();
+          emitDaemonConnectionStatus("disconnected");
+        },
       }),
     );
   }
@@ -109,11 +144,36 @@ async function getDaemonTransportClient(): Promise<DaemonClient> {
   return await daemonTransportClientPromise;
 }
 
+async function refreshDaemonIdentity(): Promise<void> {
+  try {
+    const info = await getDesktopHostBridge().getDaemonInfo();
+    emitDesktopRpcEvent({
+      method: "daemon.info.refreshed",
+      payload: info,
+    });
+  } catch (error) {
+    emitDesktopRpcEvent({
+      method: "daemon.info.error",
+      payload: { error },
+    });
+  }
+}
+
 /** Emits one raw desktop RPC envelope to registered listeners. */
 function emitDesktopRpcEvent(envelope: DesktopRpcEventEnvelope): void {
   for (const listener of desktopRpcEventListeners) {
     listener(envelope);
   }
+}
+
+/** Registers one daemon connection status listener and returns one unsubscribe callback. */
+export function subscribeDaemonConnectionStatus(listener: (status: DaemonConnectionStatus) => void): () => void {
+  daemonConnectionStatusListeners.add(listener);
+  listener(daemonConnectionStatus);
+
+  return () => {
+    daemonConnectionStatusListeners.delete(listener);
+  };
 }
 
 function formatSubscriptionEventData(method: string, payload: unknown): unknown {

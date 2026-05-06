@@ -1,10 +1,10 @@
-import type { AgentKind } from "@yishan/agent-runtime";
 import type { RpcSchema } from "../../shared/contracts/rpcSchema";
+import type { DesktopAgentKind } from "../helpers/agentSettings";
 import { getDaemonClient } from "../rpc/rpcTransport";
 import { chatStore } from "../store/chatStore";
 import type { AvailableCommand, AvailableModel, ChatMessage } from "../store/types";
 
-type WorkspaceAgentKind = AgentKind;
+type WorkspaceAgentKind = DesktopAgentKind;
 type EnsureWorkspaceChatSessionResponse = {
   sessionId: string;
 } & {

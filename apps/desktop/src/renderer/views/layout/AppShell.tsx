@@ -1,10 +1,15 @@
-import { Box } from "@mui/material";
+import { Alert, Box, LinearProgress, Snackbar } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
+import { useDaemonConnectionMonitor } from "../../hooks/useDaemonConnectionMonitor";
 import { useShortcuts } from "../../hooks/useShortcuts";
 
 /** Renders the app frame and route content. */
 export function AppShell() {
+  const { t } = useTranslation();
   useShortcuts();
+  const daemonConnectionStatus = useDaemonConnectionMonitor();
+  const isReconnecting = daemonConnectionStatus !== "connected";
 
   return (
     <Box
@@ -19,7 +24,18 @@ export function AppShell() {
         flex: 1,
       }}
     >
-        <Outlet />
+      {isReconnecting ? (
+        <LinearProgress
+          color="warning"
+          sx={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: (theme) => theme.zIndex.snackbar }}
+        />
+      ) : null}
+      <Outlet />
+      <Snackbar open={isReconnecting} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="warning" variant="filled">
+          {t("daemon.connection.reconnecting")}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
