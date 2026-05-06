@@ -196,6 +196,20 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+function stubTerminalBrowserApis(): void {
+  class MockResizeObserver {
+    observe() {}
+    disconnect() {}
+  }
+
+  vi.stubGlobal("ResizeObserver", MockResizeObserver);
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    callback(0);
+    return 0;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+}
+
 /** Builds the minimal workspace-store state required by TerminalView. */
 function buildStoreState() {
   const state: {
@@ -286,12 +300,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
@@ -347,12 +356,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-2" />);
     await waitFor(() => {
@@ -382,12 +386,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
@@ -417,12 +416,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
@@ -452,12 +446,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
@@ -488,12 +477,7 @@ describe("TerminalView", () => {
     });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
@@ -538,12 +522,7 @@ describe("TerminalView", () => {
       .mockResolvedValueOnce({ nextIndex: 0, chunks: [], exited: false, exitCode: null, signalCode: null });
     mocked.resizeTerminal.mockResolvedValue({ ok: true });
 
-    class MockResizeObserver {
-      observe() {}
-      disconnect() {}
-    }
-
-    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    stubTerminalBrowserApis();
 
     render(
       <>
@@ -554,6 +533,7 @@ describe("TerminalView", () => {
     await waitFor(() => {
       expect(mocked.createTerminalSession).toHaveBeenCalledTimes(2);
     });
+    mocked.renameTab.mockClear();
 
     mocked.emitTerminalInput("pnpm test --filter apps/desktop -- --runInBand\r", 0);
     mocked.emitTerminalInput("bun lint\r", 1);
