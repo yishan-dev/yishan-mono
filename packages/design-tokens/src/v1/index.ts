@@ -160,7 +160,7 @@ export const SEMANTIC_COLOR_TOKENS = {
       hover: "rgba(221, 226, 233, 0.12)",
       selected: "rgba(221, 226, 233, 0.08)",
     },
-    primary: COLOR_PRIMITIVES.brand.amber300,
+    primary: "#9ddb72",
     secondary: "#3f5750",
   },
 } as const;
