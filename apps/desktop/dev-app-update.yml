@@ -1,0 +1,5 @@
+provider: github
+owner: yishan-io
+repo: yishan-mono
+private: false
+updaterCacheDirName: yishan-dev-updater
