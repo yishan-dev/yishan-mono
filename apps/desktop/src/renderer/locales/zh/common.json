@@ -37,6 +37,11 @@
       "dismissAria": "关闭会话过期通知"
     }
   },
+  "daemon": {
+    "connection": {
+      "reconnecting": "正在重新连接守护进程..."
+    }
+  },
   "settings": {
     "title": "设置",
     "back": "返回",

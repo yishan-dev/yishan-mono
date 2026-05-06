@@ -36,9 +36,12 @@ type ActiveSubscription = {
   method: string;
   params?: unknown;
   onNotification: (event: Rpc.DaemonNotification) => void;
+  registeredWithDaemon: boolean;
 };
 
 type DaemonRpcError = Error & { code?: number };
+
+type DaemonClientConnectionEvent = "connecting" | "connected" | "disconnected";
 
 /** Normalizes daemon file-entry paths so directories always keep a trailing slash. */
 function normalizeDaemonFileEntries(files: Rpc.DaemonFileEntry[]): Rpc.DaemonFileEntry[] {
@@ -59,16 +62,23 @@ function createDaemonRpcError(code: number, message: string): DaemonRpcError {
 
 export class DaemonClient {
   private readonly openSocket: () => Promise<WebSocket>;
+  private readonly onConnectionEvent?: (event: DaemonClientConnectionEvent) => void;
   private socket: WebSocket | null = null;
   private socketOpenPromise: Promise<WebSocket> | null = null;
   private readonly pendingRequestsById = new Map<string, PendingRequest>();
   private readonly subscriptionsById = new Map<string, ActiveSubscription>();
   private readonly workspaceIdByWorktreePath = new Map<string, string>();
   private readonly terminalNextIndexBySessionId = new Map<string, number>();
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectPromise: Promise<void> | null = null;
   private disposed = false;
 
-  constructor(options: { openSocket: () => Promise<WebSocket> }) {
+  constructor(options: {
+    openSocket: () => Promise<WebSocket>;
+    onConnectionEvent?: (event: DaemonClientConnectionEvent) => void;
+  }) {
     this.openSocket = options.openSocket;
+    this.onConnectionEvent = options.onConnectionEvent;
   }
 
   readonly workspace = {
@@ -131,6 +141,39 @@ export class DaemonClient {
       pending.reject(new Error(`${reason} while calling method "${pending.method}"`));
       this.pendingRequestsById.delete(requestId);
     }
+  }
+
+  private async restoreDaemonSubscriptions(): Promise<void> {
+    const activeSubscriptions = Array.from(this.subscriptionsById.values()).filter(
+      (subscription) => subscription.registeredWithDaemon,
+    );
+    for (const subscription of activeSubscriptions) {
+      try {
+        await this.sendRequest(subscription.method, subscription.params);
+      } catch {
+        // A later reconnect attempt will re-register subscriptions again.
+      }
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.disposed || this.reconnectPromise || this.socketOpenPromise) {
+      return;
+    }
+
+    this.reconnectPromise = this.ensureSocket()
+      .then(() => undefined)
+      .catch(() => {
+        if (!this.disposed && !this.reconnectTimer) {
+          this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.scheduleReconnect();
+          }, 1_000);
+        }
+      })
+      .finally(() => {
+        this.reconnectPromise = null;
+      });
   }
 
   private handleSocketMessage(data: unknown): void {
@@ -213,9 +256,11 @@ export class DaemonClient {
       return await this.socketOpenPromise;
     }
 
+    this.onConnectionEvent?.("connecting");
     this.socketOpenPromise = this.openSocket()
       .then((socket) => {
         this.socket = socket;
+        this.onConnectionEvent?.("connected");
         // Enable binary frame reception as ArrayBuffer for terminal output fast-path.
         socket.binaryType = "arraybuffer";
 
@@ -231,13 +276,23 @@ export class DaemonClient {
         socket.addEventListener("close", () => {
           this.clearSocketReference(socket);
           this.rejectAllPendingRequests("daemon websocket closed");
+          this.onConnectionEvent?.("disconnected");
+          this.scheduleReconnect();
         });
 
         socket.addEventListener("error", () => {
           this.rejectAllPendingRequests("daemon websocket failed");
+          this.onConnectionEvent?.("disconnected");
+          this.scheduleReconnect();
         });
 
+        void this.restoreDaemonSubscriptions();
+
         return socket;
+      })
+      .catch((error) => {
+        this.onConnectionEvent?.("disconnected");
+        throw error;
       })
       .finally(() => {
         this.socketOpenPromise = null;
@@ -383,6 +438,7 @@ export class DaemonClient {
       method: options.method,
       params: options.params,
       onNotification: options.onNotification,
+      registeredWithDaemon: true,
     });
     return subscriptionId;
   }
@@ -972,7 +1028,7 @@ export class DaemonClient {
             const eventSessionId = readOptionalString(payload.sessionId) || sessionId;
             // Accept both string (JSON-RPC) and Uint8Array (binary fast-path) chunks.
             const rawChunk = payload.chunk;
-            const chunk = rawChunk instanceof Uint8Array ? rawChunk : (typeof rawChunk === "string" ? rawChunk : "");
+            const chunk = rawChunk instanceof Uint8Array ? rawChunk : typeof rawChunk === "string" ? rawChunk : "";
             const nextIndex = (this.terminalNextIndexBySessionId.get(eventSessionId) ?? 0) + 1;
             this.terminalNextIndexBySessionId.set(eventSessionId, nextIndex);
             options.onNotification({
@@ -999,6 +1055,7 @@ export class DaemonClient {
       this.subscriptionsById.set(subscriptionId, {
         method: "terminal.sessions",
         onNotification: options.onNotification,
+        registeredWithDaemon: false,
       });
       return subscriptionId;
     }
@@ -1029,6 +1086,10 @@ export class DaemonClient {
 
   dispose(): void {
     this.disposed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     for (const requestId of this.pendingRequestsById.keys()) {
       const pending = this.pendingRequestsById.get(requestId);
       if (!pending) {

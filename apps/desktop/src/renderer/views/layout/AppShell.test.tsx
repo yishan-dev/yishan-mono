@@ -7,6 +7,17 @@ import { AppShell } from "./AppShell";
 
 const mocks = vi.hoisted(() => ({
   useShortcuts: vi.fn(),
+  useDaemonConnectionMonitor: vi.fn(() => "connected"),
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
+vi.mock("../../hooks/useDaemonConnectionMonitor", () => ({
+  useDaemonConnectionMonitor: mocks.useDaemonConnectionMonitor,
 }));
 
 vi.mock("../../hooks/useShortcuts", () => ({
@@ -40,5 +51,21 @@ describe("AppShell", () => {
     );
 
     expect(mocks.useShortcuts).toHaveBeenCalled();
+  });
+
+  it("shows reconnect feedback while daemon is unavailable", () => {
+    mocks.useDaemonConnectionMonitor.mockReturnValueOnce("disconnected");
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<div>workspace-route</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("daemon.connection.reconnecting")).toBeTruthy();
   });
 });
