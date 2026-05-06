@@ -365,13 +365,11 @@
     },
     "filter": {
       "placeholder": "按仓库、路径、工作区或分支筛选",
-      "clear": "清除仓库筛选",
       "empty": "当前筛选条件下没有匹配的仓库。",
       "searchPlaceholder": "快速搜索仓库",
       "searchAriaLabel": "快速搜索仓库",
       "actions": {
-        "all": "全部",
-        "clear": "清空"
+        "all": "全选"
       }
     },
     "registered": "已注册仓库",
@@ -417,13 +415,11 @@
     },
     "filter": {
       "placeholder": "按项目、路径、工作区或分支筛选",
-      "clear": "清除项目筛选",
       "empty": "当前筛选条件下没有匹配的项目。",
       "searchPlaceholder": "快速搜索项目",
       "searchAriaLabel": "快速搜索项目",
       "actions": {
-        "all": "全部",
-        "clear": "清空"
+        "all": "全选"
       }
     },
     "registered": "已注册项目",

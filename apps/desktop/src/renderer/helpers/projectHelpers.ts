@@ -190,13 +190,15 @@ export function buildHydratedStateFromApiData(
   const nextProjectIdSet = new Set(mappedProjects.map((project) => project.id));
   const baseDisplayProjectIds = orgPreferences?.displayProjectIds ?? [];
   const filteredDisplayProjectIds = baseDisplayProjectIds.filter((projectId) => nextProjectIdSet.has(projectId));
+  const hasNoPersistedPreference =
+    orgPreferences?.displayProjectIds === undefined || orgPreferences.displayProjectIds.length === 0;
   const shouldResetPersistedDisplayProjectIds =
     orgPreferences?.displayProjectIds !== undefined &&
     orgPreferences.displayProjectIds.length > 0 &&
     filteredDisplayProjectIds.length === 0 &&
     mappedProjects.length > 0;
   const nextDisplayProjectIds =
-    orgPreferences?.displayProjectIds === undefined && baseDisplayProjectIds.length === 0
+    hasNoPersistedPreference && mappedProjects.length > 0
       ? mappedProjects.map((project) => project.id)
       : shouldResetPersistedDisplayProjectIds
         ? mappedProjects.map((project) => project.id)
@@ -283,10 +285,7 @@ export function buildCreatedRepoState(
   return {
     projects: [...currentProjects, nextProject],
     workspaces: state.workspaces,
-    displayProjectIds:
-      currentDisplayProjectIds.length === currentProjects.length
-        ? [...currentDisplayProjectIds, nextRepoId]
-        : currentDisplayProjectIds,
+    displayProjectIds: [...currentDisplayProjectIds, nextRepoId],
     selectedProjectId: nextRepoId,
     selectedWorkspaceId: "",
   };

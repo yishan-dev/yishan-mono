@@ -381,13 +381,11 @@
     },
     "filter": {
       "placeholder": "Filter by repository, path, workspace, or branch",
-      "clear": "Clear repository filter",
       "empty": "No repositories match the current filter.",
       "searchPlaceholder": "Quick search repositories",
       "searchAriaLabel": "Quick search repositories",
       "actions": {
-        "all": "All",
-        "clear": "Clear"
+        "all": "Select all"
       }
     },
     "registered": "Registered repositories",
@@ -433,13 +431,11 @@
     },
     "filter": {
       "placeholder": "Filter by project, path, workspace, or branch",
-      "clear": "Clear project filter",
       "empty": "No projects match the current filter.",
       "searchPlaceholder": "Quick search projects",
       "searchAriaLabel": "Quick search projects",
       "actions": {
-        "all": "All",
-        "clear": "Clear"
+        "all": "Select all"
       }
     },
     "registered": "Registered projects",

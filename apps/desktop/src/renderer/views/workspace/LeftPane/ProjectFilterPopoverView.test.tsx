@@ -34,8 +34,7 @@ vi.mock("react-i18next", () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
         "project.actions.filter": "Filter",
-        "project.filter.actions.all": "All",
-        "project.filter.actions.clear": "Clear",
+        "project.filter.actions.all": "Select all",
         "project.filter.searchPlaceholder": "Quick search projects",
         "project.filter.searchAriaLabel": "Quick search projects",
       };

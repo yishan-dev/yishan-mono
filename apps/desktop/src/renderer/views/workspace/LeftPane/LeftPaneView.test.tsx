@@ -43,12 +43,10 @@ vi.mock("react-i18next", () => ({
         "project.actions.delete": "Delete project",
         "project.delete.confirm": `Delete project '${params?.name ?? ""}' and all child workspaces?`,
         "project.filter.placeholder": "Filter by project, path, workspace, or branch",
-        "project.filter.clear": "Clear project filter",
         "project.filter.empty": "No projects match the current filter.",
         "project.filter.searchPlaceholder": "Quick search projects",
         "project.filter.searchAriaLabel": "Quick search projects",
-        "project.filter.actions.all": "All",
-        "project.filter.actions.clear": "Clear",
+        "project.filter.actions.all": "Select all",
         "common.actions.cancel": "Cancel",
         "org.settings.title": "Organization settings",
         "project.list.title": "Projects",
@@ -122,7 +120,7 @@ describe("LeftPaneView deletion", () => {
     vi.clearAllMocks();
   });
 
-  it("supports clear and all actions in the repo filter popover", () => {
+  it("supports toggling individual projects and select-all in the filter popover", () => {
     mocked.stateRef.current = {
       ...mocked.stateRef.current,
       projects: [
@@ -142,14 +140,18 @@ describe("LeftPaneView deletion", () => {
     expect(screen.getByTestId("visible-repo-repo-2")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Filter" }));
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    // Uncheck one project
+    const repo1Option = screen.getAllByText("Repo 1").at(-1);
+    expect(repo1Option).toBeTruthy();
+    fireEvent.click(repo1Option!);
     rerender(<LeftPaneView />);
 
     expect(screen.queryByTestId("visible-repo-repo-1")).toBeNull();
-    expect(screen.queryByTestId("visible-repo-repo-2")).toBeNull();
-    expect(screen.getByText("No projects match the current filter.")).toBeTruthy();
+    expect(screen.getByTestId("visible-repo-repo-2")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    // Select all restores everything
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
     rerender(<LeftPaneView />);
 
     expect(screen.getByTestId("visible-repo-repo-1")).toBeTruthy();
@@ -163,13 +165,15 @@ describe("LeftPaneView deletion", () => {
         { id: "repo-1", name: "Repo 1", path: "/tmp/repo-1" },
         { id: "repo-2", name: "Client Portal", path: "/tmp/client-portal" },
       ],
-      displayProjectIds: ["repo-1", "repo-2"],
+      displayProjectIds: ["repo-1"],
     };
 
     const { rerender } = render(<LeftPaneView />);
 
+    expect(screen.getByTestId("visible-repo-repo-1")).toBeTruthy();
+    expect(screen.queryByTestId("visible-repo-repo-2")).toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "Filter" }));
-    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Quick search projects" }), {
       target: { value: "client" },
     });
@@ -181,7 +185,7 @@ describe("LeftPaneView deletion", () => {
     fireEvent.click(popoverRepoOption);
     rerender(<LeftPaneView />);
 
-    expect(screen.queryByTestId("visible-repo-repo-1")).toBeNull();
+    expect(screen.getByTestId("visible-repo-repo-1")).toBeTruthy();
     expect(screen.getByTestId("visible-repo-repo-2")).toBeTruthy();
   });
 

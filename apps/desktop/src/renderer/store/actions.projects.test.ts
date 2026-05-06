@@ -225,6 +225,41 @@ describe("createWorkspaceRepoActions", () => {
     expect(state.selectedWorkspaceId).toBe("");
   });
 
+  it("always adds new project to display filter even when some projects are filtered out", () => {
+    const harness = createHarness({ displayProjectIds: ["repo-1"] });
+
+    harness.actions.createProject({
+      name: "Repo 3",
+      source: "local",
+      path: "/tmp/repo-3",
+      backendProject: {
+        id: "repo-3",
+        name: "Repo 3",
+        key: "repo-3",
+        repoKey: "repo-3",
+        localPath: "/tmp/repo-3",
+        worktreePath: "/tmp/repo-3",
+        gitUrl: "",
+        repoUrl: null,
+        contextEnabled: true,
+        sourceType: "git-local",
+        repoProvider: null,
+        icon: "folder",
+        color: "#1E66F5",
+        setupScript: "",
+        postScript: "",
+        defaultBranch: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdByUserId: "user-1",
+      },
+    });
+
+    const state = harness.getState();
+    expect(state.displayProjectIds).toEqual(["repo-1", "repo-3"]);
+    expect(state.selectedProjectId).toBe("repo-3");
+  });
+
   it("updates project config and refresh version as separate pure actions", () => {
     const harness = createHarness();
     harness.actions.updateProjectConfig("repo-1", {

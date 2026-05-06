@@ -93,7 +93,7 @@ describe("projectHelpers", () => {
     expect(hydrated.displayProjectIds).toEqual(["repo-1"]);
   });
 
-  it("keeps explicit empty persisted display ids", () => {
+  it("defaults to all projects when persisted display ids are empty", () => {
     const initialState = {
       projects: [],
       workspaces: [],
@@ -120,6 +120,27 @@ describe("projectHelpers", () => {
       ],
       [],
     );
+
+    expect(hydrated.displayProjectIds).toEqual(["repo-1"]);
+  });
+
+  it("keeps empty display ids when no projects exist", () => {
+    const initialState = {
+      projects: [],
+      workspaces: [],
+      gitChangesCountByWorkspaceId: {},
+      gitChangeTotalsByWorkspaceId: {},
+      selectedProjectId: "",
+      selectedWorkspaceId: "",
+      displayProjectIds: [],
+      organizationPreferencesById: {
+        "org-1": {
+          displayProjectIds: [],
+        },
+      },
+    };
+
+    const hydrated = buildHydratedStateFromApiData(initialState, "org-1", [], []);
 
     expect(hydrated.displayProjectIds).toEqual([]);
   });

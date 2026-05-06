@@ -28,7 +28,7 @@ function repoMatchesQuickSearch(repoName: string, repoPath: string, keyword: str
   return repoName.toLowerCase().includes(normalizedKeyword) || repoPath.toLowerCase().includes(normalizedKeyword);
 }
 
-/** Renders the repo filter trigger and popover with all/clear controls and quick search. */
+/** Renders the repo filter trigger and popover with select-all control and quick search. */
 export function ProjectFilterPopoverView() {
   const { t } = useTranslation();
   const repos = workspaceStore((state) => state.projects);
@@ -39,10 +39,6 @@ export function ProjectFilterPopoverView() {
 
   const handleSelectAll = () => {
     setDisplayRepoIds(repos.map((repo) => repo.id));
-  };
-
-  const handleClearSelection = () => {
-    setDisplayRepoIds([]);
   };
 
   return (
@@ -92,12 +88,9 @@ export function ProjectFilterPopoverView() {
         }}
       >
         <Box sx={{ width: 240, p: 1 }}>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
             <Button size="small" sx={{ minWidth: 0, px: 0.75, py: 0.25, fontSize: 11 }} onClick={handleSelectAll}>
               {t("project.filter.actions.all")}
-            </Button>
-            <Button size="small" sx={{ minWidth: 0, px: 0.75, py: 0.25, fontSize: 11 }} onClick={handleClearSelection}>
-              {t("project.filter.actions.clear")}
             </Button>
           </Stack>
           <TextField
@@ -133,11 +126,16 @@ export function ProjectFilterPopoverView() {
               )
               .map((repo) => {
                 const checked = displayRepoIds.includes(repo.id);
+                const isLastSelected = checked && displayRepoIds.length === 1;
 
                 return (
                   <ListItem key={repo.id} disablePadding>
                     <ListItemButton
+                      disabled={isLastSelected}
                       onClick={() => {
+                        if (isLastSelected) {
+                          return;
+                        }
                         const nextDisplayRepoIds = displayRepoIds.includes(repo.id)
                           ? displayRepoIds.filter((item) => item !== repo.id)
                           : [...displayRepoIds, repo.id];
@@ -148,6 +146,7 @@ export function ProjectFilterPopoverView() {
                       <Checkbox
                         size="small"
                         checked={checked}
+                        disabled={isLastSelected}
                         tabIndex={-1}
                         disableRipple
                         sx={{ p: 0.5, mr: 0.5, "& .MuiSvgIcon-root": { fontSize: 18 } }}
