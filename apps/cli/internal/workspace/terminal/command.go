@@ -3,6 +3,8 @@ package terminal
 import (
 	"runtime"
 	"strings"
+
+	"yishan/apps/cli/internal/workspace/shellenv"
 )
 
 func resolveCommand(req StartRequest, goos string, shellEnv string) (string, []string) {
@@ -84,22 +86,9 @@ func mergeEnvOverrides(env []string, overrides []string) []string {
 }
 
 func envValueOrDefault(env []string, key string, fallback string) string {
-	prefix := key + "="
-	for _, entry := range env {
-		if strings.HasPrefix(entry, prefix) && strings.TrimSpace(strings.TrimPrefix(entry, prefix)) != "" {
-			return strings.TrimPrefix(entry, prefix)
-		}
-	}
-	return fallback
+	return shellenv.EnvValueOrDefault(env, key, fallback)
 }
 
 func upsertEnv(env []string, key string, value string) []string {
-	prefix := key + "="
-	for index, entry := range env {
-		if strings.HasPrefix(entry, prefix) {
-			env[index] = prefix + value
-			return env
-		}
-	}
-	return append(env, prefix+value)
+	return shellenv.UpsertEnv(env, key, value)
 }
