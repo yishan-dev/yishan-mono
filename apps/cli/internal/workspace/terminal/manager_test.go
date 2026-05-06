@@ -314,6 +314,52 @@ func TestSubscriptionStreamsOutputAndExit(t *testing.T) {
 	}
 }
 
+func TestResolveManagedRuntimeEnvResolvesOrigZdotdirWhenAlreadyManaged(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	managedZshDir := filepath.Join(homeDir, ".yishan", "shell", "zsh")
+
+	// Simulate dev mode: ZDOTDIR already points to the managed wrapper dir
+	// because the daemon inherited its parent shell's environment.
+	baseEnv := []string{
+		"HOME=" + homeDir,
+		"PATH=/usr/bin",
+		"ZDOTDIR=" + managedZshDir,
+	}
+
+	got := resolveManagedRuntimeEnv(baseEnv, "/bin/zsh")
+	joined := strings.Join(got, "\n")
+
+	// YISHAN_ORIG_ZDOTDIR should resolve to HOME, not the managed dir.
+	expectedOrig := managedRuntimeOrigZdotdirEnvKey + "=" + homeDir
+	if !strings.Contains(joined, expectedOrig) {
+		t.Fatalf("expected %s when ZDOTDIR already points to managed dir, got %v", expectedOrig, got)
+	}
+}
+
+func TestResolveManagedRuntimeEnvPreservesCustomZdotdir(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	customZdotdir := filepath.Join(homeDir, ".config", "zsh")
+
+	baseEnv := []string{
+		"HOME=" + homeDir,
+		"PATH=/usr/bin",
+		"ZDOTDIR=" + customZdotdir,
+	}
+
+	got := resolveManagedRuntimeEnv(baseEnv, "/bin/zsh")
+	joined := strings.Join(got, "\n")
+
+	// YISHAN_ORIG_ZDOTDIR should preserve the user's custom ZDOTDIR.
+	expectedOrig := managedRuntimeOrigZdotdirEnvKey + "=" + customZdotdir
+	if !strings.Contains(joined, expectedOrig) {
+		t.Fatalf("expected %s, got %v", expectedOrig, got)
+	}
+}
+
 func TestResizeAndUnsubscribe(t *testing.T) {
 	m := NewManager()
 

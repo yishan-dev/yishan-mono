@@ -208,3 +208,50 @@ func TestEnsureManagedShellSetupWritesShellWrappers(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedShellEnvResolvesOrigZdotdirWhenAlreadyManaged(t *testing.T) {
+	managedRootDir := t.TempDir()
+	managedZshDir := filepath.Join(managedRootDir, "shell", "zsh")
+
+	// Simulate dev mode: ZDOTDIR already points to the managed wrapper dir
+	// because the daemon inherited its parent shell's environment.
+	baseEnv := []string{
+		"HOME=/Users/test",
+		"PATH=/usr/bin",
+		"ZDOTDIR=" + managedZshDir,
+	}
+
+	got := managedShellEnv(baseEnv, managedRootDir, "/bin/zsh")
+	joined := strings.Join(got, "\n")
+
+	// YISHAN_ORIG_ZDOTDIR should resolve to HOME, not the managed dir.
+	expectedOrig := origZdotdirEnvKey + "=/Users/test"
+	if !strings.Contains(joined, expectedOrig) {
+		t.Fatalf("expected %s when ZDOTDIR already points to managed dir, got %v", expectedOrig, got)
+	}
+
+	// ZDOTDIR should still be set to managed wrapper dir.
+	if !strings.Contains(joined, "ZDOTDIR="+managedZshDir) {
+		t.Fatalf("expected ZDOTDIR to be set to managed wrapper dir, got %v", got)
+	}
+}
+
+func TestManagedShellEnvPreservesCustomZdotdir(t *testing.T) {
+	managedRootDir := t.TempDir()
+
+	// User has a custom ZDOTDIR (not the managed one).
+	baseEnv := []string{
+		"HOME=/Users/test",
+		"PATH=/usr/bin",
+		"ZDOTDIR=/Users/test/.config/zsh",
+	}
+
+	got := managedShellEnv(baseEnv, managedRootDir, "/bin/zsh")
+	joined := strings.Join(got, "\n")
+
+	// YISHAN_ORIG_ZDOTDIR should preserve the user's custom ZDOTDIR.
+	expectedOrig := origZdotdirEnvKey + "=/Users/test/.config/zsh"
+	if !strings.Contains(joined, expectedOrig) {
+		t.Fatalf("expected %s, got %v", expectedOrig, got)
+	}
+}

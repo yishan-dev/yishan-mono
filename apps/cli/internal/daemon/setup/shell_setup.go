@@ -148,10 +148,27 @@ func managedShellEnv(baseEnv []string, managedRootDir string, command string) []
 	env := upsertSetupEnv(baseEnv, "PATH", prependPathValue(envValueOrDefault(baseEnv, "PATH", os.Getenv("PATH")), filepath.Join(managedRootDir, "bin")))
 	shellName := filepath.Base(command)
 	if shellName == "zsh" {
-		env = upsertSetupEnv(env, origZdotdirEnvKey, envValueOrDefault(env, "ZDOTDIR", envValueOrDefault(env, "HOME", os.Getenv("HOME"))))
-		env = upsertSetupEnv(env, "ZDOTDIR", filepath.Join(managedRootDir, "shell", "zsh"))
+		managedZshDir := filepath.Join(managedRootDir, "shell", "zsh")
+		// If ZDOTDIR already points to the managed wrapper directory (e.g.
+		// daemon inherited it from a parent shell in dev mode), treat it as
+		// unset and fall back to HOME to avoid a self-referential source
+		// loop in .zshenv.
+		origZdotdir := resolveOrigZdotdirValue(env, managedZshDir)
+		env = upsertSetupEnv(env, origZdotdirEnvKey, origZdotdir)
+		env = upsertSetupEnv(env, "ZDOTDIR", managedZshDir)
 	}
 	return env
+}
+
+// resolveOrigZdotdirValue returns the user's real ZDOTDIR. If the current
+// ZDOTDIR already points to the managed wrapper directory, it is treated as
+// unset and falls back to HOME.
+func resolveOrigZdotdirValue(env []string, managedZshDir string) string {
+	zdotdir := envValueOrDefault(env, "ZDOTDIR", "")
+	if zdotdir == "" || zdotdir == managedZshDir {
+		return envValueOrDefault(env, "HOME", os.Getenv("HOME"))
+	}
+	return zdotdir
 }
 
 func prependPathValue(pathValue string, directory string) string {
