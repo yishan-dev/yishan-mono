@@ -75,7 +75,7 @@ function getChangeColors(kind: ProjectGitChangeKind, sectionId: string) {
 
 /** Groups changed files by parent folder so list rows stay compact. */
 function groupByFolder(files: ProjectGitChangeItem[]): FolderGroup[] {
-  const groups = new Map<string, RepoGitChangeItem[]>();
+  const groups = new Map<string, ProjectGitChangeItem[]>();
 
   for (const file of files) {
     const pathParts = file.path.split("/");
@@ -262,7 +262,7 @@ export function ProjectGitChangesList({
   };
 
   /** Enables dropping on sections only when one valid git state transition exists. */
-  const handleSectionDragOver = (event: ReactDragEvent, targetSectionId: RepoGitChangesSection["id"]) => {
+  const handleSectionDragOver = (event: ReactDragEvent, targetSectionId: ProjectGitChangesSection["id"]) => {
     if (!draggedFileState || !canMoveFileBetweenSections(draggedFileState.sectionId, targetSectionId)) {
       return;
     }
@@ -277,7 +277,7 @@ export function ProjectGitChangesList({
   };
 
   /** Applies one section drop operation by delegating to the parent handler. */
-  const handleSectionDrop = (event: ReactDragEvent, targetSectionId: RepoGitChangesSection["id"]) => {
+  const handleSectionDrop = (event: ReactDragEvent, targetSectionId: ProjectGitChangesSection["id"]) => {
     event.preventDefault();
     if (!draggedFileState || !canMoveFileBetweenSections(draggedFileState.sectionId, targetSectionId)) {
       handleFileDragEnd();
@@ -293,7 +293,7 @@ export function ProjectGitChangesList({
   };
 
   /** Handles click selection, including section-local shift-range selection. */
-  const handleFileClick = (event: ReactMouseEvent, file: RepoGitChangeItem, section: RepoGitChangesSection) => {
+  const handleFileClick = (event: ReactMouseEvent, file: ProjectGitChangeItem, section: ProjectGitChangesSection) => {
     const clickedFileKey = getFileSelectionKey(section.id, file.path);
     if (event.shiftKey) {
       if (!selectionAnchor || selectionAnchor.sectionId !== section.id) {

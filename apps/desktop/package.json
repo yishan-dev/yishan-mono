@@ -127,6 +127,14 @@
         "releaseType": "draft",
         "tagNamePrefix": "desktop-v"
       }
+    ],
+    "protocols": [
+      {
+        "name": "Yishan",
+        "schemes": [
+          "yishan"
+        ]
+      }
     ]
   },
   "license": "Elastic-2.0",

@@ -16,17 +16,17 @@ afterEach(() => {
 
 describe("selectionCommands", () => {
   it("selects repo and syncs selected workspace into tab store", () => {
-    const setSelectedRepoId = vi.fn();
+    const setSelectedProjectId = vi.fn();
     const setSelectedWorkspaceId = vi.fn();
     workspaceStore.setState({
-      setSelectedRepoId,
+      setSelectedProjectId,
       selectedWorkspaceId: "workspace-2",
     });
     tabStore.setState({ setSelectedWorkspaceId });
 
     setSelectedRepo("repo-2");
 
-    expect(setSelectedRepoId).toHaveBeenCalledWith("repo-2");
+    expect(setSelectedProjectId).toHaveBeenCalledWith("repo-2");
     expect(setSelectedWorkspaceId).toHaveBeenCalledWith("workspace-2");
   });
 

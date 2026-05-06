@@ -7,7 +7,11 @@ import {
   type ProjectCommitComparisonData,
   type ProjectCommitComparisonSelection,
 } from "../../../components/ProjectCommitComparison";
-import { ProjectGitChangesList, type ProjectGitChangesSection } from "../../../components/ProjectGitChangesList";
+import {
+  ProjectGitChangesList,
+  type ProjectGitChangeKind,
+  type ProjectGitChangesSection,
+} from "../../../components/ProjectGitChangesList";
 import { useCommands } from "../../../hooks/useCommands";
 import { workspaceStore } from "../../../store/workspaceStore";
 
@@ -78,6 +82,14 @@ function dedupeRepoChangeFiles(files: ProjectGitChangesSection["files"]): Projec
   }
 
   return [...dedupedFilesByPath.values()];
+}
+
+function normalizeProjectGitChangeKind(kind: string): ProjectGitChangeKind {
+  if (kind === "added" || kind === "deleted" || kind === "modified") {
+    return kind;
+  }
+
+  return "modified";
 }
 
 /** Resolves an absolute path by joining worktree root and relative file path. */
@@ -161,13 +173,21 @@ export function ChangesTabView() {
       return undefined;
     }
 
+    if (sourceBranch.startsWith("origin/")) {
+      return sourceBranch;
+    }
+
+    if (sourceBranch.includes("/")) {
+      return sourceBranch;
+    }
+
     // When the workspace branch matches its source branch (e.g., both are "main"),
     // compare against the remote tracking branch to show unpushed commits.
     if (selectedWorkspaceBranch && selectedWorkspaceBranch === sourceBranch) {
       return `origin/${sourceBranch}`;
     }
 
-    return sourceBranch;
+    return `origin/${sourceBranch}`;
   }, [selectedWorkspace?.sourceBranch, selectedWorkspaceBranch]);
   const workspaceGitRefreshVersion = workspaceStore((state) => {
     if (!selectedWorkspaceWorktreePath) {
@@ -258,9 +278,15 @@ export function ChangesTabView() {
       });
 
       const dedupedResponse: RepoChangesBySection = {
-        unstaged: dedupeRepoChangeFiles(response.unstaged),
-        staged: dedupeRepoChangeFiles(response.staged),
-        untracked: dedupeRepoChangeFiles(response.untracked),
+        unstaged: dedupeRepoChangeFiles(
+          response.unstaged.map((file) => ({ ...file, kind: normalizeProjectGitChangeKind(file.kind) })),
+        ),
+        staged: dedupeRepoChangeFiles(
+          response.staged.map((file) => ({ ...file, kind: normalizeProjectGitChangeKind(file.kind) })),
+        ),
+        untracked: dedupeRepoChangeFiles(
+          response.untracked.map((file) => ({ ...file, kind: normalizeProjectGitChangeKind(file.kind) })),
+        ),
       };
 
       setRepoChangesBySection(dedupedResponse);
@@ -289,7 +315,7 @@ export function ChangesTabView() {
     }
   }, [listGitChanges, loadCommitComparison, selectedWorkspaceSourceBranch, selectedWorkspaceWorktreePath]);
 
-  const repoChanges: RepoGitChangesSection[] = useMemo(
+  const repoChanges: ProjectGitChangesSection[] = useMemo(
     () => [
       {
         id: "staged",

@@ -44,7 +44,7 @@ export type ExternalAppMenuEntry =
       appIds: readonly ExternalAppId[];
     };
 
-export type ExternalAppPlatform = NodeJS.Platform;
+export type ExternalAppPlatform = NodeJS.Platform | "unknown";
 
 export const SYSTEM_FILE_MANAGER_APP_ID = "system-file-manager" as const;
 

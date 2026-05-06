@@ -77,6 +77,17 @@ export function renameTabsForEntryRenameState(
 
     const nextTitle = remappedPath.split("/").filter(Boolean).at(-1) ?? remappedPath;
     didChange = true;
+    if (tab.kind === "file") {
+      return {
+        ...tab,
+        title: nextTitle,
+        data: {
+          ...tab.data,
+          path: remappedPath,
+        },
+      };
+    }
+
     return {
       ...tab,
       title: nextTitle,

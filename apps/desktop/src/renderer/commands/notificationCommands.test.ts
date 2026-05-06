@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SessionUser } from "../store/sessionStore";
 import {
   dispatchNotification,
   getNotificationPreferences,
@@ -33,7 +34,7 @@ const mocks = vi.hoisted(() => ({
         },
         enabledCategories: ["ai-task"],
       },
-    },
+    } as SessionUser,
     organizations: [{ id: "org-1", name: "Org" }],
     selectedOrganizationId: "org-1",
   },
@@ -80,7 +81,7 @@ describe("notificationCommands", () => {
     mocks.sessionState.currentUser = {
       ...mocks.sessionState.currentUser,
       notificationPreferences: undefined,
-    };
+    } as (typeof mocks.sessionState.currentUser);
     window.localStorage.setItem(
       "notifications.preferences.v1",
       JSON.stringify({

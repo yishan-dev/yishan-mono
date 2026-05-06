@@ -387,7 +387,7 @@ export function CreateWorkspaceDialogView({
                               ),
                             }}
                           >
-                            {renderProjectIcon(selectedValueRepo?.icon, 12)}
+                            {renderProjectIcon(selectedValueRepo?.icon ?? undefined, 12)}
                           </Avatar>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>
                             {repoName}
@@ -410,7 +410,7 @@ export function CreateWorkspaceDialogView({
                           color: theme.palette.getContrastText(repo.color ?? theme.palette.primary.main),
                         }}
                       >
-                        {renderProjectIcon(repo.icon, 12)}
+                        {renderProjectIcon(repo.icon ?? undefined, 12)}
                       </Avatar>
                       <Typography variant="body2">{repo.name}</Typography>
                     </Stack>

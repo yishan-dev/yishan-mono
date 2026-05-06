@@ -551,7 +551,8 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
         const successfulDirectoryPaths = new Set<string>();
         for (const result of response.results) {
           const normalizedDirectoryPath = normalizeRelativePath(result.request.relativePath ?? "").replace(/\/+$/, "");
-          const resultError = typeof (result as { error?: unknown }).error === "string" ? result.error.trim() : "";
+          const rawError = (result as { error?: unknown }).error;
+          const resultError = typeof rawError === "string" ? rawError.trim() : "";
           if (resultError) {
             if (normalizedDirectoryPath && isInvalidDirectoryListPathError(resultError)) {
               // Drop stale directory markers so refresh no longer retries the same
