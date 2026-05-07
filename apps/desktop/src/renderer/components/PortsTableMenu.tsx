@@ -1,4 +1,5 @@
 import { TableDropdownMenu } from "./TableDropdownMenu";
+import { LuX } from "react-icons/lu";
 
 const PORTS_GRID_TEMPLATE_COLUMNS = "minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 0.8fr)";
 
@@ -21,6 +22,8 @@ type PortsTableMenuProps = {
   onClose: () => void;
   onOpen: (anchorEl: HTMLElement) => void;
   onSelectRow: (rowId: string) => void;
+  onCloseRow: (rowId: string) => void;
+  isClosingRow?: (rowId: string) => boolean;
 };
 
 /** Renders one stateless ports button and table-like dropdown with address:port, pid, and process columns. */
@@ -35,6 +38,8 @@ export function PortsTableMenu({
   onClose,
   onOpen,
   onSelectRow,
+  onCloseRow,
+  isClosingRow,
 }: PortsTableMenuProps) {
   return (
     <TableDropdownMenu
@@ -72,6 +77,12 @@ export function PortsTableMenu({
       onOpen={onOpen}
       onClose={onClose}
       onSelectRow={onSelectRow}
+      getRowAction={(rowId) => ({
+        ariaLabel: `Close port ${rows.find((row) => row.id === rowId)?.addressPortLabel ?? ""}`,
+        icon: <LuX size={12} />,
+        onClick: onCloseRow,
+        disabled: isClosingRow?.(rowId) ?? false,
+      })}
     />
   );
 }

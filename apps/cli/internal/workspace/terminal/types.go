@@ -40,6 +40,14 @@ type StopResponse struct {
 	Stopped bool `json:"stopped"`
 }
 
+type KillProcessRequest struct {
+	PID int `json:"pid"`
+}
+
+type KillProcessResponse struct {
+	Killed bool `json:"killed"`
+}
+
 type ListSessionsRequest struct {
 	IncludeExited bool `json:"includeExited,omitempty"`
 }

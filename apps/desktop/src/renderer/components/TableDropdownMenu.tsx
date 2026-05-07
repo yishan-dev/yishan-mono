@@ -1,4 +1,5 @@
-import { Button, Menu, MenuItem, type SxProps, type Theme, Typography } from "@mui/material";
+import { Button, IconButton, Menu, MenuItem, type SxProps, type Theme, Typography } from "@mui/material";
+import type { ReactNode } from "react";
 import { LuChevronDown } from "react-icons/lu";
 
 export type TableDropdownMenuColumn = {
@@ -29,6 +30,12 @@ type TableDropdownMenuProps = {
   gridTemplateColumns: string;
   paperMinWidth: number;
   buttonMaxWidth?: number;
+  getRowAction?: (rowId: string) => {
+    ariaLabel: string;
+    icon: ReactNode;
+    onClick: (rowId: string) => void;
+    disabled?: boolean;
+  } | null;
   onClose: () => void;
   onOpen: (anchorEl: HTMLElement) => void;
   onSelectRow: (rowId: string) => void;
@@ -60,6 +67,7 @@ export function TableDropdownMenu({
   gridTemplateColumns,
   paperMinWidth,
   buttonMaxWidth,
+  getRowAction,
   onClose,
   onOpen,
   onSelectRow,
@@ -157,11 +165,40 @@ export function TableDropdownMenu({
                 minHeight: 32,
                 py: 0.5,
                 px: 1.5,
+                pr: getRowAction ? 4 : 1.5,
+                position: "relative",
               }}
               onClick={() => {
                 onSelectRow(row.id);
               }}
             >
+              {(() => {
+                const rowAction = getRowAction?.(row.id);
+                if (!rowAction) {
+                  return null;
+                }
+                return (
+                  <IconButton
+                    size="small"
+                    aria-label={rowAction.ariaLabel}
+                    disabled={rowAction.disabled === true}
+                    sx={{
+                      p: 0.25,
+                      position: "absolute",
+                      right: 6,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      rowAction.onClick(row.id);
+                    }}
+                  >
+                    {rowAction.icon}
+                  </IconButton>
+                );
+              })()}
               {row.cells.map((cell, index) => {
                 const defaultAlign = columns[index]?.align === "right" ? "right" : "left";
                 const resolvedAlign = cell.align ?? defaultAlign;

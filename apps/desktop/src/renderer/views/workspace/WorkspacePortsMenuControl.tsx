@@ -7,6 +7,7 @@ import { useCommands } from "../../hooks/useCommands";
 import type { TabStoreState } from "../../store/tabStore";
 import { tabStore } from "../../store/tabStore";
 import { workspaceStore } from "../../store/workspaceStore";
+import { enqueueWorkspaceErrorNotice } from "../../store/workspaceLifecycleNoticeStore";
 
 const PORT_POLL_INTERVAL_MS = 3000;
 type TerminalTab = Extract<TabStoreState["tabs"][number], { kind: "terminal" }>;
@@ -46,9 +47,10 @@ export function WorkspacePortsMenuControl() {
   const isInRouterContext = useInRouterContext();
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const tabs = tabStore((state) => state.tabs);
-  const { listDetectedPorts, setSelectedTabId, setSelectedWorkspaceId } = useCommands();
+  const { killTerminalProcess, listDetectedPorts, setSelectedTabId, setSelectedWorkspaceId } = useCommands();
   const [portsMenuAnchorEl, setPortsMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [detectedPorts, setDetectedPorts] = useState<TerminalDetectedPort[]>([]);
+  const [isKillingByRowId, setIsKillingByRowId] = useState<Record<string, boolean>>({});
   const closePortsMenu = useCallback(() => {
     setPortsMenuAnchorEl(null);
   }, []);
@@ -73,6 +75,9 @@ export function WorkspacePortsMenuControl() {
   );
   const sessionIdByPortRowId = useMemo(() => {
     return new Map(workspacePorts.map((entry) => [buildPortRowId(entry), entry.sessionId]));
+  }, [workspacePorts]);
+  const pidByPortRowId = useMemo(() => {
+    return new Map(workspacePorts.map((entry) => [buildPortRowId(entry), entry.pid]));
   }, [workspacePorts]);
   const terminalTabBySessionId = useMemo(() => {
     return new Map(tabs.filter(isTerminalTabWithSessionId).map((tab) => [tab.data.sessionId.trim(), tab]));
@@ -161,6 +166,36 @@ export function WorkspacePortsMenuControl() {
           }
           closePortsMenu();
         }}
+        onCloseRow={(rowId) => {
+          const pid = pidByPortRowId.get(rowId);
+          if (!pid || isKillingByRowId[rowId]) {
+            return;
+          }
+          setIsKillingByRowId((state) => ({
+            ...state,
+            [rowId]: true,
+          }));
+          void killTerminalProcess({ pid })
+            .then(async () => {
+              const nextPorts = await listDetectedPorts();
+              setDetectedPorts(nextPorts);
+            })
+            .catch((error) => {
+              const message = error instanceof Error ? error.message : String(error);
+              enqueueWorkspaceErrorNotice({
+                title: "Failed to close port",
+                message: `Could not terminate PID ${pid}: ${message}`,
+              });
+            })
+            .finally(() => {
+              setIsKillingByRowId((state) => {
+                const next = { ...state };
+                delete next[rowId];
+                return next;
+              });
+            });
+        }}
+        isClosingRow={(rowId) => Boolean(isKillingByRowId[rowId])}
       />
     </>
   );

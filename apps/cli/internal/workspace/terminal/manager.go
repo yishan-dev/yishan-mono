@@ -266,6 +266,18 @@ func (m *Manager) Stop(req StopRequest) (StopResponse, error) {
 	return StopResponse{Stopped: true}, nil
 }
 
+func (m *Manager) KillProcess(req KillProcessRequest) (KillProcessResponse, error) {
+	if req.PID <= 0 {
+		return KillProcessResponse{}, NewRPCError(-32602, "pid is required")
+	}
+
+	if err := stopProcessByPID(req.PID); err != nil {
+		return KillProcessResponse{}, err
+	}
+
+	return KillProcessResponse{Killed: true}, nil
+}
+
 func stopListeningProcessesForSession(s *session) error {
 	if s == nil || s.cmd == nil || s.cmd.Process == nil {
 		return nil

@@ -8,6 +8,7 @@ import { workspaceStore } from "../../store/workspaceStore";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
 
 const mocked = vi.hoisted(() => ({
+  killTerminalProcess: vi.fn(),
   listDetectedPorts: vi.fn(),
   setSelectedWorkspaceId: vi.fn(),
   setSelectedTabId: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../../hooks/useCommands", () => ({
   useCommands: () => ({
+    killTerminalProcess: mocked.killTerminalProcess,
     listDetectedPorts: mocked.listDetectedPorts,
     setSelectedWorkspaceId: mocked.setSelectedWorkspaceId,
     setSelectedTabId: mocked.setSelectedTabId,
@@ -64,6 +66,7 @@ const initialTabState = tabStore.getState();
 describe("WorkspacePortsMenuControl", () => {
   beforeEach(() => {
     mocked.listDetectedPorts.mockReset();
+    mocked.killTerminalProcess.mockReset();
     mocked.setSelectedWorkspaceId.mockReset();
     mocked.setSelectedTabId.mockReset();
 
@@ -150,6 +153,18 @@ describe("WorkspacePortsMenuControl", () => {
     await waitFor(() => {
       expect(screen.getByTestId("settings-overlay")).toBeTruthy();
       expect(screen.queryByText("0.0.0.0:3000")).toBeNull();
+    });
+  });
+
+  it("kills pid when close port action is clicked", async () => {
+    mocked.killTerminalProcess.mockResolvedValue({ ok: true });
+    renderWorkspaceShell();
+
+    fireEvent.click(await screen.findByRole("button", { name: "terminal.ports.toggleLabel" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Close port 0.0.0.0:3000" }));
+
+    await waitFor(() => {
+      expect(mocked.killTerminalProcess).toHaveBeenCalledWith({ pid: 6510 });
     });
   });
 });

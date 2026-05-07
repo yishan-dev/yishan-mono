@@ -211,6 +211,10 @@ export type TerminalCloseInput = {
   sessionId: string;
 };
 
+export type TerminalKillProcessInput = {
+  pid: number;
+};
+
 export type TerminalReadOutputInput = {
   sessionId: string;
   fromIndex: number;

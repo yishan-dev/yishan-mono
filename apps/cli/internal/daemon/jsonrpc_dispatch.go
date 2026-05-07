@@ -413,6 +413,12 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return h.manager.TerminalStop(req)
+	case MethodTerminalKillProcess:
+		var req workspace.TerminalKillProcessRequest
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		return h.manager.TerminalKillProcess(req)
 	case MethodTerminalListSessions:
 		var req workspace.TerminalListSessionsRequest
 		if err := decodeParams(params, &req); err != nil {

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   closeTerminalSession,
   createTerminalSession,
+  killTerminalProcess,
   listDetectedPorts,
   listTerminalSessions,
   readTerminalOutput,
@@ -15,6 +16,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   closeSession: vi.fn(),
+  killProcess: vi.fn(),
   createSession: vi.fn(),
   listDetectedPorts: vi.fn(),
   listSessions: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock("../rpc/rpcTransport", () => ({
   getDaemonClient: vi.fn(async () => ({
     terminal: {
       closeSession: mocks.closeSession,
+      killProcess: mocks.killProcess,
       createSession: mocks.createSession,
       listDetectedPorts: mocks.listDetectedPorts,
       listSessions: mocks.listSessions,
@@ -63,6 +66,7 @@ describe("terminalCommands", () => {
       onError: vi.fn(),
     });
     await closeTerminalSession({ sessionId: "session-1" });
+    await killTerminalProcess({ pid: 1234 });
 
     expect(mocks.createSession).toHaveBeenCalledWith({ cwd: "/tmp/repo", cols: 120, rows: 40 });
     expect(mocks.writeInput).toHaveBeenCalledWith({ sessionId: "session-1", data: "ls\n" });
@@ -85,5 +89,6 @@ describe("terminalCommands", () => {
       }),
     );
     expect(mocks.closeSession).toHaveBeenCalledWith({ sessionId: "session-1" });
+    expect(mocks.killProcess).toHaveBeenCalledWith({ pid: 1234 });
   });
 });
