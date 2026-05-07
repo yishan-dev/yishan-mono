@@ -18,11 +18,11 @@ const (
 )
 
 type JSONRPCHandler struct {
-	upgrader  websocket.Upgrader
-	manager   *workspace.Manager
-	nodeID    string
-	events    *eventHub
-	watchers  *workspaceWatchers
+	upgrader websocket.Upgrader
+	manager  *workspace.Manager
+	nodeID   string
+	events   *eventHub
+	watchers *workspaceWatchers
 }
 
 func NewJSONRPCHandler(manager *workspace.Manager, nodeID string) *JSONRPCHandler {
@@ -76,7 +76,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleBinaryFrame processes a binary WebSocket frame for terminal I/O.
 // Frame format: [1 byte opcode] [session ID (null-terminated)] [payload]
-func (h *JSONRPCHandler) handleBinaryFrame(_ *wsConnState, payload []byte) {
+func (h *JSONRPCHandler) handleBinaryFrame(connState *wsConnState, payload []byte) {
 	if len(payload) < 3 { // minimum: opcode + at least 1 char session ID + null terminator
 		return
 	}
@@ -91,7 +91,7 @@ func (h *JSONRPCHandler) handleBinaryFrame(_ *wsConnState, payload []byte) {
 		if nullIdx < 0 {
 			return
 		}
-		sessionID := string(rest[:nullIdx])
+		sessionID := connState.terminalInputSessionID(rest[:nullIdx])
 		inputData := rest[nullIdx+1:]
 		if len(inputData) == 0 {
 			return

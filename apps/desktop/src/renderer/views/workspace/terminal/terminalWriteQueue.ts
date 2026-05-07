@@ -33,7 +33,7 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
     writeInFlight = true;
     terminal.write(chunk, () => {
       writeInFlight = false;
-      scheduleFlush();
+      flushNextBatch();
     });
   };
 

@@ -31,7 +31,7 @@ export async function createTerminalSession(params?: TerminalCreateSessionParams
 }
 
 /** Writes one raw keystroke/input chunk to one terminal session. */
-export async function writeTerminalInput(params: { sessionId: string; data: string }) {
+export async function writeTerminalInput(params: { sessionId: string; data: string | Uint8Array }) {
   // Fast path: use cached client to avoid microtask overhead on every keystroke.
   if (cachedDaemonClient) {
     return cachedDaemonClient.terminal.writeInput(params);

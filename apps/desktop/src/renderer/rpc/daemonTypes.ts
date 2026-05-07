@@ -198,7 +198,7 @@ export type TerminalCreateSessionInput = {
 
 export type TerminalWriteInput = {
   sessionId: string;
-  data: string;
+  data: string | Uint8Array;
 };
 
 export type TerminalResizeInput = {

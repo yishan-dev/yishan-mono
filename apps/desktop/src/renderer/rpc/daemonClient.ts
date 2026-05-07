@@ -13,6 +13,7 @@ import {
 
 const RPC_REQUEST_TIMEOUT_MS = 30_000;
 const terminalFrameTextDecoder = new TextDecoder();
+const terminalFrameTextEncoder = new TextEncoder();
 
 function createRandomId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -345,16 +346,15 @@ export class DaemonClient {
    * Sends terminal input as a binary WebSocket frame, bypassing JSON
    * serialization entirely. Frame format: [0x01] [sessionId + '\0'] [input bytes]
    */
-  private sendTerminalInputBinary(sessionId: string, data: string): void {
+  private sendTerminalInputBinary(sessionId: string, data: string | Uint8Array): void {
     const socket = this.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
     try {
-      const encoder = new TextEncoder();
-      const sessionIdBytes = encoder.encode(sessionId);
-      const inputBytes = encoder.encode(data);
+      const sessionIdBytes = terminalFrameTextEncoder.encode(sessionId);
+      const inputBytes = typeof data === "string" ? terminalFrameTextEncoder.encode(data) : data;
       const frame = new Uint8Array(1 + sessionIdBytes.length + 1 + inputBytes.length);
       frame[0] = 0x01; // opcode: terminal input
       frame.set(sessionIdBytes, 1);
@@ -922,7 +922,8 @@ export class DaemonClient {
 
   private async writeTerminalInput(input: Rpc.TerminalWriteInput): Promise<Rpc.TerminalMutationOkResponse> {
     const record = asRecord(input);
-    const data = typeof record?.data === "string" ? record.data : "";
+    const rawData = record?.data;
+    const data = rawData instanceof Uint8Array ? rawData : typeof rawData === "string" ? rawData : "";
     const sessionId = readOptionalString(record?.sessionId) || "";
 
     // Fast path: send as binary WebSocket frame — zero JSON overhead.
@@ -933,7 +934,7 @@ export class DaemonClient {
 
     // Fallback: socket is not open yet (rare — e.g. reconnection in progress).
     // Use full request/response to ensure the connection is re-established.
-    await this.invoke("terminal.send", { sessionId, input: data });
+    await this.invoke("terminal.send", { sessionId, input: typeof data === "string" ? data : terminalFrameTextDecoder.decode(data) });
     return { ok: true };
   }
 

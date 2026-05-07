@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TerminalView } from "./TerminalView";
 
 type TerminalOutputEvent =
-  | { type: "output"; sessionId: string; chunk: string; nextIndex: number }
+  | { type: "output"; sessionId: string; chunk: string | Uint8Array; nextIndex: number }
   | { type: "exit"; sessionId: string; exitCode: number | null; signalCode: string | number | null };
 
 const mocked = vi.hoisted(() => {
@@ -537,7 +537,7 @@ describe("TerminalView", () => {
     expect(mocked.renameTab).not.toHaveBeenCalledWith("terminal-tab-1", "yishan");
   });
 
-  it("writes small live terminal output chunks immediately", async () => {
+  it("drains queued live terminal output chunks without frame gaps", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -582,6 +582,63 @@ describe("TerminalView", () => {
     expect(mocked.xtermWrite).toHaveBeenCalledTimes(2);
     expect(mocked.xtermWrite).toHaveBeenNthCalledWith(1, "hel", expect.any(Function));
     expect(mocked.xtermWrite).toHaveBeenNthCalledWith(2, "lo", expect.any(Function));
+    expect(animationFrames).toHaveLength(0);
+  });
+
+  it("flushes output queued while xterm write is in flight immediately after completion", async () => {
+    const state = buildStoreState();
+    mocked.stateRef.current = state;
+    mocked.createTerminalSession.mockResolvedValueOnce({
+      sessionId: "session-output-queued",
+      cwd: "/tmp/workspace-1",
+      cols: 120,
+      rows: 30,
+    });
+    mocked.readTerminalOutput.mockResolvedValueOnce({
+      nextIndex: 0,
+      chunks: [],
+      exited: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mocked.resizeTerminal.mockResolvedValue({ ok: true });
+
+    const animationFrames = stubAsyncTerminalBrowserApis();
+    let completeFirstWrite: (() => void) | undefined;
+    mocked.xtermWrite.mockImplementationOnce((_chunk, callback) => {
+      completeFirstWrite = callback;
+    });
+
+    render(<TerminalView tabId="terminal-tab-1" />);
+    while (animationFrames.length > 0) {
+      animationFrames.shift()?.(0);
+    }
+    await waitFor(() => {
+      expect(mocked.subscribeTerminalOutput).toHaveBeenCalled();
+    });
+    mocked.xtermWrite.mockClear();
+
+    mocked.emitTerminalEvent("session-output-queued", {
+      type: "output",
+      sessionId: "session-output-queued",
+      chunk: "h",
+      nextIndex: 1,
+    });
+    mocked.emitTerminalEvent("session-output-queued", {
+      type: "output",
+      sessionId: "session-output-queued",
+      chunk: "i",
+      nextIndex: 2,
+    });
+
+    expect(mocked.xtermWrite).toHaveBeenCalledTimes(1);
+    expect(mocked.xtermWrite).toHaveBeenNthCalledWith(1, "h", expect.any(Function));
+
+    completeFirstWrite?.();
+
+    expect(mocked.xtermWrite).toHaveBeenCalledTimes(2);
+    expect(mocked.xtermWrite).toHaveBeenNthCalledWith(2, "i", expect.any(Function));
+    expect(animationFrames).toHaveLength(0);
   });
 
   it("truncates long command titles and keeps terminal tabs independent", async () => {
@@ -941,7 +998,7 @@ describe("TerminalView", () => {
     await waitFor(() => {
       expect(mocked.writeTerminalInput).toHaveBeenCalledWith({
         sessionId: "session-shift-enter",
-        data: "\n",
+        data: new Uint8Array([0x0a]),
       });
     });
 
@@ -957,5 +1014,49 @@ describe("TerminalView", () => {
     expect(keypressHandled).toBe(false);
     expect(keyupHandled).toBe(false);
     expect(mocked.writeTerminalInput).toHaveBeenCalledTimes(2);
+  });
+
+  it("encodes single ASCII key input and renders only PTY echo", async () => {
+    const state = buildStoreState();
+    mocked.stateRef.current = state;
+    mocked.createTerminalSession.mockResolvedValueOnce({
+      sessionId: "session-ascii-input",
+      cwd: "/tmp/workspace-1",
+      cols: 120,
+      rows: 30,
+    });
+    mocked.readTerminalOutput.mockResolvedValueOnce({
+      nextIndex: 0,
+      chunks: [],
+      exited: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mocked.resizeTerminal.mockResolvedValue({ ok: true });
+
+    stubTerminalBrowserApis();
+
+    render(<TerminalView tabId="terminal-tab-1" />);
+    await waitFor(() => {
+      expect(mocked.createTerminalSession).toHaveBeenCalled();
+    });
+
+    mocked.emitTerminalInput("a");
+
+    expect(mocked.writeTerminalInput).toHaveBeenCalledWith({
+      sessionId: "session-ascii-input",
+      data: new Uint8Array([0x61]),
+    });
+    expect(mocked.xtermWrite).not.toHaveBeenCalledWith("a", expect.any(Function));
+    mocked.xtermWrite.mockClear();
+
+    mocked.emitTerminalEvent("session-ascii-input", {
+      type: "output",
+      sessionId: "session-ascii-input",
+      chunk: new Uint8Array([0x61]),
+      nextIndex: 1,
+    });
+
+    expect(mocked.xtermWrite).toHaveBeenCalledWith(new Uint8Array([0x61]), expect.any(Function));
   });
 });

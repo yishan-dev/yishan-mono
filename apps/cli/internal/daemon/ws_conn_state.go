@@ -8,13 +8,15 @@ import (
 )
 
 type wsConnState struct {
-	conn          *websocket.Conn
-	writeMu       sync.Mutex
-	closeOnce     sync.Once
-	subsMu        sync.Mutex
-	subscriptions map[string]subscriptionHandle
-	eventsMu      sync.Mutex
-	eventsCancel  func()
+	conn                            *websocket.Conn
+	writeMu                         sync.Mutex
+	closeOnce                       sync.Once
+	subsMu                          sync.Mutex
+	subscriptions                   map[string]subscriptionHandle
+	eventsMu                        sync.Mutex
+	eventsCancel                    func()
+	lastTerminalInputSessionID      string
+	lastTerminalInputSessionIDBytes []byte
 }
 
 type subscriptionHandle struct {
@@ -25,6 +27,16 @@ type subscriptionHandle struct {
 
 func newWSConnState(conn *websocket.Conn) *wsConnState {
 	return &wsConnState{conn: conn, subscriptions: make(map[string]subscriptionHandle)}
+}
+
+func (c *wsConnState) terminalInputSessionID(raw []byte) string {
+	if stringBytesEqual(raw, c.lastTerminalInputSessionIDBytes) {
+		return c.lastTerminalInputSessionID
+	}
+
+	c.lastTerminalInputSessionID = string(raw)
+	c.lastTerminalInputSessionIDBytes = append(c.lastTerminalInputSessionIDBytes[:0], raw...)
+	return c.lastTerminalInputSessionID
 }
 
 func (c *wsConnState) WriteJSON(v any) error {
@@ -73,18 +85,21 @@ func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64
 	c.subsMu.Unlock()
 
 	go func() {
+		sid := []byte(sessionID)
+		outputFramePrefix := make([]byte, 1+len(sid)+1)
+		outputFramePrefix[0] = 0x02 // opcode: terminal output
+		copy(outputFramePrefix[1:], sid)
+		outputFramePrefix[1+len(sid)] = 0 // null terminator
+
 		for event := range events {
 			switch event.Type {
 			case "output":
 				// Fast path: send PTY output as binary WebSocket frame.
 				// Frame format: [0x02] [sessionID + '\0'] [raw PTY bytes]
 				if len(event.RawChunk) > 0 {
-					sid := []byte(event.SessionID)
-					frame := make([]byte, 1+len(sid)+1+len(event.RawChunk))
-					frame[0] = 0x02 // opcode: terminal output
-					copy(frame[1:], sid)
-					frame[1+len(sid)] = 0 // null terminator
-					copy(frame[1+len(sid)+1:], event.RawChunk)
+					frame := make([]byte, len(outputFramePrefix)+len(event.RawChunk))
+					copy(frame, outputFramePrefix)
+					copy(frame[len(outputFramePrefix):], event.RawChunk)
 					if err := c.WriteBinary(frame); err != nil {
 						c.DetachSubscription(sessionID)
 						return
@@ -149,4 +164,16 @@ func (c *wsConnState) DetachEventStream() {
 	if cancel != nil {
 		cancel()
 	}
+}
+
+func stringBytesEqual(value []byte, candidate []byte) bool {
+	if len(value) != len(candidate) {
+		return false
+	}
+	for index := range value {
+		if value[index] != candidate[index] {
+			return false
+		}
+	}
+	return true
 }

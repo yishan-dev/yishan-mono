@@ -329,9 +329,36 @@ function createRpcPathProxy(pathSegments: string[]): unknown {
 /** Returns one cached dynamic API client for renderer commands. */
 export async function getDaemonClient(): Promise<DaemonRpcClient> {
   if (!daemonRpcClientPromise) {
-    // TODO: remove proxy indirection once DaemonClient exposes the full DaemonRpcClient surface
-    // (app/chat/agent/notification/events + subscribe shape) directly.
-    daemonRpcClientPromise = Promise.resolve(createRpcPathProxy([]) as DaemonRpcClient);
+    daemonRpcClientPromise = getDaemonTransportClient().then<DaemonRpcClient>((transportClient) => {
+      const proxyClient = createRpcPathProxy([]) as DaemonRpcClient;
+      return {
+        app: proxyClient.app,
+        workspace: proxyClient.workspace,
+        file: proxyClient.file,
+        git: proxyClient.git,
+        terminal: {
+          createSession: (input) => transportClient.terminal.createSession(input ?? {}),
+          writeInput: transportClient.terminal.writeInput,
+          resize: transportClient.terminal.resize,
+          readOutput: transportClient.terminal.readOutput,
+          closeSession: transportClient.terminal.closeSession,
+          killProcess: transportClient.terminal.killProcess,
+          listDetectedPorts: transportClient.terminal.listDetectedPorts,
+          getResourceUsage: transportClient.terminal.getResourceUsage,
+          listSessions: transportClient.terminal.listSessions,
+          subscribeOutput: proxyClient.terminal.subscribeOutput,
+          subscribeSessions: proxyClient.terminal.subscribeSessions,
+        },
+        chat: proxyClient.chat,
+        agent: proxyClient.agent,
+        notification: proxyClient.notification,
+        events: proxyClient.events,
+      };
+    });
+    void daemonRpcClientPromise.then(() => {
+      emitDaemonConnectionStatus("connected");
+      void refreshDaemonIdentity();
+    });
   }
 
   return await daemonRpcClientPromise;
