@@ -13,6 +13,7 @@ import (
 )
 
 type WorkspaceCreation struct {
+	ID             string
 	NodeID         string
 	OrganizationID string
 	ProjectID      string
@@ -41,6 +42,7 @@ func createRemoteWorkspace(_ context.Context, creation WorkspaceCreation) error 
 	}
 
 	_, err := cliruntime.APIClient().CreateWorkspace(orgID, creation.ProjectID, api.CreateWorkspaceInput{
+		ID:           creation.ID,
 		NodeID:       creation.NodeID,
 		LocalPath:    creation.LocalPath,
 		Kind:         creation.Kind,

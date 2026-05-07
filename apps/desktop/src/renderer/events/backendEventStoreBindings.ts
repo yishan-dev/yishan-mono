@@ -10,6 +10,7 @@ import {
 } from "../commands/notificationCommands";
 import { type WorkspaceAgentStatus, type WorkspaceUnreadTone, chatStore } from "../store/chatStore";
 import { tabStore } from "../store/tabStore";
+import { workspaceCreateProgressStore } from "../store/workspaceCreateProgressStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { subscribeBackendEvent } from "./backendEventPipeline";
 import { subscribeInAppNotificationEvent } from "./backendEventSubscriptions";
@@ -17,6 +18,7 @@ import { subscribeInAppNotificationEvent } from "./backendEventSubscriptions";
 type NotificationEventPayload = RpcFrontendMessagePayload<"notificationEvent">;
 type ObserverStatusPayload = NonNullable<NotificationEventPayload["observerStatus"]>;
 type NotificationSoundPayload = NonNullable<NotificationEventPayload["soundToPlay"]>;
+type WorkspaceCreateProgressPayload = RpcFrontendMessagePayload<"workspaceCreateProgress">;
 type AgentSessionLifecycleStatus = "running" | "waiting_input";
 
 type BackendEventStoreBindingsDependencies = {
@@ -25,10 +27,12 @@ type BackendEventStoreBindingsDependencies = {
     listener: (workspaceWorktreePath: string, changedRelativePaths?: string[]) => void,
   ) => () => void;
   subscribeInAppNotification: (listener: (payload: NotificationEventPayload) => void) => () => void;
+  subscribeWorkspaceCreateProgress?: (listener: (payload: WorkspaceCreateProgressPayload) => void) => () => void;
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
   setWorkspaceAgentStatusByWorkspaceId: (statusByWorkspaceId: Record<string, WorkspaceAgentStatus>) => void;
   recordWorkspaceUnreadNotification: (workspaceId: string, tone: WorkspaceUnreadTone) => void;
+  applyWorkspaceCreateProgressEvent?: (payload: WorkspaceCreateProgressPayload) => void;
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
   getNotificationPreferences?: () => Promise<NotificationPreferences>;
@@ -55,6 +59,15 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   subscribeInAppNotification: (listener) => {
     return subscribeInAppNotificationEvent(listener);
   },
+  subscribeWorkspaceCreateProgress: (listener) => {
+    return subscribeBackendEvent("workspace.create.progress", (event) => {
+      if (event.source !== "workspaceCreateProgress") {
+        return;
+      }
+
+      listener(event.payload);
+    });
+  },
   incrementFileTreeRefreshVersion: (workspaceWorktreePath, changedRelativePaths) => {
     workspaceStore.getState().incrementFileTreeRefreshVersion(workspaceWorktreePath, changedRelativePaths);
   },
@@ -66,6 +79,9 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   },
   recordWorkspaceUnreadNotification: (workspaceId, tone) => {
     chatStore.getState().recordWorkspaceUnreadNotification(workspaceId, tone);
+  },
+  applyWorkspaceCreateProgressEvent: (payload) => {
+    workspaceCreateProgressStore.getState().applyWorkspaceCreateProgressEvent(payload);
   },
   dispatchSystemNotification: async (input) => {
     await dispatchNotification(input);
@@ -302,11 +318,15 @@ export function createBackendEventStoreBindings(
       const tone: WorkspaceUnreadTone = payload.tone === "error" ? "error" : "success";
       dependencies.recordWorkspaceUnreadNotification(workspaceId, tone);
     });
+    const unsubscribeWorkspaceCreateProgress = dependencies.subscribeWorkspaceCreateProgress?.((payload) => {
+      dependencies.applyWorkspaceCreateProgressEvent?.(payload);
+    }) ?? (() => {});
 
     return () => {
       unsubscribeGitChanged();
       unsubscribeWorkspaceFilesChanged();
       unsubscribeInAppNotification();
+      unsubscribeWorkspaceCreateProgress();
       lifecycleBySessionKey.clear();
     };
   };

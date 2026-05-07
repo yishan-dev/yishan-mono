@@ -21,6 +21,7 @@ export async function createWorkspaceHandler(
 ) {
   const actorUser = c.get("sessionUser");
   const workspace = await c.get("services").workspace.createWorkspace({
+    id: body.id,
     actorUserId: actorUser.id,
     organizationId: params.orgId,
     projectId: params.projectId,

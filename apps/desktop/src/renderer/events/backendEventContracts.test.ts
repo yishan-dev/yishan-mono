@@ -37,6 +37,7 @@ describe("BACKEND_EVENT_NAME_BY_SOURCE", () => {
       notificationEvent: "notification.event",
       gitChanged: "git.changed",
       workspaceFilesChanged: "workspace.files.changed",
+      workspaceCreateProgress: "workspace.create.progress",
     });
   });
 });
@@ -176,6 +177,26 @@ describe("normalizeBackendEvent", () => {
 
     expect(normalized.name).toBe("workspace.files.changed");
     expect(normalized.source).toBe("workspaceFilesChanged");
+  });
+
+  it("normalizes workspace create progress events", () => {
+    const normalized = assertNormalized(
+      normalizeBackendEvent(
+        createEnvelope({
+          method: "workspaceCreateProgress",
+          payload: {
+            workspaceId: "workspace-1",
+            stepId: "worktree",
+            label: "Create local worktree",
+            status: "running",
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      ),
+    );
+
+    expect(normalized.name).toBe("workspace.create.progress");
+    expect(normalized.source).toBe("workspaceCreateProgress");
   });
 
   it("normalizes app actions", () => {

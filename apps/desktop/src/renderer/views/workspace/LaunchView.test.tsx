@@ -32,7 +32,7 @@ vi.mock("../../hooks/useCommands", () => ({
   }),
 }));
 
-vi.mock("../../mod/platform", () => ({
+vi.mock("../../helpers/platform", () => ({
   getRendererPlatform: () => "darwin",
 }));
 
@@ -51,7 +51,7 @@ vi.mock("../../shortcuts/shortcutDisplay", () => ({
 
 vi.mock("../../store/workspaceStore", () => ({
   workspaceStore: (selector: (state: { selectedWorkspaceId: string }) => unknown) =>
-    selector({ selectedWorkspaceId: "workspace-1" }),
+    selector({ selectedWorkspaceId: "workspace-1", workspaces: [] } as never),
 }));
 
 describe("LaunchView", () => {

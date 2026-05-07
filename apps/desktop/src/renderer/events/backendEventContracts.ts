@@ -8,6 +8,7 @@ const FRONTEND_MESSAGE_KEYS = [
   "notificationEvent",
   "gitChanged",
   "workspaceFilesChanged",
+  "workspaceCreateProgress",
 ] as const satisfies readonly RpcFrontendMessageKey[];
 
 const FRONTEND_MESSAGE_KEY_SET = new Set<string>(FRONTEND_MESSAGE_KEYS);
@@ -17,7 +18,8 @@ export type BackendEventName =
   | "chat.event"
   | "notification.event"
   | "git.changed"
-  | "workspace.files.changed";
+  | "workspace.files.changed"
+  | "workspace.create.progress";
 
 export type NormalizedBackendEvent =
   | {
@@ -44,6 +46,11 @@ export type NormalizedBackendEvent =
       source: "workspaceFilesChanged";
       name: "workspace.files.changed";
       payload: RpcFrontendMessagePayload<"workspaceFilesChanged">;
+    }
+  | {
+      source: "workspaceCreateProgress";
+      name: "workspace.create.progress";
+      payload: RpcFrontendMessagePayload<"workspaceCreateProgress">;
     };
 
 /**
@@ -55,6 +62,7 @@ export const BACKEND_EVENT_NAME_BY_SOURCE = {
   notificationEvent: "notification.event",
   gitChanged: "git.changed",
   workspaceFilesChanged: "workspace.files.changed",
+  workspaceCreateProgress: "workspace.create.progress",
 } as const satisfies Record<RpcFrontendMessageKey, BackendEventName>;
 
 /**
@@ -242,6 +250,30 @@ export function normalizeBackendEvent(envelope: DesktopRpcEventEnvelope): Normal
       source: "workspaceFilesChanged",
       name: BACKEND_EVENT_NAME_BY_SOURCE.workspaceFilesChanged,
       payload: payload as RpcFrontendMessagePayload<"workspaceFilesChanged">,
+    };
+  }
+
+  if (envelope.method === "workspaceCreateProgress") {
+    if (
+      typeof payload.workspaceId !== "string" ||
+      typeof payload.stepId !== "string" ||
+      typeof payload.label !== "string" ||
+      typeof payload.createdAt !== "string" ||
+      (payload.status !== "pending" &&
+        payload.status !== "running" &&
+        payload.status !== "completed" &&
+        payload.status !== "failed" &&
+        payload.status !== "skipped" &&
+        payload.status !== "warning") ||
+      !isOptionalString(payload.message)
+    ) {
+      return null;
+    }
+
+    return {
+      source: "workspaceCreateProgress",
+      name: BACKEND_EVENT_NAME_BY_SOURCE.workspaceCreateProgress,
+      payload: payload as RpcFrontendMessagePayload<"workspaceCreateProgress">,
     };
   }
 
