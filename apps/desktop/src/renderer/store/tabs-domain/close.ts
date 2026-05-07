@@ -11,10 +11,9 @@ export function closeTabState(state: WorkspaceTabStateSlice, tabId: string): Par
   const workspaceTabs = state.tabs.filter((tab) => tab.workspaceId === currentTab.workspaceId);
   const remainingWorkspaceTabs = workspaceTabs.filter((tab) => tab.id !== tabId);
   const closedIndex = workspaceTabs.findIndex((tab) => tab.id === tabId);
-  const fallbackIndex = Math.max(0, closedIndex - 1);
   const nextSelectedTabId =
     state.selectedTabId === tabId
-      ? (remainingWorkspaceTabs[fallbackIndex]?.id ?? remainingWorkspaceTabs[0]?.id ?? "")
+      ? (remainingWorkspaceTabs[closedIndex]?.id ?? remainingWorkspaceTabs[closedIndex - 1]?.id ?? "")
       : state.selectedTabId;
 
   return {
