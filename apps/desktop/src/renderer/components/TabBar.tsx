@@ -103,6 +103,8 @@ export function TabBar({
   const editingRef = useRef<HTMLDivElement | null>(null);
   const editingDraftRef = useRef("");
   const renameCancelledRef = useRef(false);
+  const previousSelectedTabIdRef = useRef(selectedTabId);
+  const previousTabIdsRef = useRef(new Set(tabs.map((tab) => tab.id)));
 
   useEffect(() => {
     if (!editingTabId || !editingRef.current) {
@@ -124,6 +126,19 @@ export function TabBar({
   }, [editingTabId]);
 
   useEffect(() => {
+    const previousSelectedTabId = previousSelectedTabIdRef.current;
+    const previousTabIds = previousTabIdsRef.current;
+    const currentTabIds = new Set(tabs.map((tab) => tab.id));
+    const selectedNewlyCreatedTab =
+      selectedTabId && selectedTabId !== previousSelectedTabId && !previousTabIds.has(selectedTabId);
+
+    previousSelectedTabIdRef.current = selectedTabId;
+    previousTabIdsRef.current = currentTabIds;
+
+    if (!selectedNewlyCreatedTab) {
+      return;
+    }
+
     if (!selectedTabId) {
       return;
     }
@@ -268,8 +283,7 @@ export function TabBar({
     alignItems: "center",
     bgcolor: active ? "background.default" : "transparent",
     px: 2,
-    minWidth: 150,
-    maxWidth: 240,
+    width: 180,
     flexShrink: 0,
     position: "relative",
     zIndex: active ? 1 : 0,
