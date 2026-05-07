@@ -1,6 +1,6 @@
 import { Autocomplete, type AutocompleteRenderInputParams, Box, LinearProgress, TextField, Typography } from "@mui/material";
 import { memo, useCallback, useMemo, useState } from "react";
-import { LuArrowRight } from "react-icons/lu";
+import { LuArrowRight, LuGitBranch } from "react-icons/lu";
 
 export type ProjectCommitComparisonCommit = {
   hash: string;
@@ -209,18 +209,16 @@ export const ProjectCommitComparison = memo(function ProjectCommitComparison({
   return (
     <Box sx={{ mt: 1, minWidth: 0 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0, overflow: "hidden" }}>
-        <Typography
-          variant="caption"
+        <Box
           data-testid="commit-comparison-current-branch"
           title={comparison.currentBranch}
           sx={{
             color: "text.secondary",
             flex: "1 1 0",
             minWidth: 0,
-            display: "block",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
             px: 0.625,
             py: 0.375,
             border: 1,
@@ -229,23 +227,28 @@ export const ProjectCommitComparison = memo(function ProjectCommitComparison({
             boxSizing: "border-box",
           }}
         >
-          {comparison.currentBranch}
-        </Typography>
+          <LuGitBranch size={12} color="currentColor" />
+          <Typography
+            variant="caption"
+            component="span"
+            sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {comparison.currentBranch}
+          </Typography>
+        </Box>
         <Box sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
           <LuArrowRight size={13} color="currentColor" />
         </Box>
-        <Typography
-          variant="caption"
+        <Box
           data-testid="commit-comparison-target-branch"
           title={normalizedTargetBranch}
           sx={{
             flex: "1 1 0",
             minWidth: 0,
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
             color: "text.secondary",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
             px: 0.625,
             py: 0.375,
             border: 1,
@@ -254,8 +257,15 @@ export const ProjectCommitComparison = memo(function ProjectCommitComparison({
             boxSizing: "border-box",
           }}
         >
-          {normalizedTargetBranch}
-        </Typography>
+          <LuGitBranch size={12} color="currentColor" />
+          <Typography
+            variant="caption"
+            component="span"
+            sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {normalizedTargetBranch}
+          </Typography>
+        </Box>
       </Box>
 
       <Autocomplete
