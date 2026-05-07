@@ -59,6 +59,12 @@ export async function closeTerminalSession(params: { sessionId: string }) {
   return client.terminal.closeSession(params);
 }
 
+/** Terminates one process id associated with terminal workloads. */
+export async function killTerminalProcess(params: { pid: number }) {
+  const client = await getDaemonClient();
+  return client.terminal.killProcess(params);
+}
+
 /** Lists currently detected listening ports for active terminal sessions. */
 export async function listDetectedPorts(): Promise<TerminalDetectedPort[]> {
   const client = await getDaemonClient();

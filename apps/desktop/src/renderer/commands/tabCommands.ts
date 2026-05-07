@@ -4,6 +4,7 @@ import { chatStore } from "../store/chatStore";
 import type { TabStoreState } from "../store/tabStore";
 import { tabStore } from "../store/tabStore";
 import type { OpenWorkspaceTabInput } from "../store/types";
+import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
 
 type TabStoreFacade = typeof tabStore & {
   getState?: () => TabStoreState;
@@ -37,8 +38,12 @@ function closeTerminalSessionsForTabs(tabs: TerminalTab[]): void {
       .then((client) => {
         return client.terminal.closeSession({ sessionId });
       })
-      .catch(() => {
-        return;
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        enqueueWorkspaceErrorNotice({
+          title: "Failed to close terminal session",
+          message: `Could not clean up terminal session ${sessionId}: ${message}`,
+        });
       });
   }
 }

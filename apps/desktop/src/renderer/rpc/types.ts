@@ -66,6 +66,7 @@ export type DaemonRpcClient = {
     resize: (input: Rpc.TerminalResizeInput) => Promise<Rpc.TerminalMutationOkResponse>;
     readOutput: (input: Rpc.TerminalReadOutputInput) => Promise<Rpc.TerminalReadOutputResponse>;
     closeSession: (input: Rpc.TerminalCloseInput) => Promise<Rpc.TerminalMutationOkResponse>;
+    killProcess: (input: Rpc.TerminalKillProcessInput) => Promise<Rpc.TerminalMutationOkResponse>;
     listDetectedPorts: (input?: unknown) => Promise<Rpc.TerminalDetectedPort[]>;
     getResourceUsage: (input?: unknown) => Promise<Rpc.TerminalResourceUsageSnapshot>;
     listSessions: (input?: Rpc.TerminalListSessionsInput) => Promise<Rpc.TerminalSessionSummary[]>;

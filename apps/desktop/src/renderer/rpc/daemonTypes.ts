@@ -211,6 +211,10 @@ export type TerminalCloseInput = {
   sessionId: string;
 };
 
+export type TerminalKillProcessInput = {
+  pid: number;
+};
+
 export type TerminalReadOutputInput = {
   sessionId: string;
   fromIndex: number;
@@ -231,6 +235,7 @@ export type WorkspaceCreateResponse = {
   worktreePath: string;
   status: string;
   lifecycleScriptWarnings: unknown[];
+  remoteSyncWarning?: string;
 };
 
 export type WorkspaceCloseExecutionResponse = {

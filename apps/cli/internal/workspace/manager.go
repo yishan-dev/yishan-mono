@@ -407,6 +407,10 @@ func (m *Manager) TerminalStop(req TerminalStopRequest) (TerminalStopResponse, e
 	return m.terminals.Stop(req)
 }
 
+func (m *Manager) TerminalKillProcess(req TerminalKillProcessRequest) (TerminalKillProcessResponse, error) {
+	return m.terminals.KillProcess(req)
+}
+
 func (m *Manager) TerminalResize(req TerminalResizeRequest) (TerminalResizeResponse, error) {
 	return m.terminals.Resize(req)
 }

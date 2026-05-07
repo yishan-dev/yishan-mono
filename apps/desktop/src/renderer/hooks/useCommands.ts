@@ -80,6 +80,7 @@ import {
   closeTerminalSession as closeTerminalSessionCommand,
   createTerminalSession as createTerminalSessionCommand,
   getTerminalResourceUsage as getTerminalResourceUsageCommand,
+  killTerminalProcess as killTerminalProcessCommand,
   listDetectedPorts as listDetectedPortsCommand,
   listTerminalSessions as listTerminalSessionsCommand,
   readTerminalOutput as readTerminalOutputCommand,
@@ -177,6 +178,7 @@ export type Commands = {
   subscribeTerminalOutput: typeof subscribeTerminalOutputCommand;
   subscribeTerminalSessions: typeof subscribeTerminalSessionsCommand;
   closeTerminalSession: typeof closeTerminalSessionCommand;
+  killTerminalProcess: typeof killTerminalProcessCommand;
   getNotificationPreferences: typeof getNotificationPreferencesCommand;
   updateNotificationPreferences: typeof updateNotificationPreferencesCommand;
   previewNotification: typeof previewNotificationCommand;
@@ -284,6 +286,7 @@ export function useCommands(): Commands {
       subscribeTerminalOutput: subscribeTerminalOutputCommand,
       subscribeTerminalSessions: subscribeTerminalSessionsCommand,
       closeTerminalSession: closeTerminalSessionCommand,
+      killTerminalProcess: killTerminalProcessCommand,
       getNotificationPreferences: getNotificationPreferencesCommand,
       updateNotificationPreferences: updateNotificationPreferencesCommand,
       previewNotification: previewNotificationCommand,

@@ -21,6 +21,11 @@ const rpcMocks = vi.hoisted(() => ({
   ensureWorkspaceChatSession: vi.fn(),
   closeAgentSession: vi.fn(),
   closeSession: vi.fn(),
+  enqueueWorkspaceErrorNotice: vi.fn(),
+}));
+
+vi.mock("../store/workspaceLifecycleNoticeStore", () => ({
+  enqueueWorkspaceErrorNotice: rpcMocks.enqueueWorkspaceErrorNotice,
 }));
 
 vi.mock("../rpc/rpcTransport", () => ({
@@ -200,6 +205,36 @@ describe("tabCommands", () => {
     expect(rpcMocks.closeSession).toHaveBeenCalledWith({ sessionId: "terminal-session-2" });
     expect(closeOtherTabsState).toHaveBeenCalledWith("tab-terminal-keep");
     expect(removeTabData).toHaveBeenCalledWith(["tab-terminal-close"]);
+  });
+
+  it("shows an error notice when terminal cleanup fails", async () => {
+    const closeTabState = vi.fn();
+    const removeTabData = vi.fn();
+    tabStore.setState({
+      tabs: [
+        {
+          id: "tab-terminal-1",
+          workspaceId: "workspace-1",
+          title: "Terminal",
+          pinned: false,
+          kind: "terminal",
+          data: { title: "Terminal", sessionId: "terminal-session-1" },
+        },
+      ],
+      closeTab: closeTabState,
+    });
+    chatStore.setState({ removeTabData });
+    rpcMocks.closeSession.mockRejectedValueOnce(new Error("permission denied"));
+
+    closeTab("tab-terminal-1");
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(rpcMocks.enqueueWorkspaceErrorNotice).toHaveBeenCalledWith({
+      title: "Failed to close terminal session",
+      message: "Could not clean up terminal session terminal-session-1: permission denied",
+    });
   });
 
   it("closes all tabs and backend sessions for same workspace", async () => {

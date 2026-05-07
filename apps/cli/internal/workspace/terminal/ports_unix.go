@@ -4,6 +4,7 @@ package terminal
 
 import (
 	"bytes"
+	"errors"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -20,6 +21,11 @@ func listProcesses() ([]processInfo, error) {
 func listListeningTCPPorts() ([]listeningPort, error) {
 	out, err := exec.Command("lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn").Output()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			// lsof exits 1 when no rows match; treat as empty result.
+			return nil, nil
+		}
 		return nil, err
 	}
 	return parseLsofListeningTCPPorts(out), nil

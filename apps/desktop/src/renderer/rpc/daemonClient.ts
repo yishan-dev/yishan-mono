@@ -124,6 +124,7 @@ export class DaemonClient {
     writeInput: this.writeTerminalInput.bind(this),
     resize: this.resizeTerminal.bind(this),
     closeSession: this.closeTerminalSession.bind(this),
+    killProcess: this.killTerminalProcess.bind(this),
     readOutput: this.readTerminalOutput.bind(this),
     listDetectedPorts: this.listDetectedTerminalPorts.bind(this),
     getResourceUsage: this.getTerminalResourceUsage.bind(this),
@@ -515,7 +516,7 @@ export class DaemonClient {
       return existingWorkspace.id;
     }
 
-    const workspaceId = readOptionalString(record?.workspaceId) || createDesktopWorkspaceId();
+    const workspaceId = createDesktopWorkspaceId();
     await this.invoke("open", {
       id: workspaceId,
       path: normalizedWorktreePath,
@@ -584,7 +585,7 @@ export class DaemonClient {
       sourceBranch,
       contextEnabled,
       setupHook,
-    })) as Rpc.DaemonWorkspace & { lifecycleScriptWarnings?: unknown[] };
+    })) as Rpc.DaemonWorkspace & { lifecycleScriptWarnings?: unknown[]; remoteSyncWarning?: unknown };
 
     const createdWorktreePath = createdWorkspace.path || "";
     if (createdWorktreePath) {
@@ -602,6 +603,7 @@ export class DaemonClient {
       lifecycleScriptWarnings: Array.isArray(createdWorkspace.lifecycleScriptWarnings)
         ? createdWorkspace.lifecycleScriptWarnings
         : [],
+      remoteSyncWarning: readOptionalString(createdWorkspace.remoteSyncWarning),
     };
   }
 
@@ -951,6 +953,13 @@ export class DaemonClient {
     await this.invoke("terminal.stop", { sessionId });
     this.dropTerminalSubscriptionsForSession(sessionId);
     this.terminalNextIndexBySessionId.delete(sessionId);
+    return { ok: true };
+  }
+
+  private async killTerminalProcess(input: Rpc.TerminalKillProcessInput): Promise<Rpc.TerminalMutationOkResponse> {
+    const record = asRecord(input);
+    const pid = Math.floor(readOptionalNumber(record?.pid) ?? 0);
+    await this.invoke("terminal.killProcess", { pid });
     return { ok: true };
   }
 

@@ -422,3 +422,25 @@ func TestResizeAndUnsubscribe(t *testing.T) {
 		t.Fatal("timed out waiting for subscription channel close")
 	}
 }
+
+func TestBuildPIDToRootMap(t *testing.T) {
+	pidToRoot := buildPIDToRootMap(
+		[]int{100, 200},
+		[]processInfo{
+			{PID: 101, PPID: 100},
+			{PID: 102, PPID: 101},
+			{PID: 201, PPID: 200},
+			{PID: 301, PPID: 999},
+		},
+	)
+
+	if pidToRoot[100] != 100 || pidToRoot[101] != 100 || pidToRoot[102] != 100 {
+		t.Fatalf("expected process tree rooted at 100, got %+v", pidToRoot)
+	}
+	if pidToRoot[200] != 200 || pidToRoot[201] != 200 {
+		t.Fatalf("expected process tree rooted at 200, got %+v", pidToRoot)
+	}
+	if _, ok := pidToRoot[301]; ok {
+		t.Fatalf("expected unrelated process to be excluded, got %+v", pidToRoot)
+	}
+}

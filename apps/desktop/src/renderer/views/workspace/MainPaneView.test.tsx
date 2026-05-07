@@ -684,7 +684,7 @@ describe("MainPaneView", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "terminal.ports.toggleLabel" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /127\.0\.0\.1:3000.*12345.*node/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /node.*3000.*12345/ }));
     expect(setSelectedWorkspaceId).toHaveBeenCalledWith("workspace-1");
     expect(setSelectedTabId).toHaveBeenCalledWith("terminal-tab-1");
   });
