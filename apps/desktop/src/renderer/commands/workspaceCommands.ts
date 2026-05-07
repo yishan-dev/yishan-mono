@@ -115,6 +115,21 @@ function formatWorkspaceCreateError(error: unknown): string {
   return daemonPrefixMatch?.[1]?.trim() || message;
 }
 
+function formatWorkspaceCloseError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Workspace close failed.";
+  const daemonPrefixMatch = message.match(/^daemon RPC error -?\d+:\s*(.*)$/s);
+  return daemonPrefixMatch?.[1]?.trim() || message;
+}
+
+function notifyWorkspaceCloseFailure(input: { workspaceName?: string; error: unknown }): void {
+  const workspaceName = input.workspaceName?.trim();
+  const title = "Failed to close workspace";
+  const workspaceLabel = workspaceName ? `Workspace \"${workspaceName}\"` : "The workspace";
+  const message = `${workspaceLabel} was not closed. Try closing it again. ${formatWorkspaceCloseError(input.error)}`;
+
+  enqueueWorkspaceErrorNotice({ title, message });
+}
+
 /** Runs backend workspace-close cleanup without blocking UI state updates. */
 async function closeWorkspaceInBackground(input: {
   workspaceId: string;
@@ -285,6 +300,10 @@ export async function closeWorkspace(workspaceId: string, options?: { removeBran
     postHook: project?.postScript?.trim() || undefined,
   }).catch((error) => {
     console.error("Failed to close backend workspace", error);
+    notifyWorkspaceCloseFailure({
+      workspaceName: workspace.name,
+      error,
+    });
   });
 }
 
