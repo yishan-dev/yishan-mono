@@ -357,6 +357,9 @@ export class DesktopApplication {
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.installUpdate, async () => {
+      // Mark quit intent before electron-updater closes windows so the
+      // macOS close handler does not convert update restart into a hide.
+      this.isQuitting = true;
       autoUpdater.quitAndInstall();
       return { ok: true };
     });
