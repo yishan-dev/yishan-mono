@@ -2,6 +2,7 @@ import {
   Avatar,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -14,6 +15,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuGitBranch } from "react-icons/lu";
+import { useNavigate } from "react-router-dom";
 import {
   resolveSourceBranchState,
   resolveTargetBranchForCreate,
@@ -21,6 +23,7 @@ import {
 } from "../../../helpers/workspaceBranchNaming";
 import { renderProjectIcon } from "../../../components/projectIcons";
 import { useCommands } from "../../../hooks/useCommands";
+import { buildWorkspaceNavigationPath } from "../../../navigation/workspaceNavigation";
 import { gitBranchStore, resolveGitBranchPrefix } from "../../../store/gitBranchStore";
 import { workspaceStore } from "../../../store/workspaceStore";
 
@@ -70,6 +73,7 @@ export function CreateWorkspaceDialogView({
 }: CreateWorkspaceDialogViewProps) {
   const theme = useTheme();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const projects = workspaceStore((state) => state.projects);
   const workspaces = workspaceStore((state) => state.workspaces);
   const { createWorkspace, renameWorkspace, renameWorkspaceBranch, getGitAuthorName, listGitBranches } = useCommands();
@@ -263,7 +267,7 @@ export function CreateWorkspaceDialogView({
 
     setIsCreatingWorkspace(true);
     try {
-      await createWorkspace({
+      const createdWorkspaceId = await createWorkspace({
         projectId: selectedRepoId,
         name: normalizedName,
         sourceBranch: sourceBranch.trim() || undefined,
@@ -271,6 +275,9 @@ export function CreateWorkspaceDialogView({
       });
       resetDraftInputs();
       onClose();
+      if (createdWorkspaceId) {
+        navigate(buildWorkspaceNavigationPath(createdWorkspaceId));
+      }
     } finally {
       setIsCreatingWorkspace(false);
     }
@@ -492,8 +499,9 @@ export function CreateWorkspaceDialogView({
             variant="contained"
             onClick={() => void (isRenameMode ? handleRenameWorkspace() : handleCreateWorkspace())}
             disabled={!canSubmitWorkspace}
-            sx={{ borderRadius: 2.5, textTransform: "none", py: 1, position: "relative" }}
+            sx={{ borderRadius: 2.5, textTransform: "none", py: 1, position: "relative", gap: 1 }}
           >
+            {isCreatingWorkspace ? <CircularProgress size={16} color="inherit" /> : null}
             <Typography component="span" sx={{ mx: "auto", fontWeight: 500 }}>
               {submitLabel}
             </Typography>

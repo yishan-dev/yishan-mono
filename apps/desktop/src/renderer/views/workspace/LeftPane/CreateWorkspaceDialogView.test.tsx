@@ -2,6 +2,8 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import type { ReactElement } from "react";
 import { gitBranchStore } from "../../../store/gitBranchStore";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { CreateWorkspaceDialogView } from "./CreateWorkspaceDialogView";
@@ -26,6 +28,40 @@ vi.mock("../../../hooks/useCommands", () => ({
 
 const initialWorkspaceStoreState = workspaceStore.getState();
 const initialGitBranchStoreState = gitBranchStore.getState();
+
+function renderDialog(ui: ReactElement) {
+  const result = render(<MemoryRouter initialEntries={["/"]}>{ui}</MemoryRouter>);
+
+  return {
+    ...result,
+    rerender: (nextUi: ReactElement) => {
+      result.rerender(<MemoryRouter initialEntries={["/"]}>{nextUi}</MemoryRouter>);
+    },
+  };
+}
+
+function CurrentLocationView() {
+  const location = useLocation();
+  return <div data-testid="current-location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function renderDialogWithLocation(ui: ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              {ui}
+              <CurrentLocationView />
+            </>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 describe("CreateWorkspaceDialogView", () => {
   beforeEach(() => {
@@ -89,7 +125,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("shows manual-only create controls", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -100,7 +136,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("keeps branch input empty when no prefix is configured", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect((screen.getByPlaceholderText("workspace.create.branchNameLabel") as HTMLInputElement).value).toBe("");
@@ -108,7 +144,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("links workspace name to branch name when branch is not manually edited", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     fireEvent.change(screen.getByPlaceholderText("workspace.create.namePlaceholder"), {
       target: { value: "My Linked Workspace" },
@@ -123,7 +159,8 @@ describe("CreateWorkspaceDialogView", () => {
 
   it("creates workspace using selected repo and source branch", async () => {
     const onClose = vi.fn();
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={onClose} />);
+    mocked.createWorkspace.mockResolvedValueOnce("workspace-2");
+    renderDialogWithLocation(<CreateWorkspaceDialogView open repoId="repo-1" onClose={onClose} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -151,10 +188,13 @@ describe("CreateWorkspaceDialogView", () => {
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
+    await waitFor(() => {
+      expect(screen.getByTestId("current-location").textContent).toBe("/?workspaceId=workspace-2");
+    });
   });
 
   it("reloads branches when repository changes", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -173,7 +213,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("uses latest repoId when dialog reopens", async () => {
-    const { rerender } = render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    const { rerender } = renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -203,7 +243,7 @@ describe("CreateWorkspaceDialogView", () => {
 
   it("clears previous inputs after successful creation when reopened", async () => {
     const onClose = vi.fn();
-    const { rerender } = render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={onClose} />);
+    const { rerender } = renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={onClose} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -238,7 +278,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("does not override manual repo selection while dialog stays open", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -284,7 +324,7 @@ describe("CreateWorkspaceDialogView", () => {
       branches: ["master", "main", "feature/alpha"],
     });
 
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -315,7 +355,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect((screen.getByPlaceholderText("workspace.create.branchNameLabel") as HTMLInputElement).value).toBe(
@@ -355,7 +395,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     const branchInput = (await screen.findByPlaceholderText("workspace.create.branchNameLabel")) as HTMLInputElement;
     fireEvent.change(branchInput, { target: { value: "team-core/manual-branch" } });
@@ -391,7 +431,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    const { rerender } = render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    const { rerender } = renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     const branchInput = (await screen.findByPlaceholderText("workspace.create.branchNameLabel")) as HTMLInputElement;
     fireEvent.change(branchInput, { target: { value: "team-core/tmp" } });
@@ -424,7 +464,7 @@ describe("CreateWorkspaceDialogView", () => {
   });
 
   it("does not create workspace when name is empty", async () => {
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.listGitBranches).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-1" });
@@ -444,7 +484,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
+    renderDialog(<CreateWorkspaceDialogView open repoId="repo-1" onClose={() => {}} />);
 
     await waitFor(() => {
       expect(mocked.getGitAuthorName).toHaveBeenCalledWith({
@@ -479,7 +519,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(
+    renderDialog(
       <CreateWorkspaceDialogView open repoId="repo-1" mode="rename" workspaceId="workspace-1" onClose={() => {}} />,
     );
 
@@ -518,7 +558,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(
+    renderDialog(
       <CreateWorkspaceDialogView open repoId="repo-1" mode="rename" workspaceId="workspace-1" onClose={onClose} />,
     );
 
@@ -571,7 +611,7 @@ describe("CreateWorkspaceDialogView", () => {
       true,
     );
 
-    render(
+    renderDialog(
       <CreateWorkspaceDialogView open repoId="repo-1" mode="rename" workspaceId="workspace-1" onClose={onClose} />,
     );
 

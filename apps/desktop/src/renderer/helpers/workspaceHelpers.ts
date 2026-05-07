@@ -49,23 +49,33 @@ export function buildCreatedWorkspaceState(
   },
 ): Partial<WorkspaceStoreSlice> {
   const nextWorkspaceId = input.backendWorkspace.workspaceId;
+  const nextWorkspace = {
+    id: nextWorkspaceId,
+    organizationId: input.backendWorkspace.organizationId,
+    projectId: input.projectId,
+    repoId: input.projectId,
+    name: input.backendWorkspace.name || input.normalizedName,
+    title: input.normalizedTitle,
+    sourceBranch: input.backendWorkspace.sourceBranch || input.normalizedBranch,
+    branch: input.backendWorkspace.branch || input.normalizedBranch,
+    summaryId: nextWorkspaceId,
+    worktreePath: input.backendWorkspace.worktreePath,
+  };
+  const existingWorkspaceIndex = state.workspaces.findIndex((workspace) => workspace.id === nextWorkspaceId);
+  const nextWorkspaces =
+    existingWorkspaceIndex >= 0
+      ? state.workspaces.map((workspace, index) =>
+          index === existingWorkspaceIndex
+            ? {
+                ...workspace,
+                ...nextWorkspace,
+              }
+            : workspace,
+        )
+      : [...state.workspaces, nextWorkspace];
 
   return {
-    workspaces: [
-      ...state.workspaces,
-      {
-        id: nextWorkspaceId,
-        organizationId: input.backendWorkspace.organizationId,
-        projectId: input.projectId,
-        repoId: input.projectId,
-        name: input.backendWorkspace.name || input.normalizedName,
-        title: input.normalizedTitle,
-        sourceBranch: input.backendWorkspace.sourceBranch || input.normalizedBranch,
-        branch: input.backendWorkspace.branch || input.normalizedBranch,
-        summaryId: nextWorkspaceId,
-        worktreePath: input.backendWorkspace.worktreePath,
-      },
-    ],
+    workspaces: nextWorkspaces,
     selectedProjectId: input.projectId,
     selectedWorkspaceId: nextWorkspaceId,
   };

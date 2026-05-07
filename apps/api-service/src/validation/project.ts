@@ -40,6 +40,7 @@ export const updateProjectBodySchema = z
   });
 
 export const createWorkspaceBodySchema = z.object({
+  id: nonEmptyStringSchema.optional(),
   kind: z.enum(["primary", "worktree"]).optional().default("primary"),
   branch: nonEmptyStringSchema.optional(),
   sourceBranch: nonEmptyStringSchema.optional(),

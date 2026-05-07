@@ -33,6 +33,7 @@ export type WorkspaceView = {
 };
 
 type CreateWorkspaceInput = {
+  id?: string;
   organizationId: string;
   actorUserId: string;
   projectId: string;
@@ -150,7 +151,7 @@ export class WorkspaceService {
       const insertedRows = await tx
         .insert(workspaces)
         .values({
-          id: newId(),
+          id: input.id?.trim() || newId(),
           organizationId: input.organizationId,
           projectId: input.projectId,
           userId: input.actorUserId,

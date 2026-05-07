@@ -66,6 +66,7 @@ export type DaemonWorkspace = {
 };
 
 export type WorkspaceCreateInput = {
+  workspaceId?: string;
   organizationId?: string;
   repoKey?: string;
   sourcePath?: string;

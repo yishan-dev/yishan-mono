@@ -156,7 +156,7 @@ describe("ChangesTabView", () => {
       expect(mocks.listGitCommitsToTarget.mock.calls.length).toBeGreaterThan(0);
       expect(mocks.listGitCommitsToTarget).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        targetBranch: "main",
+        targetBranch: "origin/main",
       });
     });
     expect(screen.queryByRole("combobox", { name: "Target branch" })).toBeNull();
@@ -251,7 +251,7 @@ describe("ChangesTabView", () => {
     await waitFor(() => {
       expect(mocks.readBranchComparisonDiff).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        targetBranch: "main",
+        targetBranch: "origin/main",
         relativePath: "src/a.ts",
       });
       expect(mocks.openTab).toHaveBeenCalledWith({
@@ -299,7 +299,7 @@ describe("ChangesTabView", () => {
     await waitFor(() => {
       expect(mocks.readBranchComparisonDiff).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        targetBranch: "main",
+        targetBranch: "origin/main",
         relativePath: "src/a.ts",
       });
     });
