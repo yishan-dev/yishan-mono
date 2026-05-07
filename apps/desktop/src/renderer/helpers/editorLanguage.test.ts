@@ -124,6 +124,10 @@ describe("editorLanguage", () => {
       expect(getLanguageId("index.js")).toBe("javascript");
     });
 
+    it("returns 'javascript' for JSX files", () => {
+      expect(getLanguageId("component.jsx")).toBe("javascript");
+    });
+
     it("returns 'python' for Python files", () => {
       expect(getLanguageId("script.py")).toBe("python");
     });
