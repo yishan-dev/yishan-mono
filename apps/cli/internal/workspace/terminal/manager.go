@@ -155,27 +155,7 @@ func (m *Manager) ListDetectedPorts() []DetectedPort {
 	if err != nil {
 		return nil
 	}
-	childrenByPPID := make(map[int][]int)
-	for _, process := range processes {
-		if process.PID <= 0 || process.PPID <= 0 {
-			continue
-		}
-		childrenByPPID[process.PPID] = append(childrenByPPID[process.PPID], process.PID)
-	}
-
-	pidToRoot := make(map[int]int)
-	for _, rootPID := range rootPIDs {
-		stack := []int{rootPID}
-		for len(stack) > 0 {
-			pid := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if _, seen := pidToRoot[pid]; seen {
-				continue
-			}
-			pidToRoot[pid] = rootPID
-			stack = append(stack, childrenByPPID[pid]...)
-		}
-	}
+	pidToRoot := buildPIDToRootMap(rootPIDs, processes)
 
 	listeningPorts, err := listListeningTCPPorts()
 	if err != nil {
@@ -268,6 +248,9 @@ func (m *Manager) Stop(req StopRequest) (StopResponse, error) {
 	}
 
 	if s.running.Load() {
+		if err := stopListeningProcessesForSession(s); err != nil {
+			return StopResponse{}, fmt.Errorf("terminal session cleanup failed: %w", err)
+		}
 		if err := stopProcess(s.cmd); err != nil {
 			return StopResponse{}, err
 		}
@@ -281,6 +264,71 @@ func (m *Manager) Stop(req StopRequest) (StopResponse, error) {
 	m.mu.Unlock()
 
 	return StopResponse{Stopped: true}, nil
+}
+
+func stopListeningProcessesForSession(s *session) error {
+	if s == nil || s.cmd == nil || s.cmd.Process == nil {
+		return nil
+	}
+
+	processes, err := listProcesses()
+	if err != nil {
+		return err
+	}
+
+	listeningPorts, err := listListeningTCPPorts()
+	if err != nil {
+		return err
+	}
+
+	pidToRoot := buildPIDToRootMap([]int{s.cmd.Process.Pid}, processes)
+	listeningPIDs := make(map[int]struct{})
+	for _, port := range listeningPorts {
+		rootPID, ok := pidToRoot[port.PID]
+		if !ok || rootPID != s.cmd.Process.Pid {
+			continue
+		}
+		if port.PID > 0 {
+			listeningPIDs[port.PID] = struct{}{}
+		}
+	}
+
+	for pid := range listeningPIDs {
+		if err := stopProcessByPID(pid); err != nil {
+			return fmt.Errorf("kill pid %d: %w", pid, err)
+		}
+	}
+
+	return nil
+}
+
+func buildPIDToRootMap(rootPIDs []int, processes []processInfo) map[int]int {
+	childrenByPPID := make(map[int][]int)
+	for _, process := range processes {
+		if process.PID <= 0 || process.PPID <= 0 {
+			continue
+		}
+		childrenByPPID[process.PPID] = append(childrenByPPID[process.PPID], process.PID)
+	}
+
+	pidToRoot := make(map[int]int)
+	for _, rootPID := range rootPIDs {
+		if rootPID <= 0 {
+			continue
+		}
+		stack := []int{rootPID}
+		for len(stack) > 0 {
+			pid := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if _, seen := pidToRoot[pid]; seen {
+				continue
+			}
+			pidToRoot[pid] = rootPID
+			stack = append(stack, childrenByPPID[pid]...)
+		}
+	}
+
+	return pidToRoot
 }
 
 func (m *Manager) Resize(req ResizeRequest) (ResizeResponse, error) {
