@@ -30,6 +30,7 @@ type RegisterNodeInput struct {
 }
 
 type CreateWorkspaceInput struct {
+	ID           string
 	NodeID       string
 	LocalPath    string
 	Kind         string
@@ -181,6 +182,9 @@ func (c *Client) CreateWorkspace(orgID string, projectID string, input CreateWor
 		"nodeId":    input.NodeID,
 		"localPath": input.LocalPath,
 		"kind":      input.Kind,
+	}
+	if input.ID != "" {
+		payload["id"] = input.ID
 	}
 	if input.Branch != "" {
 		payload["branch"] = input.Branch

@@ -46,6 +46,14 @@ export type RpcSchema = {
         workspaceWorktreePath: string;
         changedRelativePaths?: string[];
       };
+      workspaceCreateProgress: {
+        workspaceId: string;
+        stepId: string;
+        label: string;
+        status: "pending" | "running" | "completed" | "failed" | "skipped" | "warning";
+        message?: string;
+        createdAt: string;
+      };
     };
   };
 };

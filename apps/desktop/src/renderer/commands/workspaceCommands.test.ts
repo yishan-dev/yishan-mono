@@ -99,34 +99,51 @@ describe("workspaceCommands", () => {
       status: "active",
     });
 
-    await createWorkspace({
+    const createdWorkspaceId = await createWorkspace({
       projectId: "repo-1",
       name: "  feature-a  ",
       sourceBranch: " main ",
       targetBranch: " feature-a ",
     });
 
-    expect(rpcMocks.createWorkspace).toHaveBeenCalledWith({
-      organizationId: "org-1",
-      projectId: "repo-1",
-      repoKey: "repo-1",
-      workspaceName: "feature-a",
-      sourcePath: "/tmp/repo-1",
-      sourceBranch: "main",
-      targetBranch: "feature-a",
-      contextEnabled: true,
-    });
-    expect(rpcMocks.list).not.toHaveBeenCalled();
+    expect(createdWorkspaceId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(addWorkspace).toHaveBeenCalledWith({
       repoId: "repo-1",
       organizationId: "org-1",
-      workspaceId: "workspace-2",
+      workspaceId: createdWorkspaceId,
       name: "feature-a",
       sourceBranch: "main",
       branch: "feature-a",
-      worktreePath: "~/.yishan/worktrees/repo-1/feature-a",
+      worktreePath: "",
     });
-    expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(rpcMocks.createWorkspace).toHaveBeenCalledWith({
+        workspaceId: createdWorkspaceId,
+        organizationId: "org-1",
+        projectId: "repo-1",
+        repoKey: "repo-1",
+        workspaceName: "feature-a",
+        sourcePath: "/tmp/repo-1",
+        sourceBranch: "main",
+        targetBranch: "feature-a",
+        contextEnabled: true,
+      });
+    });
+    expect(rpcMocks.list).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(addWorkspace).toHaveBeenCalledWith({
+        repoId: "repo-1",
+        organizationId: "org-1",
+        workspaceId: createdWorkspaceId,
+        name: "feature-a",
+        sourceBranch: "main",
+        branch: "feature-a",
+        worktreePath: "~/.yishan/worktrees/repo-1/feature-a",
+      });
+    });
+    await vi.waitFor(() => {
+      expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(2);
+    }, { timeout: 3_500 });
     expect(rpcMocks.enqueueWorkspaceLifecycleWarnings).not.toHaveBeenCalled();
   });
 
@@ -168,32 +185,35 @@ describe("workspaceCommands", () => {
       ],
     });
 
-    await createWorkspace({
+    const createdWorkspaceId = await createWorkspace({
       projectId: "repo-1",
       name: "feature-a",
       sourceBranch: "main",
       targetBranch: "feature-a",
     });
 
-    expect(rpcMocks.enqueueWorkspaceLifecycleWarnings).toHaveBeenCalledWith({
-      workspaceName: "feature-a",
-      warnings: [
-        {
-          scriptKind: "setup",
-          timedOut: false,
-          message: "Workspace setup script failed.",
-          command: "pnpm install",
-          stdoutExcerpt: "",
-          stderrExcerpt: "error",
-          exitCode: 1,
-          signal: null,
-          logFilePath: "/tmp/.yishan-dev/logs/workspace-lifecycle/setup.log",
-        },
-      ],
+    expect(createdWorkspaceId).toMatch(/^[0-9a-f-]{36}$/i);
+    await vi.waitFor(() => {
+      expect(rpcMocks.enqueueWorkspaceLifecycleWarnings).toHaveBeenCalledWith({
+        workspaceName: "feature-a",
+        warnings: [
+          {
+            scriptKind: "setup",
+            timedOut: false,
+            message: "Workspace setup script failed.",
+            command: "pnpm install",
+            stdoutExcerpt: "",
+            stderrExcerpt: "error",
+            exitCode: 1,
+            signal: null,
+            logFilePath: "/tmp/.yishan-dev/logs/workspace-lifecycle/setup.log",
+          },
+        ],
+      });
     });
   });
 
-  it("does not add workspace when backend create fails", async () => {
+  it("keeps optimistic workspace when backend create fails", async () => {
     sessionStore.setState({ selectedOrganizationId: "org-1" });
     const addWorkspace = vi.fn();
     workspaceStore.setState({
@@ -219,9 +239,11 @@ describe("workspaceCommands", () => {
       targetBranch: "feature-b",
     });
 
-    expect(rpcMocks.createWorkspace).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(rpcMocks.createWorkspace).toHaveBeenCalledTimes(1);
+    });
     expect(rpcMocks.list).not.toHaveBeenCalled();
-    expect(addWorkspace).not.toHaveBeenCalled();
+    expect(addWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("deletes local workspace immediately and closes backend workspace in background", async () => {

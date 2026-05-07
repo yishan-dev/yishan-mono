@@ -22,7 +22,7 @@ function createRandomId(): string {
 }
 
 function createDesktopWorkspaceId(): string {
-  return `desktop-${createRandomId()}`;
+  return createRandomId();
 }
 
 type PendingRequest = {
@@ -238,6 +238,10 @@ export class DaemonClient {
 
       const payloadSessionId = readOptionalString(asRecord(event.payload)?.sessionId);
       return payloadSessionId === expectedSessionId;
+    }
+
+    if (subscription.method === "events.frontendStream" && event.method === "events.frontendStream") {
+      return true;
     }
 
     return event.method === subscription.method;
@@ -510,7 +514,7 @@ export class DaemonClient {
       return existingWorkspace.id;
     }
 
-    const workspaceId = createDesktopWorkspaceId();
+    const workspaceId = readOptionalString(record?.workspaceId) || createDesktopWorkspaceId();
     await this.invoke("open", {
       id: workspaceId,
       path: normalizedWorktreePath,
@@ -1060,16 +1064,26 @@ export class DaemonClient {
       return subscriptionId;
     }
 
-    if (
-      options.namespace === "terminal" ||
-      options.namespace === "git" ||
-      options.namespace === "file" ||
-      options.namespace === "events"
-    ) {
+    if (options.namespace === "terminal" || options.namespace === "git" || options.namespace === "file") {
       return await this.startRawSubscription({
         method: path,
         params: options.input,
         onNotification: options.onNotification,
+      });
+    }
+
+    if (options.namespace === "events" && options.method === "frontendStream") {
+      return await this.startRawSubscription({
+        method: path,
+        params: options.input,
+        onNotification: (event) => {
+          const payload = asRecord(event.payload);
+          const result = asRecord(payload?.result);
+          options.onNotification({
+            method: event.method,
+            payload: result ?? payload ?? event.payload,
+          });
+        },
       });
     }
 
