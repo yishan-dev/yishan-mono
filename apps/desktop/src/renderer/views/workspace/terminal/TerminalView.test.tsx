@@ -76,6 +76,7 @@ const mocked = vi.hoisted(() => {
   };
   let terminalCustomKeyEventHandler: ((event: KeyboardEvent) => boolean) | undefined;
   const terminalDataHandlers: Array<((data: string) => void) | undefined> = [];
+  const terminalTitleHandlers: Array<((title: string) => void) | undefined> = [];
   const loadTerminalAddons = vi.fn(() => ({
     fitAddon: {
       fit() {},
@@ -108,6 +109,9 @@ const mocked = vi.hoisted(() => {
     emitTerminalInput: (data: string, terminalIndex = terminalDataHandlers.length - 1) => {
       terminalDataHandlers[terminalIndex]?.(data);
     },
+    emitTerminalTitle: (title: string, terminalIndex = terminalTitleHandlers.length - 1) => {
+      terminalTitleHandlers[terminalIndex]?.(title);
+    },
     emitTerminalEvent: (sessionId: string, event: TerminalOutputEvent) => {
       subscriptions.get(sessionId)?.onData(event);
     },
@@ -120,6 +124,14 @@ const mocked = vi.hoisted(() => {
     },
     clearTerminalDataHandlers: () => {
       terminalDataHandlers.length = 0;
+      terminalTitleHandlers.length = 0;
+    },
+    addTerminalTitleHandler: (handler: (title: string) => void) => {
+      terminalTitleHandlers.push(handler);
+      return terminalTitleHandlers.length - 1;
+    },
+    removeTerminalTitleHandler: (handlerIndex: number) => {
+      terminalTitleHandlers[handlerIndex] = undefined;
     },
   };
 });
@@ -151,6 +163,7 @@ vi.mock("@xterm/xterm", () => {
     rows = 30;
     private onDataHandler: ((data: string) => void) | undefined;
     private onDataHandlerIndex: number | undefined;
+    private onTitleChangeHandlerIndex: number | undefined;
 
     open() {}
     reset() {}
@@ -179,6 +192,16 @@ vi.mock("@xterm/xterm", () => {
           this.onDataHandler = undefined;
           if (this.onDataHandlerIndex !== undefined) {
             mocked.removeTerminalDataHandler(this.onDataHandlerIndex);
+          }
+        },
+      };
+    }
+    onTitleChange(handler: (title: string) => void) {
+      this.onTitleChangeHandlerIndex = mocked.addTerminalTitleHandler(handler);
+      return {
+        dispose: () => {
+          if (this.onTitleChangeHandlerIndex !== undefined) {
+            mocked.removeTerminalTitleHandler(this.onTitleChangeHandlerIndex);
           }
         },
       };
@@ -390,7 +413,7 @@ describe("TerminalView", () => {
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-2", "codex");
   });
 
-  it("updates terminal tab title from submitted command input", async () => {
+  it("updates terminal tab title from xterm title changes", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -415,12 +438,12 @@ describe("TerminalView", () => {
       expect(mocked.createTerminalSession).toHaveBeenCalled();
     });
 
-    mocked.emitTerminalInput("git status\r");
+    mocked.emitTerminalTitle("git status");
 
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-1", "git status");
   });
 
-  it("strips terminal color and control sequences from submitted command titles", async () => {
+  it("strips terminal control sequences from xterm titles", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -445,12 +468,12 @@ describe("TerminalView", () => {
       expect(mocked.createTerminalSession).toHaveBeenCalled();
     });
 
-    mocked.emitTerminalInput("\u001b[31mpnpm test\u001b[0m\u0007\r");
+    mocked.emitTerminalTitle("\u001b[31mpnpm test\u001b[0m\u0007");
 
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-1", "pnpm test");
   });
 
-  it("uses workspace directory title until a command is submitted", async () => {
+  it("uses workspace directory title until xterm provides a title", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -474,8 +497,6 @@ describe("TerminalView", () => {
     await waitFor(() => {
       expect(mocked.createTerminalSession).toHaveBeenCalled();
     });
-
-    mocked.emitTerminalInput("\r");
 
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-1", "workspace-1");
     expect(mocked.renameTab).not.toHaveBeenCalledWith("terminal-tab-1", "");
@@ -516,7 +537,7 @@ describe("TerminalView", () => {
     expect(mocked.renameTab).not.toHaveBeenCalledWith("terminal-tab-1", "yishan");
   });
 
-  it("batches live terminal output before writing to xterm", async () => {
+  it("writes small live terminal output chunks immediately", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -558,11 +579,9 @@ describe("TerminalView", () => {
       nextIndex: 2,
     });
 
-    expect(mocked.xtermWrite).not.toHaveBeenCalled();
-    animationFrames.shift()?.(0);
-
-    expect(mocked.xtermWrite).toHaveBeenCalledTimes(1);
-    expect(mocked.xtermWrite).toHaveBeenCalledWith("hello", expect.any(Function));
+    expect(mocked.xtermWrite).toHaveBeenCalledTimes(2);
+    expect(mocked.xtermWrite).toHaveBeenNthCalledWith(1, "hel", expect.any(Function));
+    expect(mocked.xtermWrite).toHaveBeenNthCalledWith(2, "lo", expect.any(Function));
   });
 
   it("truncates long command titles and keeps terminal tabs independent", async () => {
@@ -606,8 +625,8 @@ describe("TerminalView", () => {
     });
     mocked.renameTab.mockClear();
 
-    mocked.emitTerminalInput("pnpm test --filter apps/desktop -- --runInBand\r", 0);
-    mocked.emitTerminalInput("bun lint\r", 1);
+    mocked.emitTerminalTitle("pnpm test --filter apps/desktop -- --runInBand", 0);
+    mocked.emitTerminalTitle("bun lint", 1);
 
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-1", "pnpm test --filter apps/desktop…");
     expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-2", "bun lint");

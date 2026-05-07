@@ -1,6 +1,7 @@
 import type { Terminal } from "@xterm/xterm";
 
 const MAX_TERMINAL_LIVE_WRITE_QUEUE_BYTES = 1024 * 1024;
+const MAX_IMMEDIATE_TERMINAL_CHUNK_BYTES = 256;
 
 export type TerminalWriteChunk = string | Uint8Array;
 
@@ -28,6 +29,14 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
     });
   };
 
+  const writeChunk = (chunk: TerminalWriteChunk): void => {
+    writeInFlight = true;
+    terminal.write(chunk, () => {
+      writeInFlight = false;
+      scheduleFlush();
+    });
+  };
+
   const flushNextBatch = (): void => {
     if (disposed || writeInFlight || chunks.length === 0) {
       return;
@@ -35,15 +44,16 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
 
     const batch = takeTerminalWriteBatch(chunks);
     pendingBytes = Math.max(0, pendingBytes - getTerminalWriteChunkLength(batch));
-    writeInFlight = true;
-    terminal.write(batch, () => {
-      writeInFlight = false;
-      scheduleFlush();
-    });
+    writeChunk(batch);
   };
 
   const enqueue = (chunk: TerminalWriteChunk): void => {
     if (disposed) {
+      return;
+    }
+
+    if (!writeInFlight && chunks.length === 0 && isInteractiveTerminalChunk(chunk)) {
+      writeChunk(chunk);
       return;
     }
 
@@ -76,6 +86,10 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
       pendingBytes = 0;
     },
   };
+}
+
+function isInteractiveTerminalChunk(chunk: TerminalWriteChunk): boolean {
+  return getTerminalWriteChunkLength(chunk) <= MAX_IMMEDIATE_TERMINAL_CHUNK_BYTES;
 }
 
 /** Takes and combines one run of same-type chunks into a single xterm.write payload. */

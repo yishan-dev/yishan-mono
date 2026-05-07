@@ -15,7 +15,6 @@ import {
 } from "./terminalKeyboardUtils";
 import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
 import {
-  collectExecutedTerminalCommand,
   formatTerminalCommandTitle,
   formatTerminalPathTitle,
   resolveTerminalWorkspacePath,
@@ -48,7 +47,6 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
   const terminalWriteQueueRef = useRef<TerminalWriteQueue | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const outputSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
-  const pendingCommandInputRef = useRef("");
   const readIndexRef = useRef(0);
   const didRequestCloseRef = useRef(false);
   const lastAppliedTitleRef = useRef<string>("");
@@ -213,7 +211,10 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       return false;
     });
 
-    const titleFrameIds = new Set<number>();
+    const titleDisposable = terminal.onTitleChange((title) => {
+      updateTerminalTabTitleFromCommand(title);
+    });
+
     const writeDisposable = terminal.onData((data) => {
       const sessionId = sessionIdRef.current;
       if (!sessionId) {
@@ -224,27 +225,6 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       void writeTerminalInput({ sessionId, data }).catch((error) => {
         reportTerminalAsyncError("write terminal input", error);
       });
-
-      // Defer command title extraction off the hot path so it doesn't
-      // compete with the keystroke dispatch for CPU time.
-      let titleFrameId = 0;
-      titleFrameId = window.requestAnimationFrame(() => {
-        if (titleFrameId !== 0) {
-          titleFrameIds.delete(titleFrameId);
-        }
-        if (disposed) {
-          return;
-        }
-
-        const commandInput = collectExecutedTerminalCommand(pendingCommandInputRef.current, data);
-        pendingCommandInputRef.current = commandInput.buffer;
-        if (commandInput.executedCommand) {
-          updateTerminalTabTitleFromCommand(commandInput.executedCommand);
-        }
-      });
-      if (titleFrameId !== 0) {
-        titleFrameIds.add(titleFrameId);
-      }
     });
 
     let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -277,13 +257,10 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
 
     return () => {
       disposed = true;
+      titleDisposable.dispose();
       writeDisposable.dispose();
       outputSubscriptionRef.current?.unsubscribe();
       outputSubscriptionRef.current = null;
-      for (const titleFrameId of titleFrameIds) {
-        window.cancelAnimationFrame(titleFrameId);
-      }
-      titleFrameIds.clear();
       if (resizeTimerId !== null) {
         clearTimeout(resizeTimerId);
       }
