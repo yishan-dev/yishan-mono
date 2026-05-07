@@ -516,7 +516,7 @@ export class DaemonClient {
       return existingWorkspace.id;
     }
 
-    const workspaceId = readOptionalString(record?.workspaceId) || createDesktopWorkspaceId();
+    const workspaceId = createDesktopWorkspaceId();
     await this.invoke("open", {
       id: workspaceId,
       path: normalizedWorktreePath,
