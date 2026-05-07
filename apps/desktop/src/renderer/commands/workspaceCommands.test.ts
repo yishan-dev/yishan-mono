@@ -381,6 +381,68 @@ describe("workspaceCommands", () => {
     expect(closeWorkspaceAction).toHaveBeenCalledWith({ repoId: "repo-1", workspaceId: "workspace-1" });
   });
 
+  it("shows in-app error notification when background workspace close fails", async () => {
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
+    workspaceStore.setState({
+      workspaces: [
+        {
+          id: "workspace-1",
+          organizationId: "org-1",
+          repoId: "repo-1",
+          name: "Feature A",
+          title: "Feature A",
+          summaryId: "",
+          branch: "feature-a",
+          sourceBranch: "main",
+          worktreePath: "/tmp/worktrees/feature-a",
+        },
+      ],
+      closeWorkspace: closeWorkspaceAction,
+    });
+    rpcMocks.closeWorkspace.mockRejectedValueOnce(new Error("daemon RPC error -32000: server unavailable"));
+
+    await closeWorkspace("workspace-1");
+
+    await vi.waitFor(() => {
+      expect(rpcMocks.enqueueWorkspaceErrorNotice).toHaveBeenCalledWith({
+        title: "Failed to close workspace",
+        message: 'Workspace "Feature A" was not closed. Try closing it again. server unavailable',
+      });
+    });
+  });
+
+  it("does not show close failure notification when background workspace close succeeds", async () => {
+    const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
+    workspaceStore.setState({
+      workspaces: [
+        {
+          id: "workspace-1",
+          organizationId: "org-1",
+          repoId: "repo-1",
+          name: "Feature A",
+          title: "Feature A",
+          summaryId: "",
+          branch: "feature-a",
+          sourceBranch: "main",
+          worktreePath: "/tmp/worktrees/feature-a",
+        },
+      ],
+      closeWorkspace: closeWorkspaceAction,
+    });
+    rpcMocks.closeWorkspace.mockResolvedValueOnce({
+      workspace: { id: "workspace-1", status: "archived" },
+      workspaceId: "workspace-1",
+      lifecycleScriptWarnings: [],
+    });
+
+    await closeWorkspace("workspace-1");
+
+    await vi.waitFor(() => {
+      expect(rpcMocks.closeWorkspace).toHaveBeenCalledTimes(1);
+    });
+    expect(rpcMocks.enqueueWorkspaceErrorNotice).not.toHaveBeenCalled();
+  });
+
   it("does nothing when closing a missing workspace", async () => {
     const closeWorkspaceAction = vi.fn().mockResolvedValue(undefined);
     workspaceStore.setState({
