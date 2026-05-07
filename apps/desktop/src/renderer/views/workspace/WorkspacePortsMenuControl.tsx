@@ -66,8 +66,8 @@ export function WorkspacePortsMenuControl() {
     () =>
       workspacePorts.map((entry) => ({
         id: buildPortRowId(entry),
-        addressPortLabel: `${entry.address}:${entry.port}`,
-        addressPortTooltip: `${entry.address}:${entry.port}`,
+        portLabel: String(entry.port),
+        portTooltip: String(entry.port),
         pidLabel: String(entry.pid),
         processNameLabel: entry.processName,
       })),
@@ -148,7 +148,7 @@ export function WorkspacePortsMenuControl() {
         rows={portRows}
         summaryLabel={portsSummaryLabel}
         toggleAriaLabel={t("terminal.ports.toggleLabel", { count: workspacePorts.length })}
-        addressPortColumnLabel={t("terminal.ports.columns.addressPort")}
+        portColumnLabel={"Port"}
         pidColumnLabel={t("terminal.ports.columns.pid")}
         processNameColumnLabel={t("terminal.ports.columns.processName")}
         onOpen={setPortsMenuAnchorEl}

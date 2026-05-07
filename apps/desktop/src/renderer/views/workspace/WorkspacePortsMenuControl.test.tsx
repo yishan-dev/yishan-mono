@@ -143,7 +143,7 @@ describe("WorkspacePortsMenuControl", () => {
     renderWorkspaceShell();
 
     fireEvent.click(await screen.findByRole("button", { name: "terminal.ports.toggleLabel" }));
-    expect(await screen.findByText("0.0.0.0:3000")).toBeTruthy();
+    expect(await screen.findByText("3000")).toBeTruthy();
 
     if (!navigateToSettings) {
       throw new Error("Expected settings navigation helper to be initialized.");
@@ -152,7 +152,7 @@ describe("WorkspacePortsMenuControl", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("settings-overlay")).toBeTruthy();
-      expect(screen.queryByText("0.0.0.0:3000")).toBeNull();
+      expect(screen.queryByText("3000")).toBeNull();
     });
   });
 
@@ -161,7 +161,7 @@ describe("WorkspacePortsMenuControl", () => {
     renderWorkspaceShell();
 
     fireEvent.click(await screen.findByRole("button", { name: "terminal.ports.toggleLabel" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Close port 0.0.0.0:3000" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Close port 3000" }));
 
     await waitFor(() => {
       expect(mocked.killTerminalProcess).toHaveBeenCalledWith({ pid: 6510 });

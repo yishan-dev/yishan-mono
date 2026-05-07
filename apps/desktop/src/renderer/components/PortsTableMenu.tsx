@@ -1,14 +1,14 @@
 import { TableDropdownMenu } from "./TableDropdownMenu";
 import { LuX } from "react-icons/lu";
 
-const PORTS_GRID_TEMPLATE_COLUMNS = "minmax(0, 1.2fr) minmax(0, 0.6fr) minmax(0, 0.8fr)";
+const PORTS_GRID_TEMPLATE_COLUMNS = "minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.6fr) 28px";
 
 export type PortsTableMenuRow = {
   id: string;
-  addressPortLabel: string;
+  portLabel: string;
   pidLabel: string;
   processNameLabel: string;
-  addressPortTooltip?: string;
+  portTooltip?: string;
 };
 
 type PortsTableMenuProps = {
@@ -16,7 +16,7 @@ type PortsTableMenuProps = {
   rows: PortsTableMenuRow[];
   summaryLabel: string;
   toggleAriaLabel: string;
-  addressPortColumnLabel: string;
+  portColumnLabel: string;
   pidColumnLabel: string;
   processNameColumnLabel: string;
   onClose: () => void;
@@ -26,13 +26,13 @@ type PortsTableMenuProps = {
   isClosingRow?: (rowId: string) => boolean;
 };
 
-/** Renders one stateless ports button and table-like dropdown with address:port, pid, and process columns. */
+/** Renders one stateless ports button and table-like dropdown with process, port, pid, and row action. */
 export function PortsTableMenu({
   anchorEl,
   rows,
   summaryLabel,
   toggleAriaLabel,
-  addressPortColumnLabel,
+  portColumnLabel,
   pidColumnLabel,
   processNameColumnLabel,
   onClose,
@@ -48,10 +48,14 @@ export function PortsTableMenu({
         id: row.id,
         cells: [
           {
-            label: row.addressPortLabel,
+            label: row.processNameLabel,
+            noWrap: true,
+          },
+          {
+            label: row.portLabel,
             mono: true,
             noWrap: true,
-            title: row.addressPortTooltip,
+            title: row.portTooltip,
           },
           {
             label: row.pidLabel,
@@ -59,16 +63,15 @@ export function PortsTableMenu({
             align: "right",
           },
           {
-            label: row.processNameLabel,
-            align: "right",
-            noWrap: true,
+            label: "",
           },
         ],
       }))}
       columns={[
-        { label: addressPortColumnLabel },
+        { label: processNameColumnLabel },
+        { label: portColumnLabel },
         { label: pidColumnLabel, align: "right" },
-        { label: processNameColumnLabel, align: "right" },
+        { label: "", align: "right" },
       ]}
       summaryLabel={summaryLabel}
       toggleAriaLabel={toggleAriaLabel}
@@ -78,7 +81,7 @@ export function PortsTableMenu({
       onClose={onClose}
       onSelectRow={onSelectRow}
       getRowAction={(rowId) => ({
-        ariaLabel: `Close port ${rows.find((row) => row.id === rowId)?.addressPortLabel ?? ""}`,
+        ariaLabel: `Close port ${rows.find((row) => row.id === rowId)?.portLabel ?? ""}`,
         icon: <LuX size={12} />,
         onClick: onCloseRow,
         disabled: isClosingRow?.(rowId) ?? false,

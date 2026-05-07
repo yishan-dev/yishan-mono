@@ -209,6 +209,8 @@ export function TableDropdownMenu({
                     noWrap={Boolean(cell.noWrap)}
                     title={cell.title}
                     sx={{
+                      display: "block",
+                      width: "100%",
                       textAlign: resolvedAlign,
                       fontFamily: cell.mono ? "monospace" : undefined,
                       fontSize: 12,
