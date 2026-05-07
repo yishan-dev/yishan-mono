@@ -12,6 +12,7 @@ import {
 } from "./helpers";
 
 const RPC_REQUEST_TIMEOUT_MS = 30_000;
+const terminalFrameTextDecoder = new TextDecoder();
 
 function createRandomId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -391,7 +392,7 @@ export class DaemonClient {
       return;
     }
 
-    const sessionId = new TextDecoder().decode(data.subarray(1, nullIdx));
+    const sessionId = terminalFrameTextDecoder.decode(data.subarray(1, nullIdx));
     const chunk = data.subarray(nullIdx + 1);
     if (chunk.length === 0) {
       return;
@@ -948,6 +949,7 @@ export class DaemonClient {
     const record = asRecord(input);
     const sessionId = readOptionalString(record?.sessionId) || "";
     await this.invoke("terminal.stop", { sessionId });
+    this.dropTerminalSubscriptionsForSession(sessionId);
     this.terminalNextIndexBySessionId.delete(sessionId);
     return { ok: true };
   }
@@ -1091,11 +1093,50 @@ export class DaemonClient {
   }
 
   stopSubscription(subscriptionId: string): void {
-    if (!this.subscriptionsById.has(subscriptionId)) {
+    const subscription = this.subscriptionsById.get(subscriptionId);
+    if (!subscription) {
       return;
     }
 
     this.subscriptionsById.delete(subscriptionId);
+    if (subscription.method !== "terminal.subscribe") {
+      return;
+    }
+
+    const sessionId = readOptionalString(asRecord(subscription.params)?.sessionId);
+    if (!sessionId) {
+      return;
+    }
+
+    if (!this.hasTerminalSubscriptionForSession(sessionId)) {
+      this.terminalNextIndexBySessionId.delete(sessionId);
+    }
+    if (subscription.registeredWithDaemon) {
+      void this.sendRequest("terminal.unsubscribe", { sessionId }).catch(() => undefined);
+    }
+  }
+
+  private hasTerminalSubscriptionForSession(sessionId: string): boolean {
+    for (const subscription of this.subscriptionsById.values()) {
+      if (subscription.method !== "terminal.subscribe") {
+        continue;
+      }
+      if (readOptionalString(asRecord(subscription.params)?.sessionId) === sessionId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private dropTerminalSubscriptionsForSession(sessionId: string): void {
+    for (const [subscriptionId, subscription] of this.subscriptionsById.entries()) {
+      if (subscription.method !== "terminal.subscribe") {
+        continue;
+      }
+      if (readOptionalString(asRecord(subscription.params)?.sessionId) === sessionId) {
+        this.subscriptionsById.delete(subscriptionId);
+      }
+    }
   }
 
   dispose(): void {

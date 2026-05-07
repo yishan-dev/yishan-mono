@@ -15,7 +15,7 @@ import { workspaceStore } from "../../store/workspaceStore";
 import { DARK_SURFACE_COLORS } from "../../theme";
 import { LaunchView } from "./LaunchView";
 import { MainPaneTitleBarView } from "./MainPaneTitleBarView";
-import { TerminalView } from "./TerminalView";
+import { TerminalView } from "./terminal/TerminalView";
 
 const paneHeaderSx = {
   minHeight: 38,

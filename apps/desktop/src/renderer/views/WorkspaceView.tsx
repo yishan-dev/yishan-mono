@@ -19,7 +19,7 @@ import { MainPaneView } from "./workspace/MainPaneView";
 import { OnboardingView } from "./workspace/OnboardingView";
 import { RightPaneView } from "./workspace/RightPane/RightPaneView";
 import { WorkspaceLifecycleNoticeView } from "./workspace/WorkspaceLifecycleNoticeView";
-import { TerminalRecoveryCoordinator } from "./workspace/terminalRecovery";
+import { TerminalRecoveryCoordinator } from "./workspace/terminal/terminalRecovery";
 
 const LEFT_MIN_WIDTH = 240;
 const RIGHT_MIN_WIDTH = 280;

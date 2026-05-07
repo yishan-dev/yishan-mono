@@ -6,7 +6,7 @@ import { WebFontsAddon } from "@xterm/addon-web-fonts";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import type { ITerminalAddon, Terminal } from "@xterm/xterm";
-import { openExternalUrl } from "../../commands/appCommands";
+import { openExternalUrl } from "../../../commands/appCommands";
 
 type Logger = Pick<Console, "warn">;
 
