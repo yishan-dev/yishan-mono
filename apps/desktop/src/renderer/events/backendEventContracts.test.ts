@@ -186,8 +186,8 @@ describe("normalizeBackendEvent", () => {
           method: "workspaceCreateProgress",
           payload: {
             workspaceId: "workspace-1",
-            stepId: "worktree",
-            label: "Create local worktree",
+            stepId: "update",
+            label: "Fetch repository",
             status: "running",
             createdAt: new Date().toISOString(),
           },

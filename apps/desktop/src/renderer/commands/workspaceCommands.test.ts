@@ -5,6 +5,7 @@ import { chatStore } from "../store/chatStore";
 import { layoutStore } from "../store/layoutStore";
 import { sessionStore } from "../store/sessionStore";
 import { tabStore } from "../store/tabStore";
+import { workspaceCreateProgressStore } from "../store/workspaceCreateProgressStore";
 import { workspacePaneStore } from "../store/workspacePaneStore";
 import { workspaceStore } from "../store/workspaceStore";
 import {
@@ -56,6 +57,7 @@ const initialWorkspaceStoreState = workspaceStore.getState();
 const initialLayoutStoreState = layoutStore.getState();
 const initialSessionStoreState = sessionStore.getState();
 const initialTabStoreState = tabStore.getState();
+const initialWorkspaceCreateProgressStoreState = workspaceCreateProgressStore.getState();
 const initialWorkspacePaneStoreState = workspacePaneStore.getState();
 const initialChatStoreState = chatStore.getState();
 
@@ -64,6 +66,7 @@ afterEach(() => {
   layoutStore.setState(initialLayoutStoreState, true);
   sessionStore.setState(initialSessionStoreState, true);
   tabStore.setState(initialTabStoreState, true);
+  workspaceCreateProgressStore.setState(initialWorkspaceCreateProgressStoreState, true);
   workspacePaneStore.setState(initialWorkspacePaneStoreState, true);
   chatStore.setState(initialChatStoreState, true);
   vi.clearAllMocks();
@@ -107,6 +110,11 @@ describe("workspaceCommands", () => {
     });
 
     expect(createdWorkspaceId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(workspaceCreateProgressStore.getState().progressByWorkspaceId[createdWorkspaceId]?.steps[0]).toMatchObject({
+      id: "update",
+      label: "Fetch repository",
+      status: "running",
+    });
     expect(addWorkspace).toHaveBeenCalledWith({
       repoId: "repo-1",
       organizationId: "org-1",

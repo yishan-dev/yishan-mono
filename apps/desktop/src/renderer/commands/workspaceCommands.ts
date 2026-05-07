@@ -149,7 +149,7 @@ function delay(ms: number): Promise<void> {
 }
 
 async function completeVisibleCreateProgressSteps(workspaceId: string): Promise<void> {
-  for (const step of ["worktree", "context", "setup"] as const) {
+  for (const step of ["update", "worktree", "context", "setup"] as const) {
     const currentStep = workspaceCreateProgressStore
       .getState()
       .progressByWorkspaceId[workspaceId]?.steps.find((item) => item.id === step);
@@ -280,8 +280,8 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<stri
 
   workspaceCreateProgressStore.getState().applyWorkspaceCreateProgressEvent({
     workspaceId: optimisticWorkspaceId,
-    stepId: "worktree",
-    label: "Create local worktree",
+    stepId: "update",
+    label: "Fetch repository",
     status: "running",
     createdAt: new Date().toISOString(),
   });

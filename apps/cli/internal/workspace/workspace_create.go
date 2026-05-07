@@ -44,6 +44,12 @@ type CreateProgressEvent struct {
 
 type CreateProgressReporter func(CreateProgressEvent)
 
+type createProgressStep struct {
+	ID    string
+	Label string
+	Run   func() (CreateProgressStatus, string, error)
+}
+
 func (m *Manager) CreateWorkspace(ctx context.Context, req CreateRequest) (Workspace, error) {
 	return m.CreateWorkspaceWithProgress(ctx, req, nil)
 }
@@ -64,102 +70,118 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 		})
 	}
 
-	reportProgress("validate", "Validate workspace inputs", CreateProgressRunning, "")
-	if strings.TrimSpace(req.ID) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "id is required")
-		return Workspace{}, NewRPCError(-32602, "id is required")
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{name: "id", value: req.ID},
+		{name: "sourcePath", value: req.SourcePath},
+		{name: "repoKey", value: req.RepoKey},
+		{name: "workspaceName", value: req.WorkspaceName},
+		{name: "targetBranch", value: req.TargetBranch},
+		{name: "sourceBranch", value: req.SourceBranch},
+	} {
+		if strings.TrimSpace(field.value) == "" {
+			return Workspace{}, NewRPCError(-32602, field.name+" is required")
+		}
 	}
-	if strings.TrimSpace(req.SourcePath) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "sourcePath is required")
-		return Workspace{}, NewRPCError(-32602, "sourcePath is required")
-	}
-	if strings.TrimSpace(req.RepoKey) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "repoKey is required")
-		return Workspace{}, NewRPCError(-32602, "repoKey is required")
-	}
-	if strings.TrimSpace(req.WorkspaceName) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "workspaceName is required")
-		return Workspace{}, NewRPCError(-32602, "workspaceName is required")
-	}
-	if strings.TrimSpace(req.TargetBranch) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "targetBranch is required")
-		return Workspace{}, NewRPCError(-32602, "targetBranch is required")
-	}
-	if strings.TrimSpace(req.SourceBranch) == "" {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, "sourceBranch is required")
-		return Workspace{}, NewRPCError(-32602, "sourceBranch is required")
-	}
-	reportProgress("validate", "Validate workspace inputs", CreateProgressCompleted, "")
 
 	sourcePath, err := absUserPath(req.SourcePath)
 	if err != nil {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, err.Error())
 		return Workspace{}, err
 	}
 	repoKey, err := safeRelativePath(req.RepoKey, "repoKey")
 	if err != nil {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, err.Error())
 		return Workspace{}, err
 	}
 	workspaceName, err := safeRelativePath(req.WorkspaceName, "workspaceName")
 	if err != nil {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, err.Error())
 		return Workspace{}, err
 	}
 	worktreePath, err := defaultWorktreePath(repoKey, workspaceName)
 	if err != nil {
-		reportProgress("validate", "Validate workspace inputs", CreateProgressFailed, err.Error())
 		return Workspace{}, err
-	}
-
-	reportProgress("worktree", "Create local worktree", CreateProgressRunning, "")
-	if err := m.gits.CreateWorktree(ctx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch)); err != nil {
-		reportProgress("worktree", "Create local worktree", CreateProgressFailed, err.Error())
-		return Workspace{}, err
-	}
-	reportProgress("worktree", "Create local worktree", CreateProgressCompleted, worktreePath)
-
-	reportProgress("context", "Link project context", CreateProgressRunning, "")
-	if req.ContextEnabled {
-		contextPath, err := defaultContextPath(repoKey)
-		if err != nil {
-			reportProgress("context", "Link project context", CreateProgressFailed, err.Error())
-			return Workspace{}, err
-		}
-		if err := ensureContextLink(contextPath, worktreePath); err != nil {
-			reportProgress("context", "Link project context", CreateProgressFailed, err.Error())
-			return Workspace{}, fmt.Errorf("create context link: %w", err)
-		}
-		reportProgress("context", "Link project context", CreateProgressCompleted, "")
-	} else {
-		reportProgress("context", "Link project context", CreateProgressSkipped, "Context link disabled")
 	}
 
 	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath}
+	steps := []createProgressStep{
+		{
+			ID:    "update",
+			Label: "Fetch repository",
+			Run: func() (CreateProgressStatus, string, error) {
+				if err := m.gits.FetchRemotes(ctx, sourcePath); err != nil {
+					return CreateProgressFailed, err.Error(), err
+				}
+				return CreateProgressCompleted, "", nil
+			},
+		},
+		{
+			ID:    "worktree",
+			Label: "Create local worktree",
+			Run: func() (CreateProgressStatus, string, error) {
+				if err := m.gits.CreateWorktree(ctx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch)); err != nil {
+					return CreateProgressFailed, err.Error(), err
+				}
+				return CreateProgressCompleted, worktreePath, nil
+			},
+		},
+		{
+			ID:    "context",
+			Label: "Link project context",
+			Run: func() (CreateProgressStatus, string, error) {
+				if !req.ContextEnabled {
+					return CreateProgressSkipped, "Context link disabled", nil
+				}
 
-	reportProgress("setup", "Run setup script", CreateProgressRunning, "")
-	hookResult, hookErr := RunHook(ctx, HookRequest{
-		Command:       req.SetupHook,
-		WorkspaceID:   ws.ID,
-		WorkspacePath: ws.Path,
-		HookName:      "setup",
-	})
-	if hookErr != nil {
-		// System-level hook failure (e.g. shell not found). Treat as
-		// non-fatal: workspace was created successfully, surface the error
-		// in the result so callers can warn the user.
-		hookResult.Error = fmt.Sprintf("setup hook: %v", hookErr)
-		ws.SetupHookResult = &hookResult
-		reportProgress("setup", "Run setup script", CreateProgressWarning, hookResult.Error)
-	} else if !hookResult.Skipped {
-		ws.SetupHookResult = &hookResult
-		if hookResult.Error != "" {
-			reportProgress("setup", "Run setup script", CreateProgressWarning, hookResult.Error)
-		} else {
-			reportProgress("setup", "Run setup script", CreateProgressCompleted, "")
+				contextPath, err := defaultContextPath(repoKey)
+				if err != nil {
+					return CreateProgressFailed, err.Error(), err
+				}
+				if err := ensureContextLink(contextPath, worktreePath); err != nil {
+					wrappedErr := fmt.Errorf("create context link: %w", err)
+					return CreateProgressFailed, err.Error(), wrappedErr
+				}
+				return CreateProgressCompleted, "", nil
+			},
+		},
+		{
+			ID:    "setup",
+			Label: "Run setup script",
+			Run: func() (CreateProgressStatus, string, error) {
+				hookResult, hookErr := RunHook(ctx, HookRequest{
+					Command:       req.SetupHook,
+					WorkspaceID:   ws.ID,
+					WorkspacePath: ws.Path,
+					HookName:      "setup",
+				})
+				if hookErr != nil {
+					// System-level hook failure (e.g. shell not found). Treat as
+					// non-fatal: workspace was created successfully, surface the error
+					// in the result so callers can warn the user.
+					hookResult.Error = fmt.Sprintf("setup hook: %v", hookErr)
+					ws.SetupHookResult = &hookResult
+					return CreateProgressWarning, hookResult.Error, nil
+				}
+				if !hookResult.Skipped {
+					ws.SetupHookResult = &hookResult
+					if hookResult.Error != "" {
+						return CreateProgressWarning, hookResult.Error, nil
+					}
+					return CreateProgressCompleted, "", nil
+				}
+				return CreateProgressSkipped, "No setup script configured", nil
+			},
+		},
+	}
+
+	for _, step := range steps {
+		reportProgress(step.ID, step.Label, CreateProgressRunning, "")
+		status, message, err := step.Run()
+		if err != nil {
+			reportProgress(step.ID, step.Label, status, message)
+			return Workspace{}, err
 		}
-	} else {
-		reportProgress("setup", "Run setup script", CreateProgressSkipped, "No setup script configured")
+		reportProgress(step.ID, step.Label, status, message)
 	}
 
 	m.mu.Lock()

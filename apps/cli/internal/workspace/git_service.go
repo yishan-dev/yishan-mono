@@ -437,6 +437,19 @@ func (s *GitService) RemoveBranch(ctx context.Context, root string, branch strin
 	return err
 }
 
+func (s *GitService) FetchRemotes(ctx context.Context, root string) error {
+	remotesOut, err := gitCommand(ctx, root, "remote")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(remotesOut) == "" {
+		return nil
+	}
+
+	_, err = gitCommandCombined(ctx, root, "fetch", "--all", "--prune")
+	return err
+}
+
 func (s *GitService) CreateWorktree(ctx context.Context, root string, branch string, worktreePath string, createBranch bool, fromRef string) error {
 	if strings.TrimSpace(branch) == "" {
 		return NewRPCError(-32602, "branch is required")
