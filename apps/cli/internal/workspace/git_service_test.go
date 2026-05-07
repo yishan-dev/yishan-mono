@@ -195,6 +195,7 @@ func TestGitServiceFetchRemotes(t *testing.T) {
 
 	other := filepath.Join(t.TempDir(), "other")
 	runGit(t, t.TempDir(), "clone", remote, other)
+	runGit(t, other, "checkout", "-B", "main", "origin/main")
 	runGit(t, other, "config", "user.name", "Test User")
 	runGit(t, other, "config", "user.email", "test@example.com")
 	if err := os.WriteFile(filepath.Join(other, "latest.txt"), []byte("latest\n"), 0o644); err != nil {

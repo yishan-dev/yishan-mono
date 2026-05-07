@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   webLinksOpenHandler: null as ((event: MouseEvent, uri: string) => void) | null,
 }));
 
-vi.mock("../../commands/appCommands", () => ({
+vi.mock("../../../commands/appCommands", () => ({
   openExternalUrl: (url: string) => mocks.openExternalUrl(url),
 }));
 

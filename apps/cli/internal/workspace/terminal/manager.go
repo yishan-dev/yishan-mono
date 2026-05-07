@@ -17,6 +17,8 @@ import (
 	"github.com/creack/pty"
 )
 
+const maxSessionOutputBytes = 2 * 1024 * 1024
+
 type Manager struct {
 	mu        sync.RWMutex
 	nextID    atomic.Uint64
@@ -359,7 +361,7 @@ func (s *session) capture() {
 			copy(raw, buf[:n])
 			chunk := string(raw)
 			s.outputMu.Lock()
-			_, _ = s.output.WriteString(chunk)
+			s.appendOutput(chunk)
 			s.outputMu.Unlock()
 			s.broadcast(Event{SessionID: s.id, Type: "output", Chunk: chunk, RawChunk: raw})
 		}
@@ -370,6 +372,28 @@ func (s *session) capture() {
 			return
 		}
 	}
+}
+
+func (s *session) appendOutput(chunk string) {
+	if len(chunk) >= maxSessionOutputBytes {
+		s.output.Reset()
+		_, _ = s.output.WriteString(chunk[len(chunk)-maxSessionOutputBytes:])
+		return
+	}
+
+	if s.output.Len()+len(chunk) > maxSessionOutputBytes {
+		current := s.output.String()
+		retainedBytes := maxSessionOutputBytes/2 - len(chunk)
+		if retainedBytes < 0 {
+			retainedBytes = 0
+		}
+		if retainedBytes > len(current) {
+			retainedBytes = len(current)
+		}
+		s.output.Reset()
+		_, _ = s.output.WriteString(current[len(current)-retainedBytes:])
+	}
+	_, _ = s.output.WriteString(chunk)
 }
 
 func (s *session) broadcast(event Event) {

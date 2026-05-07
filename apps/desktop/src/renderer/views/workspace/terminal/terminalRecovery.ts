@@ -1,6 +1,6 @@
-import { tabStore } from "../../store/tabStore";
-import type { TabStoreState } from "../../store/tabStore";
-import { workspaceStore } from "../../store/workspaceStore";
+import { tabStore } from "../../../store/tabStore";
+import type { TabStoreState } from "../../../store/tabStore";
+import { workspaceStore } from "../../../store/workspaceStore";
 
 type TerminalTab = Extract<TabStoreState["tabs"][number], { kind: "terminal" }>;
 

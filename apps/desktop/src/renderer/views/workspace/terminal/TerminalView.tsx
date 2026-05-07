@@ -4,12 +4,24 @@ import type { ISearchOptions, SearchAddon } from "@xterm/addon-search";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { useCommands } from "../../hooks/useCommands";
-import { tabStore } from "../../store/tabStore";
-import type { WorkspaceTab } from "../../store/types";
-import { workspaceStore } from "../../store/workspaceStore";
+import { useCommands } from "../../../hooks/useCommands";
+import { tabStore } from "../../../store/tabStore";
+import type { WorkspaceTab } from "../../../store/types";
 import { loadTerminalAddons } from "./terminalAddons";
+import {
+  isShiftEnterLineFeedChord,
+  shouldClearTerminalOutputShortcut,
+  shouldReleaseCommandWForTabCloseShortcut,
+} from "./terminalKeyboardUtils";
 import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
+import {
+  collectExecutedTerminalCommand,
+  formatTerminalCommandTitle,
+  formatTerminalPathTitle,
+  resolveTerminalWorkspacePath,
+} from "./terminalTitleUtils";
+import { createTerminalWriteQueue } from "./terminalWriteQueue";
+import type { TerminalWriteQueue } from "./terminalWriteQueue";
 
 /** Resize debounce interval in milliseconds. */
 const RESIZE_DEBOUNCE_MS = 50;
@@ -25,10 +37,6 @@ const TERMINAL_SEARCH_OPTIONS: ISearchOptions = {
   wholeWord: false,
   incremental: true,
 };
-const MAX_TERMINAL_COMMAND_TITLE_LENGTH = 32;
-const ASCII_ESCAPE_CODE = 27;
-const ASCII_BELL_CODE = 7;
-const ASCII_STRING_TERMINATOR_CODE = 156;
 
 /** Renders an xterm instance and binds it to a daemon-backed terminal session. */
 export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
@@ -37,6 +45,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
+  const terminalWriteQueueRef = useRef<TerminalWriteQueue | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const outputSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const pendingCommandInputRef = useRef("");
@@ -174,6 +183,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
+    terminalWriteQueueRef.current = createTerminalWriteQueue(terminal);
 
     terminal.attachCustomKeyEventHandler((event) => {
       if (shouldReleaseCommandWForTabCloseShortcut(event)) {
@@ -203,6 +213,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       return false;
     });
 
+    const titleFrameIds = new Set<number>();
     const writeDisposable = terminal.onData((data) => {
       const sessionId = sessionIdRef.current;
       if (!sessionId) {
@@ -216,13 +227,24 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
 
       // Defer command title extraction off the hot path so it doesn't
       // compete with the keystroke dispatch for CPU time.
-      requestAnimationFrame(() => {
+      let titleFrameId = 0;
+      titleFrameId = window.requestAnimationFrame(() => {
+        if (titleFrameId !== 0) {
+          titleFrameIds.delete(titleFrameId);
+        }
+        if (disposed) {
+          return;
+        }
+
         const commandInput = collectExecutedTerminalCommand(pendingCommandInputRef.current, data);
         pendingCommandInputRef.current = commandInput.buffer;
         if (commandInput.executedCommand) {
           updateTerminalTabTitleFromCommand(commandInput.executedCommand);
         }
       });
+      if (titleFrameId !== 0) {
+        titleFrameIds.add(titleFrameId);
+      }
     });
 
     let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -258,6 +280,10 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       writeDisposable.dispose();
       outputSubscriptionRef.current?.unsubscribe();
       outputSubscriptionRef.current = null;
+      for (const titleFrameId of titleFrameIds) {
+        window.cancelAnimationFrame(titleFrameId);
+      }
+      titleFrameIds.clear();
       if (resizeTimerId !== null) {
         clearTimeout(resizeTimerId);
       }
@@ -266,6 +292,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
       xtermRef.current = null;
       fitAddonRef.current = null;
       searchAddonRef.current = null;
+      terminalWriteQueueRef.current?.dispose();
+      terminalWriteQueueRef.current = null;
     };
   }, [resizeTerminal, updateTerminalTabTitleFromCommand, writeTerminalInput]);
 
@@ -412,12 +440,11 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
             if (chunk instanceof Uint8Array) {
               // Binary fast-path: pass raw bytes directly to xterm.
               if (chunk.byteLength > 0) {
-                terminal.write(chunk);
+                terminalWriteQueueRef.current?.enqueue(chunk);
               }
             } else if (typeof chunk === "string" && chunk.length > 0) {
               // JSON-RPC fallback: string data.
-              updateTerminalTabTitleFromPath(extractPathTitleFromTerminalOutput(chunk));
-              terminal.write(chunk);
+              terminalWriteQueueRef.current?.enqueue(chunk);
             }
             return;
           }
@@ -571,48 +598,6 @@ function reportTerminalAsyncError(action: string, error: unknown): void {
   console.error(`[TerminalView] Failed to ${action}`, error);
 }
 
-/** Returns true when xterm should skip handling so renderer Cmd+W can close one terminal tab. */
-function shouldReleaseCommandWForTabCloseShortcut(event: KeyboardEvent): boolean {
-  return (
-    isMacPlatform() &&
-    event.type === "keydown" &&
-    event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "w"
-  );
-}
-
-/** Returns true when macOS Cmd+K should clear local terminal output instead of reaching the shell. */
-function shouldClearTerminalOutputShortcut(event: KeyboardEvent): boolean {
-  return (
-    isMacPlatform() &&
-    event.metaKey &&
-    !event.ctrlKey &&
-    !event.altKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "k"
-  );
-}
-
-/** Returns true when one keyboard event is an unmodified Shift+Enter line-feed chord. */
-function isShiftEnterLineFeedChord(event: KeyboardEvent): boolean {
-  return event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey;
-}
-
-/** Returns true when the current renderer runs on one macOS platform. */
-function isMacPlatform(): boolean {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  const userAgentDataPlatform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
-    ?.platform;
-  const platformHint = (userAgentDataPlatform ?? navigator.userAgent).toLowerCase();
-  return platformHint.includes("mac");
-}
-
 /** Fits one attached xterm instance to its host without throwing during teardown races. */
 function safeFitTerminalToHost(terminal: Terminal, fitAddon: FitAddon): void {
   if (!isTerminalAttached(terminal)) {
@@ -633,182 +618,4 @@ function isTerminalAttached(terminal: Terminal): boolean {
   }
 
   return Boolean(terminal.element);
-}
-
-/** Tracks typed terminal input and returns the most recent command submitted by Enter. */
-function collectExecutedTerminalCommand(
-  previousBuffer: string,
-  data: string,
-): { buffer: string; executedCommand?: string } {
-  let buffer = previousBuffer;
-  let executedCommand: string | undefined;
-  const commandData = stripTerminalEscapeSequences(data);
-
-  for (const character of commandData) {
-    if (character === "\r" || character === "\n") {
-      const normalizedCommand = normalizeTerminalCommandForTitle(buffer);
-      if (normalizedCommand) {
-        executedCommand = normalizedCommand;
-      }
-      buffer = "";
-      continue;
-    }
-
-    if (character === "\u0003") {
-      buffer = "";
-      continue;
-    }
-
-    if (character === "\b" || character === "\u007f") {
-      buffer = buffer.slice(0, -1);
-      continue;
-    }
-
-    if (character >= " " && character !== "\u001b") {
-      buffer += character;
-    }
-  }
-
-  return { buffer, executedCommand };
-}
-
-/** Removes terminal control escape sequences that are not part of shell command text. */
-function stripTerminalEscapeSequences(data: string): string {
-  let output = "";
-
-  for (let index = 0; index < data.length; index += 1) {
-    const character = data[index];
-    if (character?.charCodeAt(0) !== ASCII_ESCAPE_CODE) {
-      output += character ?? "";
-      continue;
-    }
-
-    if (data[index + 1] !== "[") {
-      continue;
-    }
-
-    index += 1;
-    while (index + 1 < data.length) {
-      index += 1;
-      const code = data.charCodeAt(index);
-      if (code >= 0x40 && code <= 0x7e) {
-        break;
-      }
-    }
-  }
-
-  return output;
-}
-
-/** Resolves one terminal tab's workspace root for the default terminal title. */
-function resolveTerminalWorkspacePath(
-  tab: Extract<WorkspaceTab, { kind: "terminal" }> | undefined,
-): string | undefined {
-  if (!tab) {
-    return undefined;
-  }
-
-  return workspaceStore.getState().workspaces.find((workspace) => workspace.id === tab.workspaceId)?.worktreePath;
-}
-
-/** Extracts the last path-like title emitted via terminal OSC title sequences. */
-function extractPathTitleFromTerminalOutput(output: string): string | undefined {
-  let pathTitle: string | undefined;
-
-  for (const title of extractTerminalOscTitles(output)) {
-    const formattedTitle = formatTerminalPathTitle(title);
-    if (formattedTitle) {
-      pathTitle = title;
-    }
-  }
-
-  return pathTitle;
-}
-
-/** Extracts OSC 0/2 terminal title payloads while ignoring color/control escape sequences. */
-function extractTerminalOscTitles(output: string): string[] {
-  const titles: string[] = [];
-
-  for (let index = 0; index < output.length; index += 1) {
-    if (output.charCodeAt(index) !== ASCII_ESCAPE_CODE || output[index + 1] !== "]") {
-      continue;
-    }
-
-    index += 2;
-    const commandStartIndex = index;
-    while (index < output.length && output[index] !== ";") {
-      index += 1;
-    }
-    const command = output.slice(commandStartIndex, index);
-    if (output[index] !== ";") {
-      continue;
-    }
-
-    index += 1;
-    const titleStartIndex = index;
-    while (index < output.length) {
-      const code = output.charCodeAt(index);
-      if (code === ASCII_BELL_CODE || code === ASCII_STRING_TERMINATOR_CODE) {
-        break;
-      }
-      if (code === ASCII_ESCAPE_CODE && output[index + 1] === "\\") {
-        break;
-      }
-      index += 1;
-    }
-
-    if (command === "0" || command === "2") {
-      titles.push(output.slice(titleStartIndex, index));
-    }
-  }
-
-  return titles;
-}
-
-/** Builds one concise tab title from a current working directory or terminal title payload. */
-function formatTerminalPathTitle(path: string | undefined): string {
-  const normalizedPath = normalizeTerminalCommandForTitle(path ?? "");
-  if (!normalizedPath) {
-    return "";
-  }
-
-  const pathCandidate = normalizedPath.includes(":")
-    ? normalizedPath.slice(normalizedPath.lastIndexOf(":") + 1)
-    : normalizedPath;
-  const pathParts = pathCandidate.replace(/\\/g, "/").split("/").filter(Boolean);
-  const directoryName = pathParts.at(-1) ?? pathCandidate.trim();
-  return formatTerminalCommandTitle(directoryName || pathCandidate.trim());
-}
-
-/** Builds one concise terminal tab title from a submitted shell command. */
-function formatTerminalCommandTitle(command: string): string {
-  const normalizedCommand = normalizeTerminalCommandForTitle(command);
-  if (!normalizedCommand) {
-    return "";
-  }
-
-  if (normalizedCommand.length <= MAX_TERMINAL_COMMAND_TITLE_LENGTH) {
-    return normalizedCommand;
-  }
-
-  return `${normalizedCommand.slice(0, MAX_TERMINAL_COMMAND_TITLE_LENGTH - 1)}…`;
-}
-
-/** Normalizes pasted or launch commands into one single-line label candidate. */
-function normalizeTerminalCommandForTitle(command: string): string {
-  return stripTerminalControlSequences(command).replace(/\s+/g, " ").trim();
-}
-
-/** Removes all non-printable control characters from one candidate tab title. */
-function stripTerminalControlSequences(value: string): string {
-  let output = "";
-
-  for (const character of stripTerminalEscapeSequences(value)) {
-    const code = character.charCodeAt(0);
-    if (code >= 0x20 && code !== 0x7f) {
-      output += character;
-    }
-  }
-
-  return output;
 }

@@ -314,6 +314,27 @@ func TestSubscriptionStreamsOutputAndExit(t *testing.T) {
 	}
 }
 
+func TestSessionOutputBufferIsBounded(t *testing.T) {
+	s := &session{}
+	s.outputMu.Lock()
+	s.appendOutput(strings.Repeat("a", maxSessionOutputBytes+128))
+	if got := s.output.Len(); got != maxSessionOutputBytes {
+		t.Fatalf("expected output buffer to be capped at %d bytes, got %d", maxSessionOutputBytes, got)
+	}
+	if !strings.HasPrefix(s.output.String(), "a") {
+		t.Fatal("expected capped buffer to retain chunk suffix")
+	}
+
+	s.appendOutput(strings.Repeat("b", 256))
+	if got := s.output.Len(); got > maxSessionOutputBytes {
+		t.Fatalf("expected output buffer to remain capped at %d bytes, got %d", maxSessionOutputBytes, got)
+	}
+	if !strings.HasSuffix(s.output.String(), strings.Repeat("b", 256)) {
+		t.Fatal("expected capped buffer to retain newest output")
+	}
+	s.outputMu.Unlock()
+}
+
 func TestResolveManagedRuntimeEnvResolvesOrigZdotdirWhenAlreadyManaged(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)

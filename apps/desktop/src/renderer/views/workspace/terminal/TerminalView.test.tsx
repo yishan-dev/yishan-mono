@@ -61,6 +61,9 @@ const mocked = vi.hoisted(() => {
   });
   const xtermFocus = vi.fn();
   const xtermClear = vi.fn();
+  const xtermWrite = vi.fn((_chunk: string | Uint8Array, callback?: () => void) => {
+    callback?.();
+  });
   const closeTab = vi.fn((tabId: string) => {
     const state = stateRef.current as { closeTab?: (nextTabId: string) => void };
     state.closeTab?.(tabId);
@@ -92,6 +95,7 @@ const mocked = vi.hoisted(() => {
     writeTerminalInput,
     xtermFocus,
     xtermClear,
+    xtermWrite,
     closeTab,
     renameTab,
     searchAddon,
@@ -120,15 +124,15 @@ const mocked = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../store/workspaceStore", () => ({
+vi.mock("../../../store/workspaceStore", () => ({
   workspaceStore: mocked.workspaceStore,
 }));
 
-vi.mock("../../store/tabStore", () => ({
+vi.mock("../../../store/tabStore", () => ({
   tabStore: mocked.tabStore,
 }));
 
-vi.mock("../../hooks/useCommands", () => ({
+vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
     closeTab: mocked.closeTab,
     createTerminalSession: mocked.createTerminalSession,
@@ -154,7 +158,9 @@ vi.mock("@xterm/xterm", () => {
       mocked.xtermClear();
     }
     writeln() {}
-    write() {}
+    write(chunk: string | Uint8Array, callback?: () => void) {
+      mocked.xtermWrite(chunk, callback);
+    }
     paste(data: string) {
       this.onDataHandler?.(data);
     }
@@ -208,6 +214,22 @@ function stubTerminalBrowserApis(): void {
     return 0;
   });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
+}
+
+function stubAsyncTerminalBrowserApis(): FrameRequestCallback[] {
+  const animationFrames: FrameRequestCallback[] = [];
+  class MockResizeObserver {
+    observe() {}
+    disconnect() {}
+  }
+
+  vi.stubGlobal("ResizeObserver", MockResizeObserver);
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  return animationFrames;
 }
 
 /** Builds the minimal workspace-store state required by TerminalView. */
@@ -459,7 +481,7 @@ describe("TerminalView", () => {
     expect(mocked.renameTab).not.toHaveBeenCalledWith("terminal-tab-1", "");
   });
 
-  it("restores a current-directory title from terminal OSC output", async () => {
+  it("ignores terminal OSC output titles", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -491,7 +513,56 @@ describe("TerminalView", () => {
       nextIndex: 1,
     });
 
-    expect(mocked.renameTab).toHaveBeenCalledWith("terminal-tab-1", "yishan");
+    expect(mocked.renameTab).not.toHaveBeenCalledWith("terminal-tab-1", "yishan");
+  });
+
+  it("batches live terminal output before writing to xterm", async () => {
+    const state = buildStoreState();
+    mocked.stateRef.current = state;
+    mocked.createTerminalSession.mockResolvedValueOnce({
+      sessionId: "session-output",
+      cwd: "/tmp/workspace-1",
+      cols: 120,
+      rows: 30,
+    });
+    mocked.readTerminalOutput.mockResolvedValueOnce({
+      nextIndex: 0,
+      chunks: [],
+      exited: false,
+      exitCode: null,
+      signalCode: null,
+    });
+    mocked.resizeTerminal.mockResolvedValue({ ok: true });
+
+    const animationFrames = stubAsyncTerminalBrowserApis();
+
+    render(<TerminalView tabId="terminal-tab-1" />);
+    while (animationFrames.length > 0) {
+      animationFrames.shift()?.(0);
+    }
+    await waitFor(() => {
+      expect(mocked.subscribeTerminalOutput).toHaveBeenCalled();
+    });
+    mocked.xtermWrite.mockClear();
+
+    mocked.emitTerminalEvent("session-output", {
+      type: "output",
+      sessionId: "session-output",
+      chunk: "hel",
+      nextIndex: 1,
+    });
+    mocked.emitTerminalEvent("session-output", {
+      type: "output",
+      sessionId: "session-output",
+      chunk: "lo",
+      nextIndex: 2,
+    });
+
+    expect(mocked.xtermWrite).not.toHaveBeenCalled();
+    animationFrames.shift()?.(0);
+
+    expect(mocked.xtermWrite).toHaveBeenCalledTimes(1);
+    expect(mocked.xtermWrite).toHaveBeenCalledWith("hello", expect.any(Function));
   });
 
   it("truncates long command titles and keeps terminal tabs independent", async () => {

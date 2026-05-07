@@ -117,7 +117,7 @@ vi.mock("./LaunchView", () => ({
   LaunchView: () => <div data-testid="launch-view" />,
 }));
 
-vi.mock("./TerminalView", () => ({
+vi.mock("./terminal/TerminalView", () => ({
   TerminalView: ({ tabId, focusRequestKey = 0 }: { tabId: string; focusRequestKey?: number }) => (
     <div data-testid="terminal-view" data-tab-id={tabId} data-focus-request-key={focusRequestKey} />
   ),
