@@ -226,6 +226,47 @@ describe("tabs-domain close", () => {
     expect(patch?.tabs?.some((tab) => tab.id === "file-1")).toBe(false);
   });
 
+  it("selects the next tab when closing the selected tab", () => {
+    const state: WorkspaceTabStateSlice = {
+      ...createBaseState(),
+      tabs: [
+        ...createBaseState().tabs,
+        {
+          id: "file-2",
+          workspaceId: "workspace-1",
+          title: "b.ts",
+          pinned: false,
+          kind: "file",
+          data: {
+            path: "src/b.ts",
+            content: "b1",
+            savedContent: "b1",
+            isDirty: false,
+            isTemporary: false,
+          },
+        },
+      ],
+    };
+
+    const patch = closeTabState(state, "file-1");
+
+    expect(patch?.selectedTabId).toBe("file-2");
+    expect(patch?.selectedTabIdByWorkspaceId?.["workspace-1"]).toBe("file-2");
+  });
+
+  it("selects the previous tab when closing the last selected tab", () => {
+    const state: WorkspaceTabStateSlice = {
+      ...createBaseState(),
+      selectedTabId: "file-1",
+      tabs: createBaseState().tabs.filter((tab) => tab.id !== "terminal-1"),
+    };
+
+    const patch = closeTabState(state, "file-1");
+
+    expect(patch?.selectedTabId).toBe("session-1");
+    expect(patch?.selectedTabIdByWorkspaceId?.["workspace-1"]).toBe("session-1");
+  });
+
   it("keeps target tab and removes siblings in closeOtherTabsState", () => {
     const state = createBaseState();
     const patch = closeOtherTabsState(state, "session-1");

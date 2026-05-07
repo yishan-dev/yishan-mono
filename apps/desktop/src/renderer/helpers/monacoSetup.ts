@@ -1,4 +1,6 @@
 import * as monaco from "monaco-editor";
+import "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution";
+import "monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution";
 import { DARK_SURFACE_COLORS } from "../theme";
 
 // Configure Monaco to use locally bundled workers instead of loading from CDN.
@@ -21,7 +23,7 @@ self.MonacoEnvironment = {
         type: "module",
       });
     }
-    if (label === "typescript" || label === "javascript") {
+    if (label === "typescript" || label === "typescriptreact" || label === "javascript" || label === "javascriptreact") {
       return new Worker(new URL("monaco-editor/esm/vs/language/typescript/ts.worker.js", import.meta.url), {
         type: "module",
       });
@@ -44,6 +46,7 @@ const sharedCompilerOptions: monaco.languages.typescript.CompilerOptions = {
   moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
   allowJs: true,
   allowNonTsExtensions: true,
+  jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
   noEmit: true,
   // Suppress diagnostics for modules that cannot be found.
   noResolve: true,

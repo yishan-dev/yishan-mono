@@ -1,5 +1,6 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import { useEffect, useMemo, useRef } from "react";
+import { getFileTreeIcon } from "./fileTreeIcons";
 import { getLanguageId } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
 
@@ -24,6 +25,7 @@ export function FileEditor({ path, content, focusRequestKey = 0, onContentChange
     () => (theme.palette.mode === "dark" ? YISHAN_THEME_DARK : YISHAN_THEME_LIGHT),
     [theme.palette.mode],
   );
+  const fileIcon = useMemo(() => getFileTreeIcon(path, false), [path]);
 
   useEffect(() => {
     contentRef.current = content;
@@ -137,6 +139,7 @@ export function FileEditor({ path, content, focusRequestKey = 0, onContentChange
             muiTheme.palette.mode === "dark" ? "background.default" : muiTheme.palette.background.paper,
         }}
       >
+        <Box component="img" src={fileIcon} alt="" sx={{ width: 14, height: 14, mr: 0.75, flexShrink: 0 }} />
         <Typography variant="caption" color="text.secondary" noWrap>
           {path}
         </Typography>

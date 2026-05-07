@@ -89,6 +89,10 @@ vi.mock("../helpers/editorLanguage", () => ({
   },
 }));
 
+vi.mock("./fileTreeIcons", () => ({
+  getFileTreeIcon: (path: string) => `/icons/${path.split("/").pop()}.svg`,
+}));
+
 afterEach(() => {
   cleanup();
   mockEditorState.editorValue = "";
@@ -253,5 +257,16 @@ describe("FileEditor", () => {
     );
 
     expect(getByText("src/components/App.tsx")).toBeTruthy();
+  });
+
+  it("displays the file icon before the path in the header", () => {
+    const { container } = render(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor path="src/components/App.tsx" content="initial" />
+      </ThemeProvider>,
+    );
+
+    const icon = container.querySelector('img[src="/icons/App.tsx.svg"]');
+    expect(icon).toBeTruthy();
   });
 });
