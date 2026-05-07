@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	"yishan/apps/cli/internal/workspace"
 )
 
@@ -40,13 +41,6 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		}
 		if req.ProjectID != "" {
 			remoteSyncWarning := ""
-			reportProgress(workspace.CreateProgressEvent{
-				WorkspaceID: created.ID,
-				StepID:      "remote",
-				Label:       "Submit workspace to remote",
-				Status:      workspace.CreateProgressRunning,
-				CreatedAt:   nowRFC3339Nano(),
-			})
 			if err := createRemoteWorkspace(ctx, WorkspaceCreation{
 				ID:             created.ID,
 				NodeID:         h.nodeID,
@@ -58,22 +52,13 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 				LocalPath:      created.Path,
 			}); err != nil {
 				remoteSyncWarning = err.Error()
-				reportProgress(workspace.CreateProgressEvent{
-					WorkspaceID: created.ID,
-					StepID:      "remote",
-					Label:       "Submit workspace to remote",
-					Status:      workspace.CreateProgressFailed,
-					Message:     err.Error(),
-					CreatedAt:   nowRFC3339Nano(),
-				})
-			} else {
-				reportProgress(workspace.CreateProgressEvent{
-					WorkspaceID: created.ID,
-					StepID:      "remote",
-					Label:       "Submit workspace to remote",
-					Status:      workspace.CreateProgressCompleted,
-					CreatedAt:   nowRFC3339Nano(),
-				})
+				log.Warn().
+					Err(err).
+					Str("workspaceId", created.ID).
+					Str("projectId", req.ProjectID).
+					Str("organizationId", req.OrganizationID).
+					Str("branch", req.TargetBranch).
+					Msg("failed to create remote workspace; local workspace remains available")
 			}
 			if remoteSyncWarning != "" {
 				warnings := []any{}
@@ -81,13 +66,6 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 					warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult))
 				}
 				h.watchers.Watch(created.Path)
-				reportProgress(workspace.CreateProgressEvent{
-					WorkspaceID: created.ID,
-					StepID:      "watch",
-					Label:       "Start file and git watchers",
-					Status:      workspace.CreateProgressCompleted,
-					CreatedAt:   nowRFC3339Nano(),
-				})
 				reportProgress(workspace.CreateProgressEvent{
 					WorkspaceID: created.ID,
 					StepID:      "complete",
@@ -103,24 +81,8 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 					"remoteSyncWarning":       remoteSyncWarning,
 				}, nil
 			}
-		} else {
-			reportProgress(workspace.CreateProgressEvent{
-				WorkspaceID: created.ID,
-				StepID:      "remote",
-				Label:       "Submit workspace to remote",
-				Status:      workspace.CreateProgressSkipped,
-				Message:     "No project id provided",
-				CreatedAt:   nowRFC3339Nano(),
-			})
 		}
 		h.watchers.Watch(created.Path)
-		reportProgress(workspace.CreateProgressEvent{
-			WorkspaceID: created.ID,
-			StepID:      "watch",
-			Label:       "Start file and git watchers",
-			Status:      workspace.CreateProgressCompleted,
-			CreatedAt:   nowRFC3339Nano(),
-		})
 		reportProgress(workspace.CreateProgressEvent{
 			WorkspaceID: created.ID,
 			StepID:      "complete",

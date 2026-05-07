@@ -585,7 +585,7 @@ export class DaemonClient {
       sourceBranch,
       contextEnabled,
       setupHook,
-    })) as Rpc.DaemonWorkspace & { lifecycleScriptWarnings?: unknown[] };
+    })) as Rpc.DaemonWorkspace & { lifecycleScriptWarnings?: unknown[]; remoteSyncWarning?: unknown };
 
     const createdWorktreePath = createdWorkspace.path || "";
     if (createdWorktreePath) {
@@ -603,6 +603,7 @@ export class DaemonClient {
       lifecycleScriptWarnings: Array.isArray(createdWorkspace.lifecycleScriptWarnings)
         ? createdWorkspace.lifecycleScriptWarnings
         : [],
+      remoteSyncWarning: readOptionalString(createdWorkspace.remoteSyncWarning),
     };
   }
 
