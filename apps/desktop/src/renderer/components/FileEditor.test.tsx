@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { ThemeProvider } from "@mui/material/styles";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppTheme } from "../theme";
 import { FileEditor } from "./FileEditor";
@@ -268,5 +268,26 @@ describe("FileEditor", () => {
 
     const icon = container.querySelector('img[src="/icons/App.tsx.svg"]');
     expect(icon).toBeTruthy();
+  });
+
+  it("runs file path header actions", () => {
+    const onCopyPath = vi.fn();
+    const onOpenExternalApp = vi.fn();
+    const { getByLabelText } = render(
+      <ThemeProvider theme={createAppTheme("dark")}>
+        <FileEditor
+          path="src/components/App.tsx"
+          content="initial"
+          onCopyPath={onCopyPath}
+          onOpenExternalApp={onOpenExternalApp}
+        />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(getByLabelText("Copy file path"));
+    fireEvent.click(getByLabelText("Open in external app"));
+
+    expect(onCopyPath).toHaveBeenCalledWith("src/components/App.tsx");
+    expect(onOpenExternalApp).toHaveBeenCalledWith("src/components/App.tsx");
   });
 });

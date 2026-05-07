@@ -3,6 +3,7 @@ import type { Theme } from "@mui/material/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuSquareTerminal } from "react-icons/lu";
+import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shared/contracts/externalApps";
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
@@ -111,8 +112,11 @@ export function MainPaneView() {
     updateFileTabContent,
     markFileTabSaved,
     writeFile,
+    openEntryInExternalApp,
   } = useCommands();
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
+  const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
+  const lastUsedExternalAppPreset = lastUsedExternalAppId ? findExternalAppPreset(lastUsedExternalAppId) : null;
   const inUseByAgentKind = agentSettingsStore((state) => state.inUseByAgentKind);
   const workspaceTabs = tabs.filter((tab) => tab.workspaceId === selectedWorkspaceId);
   const terminalTabs = tabs.filter((tab) => tab.kind === "terminal");
@@ -330,6 +334,36 @@ export function MainPaneView() {
                       console.error("Failed to save workspace file", error);
                     }
                   }}
+                  onCopyPath={async (filePath) => {
+                    if (!navigator.clipboard) {
+                      return;
+                    }
+
+                    try {
+                      await navigator.clipboard.writeText(filePath);
+                    } catch (error) {
+                      console.error("Failed to copy workspace file path", error);
+                    }
+                  }}
+                  onOpenExternalApp={async (filePath) => {
+                    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+                    if (!workspaceWorktreePath) {
+                      return;
+                    }
+
+                    try {
+                      await openEntryInExternalApp({
+                        workspaceWorktreePath,
+                        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+                        relativePath: filePath,
+                      });
+                    } catch (error) {
+                      console.error("Failed to open workspace file externally", error);
+                    }
+                  }}
+                  openExternalAppLabel={
+                    lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
+                  }
                 />
               </Box>
             );

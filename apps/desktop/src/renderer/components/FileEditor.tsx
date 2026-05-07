@@ -1,5 +1,6 @@
-import { Box, Typography, useTheme } from "@mui/material";
+import { Box, IconButton, Tooltip, Typography, useTheme } from "@mui/material";
 import { useEffect, useMemo, useRef } from "react";
+import { LuCopy, LuExternalLink } from "react-icons/lu";
 import { getFileTreeIcon } from "./fileTreeIcons";
 import { getLanguageId } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
@@ -10,10 +11,22 @@ type FileEditorProps = {
   focusRequestKey?: number;
   onContentChange?: (content: string) => void;
   onSave?: (content: string) => void | Promise<void>;
+  onCopyPath?: (path: string) => void | Promise<void>;
+  onOpenExternalApp?: (path: string) => void | Promise<void>;
+  openExternalAppLabel?: string;
 };
 
 /** Renders a Monaco file editor with local edit tracking and Cmd/Ctrl+S save shortcut. */
-export function FileEditor({ path, content, focusRequestKey = 0, onContentChange, onSave }: FileEditorProps) {
+export function FileEditor({
+  path,
+  content,
+  focusRequestKey = 0,
+  onContentChange,
+  onSave,
+  onCopyPath,
+  onOpenExternalApp,
+  openExternalAppLabel = "Open in external app",
+}: FileEditorProps) {
   const theme = useTheme();
   const editorHostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -140,9 +153,41 @@ export function FileEditor({ path, content, focusRequestKey = 0, onContentChange
         }}
       >
         <Box component="img" src={fileIcon} alt="" sx={{ width: 14, height: 14, mr: 0.75, flexShrink: 0 }} />
-        <Typography variant="caption" color="text.secondary" noWrap>
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, flex: 1 }}>
           {path}
         </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
+          <Tooltip title="Copy file path" arrow>
+            <span>
+              <IconButton
+                size="small"
+                aria-label="Copy file path"
+                onClick={() => {
+                  void onCopyPath?.(path);
+                }}
+                disabled={!onCopyPath}
+                sx={{ p: 0.375, color: "text.secondary" }}
+              >
+                <LuCopy size={14} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title={openExternalAppLabel} arrow>
+            <span>
+              <IconButton
+                size="small"
+                aria-label={openExternalAppLabel}
+                onClick={() => {
+                  void onOpenExternalApp?.(path);
+                }}
+                disabled={!onOpenExternalApp}
+                sx={{ p: 0.375, color: "text.secondary" }}
+              >
+                <LuExternalLink size={14} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
       <Box ref={editorHostRef} sx={{ flex: 1, minHeight: 0 }} />
     </Box>
