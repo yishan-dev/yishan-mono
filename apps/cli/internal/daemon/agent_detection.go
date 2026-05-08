@@ -150,10 +150,16 @@ func listAgentCLIDetectionStatusesWithOptions(options agentDetectionOptions) []A
 				return
 			}
 
+			version, unusableWrapper := detectAgentCLIVersion(binaryPath, options.VersionTimeout)
+			if unusableWrapper {
+				statuses[index] = AgentCLIDetectionStatus{AgentKind: agentCLI.Kind, Detected: false}
+				return
+			}
+
 			statuses[index] = AgentCLIDetectionStatus{
 				AgentKind: agentCLI.Kind,
 				Detected:  true,
-				Version:   detectAgentCLIVersion(binaryPath, options.VersionTimeout),
+				Version:   version,
 			}
 		}(index, agentCLI)
 	}
@@ -270,24 +276,33 @@ func isExecutableCandidate(candidatePath string, isWindows bool) bool {
 	return fileInfo.Mode().Perm()&0o111 != 0
 }
 
-func detectAgentCLIVersion(binaryPath string, timeout time.Duration) string {
+func detectAgentCLIVersion(binaryPath string, timeout time.Duration) (string, bool) {
 	for _, args := range [][]string{{"--version"}, {"version"}, {"-v"}} {
 		output := readVersionCommandOutput(binaryPath, args, timeout)
 		if output == "" {
 			continue
 		}
 
+		if isManagedWrapperMissingRealOutput(output) {
+			return "", true
+		}
+
 		if matched := versionPattern.FindString(output); matched != "" {
-			return matched
+			return matched, false
 		}
 
 		firstLine := strings.TrimSpace(strings.Split(output, "\n")[0])
 		if firstLine != "" {
-			return firstLine
+			return firstLine, false
 		}
 	}
 
-	return ""
+	return "", false
+}
+
+func isManagedWrapperMissingRealOutput(output string) bool {
+	normalized := strings.ToLower(output)
+	return strings.Contains(normalized, "wrapper: real") && strings.Contains(normalized, "not found in path")
 }
 
 func readVersionCommandOutput(binaryPath string, args []string, timeout time.Duration) string {
