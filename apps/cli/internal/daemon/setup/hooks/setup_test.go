@@ -170,13 +170,13 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 		t.Fatalf("expected cursor hook script to invoke notify script")
 	}
 
-	pluginPath := filepath.Join(configHome, "plugin", codexPluginFileName)
+	pluginPath := filepath.Join(configHome, "plugin", openCodePluginFileName)
 	pluginRaw, err := os.ReadFile(pluginPath)
 	if err != nil {
 		t.Fatalf("read OpenCode plugin: %v", err)
 	}
 	pluginText := string(pluginRaw)
-	if !strings.Contains(pluginText, codexPluginMarker) {
+	if !strings.Contains(pluginText, openCodePluginMarker) {
 		t.Fatalf("expected OpenCode plugin marker")
 	}
 	if !strings.Contains(pluginText, "process?.env?.YISHAN_TAB_ID") {
@@ -277,7 +277,7 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 		t.Fatalf("expected PowerShell Claude command, got %s", stopCommand)
 	}
 
-	pluginRaw, err := os.ReadFile(filepath.Join(configHome, "plugin", codexPluginFileName))
+	pluginRaw, err := os.ReadFile(filepath.Join(configHome, "plugin", openCodePluginFileName))
 	if err != nil {
 		t.Fatalf("read OpenCode plugin: %v", err)
 	}

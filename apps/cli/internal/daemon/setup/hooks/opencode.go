@@ -13,8 +13,8 @@ import (
 var openCodePluginTemplate string
 
 const (
-	codexPluginMarker   = "// Yishan opencode plugin v1"
-	codexPluginFileName = "yishan-notify.js"
+	openCodePluginMarker   = "// Yishan opencode plugin v1"
+	openCodePluginFileName = "yishan-notify.js"
 )
 
 type openCodeHookInstaller struct{}
@@ -27,8 +27,8 @@ func (openCodeHookInstaller) Install(ctx hookSetupContext) error {
 }
 
 func ensureOpenCodePlugin(notifyScriptPath string, configHome string, goos string) error {
-	pluginPath := filepath.Join(configHome, "plugin", codexPluginFileName)
-	content := buildOpenCodePluginContent(notifyScriptPath, "YISHAN_TAB_ID", codexPluginMarker, goos)
+	pluginPath := filepath.Join(configHome, "plugin", openCodePluginFileName)
+	content := buildOpenCodePluginContent(notifyScriptPath, "YISHAN_TAB_ID", openCodePluginMarker, goos)
 	return writeTextFileIfChanged(pluginPath, content, 0o644)
 }
 
