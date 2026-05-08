@@ -114,6 +114,11 @@ export async function readExternalClipboardSourcePaths() {
   return (await getDesktopHostBridge().readExternalClipboardSourcePaths()) as ExternalClipboardReadOutcome;
 }
 
+/** Reads one file as a base64-encoded data URL via the host bridge. */
+export async function readFileAsDataUrl(params: { absolutePath: string }) {
+  return await getDesktopHostBridge().readFileAsDataUrl({ absolutePath: params.absolutePath });
+}
+
 /** Copies or moves one or more workspace entries into a destination path. */
 export async function pasteEntries(params: {
   workspaceWorktreePath: string;

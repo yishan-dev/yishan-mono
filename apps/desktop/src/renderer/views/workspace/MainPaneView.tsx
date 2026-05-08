@@ -6,6 +6,7 @@ import { LuSquareTerminal } from "react-icons/lu";
 import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shared/contracts/externalApps";
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
+import { ImagePreview } from "../../components/ImagePreview";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
 import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
@@ -133,7 +134,7 @@ export function MainPaneView() {
     pinned: tab.pinned,
     kind: tab.kind,
     isDirty: tab.kind === "file" ? tab.data.isDirty : false,
-    isTemporary: tab.kind === "file" ? tab.data.isTemporary : false,
+    isTemporary: (tab.kind === "file" || tab.kind === "image") ? tab.data.isTemporary : false,
   }));
   const hasWorkspaceTabs = workspaceTabs.length > 0;
   const enabledAgentKinds = useMemo(
@@ -258,7 +259,7 @@ export function MainPaneView() {
               return <LuSquareTerminal size={14} />;
             }
 
-            if (fullTab?.kind === "file" || fullTab?.kind === "diff") {
+            if (fullTab?.kind === "file" || fullTab?.kind === "diff" || fullTab?.kind === "image") {
               return (
                 <Box
                   component="img"
@@ -334,6 +335,55 @@ export function MainPaneView() {
                       console.error("Failed to save workspace file", error);
                     }
                   }}
+                  onCopyPath={async (filePath) => {
+                    if (!navigator.clipboard) {
+                      return;
+                    }
+
+                    try {
+                      await navigator.clipboard.writeText(filePath);
+                    } catch (error) {
+                      console.error("Failed to copy workspace file path", error);
+                    }
+                  }}
+                  onOpenExternalApp={async (filePath) => {
+                    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+                    if (!workspaceWorktreePath) {
+                      return;
+                    }
+
+                    try {
+                      await openEntryInExternalApp({
+                        workspaceWorktreePath,
+                        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+                        relativePath: filePath,
+                      });
+                    } catch (error) {
+                      console.error("Failed to open workspace file externally", error);
+                    }
+                  }}
+                  openExternalAppLabel={
+                    lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
+                  }
+                />
+              </Box>
+            );
+          }
+
+          if (tab.kind === "image") {
+            return (
+              <Box
+                key={tab.id}
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: isSelected ? "flex" : "none",
+                  flexDirection: "column",
+                }}
+              >
+                <ImagePreview
+                  path={tab.data.path}
+                  dataUrl={tab.data.dataUrl}
                   onCopyPath={async (filePath) => {
                     if (!navigator.clipboard) {
                       return;

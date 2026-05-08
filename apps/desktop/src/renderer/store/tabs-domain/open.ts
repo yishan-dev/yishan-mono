@@ -17,6 +17,20 @@ function findTemporaryFileTab(
   return null;
 }
 
+/** Returns one reusable temporary image tab in the target workspace. */
+function findTemporaryImageTab(
+  tabs: WorkspaceTab[],
+  workspaceId: string,
+): Extract<WorkspaceTab, { kind: "image" }> | null {
+  for (const tab of tabs) {
+    if (tab.workspaceId === workspaceId && tab.kind === "image" && tab.data.isTemporary) {
+      return tab;
+    }
+  }
+
+  return null;
+}
+
 /** Returns one state patch that selects one tab in one workspace. */
 function selectWorkspaceTab(
   state: WorkspaceTabStateSlice,
@@ -52,6 +66,17 @@ function createTabFromOpenInput(input: OpenWorkspaceTabInput, workspaceId: strin
       title: getFileName(input.path),
       pinned: false,
       kind: "file",
+      data: buildTabDataByInput(input),
+    };
+  }
+
+  if (input.kind === "image") {
+    return {
+      id: tabId,
+      workspaceId,
+      title: getFileName(input.path),
+      pinned: false,
+      kind: "image",
       data: buildTabDataByInput(input),
     };
   }
@@ -160,7 +185,49 @@ export function openTabState(
       };
     }
 
+    if (input.kind === "image" && existingTab.kind === "image") {
+      const isOpeningTemporary = Boolean(input.temporary);
+      return {
+        tabs: state.tabs.map((tab) =>
+          tab.id === existingTab.id && tab.kind === "image"
+            ? {
+                ...tab,
+                data: {
+                  ...tab.data,
+                  dataUrl: input.dataUrl,
+                  isTemporary: isOpeningTemporary,
+                },
+              }
+            : tab,
+        ),
+        ...selectWorkspaceTab(state, targetWorkspaceId, existingTab.id),
+      };
+    }
+
     return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
+  }
+
+  if (input.kind === "image" && input.temporary) {
+    const temporaryImageTab = findTemporaryImageTab(state.tabs, targetWorkspaceId);
+    if (temporaryImageTab) {
+      return {
+        tabs: state.tabs.map((tab) =>
+          tab.id === temporaryImageTab.id && tab.kind === "image"
+            ? {
+                ...tab,
+                title: getFileName(input.path),
+                data: {
+                  ...tab.data,
+                  path: input.path,
+                  dataUrl: input.dataUrl,
+                  isTemporary: true,
+                },
+              }
+            : tab,
+        ),
+        ...selectWorkspaceTab(state, targetWorkspaceId, temporaryImageTab.id),
+      };
+    }
   }
 
   if (input.kind === "file" && input.temporary) {
