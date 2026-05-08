@@ -118,7 +118,7 @@ func buildHookNotificationPayload(event normalizedHookEvent) map[string]any {
 	case "start":
 		return hookNotificationPayload(event, "Run Started", "Workspace "+event.workspaceID+" is running.", "success", true, "")
 	case "wait_input":
-		return hookNotificationPayload(event, "Input Required", "Workspace "+event.workspaceID+" is waiting for your approval or input.", "error", false, "run-failed")
+		return hookNotificationPayload(event, "Input Required", "Workspace "+event.workspaceID+" is waiting for your approval or input.", "error", false, "pending-question")
 	case "stop":
 		if isFailedHookEvent(event.rawEventType) {
 			return hookNotificationPayload(event, "Run Failed", "Workspace "+event.workspaceID+" has stopped with an error.", "error", false, "run-failed")

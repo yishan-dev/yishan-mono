@@ -95,6 +95,7 @@ describe("normalizeBackendEvent", () => {
             title: "Done",
             tone: "success",
             createdAt: new Date().toISOString(),
+            notificationEventType: "pending-question",
             silent: true,
             workspaceId: "workspace-1",
             observerStatus: {

@@ -6,9 +6,11 @@ export const NOTIFICATION_SETTINGS_FOCUS_ITEM_IDS = [
   "volume",
   "sound-run-finished",
   "sound-run-failed",
+  "sound-pending-question",
   "run-type-ai-task",
   "event-run-finished",
   "event-run-failed",
+  "event-pending-question",
 ] as const;
 
 export type NotificationSettingsFocusItemId = (typeof NOTIFICATION_SETTINGS_FOCUS_ITEM_IDS)[number];
@@ -56,6 +58,11 @@ export const NOTIFICATION_SETTINGS_SEARCH_ITEMS: NotificationSettingsSearchItem[
     keywordKeys: ["org.settings.notifications.searchKeywords.soundRunFailed"],
   },
   {
+    id: "sound-pending-question",
+    labelKey: "org.settings.notifications.events.pendingQuestion",
+    keywordKeys: ["org.settings.notifications.searchKeywords.soundPendingQuestion"],
+  },
+  {
     id: "run-type-ai-task",
     labelKey: "org.settings.notifications.runTypes.items.ai-task",
     keywordKeys: ["org.settings.notifications.searchKeywords.runTypeAiTask"],
@@ -69,6 +76,11 @@ export const NOTIFICATION_SETTINGS_SEARCH_ITEMS: NotificationSettingsSearchItem[
     id: "event-run-failed",
     labelKey: "org.settings.notifications.events.runFailed",
     keywordKeys: ["org.settings.notifications.searchKeywords.eventRunFailed"],
+  },
+  {
+    id: "event-pending-question",
+    labelKey: "org.settings.notifications.events.pendingQuestion",
+    keywordKeys: ["org.settings.notifications.searchKeywords.eventPendingQuestion"],
   },
 ];
 

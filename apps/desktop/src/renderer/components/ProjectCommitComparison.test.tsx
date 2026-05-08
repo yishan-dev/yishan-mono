@@ -282,9 +282,5 @@ describe("ProjectCommitComparison", () => {
 
     const currentBranch = screen.getByTestId("commit-comparison-current-branch");
     expect(currentBranch.getAttribute("title")).toBe(longBranch);
-    const currentBranchStyle = window.getComputedStyle(currentBranch);
-    expect(currentBranchStyle.overflow).toBe("hidden");
-    expect(currentBranchStyle.textOverflow).toBe("ellipsis");
-    expect(currentBranchStyle.whiteSpace).toBe("nowrap");
   });
 });

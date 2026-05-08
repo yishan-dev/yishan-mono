@@ -1,15 +1,17 @@
 import { z } from "zod";
 
-const notificationEventTypeSchema = z.enum(["run-finished", "run-failed"]);
+const notificationEventTypeSchema = z.enum(["run-finished", "run-failed", "pending-question"]);
 const notificationSoundIdSchema = z.enum(["chime", "ping", "pop", "zip", "alert"]);
 const notificationCategorySchema = z.enum(["ai-task"]);
 
 const notificationEventSoundsSchema = z.object({
   "run-finished": notificationSoundIdSchema,
   "run-failed": notificationSoundIdSchema,
+  "pending-question": notificationSoundIdSchema,
 });
 
 export const notificationPreferencesSchema = z.object({
+  schemaVersion: z.number().int().positive().optional(),
   enabled: z.boolean(),
   osEnabled: z.boolean(),
   soundEnabled: z.boolean(),
@@ -23,6 +25,7 @@ export const notificationPreferencesSchema = z.object({
 export const updateNotificationPreferencesBodySchema = z
   .object({
     enabled: z.boolean().optional(),
+    schemaVersion: z.number().int().positive().optional(),
     osEnabled: z.boolean().optional(),
     soundEnabled: z.boolean().optional(),
     volume: z.number().min(0).max(1).optional(),

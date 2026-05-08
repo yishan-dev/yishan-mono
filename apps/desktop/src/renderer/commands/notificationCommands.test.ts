@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
         eventSounds: {
           "run-finished": "ping",
           "run-failed": "alert",
+          "pending-question": "ping",
         },
         enabledCategories: ["ai-task"],
       },
@@ -71,7 +72,14 @@ describe("notificationCommands", () => {
 
     const preferences = await getNotificationPreferences();
     expect(preferences.soundEnabled).toBe(false);
-    expect(mocks.requestJson).not.toHaveBeenCalled();
+    expect(preferences.enabledEventTypes).toContain("pending-question");
+    expect(mocks.requestJson).toHaveBeenCalledWith("/notification-preferences", {
+      method: "PUT",
+      body: expect.objectContaining({
+        schemaVersion: 2,
+        enabledEventTypes: ["run-finished", "run-failed", "pending-question"],
+      }),
+    });
 
     const cached = JSON.parse(window.localStorage.getItem("notifications.preferences.v1") ?? "{}");
     expect(cached.soundEnabled).toBe(false);
@@ -94,6 +102,7 @@ describe("notificationCommands", () => {
         eventSounds: {
           "run-finished": "chime",
           "run-failed": "alert",
+          "pending-question": "ping",
         },
         enabledCategories: ["ai-task"],
       }),
@@ -101,6 +110,7 @@ describe("notificationCommands", () => {
 
     const preferences = await getNotificationPreferences();
     expect(preferences.soundEnabled).toBe(false);
+    expect(preferences.enabledEventTypes).toContain("pending-question");
 
     mocks.sessionState.currentUser = {
       ...mocks.sessionState.currentUser,
@@ -114,6 +124,7 @@ describe("notificationCommands", () => {
         eventSounds: {
           "run-finished": "ping",
           "run-failed": "alert",
+          "pending-question": "ping",
         },
         enabledCategories: ["ai-task"],
       },
@@ -133,6 +144,7 @@ describe("notificationCommands", () => {
         eventSounds: {
           "run-finished": "zip",
           "run-failed": "alert",
+          "pending-question": "ping",
         },
         enabledCategories: ["ai-task"],
       },
@@ -140,6 +152,7 @@ describe("notificationCommands", () => {
 
     const updated = await updateNotificationPreferences({ soundEnabled: true, volume: 0.9 });
     expect(updated.volume).toBe(0.9);
+    expect(updated.enabledEventTypes).toContain("pending-question");
     expect(mocks.requestJson).toHaveBeenCalledWith("/notification-preferences", {
       method: "PUT",
       body: { soundEnabled: true, volume: 0.9 },
@@ -152,11 +165,16 @@ describe("notificationCommands", () => {
 
   it("forwards notification requests to notification service", async () => {
     await previewNotification({ eventType: "run-finished" });
+    await previewNotification({ eventType: "pending-question" });
     await playNotificationSound({ soundId: "chime", volume: 0.9 });
     await dispatchNotification({ title: "Run completed", body: "Done" });
 
     expect(mocks.dispatchNotification).toHaveBeenCalledWith({
       title: "Run finished",
+      body: "Notification preview",
+    });
+    expect(mocks.dispatchNotification).toHaveBeenCalledWith({
+      title: "Input required",
       body: "Notification preview",
     });
     expect(mocks.dispatchNotification).toHaveBeenCalledWith({ title: "Run completed", body: "Done" });

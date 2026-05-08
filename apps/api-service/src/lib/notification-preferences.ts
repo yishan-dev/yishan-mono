@@ -1,4 +1,4 @@
-export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed"] as const;
+export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed", "pending-question"] as const;
 export type NotificationEventType = (typeof SUPPORTED_NOTIFICATION_EVENT_TYPES)[number];
 
 export const SUPPORTED_NOTIFICATION_SOUND_IDS = ["chime", "ping", "pop", "zip", "alert"] as const;
@@ -6,8 +6,10 @@ export type NotificationSoundId = (typeof SUPPORTED_NOTIFICATION_SOUND_IDS)[numb
 
 export const SUPPORTED_NOTIFICATION_CATEGORIES = ["ai-task"] as const;
 export type NotificationCategory = (typeof SUPPORTED_NOTIFICATION_CATEGORIES)[number];
+export const CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION = 2;
 
 export type NotificationPreferences = {
+  schemaVersion: number;
   enabled: boolean;
   osEnabled: boolean;
   soundEnabled: boolean;
@@ -25,6 +27,7 @@ export type NotificationPreferencesPatch = Partial<
 >;
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  schemaVersion: CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
   enabled: true,
   osEnabled: true,
   soundEnabled: true,
@@ -34,6 +37,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   eventSounds: {
     "run-finished": "chime",
     "run-failed": "alert",
+    "pending-question": "ping",
   },
   enabledCategories: [...SUPPORTED_NOTIFICATION_CATEGORIES],
 };
@@ -46,7 +50,7 @@ export function normalizeNotificationPreferences(
   const candidate = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
 
   const enabledEventTypes = dedupe(
-    (Array.isArray(candidate.enabledEventTypes) ? candidate.enabledEventTypes : fallback.enabledEventTypes).filter(
+    [...(Array.isArray(candidate.enabledEventTypes) ? candidate.enabledEventTypes : fallback.enabledEventTypes), ...fallback.enabledEventTypes].filter(
       isNotificationEventType,
     ),
   );
@@ -70,6 +74,7 @@ export function normalizeNotificationPreferences(
   );
 
   return {
+    schemaVersion: CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
     osEnabled: typeof candidate.osEnabled === "boolean" ? candidate.osEnabled : fallback.osEnabled,
     soundEnabled: typeof candidate.soundEnabled === "boolean" ? candidate.soundEnabled : fallback.soundEnabled,

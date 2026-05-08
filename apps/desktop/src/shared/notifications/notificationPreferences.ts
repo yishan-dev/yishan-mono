@@ -1,12 +1,14 @@
-export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed"] as const;
+export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed", "pending-question"] as const;
 export type NotificationEventType = (typeof SUPPORTED_NOTIFICATION_EVENT_TYPES)[number];
 export const SUPPORTED_NOTIFICATION_SOUND_IDS = ["chime", "ping", "pop", "zip", "alert"] as const;
 export type NotificationSoundId = (typeof SUPPORTED_NOTIFICATION_SOUND_IDS)[number];
 export type NotificationEventSoundMap = Record<NotificationEventType, NotificationSoundId>;
 export const SUPPORTED_NOTIFICATION_CATEGORIES = ["ai-task"] as const;
 export type NotificationCategory = (typeof SUPPORTED_NOTIFICATION_CATEGORIES)[number];
+export const CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION = 2;
 
 export type NotificationPreferences = {
+  schemaVersion: number;
   enabled: boolean;
   osEnabled: boolean;
   soundEnabled: boolean;
@@ -22,10 +24,12 @@ const DEFAULT_ENABLED_NOTIFICATION_CATEGORIES = [...SUPPORTED_NOTIFICATION_CATEG
 const DEFAULT_EVENT_SOUNDS: NotificationEventSoundMap = {
   "run-finished": "chime",
   "run-failed": "alert",
+  "pending-question": "ping",
 };
 
 /** Default notification preferences used when callers do not provide an override. */
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  schemaVersion: CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
   enabled: true,
   osEnabled: true,
   soundEnabled: true,

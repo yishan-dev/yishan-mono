@@ -252,7 +252,8 @@
           "title": "触发事件",
           "hint": "选择哪些事件会触发通知。",
           "runFinished": "运行完成",
-          "runFailed": "运行失败"
+          "runFailed": "运行失败",
+          "pendingQuestion": "待处理问题"
         },
         "errors": {
           "loadFailed": "加载通知设置失败。",
@@ -277,9 +278,11 @@
           "volume": "音量 通知音量 声音大小 volume",
           "soundRunFinished": "完成声音 成功声音 run finished success sound",
           "soundRunFailed": "失败声音 错误声音 run failed failure sound",
+          "soundPendingQuestion": "待处理问题声音 输入 审批 确认 pending question approval",
           "runTypeAiTask": "运行类型 ai任务 ai run type",
           "eventRunFinished": "触发事件 完成事件 run finished",
-          "eventRunFailed": "触发事件 失败事件 run failed"
+          "eventRunFailed": "触发事件 失败事件 run failed",
+          "eventPendingQuestion": "触发事件 待处理问题 输入 审批 确认 pending question"
         },
         "saved": "通知设置已保存。"
       }

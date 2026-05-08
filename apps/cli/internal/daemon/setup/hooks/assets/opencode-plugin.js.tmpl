@@ -9,6 +9,7 @@ export const YishanNotifyPlugin = async ({ $, client }) => {
   let currentState = "idle";
   let rootSessionId = null;
   let stopSent = false;
+  let waitingInputSent = false;
 
   const notify = async (hookEventName) => {
     try {
@@ -41,6 +42,7 @@ export const YishanNotifyPlugin = async ({ $, client }) => {
     if (currentState === "idle") {
       currentState = "busy";
       stopSent = false;
+      waitingInputSent = false;
       await notify("Start");
     }
   };
@@ -49,12 +51,28 @@ export const YishanNotifyPlugin = async ({ $, client }) => {
     if (rootSessionId && sessionId !== rootSessionId) {
       return;
     }
-    if (currentState === "busy" && !stopSent) {
+    if ((currentState === "busy" || currentState === "waiting") && !stopSent) {
       currentState = "idle";
       stopSent = true;
+      waitingInputSent = false;
       await notify("Stop");
       rootSessionId = null;
     }
+  };
+
+  const handleWaitingInput = async () => {
+    if (waitingInputSent) return;
+    currentState = "waiting";
+    waitingInputSent = true;
+    await notify("PermissionRequest");
+  };
+
+  const handleWaitingInputResolved = async () => {
+    if (currentState !== "waiting") return;
+    currentState = "busy";
+    waitingInputSent = false;
+    stopSent = false;
+    await notify("Start");
   };
 
   return {
@@ -82,14 +100,27 @@ export const YishanNotifyPlugin = async ({ $, client }) => {
       if (event.type === "session.error") {
         currentState = "idle";
         stopSent = true;
+        waitingInputSent = false;
         rootSessionId = null;
         await notify("Failed");
+      }
+      if (event.type === "permission.asked" || event.type === "question.asked") {
+        await handleWaitingInput();
+      }
+      if (event.type === "permission.replied" || event.type === "question.replied" || event.type === "question.rejected") {
+        await handleWaitingInputResolved();
       }
     },
     "permission.ask": async (_permission, output) => {
       if (output?.status === "ask") {
-        await notify("PermissionRequest");
+        await handleWaitingInput();
       }
+    },
+    "permission.asked": async () => {
+      await handleWaitingInput();
+    },
+    "permission.replied": async () => {
+      await handleWaitingInputResolved();
     },
   };
 };
