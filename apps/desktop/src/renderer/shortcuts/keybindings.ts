@@ -1,4 +1,5 @@
 import { ACTIONS } from "../../shared/contracts/actions";
+import { SYSTEM_FILE_MANAGER_APP_ID } from "../../shared/contracts/externalApps";
 import { isEditableTarget, isWithinRepoFileTree, isWithinRepoWorkspaceList } from "./editableTarget";
 import { toSupportedKeyBinding } from "./shortcutMetadata";
 import type { KeyBindingScope, ShortContext, ShortcutDefinition, SupportedKeyBinding } from "./types";
@@ -25,6 +26,7 @@ type ShortcutTarget =
   | { command: "workspace.closeSelected" }
   | { command: "workspace.toggleLeftPane" }
   | { command: "workspace.toggleRightPane" }
+  | { command: "workspace.openSelectedWorkspaceInExternalApp" }
   | { command: "workspace.openFileSearch" };
 
 type ShortcutRegistryItem = {
@@ -171,6 +173,26 @@ function executeShortcutTarget(context: ShortContext, event: KeyboardEvent, targ
 
   if (target.command === "workspace.openFileSearch") {
     context.commands.openWorkspaceFileSearch();
+    event.preventDefault();
+    return true;
+  }
+
+  if (target.command === "workspace.openSelectedWorkspaceInExternalApp") {
+    const workspaceId = context.workspaceStoreState.selectedWorkspaceId || context.tabStoreState.selectedWorkspaceId;
+    if (!workspaceId) {
+      return false;
+    }
+
+    const selectedWorkspace = context.workspaceStoreState.workspaces.find((workspace) => workspace.id === workspaceId);
+    const workspaceWorktreePath = selectedWorkspace?.worktreePath?.trim();
+    if (!workspaceWorktreePath) {
+      return false;
+    }
+
+    void context.commands.openEntryInExternalApp({
+      workspaceWorktreePath,
+      appId: context.workspaceStoreState.lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+    });
     event.preventDefault();
     return true;
   }
@@ -326,6 +348,14 @@ const SHORTCUT_REGISTRY: readonly ShortcutRegistryItem[] = [
     scope: "workspace",
     keys: "ctrl+p,command+p",
     target: { command: "workspace.openFileSearch" },
+    shouldRun: (context) => context.isWorkspaceRoute && Boolean(context.workspaceStoreState.selectedWorkspaceId),
+  },
+  {
+    id: ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP,
+    descriptionKey: "keybindings.actions.openSelectedFileInExternalApp",
+    scope: "workspace",
+    keys: "ctrl+o,command+o",
+    target: { command: "workspace.openSelectedWorkspaceInExternalApp" },
     shouldRun: (context) => context.isWorkspaceRoute && Boolean(context.workspaceStoreState.selectedWorkspaceId),
   },
   {

@@ -166,6 +166,15 @@ describe("SUPPORTED_KEY_BINDINGS", () => {
     expect(createWorkspaceBinding?.macKeys).toEqual(["⌘", "N"]);
     expect(createWorkspaceBinding?.windowsKeys).toEqual(["CTRL", "N"]);
   });
+
+  it("documents open-selected-file-in-external-app as mod+o", () => {
+    const openFileBinding = SUPPORTED_KEY_BINDINGS.find(
+      (binding) => binding.id === ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP,
+    );
+
+    expect(openFileBinding?.macKeys).toEqual(["⌘", "O"]);
+    expect(openFileBinding?.windowsKeys).toEqual(["CTRL", "O"]);
+  });
 });
 
 describe("getShortcutDefinitions", () => {
@@ -191,6 +200,123 @@ describe("getShortcutDefinitions", () => {
     openFileSearch?.run(context, new KeyboardEvent("keydown", { key: "p", metaKey: true }));
 
     expect(openWorkspaceFileSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens selected file tab in latest external app from shortcut", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const openSelectedFile = runtimeDefinitions.find(
+      (definition) => definition.id === ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP,
+    );
+    expect(openSelectedFile).toBeTruthy();
+
+    const openEntryInExternalApp = vi.fn(async () => ({ ok: true as const }));
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        openEntryInExternalApp,
+      },
+      workspaceStoreState: {
+        ...createShortcutContext().workspaceStoreState,
+        lastUsedExternalAppId: "cursor",
+        workspaces: [
+          {
+            id: "workspace-1",
+            repoId: "repo-1",
+            name: "Workspace 1",
+            title: "Workspace 1",
+            sourceBranch: "main",
+            branch: "feature",
+            summaryId: "summary-1",
+            worktreePath: "/tmp/workspace-1",
+          },
+        ],
+      } as WorkspaceStoreState,
+      tabStoreState: {
+        ...createShortcutContext().tabStoreState,
+        selectedTabId: "tab-file",
+        tabs: [
+          {
+            id: "tab-file",
+            workspaceId: "workspace-1",
+            title: "App.tsx",
+            pinned: false,
+            kind: "file",
+            data: {
+              path: "src/App.tsx",
+              content: "",
+              savedContent: "",
+              isDirty: false,
+              isTemporary: false,
+            },
+          },
+        ],
+      } as TabStoreState,
+    });
+
+    openSelectedFile?.run(context, new KeyboardEvent("keydown", { key: "O", metaKey: true }));
+
+    expect(openEntryInExternalApp).toHaveBeenCalledWith({
+      workspaceWorktreePath: "/tmp/workspace-1",
+      appId: "cursor",
+      relativePath: "src/App.tsx",
+    });
+  });
+
+  it("falls back to file manager for open selected file shortcut without latest external app", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const openSelectedFile = runtimeDefinitions.find(
+      (definition) => definition.id === ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP,
+    );
+    const openEntryInExternalApp = vi.fn(async () => ({ ok: true as const }));
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        openEntryInExternalApp,
+      },
+      workspaceStoreState: {
+        ...createShortcutContext().workspaceStoreState,
+        workspaces: [
+          {
+            id: "workspace-1",
+            repoId: "repo-1",
+            name: "Workspace 1",
+            title: "Workspace 1",
+            sourceBranch: "main",
+            branch: "feature",
+            summaryId: "summary-1",
+            worktreePath: "/tmp/workspace-1",
+          },
+        ],
+      } as WorkspaceStoreState,
+      tabStoreState: {
+        ...createShortcutContext().tabStoreState,
+        selectedTabId: "tab-file",
+        tabs: [
+          {
+            id: "tab-file",
+            workspaceId: "workspace-1",
+            title: "App.tsx",
+            pinned: false,
+            kind: "file",
+            data: {
+              path: "src/App.tsx",
+              content: "",
+              savedContent: "",
+              isDirty: false,
+              isTemporary: false,
+            },
+          },
+        ],
+      } as TabStoreState,
+    });
+
+    openSelectedFile?.run(context, new KeyboardEvent("keydown", { key: "O", metaKey: true }));
+
+    expect(openEntryInExternalApp).toHaveBeenCalledWith({
+      workspaceWorktreePath: "/tmp/workspace-1",
+      appId: "system-file-manager",
+      relativePath: "src/App.tsx",
+    });
   });
 
   it("dispatches pane visibility toggles from central definitions", () => {

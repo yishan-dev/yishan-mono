@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
-import type { AppActionPayload } from "../shared/contracts/actions";
+import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
 import { configureApplicationMenu } from "./app/menu";
 import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
@@ -476,6 +476,23 @@ export class DesktopApplication {
           event.preventDefault();
           mainWindow.hide();
         }
+      });
+
+      mainWindow.webContents.on("before-input-event", (event, input) => {
+        if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
+          return;
+        }
+
+        const normalizedKey = input.key.trim().toLowerCase();
+        const isMacCmdO = process.platform === "darwin" && input.meta && !input.control;
+        const isNonMacCtrlO = process.platform !== "darwin" && input.control && !input.meta;
+        const isOpenShortcut = (isMacCmdO || isNonMacCtrlO) && !input.alt && !input.shift && normalizedKey === "o";
+        if (!isOpenShortcut) {
+          return;
+        }
+
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP });
       });
     }
 

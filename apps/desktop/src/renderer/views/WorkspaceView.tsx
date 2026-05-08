@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
+import { SYSTEM_FILE_MANAGER_APP_ID } from "../../shared/contracts/externalApps";
 import { THREE_COL_GAP_PX, THREE_COL_SPLITTER_PX, ThreeColumnLayout } from "../components/ThreeColumnLayout";
 import { subscribeAppActionEvent } from "../events";
 import { useAllWorkspacesGitSync } from "../hooks/useAllWorkspacesGitSync";
@@ -116,6 +117,23 @@ export function WorkspaceView() {
         return;
       }
 
+      if (payload.action === ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP) {
+        const selectedWorkspaceId = workspaceStore.getState().selectedWorkspaceId;
+        if (!selectedWorkspaceId) {
+          return;
+        }
+        const selectedWorkspace = workspaceStore.getState().workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
+        if (!selectedWorkspace?.worktreePath) {
+          return;
+        }
+
+        void cmd.openEntryInExternalApp({
+          workspaceWorktreePath: selectedWorkspace.worktreePath,
+          appId: workspaceStore.getState().lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+        });
+        return;
+      }
+
       if (isEditableActiveElement()) {
         return;
       }
@@ -127,7 +145,9 @@ export function WorkspaceView() {
 
       if (payload.action === ACTIONS.FILE_UNDO) {
         cmd.undoFileTreeOperation();
+        return;
       }
+
     });
   }, [
     cmd,

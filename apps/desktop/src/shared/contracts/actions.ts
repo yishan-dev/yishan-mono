@@ -5,6 +5,7 @@ export const ACTIONS = {
   NAVIGATE: "app.navigate",
   FILE_DELETE: "file.delete",
   FILE_UNDO: "file.undo",
+  WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP: "workspace.openSelectedInExternalApp",
   TOGGLE_LEFT_PANE: "layout.toggleLeftPane",
   TOGGLE_RIGHT_PANE: "layout.toggleRightPane",
 } as const;
