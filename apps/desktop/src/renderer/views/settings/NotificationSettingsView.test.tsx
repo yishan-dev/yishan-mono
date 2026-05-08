@@ -316,6 +316,56 @@ describe("NotificationSettingsPanel", () => {
     expect(await screen.findByRole("option", { name: "org.settings.notifications.sounds.zip" })).toBeTruthy();
   });
 
+  it("shows pending question event sound configuration", async () => {
+    mocked.getNotificationPreferencesMock.mockResolvedValue({
+      enabled: true,
+      soundEnabled: true,
+      volume: 0.5,
+      focusOnClick: true,
+      enabledEventTypes: ["run-finished", "run-failed", "pending-question"],
+      enabledCategories: ["ai-task"],
+      eventSounds: {
+        "run-finished": "chime",
+        "run-failed": "alert",
+        "pending-question": "ping",
+      },
+    });
+    mocked.updateNotificationPreferencesMock.mockResolvedValue({
+      enabled: true,
+      soundEnabled: true,
+      volume: 0.5,
+      focusOnClick: true,
+      enabledEventTypes: ["run-finished", "run-failed", "pending-question"],
+      enabledCategories: ["ai-task"],
+      eventSounds: {
+        "run-finished": "chime",
+        "run-failed": "alert",
+        "pending-question": "ping",
+      },
+    });
+    mocked.previewNotificationMock.mockResolvedValue({
+      sent: true,
+      eventType: "pending-question",
+    });
+    mocked.playNotificationSoundMock.mockResolvedValue({
+      played: true,
+      eventType: "pending-question",
+    });
+
+    render(<NotificationSettingsPanel />);
+
+    await waitFor(() => {
+      expect(mocked.getNotificationPreferencesMock).toHaveBeenCalled();
+    });
+
+    expect(
+      screen.getByRole("combobox", {
+        name: "org.settings.notifications.events.pendingQuestion org.settings.notifications.soundSelection",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "org.settings.notifications.events.pendingQuestion" })).toBeTruthy();
+  });
+
   it("shows failed preview status icon when notification preview is blocked", async () => {
     mocked.getNotificationPreferencesMock.mockResolvedValue({
       enabled: true,

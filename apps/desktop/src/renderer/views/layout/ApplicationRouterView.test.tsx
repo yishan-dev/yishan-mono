@@ -169,6 +169,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },
@@ -223,6 +224,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },
@@ -255,6 +257,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },
@@ -290,6 +293,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },
@@ -331,6 +335,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },
@@ -370,6 +375,7 @@ describe("ApplicationRouterView", () => {
           eventSounds: {
             "run-finished": "chime",
             "run-failed": "alert",
+            "pending-question": "ping",
           },
           enabledCategories: ["ai-task"],
         },

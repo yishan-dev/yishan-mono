@@ -347,6 +347,7 @@ describe("createBackendEventStoreBindings", () => {
       eventSounds: {
         "run-finished": "zip" as const,
         "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
       },
       enabledCategories: ["ai-task" as const],
     }));
@@ -418,6 +419,7 @@ describe("createBackendEventStoreBindings", () => {
       eventSounds: {
         "run-finished": "zip" as const,
         "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
       },
       enabledCategories: ["ai-task" as const],
     }));
@@ -479,6 +481,7 @@ describe("createBackendEventStoreBindings", () => {
       eventSounds: {
         "run-finished": "zip" as const,
         "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
       },
       enabledCategories: ["ai-task" as const],
     }));
@@ -517,6 +520,72 @@ describe("createBackendEventStoreBindings", () => {
     expect(dispatchSystemNotification).not.toHaveBeenCalled();
     expect(playNotificationSound).not.toHaveBeenCalled();
     expect(recordWorkspaceUnreadNotification).toHaveBeenCalledWith("workspace-1", "success");
+
+    stopBindings();
+  });
+
+  it("plays the distinct pending-question sound through preference-backed effects", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: true,
+      volume: 0.6,
+      focusOnClick: true,
+      enabledEventTypes: ["pending-question" as const],
+      eventSounds: {
+        "run-finished": "chime" as const,
+        "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Input Required",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "pending-question",
+      observerStatus: {
+        sessionKey: "workspace-1:tab-1:pane-1",
+        normalizedEventType: "wait_input",
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Input Required",
+      body: undefined,
+    });
+    expect(playNotificationSound).toHaveBeenCalledWith({
+      soundId: "ping",
+      volume: 0.6,
+    });
+    expect(recordWorkspaceUnreadNotification).toHaveBeenCalledWith("workspace-1", "error");
 
     stopBindings();
   });

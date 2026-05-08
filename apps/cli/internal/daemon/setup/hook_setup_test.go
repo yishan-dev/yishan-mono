@@ -83,6 +83,15 @@ func TestEnsureAgentHookSetupMergesClaudeHooksAndOpenCodePlugin(t *testing.T) {
 	if !strings.Contains(pluginText, "--agent opencode --event ${hookEventName}") {
 		t.Fatalf("expected OpenCode plugin notifier command")
 	}
+	if !strings.Contains(pluginText, `"permission.asked"`) || !strings.Contains(pluginText, `"permission.ask"`) {
+		t.Fatalf("expected OpenCode plugin to listen for current and legacy permission ask hooks")
+	}
+	if !strings.Contains(pluginText, `"permission.replied"`) {
+		t.Fatalf("expected OpenCode plugin to resume after permission replies")
+	}
+	if !strings.Contains(pluginText, `"question.asked"`) || !strings.Contains(pluginText, `"question.replied"`) || !strings.Contains(pluginText, `"question.rejected"`) {
+		t.Fatalf("expected OpenCode plugin to listen for question lifecycle events")
+	}
 	configRaw, err := os.ReadFile(filepath.Join(configHome, "opencode.json"))
 	if err != nil {
 		t.Fatalf("read OpenCode config: %v", err)

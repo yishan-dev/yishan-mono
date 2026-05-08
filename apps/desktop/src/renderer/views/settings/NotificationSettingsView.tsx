@@ -34,6 +34,10 @@ const NOTIFICATION_EVENT_OPTIONS: Array<{ type: NotificationEventType; labelKey:
     type: "run-failed",
     labelKey: "org.settings.notifications.events.runFailed",
   },
+  {
+    type: "pending-question",
+    labelKey: "org.settings.notifications.events.pendingQuestion",
+  },
 ];
 
 const NOTIFICATION_SOUND_OPTIONS: Array<{ soundId: NotificationSoundId; labelKey: string }> =
@@ -61,6 +65,7 @@ type FocusableSettingsRowProps = {
 const EVENT_SOUND_FOCUS_IDS: Record<NotificationEventType, NotificationSettingsFocusItemId> = {
   "run-finished": "sound-run-finished",
   "run-failed": "sound-run-failed",
+  "pending-question": "sound-pending-question",
 };
 
 const RUN_TYPE_FOCUS_IDS: Record<NotificationCategory, NotificationSettingsFocusItemId> = {
@@ -70,6 +75,7 @@ const RUN_TYPE_FOCUS_IDS: Record<NotificationCategory, NotificationSettingsFocus
 const EVENT_FILTER_FOCUS_IDS: Record<NotificationEventType, NotificationSettingsFocusItemId> = {
   "run-finished": "event-run-finished",
   "run-failed": "event-run-failed",
+  "pending-question": "event-pending-question",
 };
 
 /**
@@ -112,7 +118,8 @@ function isFocusableSettingsItemVisible(input: {
   if (
     input.focusItemId === "volume" ||
     input.focusItemId === "sound-run-finished" ||
-    input.focusItemId === "sound-run-failed"
+    input.focusItemId === "sound-run-failed" ||
+    input.focusItemId === "sound-pending-question"
   ) {
     return input.isSoundSettingsVisible;
   }

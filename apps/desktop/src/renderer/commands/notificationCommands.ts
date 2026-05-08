@@ -47,7 +47,12 @@ export async function updateNotificationPreferences(patch: Partial<NotificationP
 export async function previewNotification(input: {
   eventType: NotificationEventType;
 }) {
-  const previewTitle = input.eventType === "run-failed" ? "Run needs attention" : "Run finished";
+  const previewTitle =
+    input.eventType === "pending-question"
+      ? "Input required"
+      : input.eventType === "run-failed"
+        ? "Run needs attention"
+        : "Run finished";
   return await getDesktopHostBridge().dispatchNotification({
     title: previewTitle,
     body: "Notification preview",
@@ -111,7 +116,7 @@ function normalizeNotificationPreferences(input: Partial<NotificationPreferences
     focusOnClick: typeof candidate.focusOnClick === "boolean" ? candidate.focusOnClick : fallback.focusOnClick,
     enabledEventTypes:
       Array.isArray(candidate.enabledEventTypes) && candidate.enabledEventTypes.length > 0
-        ? [...new Set(candidate.enabledEventTypes)]
+        ? [...new Set([...candidate.enabledEventTypes, ...fallback.enabledEventTypes])]
         : [...fallback.enabledEventTypes],
     eventSounds: {
       ...fallback.eventSounds,

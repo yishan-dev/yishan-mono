@@ -1,4 +1,4 @@
-export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed"] as const;
+export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed", "pending-question"] as const;
 export type NotificationEventType = (typeof SUPPORTED_NOTIFICATION_EVENT_TYPES)[number];
 
 export const SUPPORTED_NOTIFICATION_SOUND_IDS = ["chime", "ping", "pop", "zip", "alert"] as const;
@@ -34,6 +34,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   eventSounds: {
     "run-finished": "chime",
     "run-failed": "alert",
+    "pending-question": "ping",
   },
   enabledCategories: [...SUPPORTED_NOTIFICATION_CATEGORIES],
 };
@@ -46,7 +47,7 @@ export function normalizeNotificationPreferences(
   const candidate = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
 
   const enabledEventTypes = dedupe(
-    (Array.isArray(candidate.enabledEventTypes) ? candidate.enabledEventTypes : fallback.enabledEventTypes).filter(
+    [...(Array.isArray(candidate.enabledEventTypes) ? candidate.enabledEventTypes : fallback.enabledEventTypes), ...fallback.enabledEventTypes].filter(
       isNotificationEventType,
     ),
   );

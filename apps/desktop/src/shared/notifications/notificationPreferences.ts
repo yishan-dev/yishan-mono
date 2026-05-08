@@ -1,4 +1,4 @@
-export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed"] as const;
+export const SUPPORTED_NOTIFICATION_EVENT_TYPES = ["run-finished", "run-failed", "pending-question"] as const;
 export type NotificationEventType = (typeof SUPPORTED_NOTIFICATION_EVENT_TYPES)[number];
 export const SUPPORTED_NOTIFICATION_SOUND_IDS = ["chime", "ping", "pop", "zip", "alert"] as const;
 export type NotificationSoundId = (typeof SUPPORTED_NOTIFICATION_SOUND_IDS)[number];
@@ -22,6 +22,7 @@ const DEFAULT_ENABLED_NOTIFICATION_CATEGORIES = [...SUPPORTED_NOTIFICATION_CATEG
 const DEFAULT_EVENT_SOUNDS: NotificationEventSoundMap = {
   "run-finished": "chime",
   "run-failed": "alert",
+  "pending-question": "ping",
 };
 
 /** Default notification preferences used when callers do not provide an override. */
