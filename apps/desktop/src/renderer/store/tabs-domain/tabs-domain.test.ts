@@ -267,22 +267,59 @@ describe("tabs-domain close", () => {
     expect(patch?.selectedTabIdByWorkspaceId?.["workspace-1"]).toBe("session-1");
   });
 
-  it("keeps target tab and removes siblings in closeOtherTabsState", () => {
+  it("keeps target and pinned tabs while removing siblings in closeOtherTabsState", () => {
     const state = createBaseState();
-    const patch = closeOtherTabsState(state, "session-1");
+    const expanded: WorkspaceTabStateSlice = {
+      ...state,
+      tabs: [
+        ...state.tabs,
+        {
+          id: "pinned-1",
+          workspaceId: "workspace-1",
+          title: "Pinned",
+          pinned: true,
+          kind: "session",
+          data: {
+            sessionId: "pinned-session",
+            agentKind: "opencode",
+          },
+        },
+      ],
+    };
+
+    const patch = closeOtherTabsState(expanded, "session-1");
 
     expect(patch).toBeTruthy();
     expect(patch?.tabs?.some((tab) => tab.id === "file-1")).toBe(false);
     expect(patch?.tabs?.some((tab) => tab.id === "session-1")).toBe(true);
+    expect(patch?.tabs?.some((tab) => tab.id === "pinned-1")).toBe(true);
   });
 
-  it("removes all workspace tabs and metadata in closeAllTabsState", () => {
-    const state = createBaseState();
+  it("removes all unpinned workspace tabs and keeps pinned tabs in closeAllTabsState", () => {
+    const state: WorkspaceTabStateSlice = {
+      ...createBaseState(),
+      tabs: [
+        ...createBaseState().tabs,
+        {
+          id: "pinned-1",
+          workspaceId: "workspace-1",
+          title: "Pinned",
+          pinned: true,
+          kind: "session",
+          data: {
+            sessionId: "pinned-session",
+            agentKind: "opencode",
+          },
+        },
+      ],
+    };
     const patch = closeAllTabsState(state, "session-1");
 
     expect(patch).toBeTruthy();
-    expect(patch?.tabs?.some((tab) => tab.workspaceId === "workspace-1")).toBe(false);
-    expect(patch?.selectedTabIdByWorkspaceId?.["workspace-1"]).toBe("");
+    expect(patch?.tabs?.some((tab) => tab.id === "session-1")).toBe(false);
+    expect(patch?.tabs?.some((tab) => tab.id === "file-1")).toBe(false);
+    expect(patch?.tabs?.some((tab) => tab.id === "pinned-1")).toBe(true);
+    expect(patch?.selectedTabIdByWorkspaceId?.["workspace-1"]).toBe("pinned-1");
   });
 });
 

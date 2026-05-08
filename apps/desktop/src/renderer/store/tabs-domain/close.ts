@@ -27,7 +27,7 @@ export function closeTabState(state: WorkspaceTabStateSlice, tabId: string): Par
   };
 }
 
-/** Closes all sibling tabs in the same workspace and keeps one tab focused. */
+/** Closes all unpinned sibling tabs in the same workspace and keeps one tab focused. */
 export function closeOtherTabsState(
   state: WorkspaceTabStateSlice,
   tabId: string,
@@ -37,9 +37,11 @@ export function closeOtherTabsState(
     return null;
   }
 
-  const tabs = state.tabs.filter((tab) => tab.workspaceId !== currentTab.workspaceId || tab.id === tabId);
+  const tabs = state.tabs.filter(
+    (tab) => tab.workspaceId !== currentTab.workspaceId || tab.id === tabId || tab.pinned,
+  );
   const removedTabIds = state.tabs
-    .filter((tab) => tab.workspaceId === currentTab.workspaceId && tab.id !== tabId)
+    .filter((tab) => tab.workspaceId === currentTab.workspaceId && tab.id !== tabId && !tab.pinned)
     .map((tab) => tab.id);
 
   return {
@@ -53,7 +55,7 @@ export function closeOtherTabsState(
   };
 }
 
-/** Closes all tabs for a workspace and clears workspace tab selection cache. */
+/** Closes all unpinned tabs for a workspace and selects the nearest pinned tab when needed. */
 export function closeAllTabsState(
   state: WorkspaceTabStateSlice,
   tabId: string,
@@ -63,19 +65,24 @@ export function closeAllTabsState(
     return null;
   }
 
-  const tabs = state.tabs.filter((tab) => tab.workspaceId !== currentTab.workspaceId);
-  const removedTabIds = state.tabs.filter((tab) => tab.workspaceId === currentTab.workspaceId).map((tab) => tab.id);
+  const tabs = state.tabs.filter((tab) => tab.workspaceId !== currentTab.workspaceId || tab.pinned);
+  const removedTabIds = state.tabs
+    .filter((tab) => tab.workspaceId === currentTab.workspaceId && !tab.pinned)
+    .map((tab) => tab.id);
   const selectedTabBelongsToWorkspace = state.tabs.some(
     (tab) => tab.id === state.selectedTabId && tab.workspaceId === currentTab.workspaceId,
   );
+  const nextSelectedTabId = selectedTabBelongsToWorkspace
+    ? (tabs.find((tab) => tab.workspaceId === currentTab.workspaceId)?.id ?? "")
+    : state.selectedTabId;
 
   return {
     tabs,
     ...removeTabMetadataById(state, removedTabIds),
-    selectedTabId: selectedTabBelongsToWorkspace ? "" : state.selectedTabId,
+    selectedTabId: nextSelectedTabId,
     selectedTabIdByWorkspaceId: {
       ...state.selectedTabIdByWorkspaceId,
-      [currentTab.workspaceId]: "",
+      [currentTab.workspaceId]: nextSelectedTabId,
     },
   };
 }

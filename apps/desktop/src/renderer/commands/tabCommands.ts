@@ -94,7 +94,7 @@ export function closeTab(tabId: string): void {
   chatStore.getState().removeTabData([tabId]);
 }
 
-/** Closes sibling tabs for one workspace and closes associated backend sessions. */
+/** Closes unpinned sibling tabs for one workspace and closes associated backend sessions. */
 export function closeOtherTabs(tabId: string): void {
   const snapshot = readTabStoreState();
   const target = snapshot.tabs.find((tab) => tab.id === tabId);
@@ -102,7 +102,7 @@ export function closeOtherTabs(tabId: string): void {
     return;
   }
 
-  const removedTabs = snapshot.tabs.filter((tab) => tab.workspaceId === target.workspaceId && tab.id !== tabId);
+  const removedTabs = snapshot.tabs.filter((tab) => tab.workspaceId === target.workspaceId && tab.id !== tabId && !tab.pinned);
   const removedTerminalTabs = removedTabs.filter((tab): tab is TerminalTab => tab.kind === "terminal");
   const removedTabIds = removedTabs.map((tab) => tab.id);
 
@@ -122,7 +122,7 @@ export function closeOtherTabs(tabId: string): void {
   }
 }
 
-/** Closes all tabs for one workspace and closes associated backend sessions. */
+/** Closes all unpinned tabs for one workspace and closes associated backend sessions. */
 export function closeAllTabs(tabId: string): void {
   const snapshot = readTabStoreState();
   const target = snapshot.tabs.find((tab) => tab.id === tabId);
@@ -130,7 +130,7 @@ export function closeAllTabs(tabId: string): void {
     return;
   }
 
-  const removedTabs = snapshot.tabs.filter((tab) => tab.workspaceId === target.workspaceId);
+  const removedTabs = snapshot.tabs.filter((tab) => tab.workspaceId === target.workspaceId && !tab.pinned);
   const removedTerminalTabs = removedTabs.filter((tab): tab is TerminalTab => tab.kind === "terminal");
   const removedTabIds = removedTabs.map((tab) => tab.id);
 

@@ -51,7 +51,7 @@ export function resolveCurrentModelFromCapabilities(capabilities: unknown): stri
     : undefined;
 }
 
-/** Returns session ids for tabs that should be closed by close-other action. */
+/** Returns session ids for unpinned tabs that should be closed by close-other action. */
 export function collectSessionIdsToCloseOtherTabs(tabs: ReadonlyArray<WorkspaceTab>, activeTabId: string): string[] {
   const current = tabs.find((tab) => tab.id === activeTabId);
   if (!current) {
@@ -59,12 +59,12 @@ export function collectSessionIdsToCloseOtherTabs(tabs: ReadonlyArray<WorkspaceT
   }
 
   return tabs
-    .filter((tab) => tab.workspaceId === current.workspaceId && tab.id !== activeTabId && tab.kind === "session")
+    .filter((tab) => tab.workspaceId === current.workspaceId && tab.id !== activeTabId && !tab.pinned && tab.kind === "session")
     .map((tab) => (tab.kind === "session" ? tab.data.sessionId : undefined))
     .filter((sessionId): sessionId is string => Boolean(sessionId));
 }
 
-/** Returns session ids for tabs that should be closed by close-all action. */
+/** Returns session ids for unpinned tabs that should be closed by close-all action. */
 export function collectSessionIdsToCloseAllTabs(tabs: ReadonlyArray<WorkspaceTab>, activeTabId: string): string[] {
   const current = tabs.find((tab) => tab.id === activeTabId);
   if (!current) {
@@ -72,7 +72,7 @@ export function collectSessionIdsToCloseAllTabs(tabs: ReadonlyArray<WorkspaceTab
   }
 
   return tabs
-    .filter((tab) => tab.workspaceId === current.workspaceId && tab.kind === "session")
+    .filter((tab) => tab.workspaceId === current.workspaceId && !tab.pinned && tab.kind === "session")
     .map((tab) => (tab.kind === "session" ? tab.data.sessionId : undefined))
     .filter((sessionId): sessionId is string => Boolean(sessionId));
 }

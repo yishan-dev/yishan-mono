@@ -49,6 +49,14 @@ describe("tabHelpers session collection", () => {
         data: { sessionId: "session-2" },
       },
       {
+        id: "tab-pinned",
+        workspaceId: "workspace-1",
+        title: "Pinned",
+        pinned: true,
+        kind: "session",
+        data: { sessionId: "session-pinned" },
+      },
+      {
         id: "terminal-1",
         workspaceId: "workspace-1",
         title: "Terminal",
