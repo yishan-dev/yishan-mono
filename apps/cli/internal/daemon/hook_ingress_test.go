@@ -102,6 +102,36 @@ func TestServeAgentHookPublishesPendingQuestionNotificationEvent(t *testing.T) {
 	}
 }
 
+func TestServeAgentHookNormalizesSupportedAgentNames(t *testing.T) {
+	for _, agent := range []string{"codex", "claude", "opencode", "gemini", "pi", "copilot", "cursor"} {
+		t.Run(agent, func(t *testing.T) {
+			handler := NewJSONRPCHandler(workspace.NewManager(), "node-1")
+			subscriptionID, events := handler.events.Subscribe()
+			defer handler.events.Unsubscribe(subscriptionID)
+
+			response := postHookPayload(t, handler, map[string]any{
+				"agent":       agent,
+				"workspaceId": "ws-1",
+				"tabId":       "tab-1",
+				"paneId":      "pane-1",
+				"event":       "Start",
+			})
+			if response.Code != http.StatusOK {
+				t.Fatalf("expected status %d, got %d", http.StatusOK, response.Code)
+			}
+
+			event := readPublishedEvent(t, events)
+			payload, ok := event.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("expected map payload, got %T", event.Payload)
+			}
+			if payload["agent"] != agent {
+				t.Fatalf("expected agent %q, got %#v", agent, payload["agent"])
+			}
+		})
+	}
+}
+
 func TestServeAgentHookRejectsInvalidPayload(t *testing.T) {
 	handler := NewJSONRPCHandler(workspace.NewManager(), "node-1")
 	response := postHookPayload(t, handler, map[string]any{"event": "Start"})

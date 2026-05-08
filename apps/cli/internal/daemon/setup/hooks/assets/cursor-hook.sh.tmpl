@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -u
+cat >/dev/null 2>&1 || true
+event_name="${1:-}"
+if [ "$event_name" = "PermissionRequest" ]; then
+  printf '{"continue":true}\n'
+fi
+{{.NotifyForwardCommand}}
+exit 0
