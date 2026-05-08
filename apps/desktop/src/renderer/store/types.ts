@@ -73,6 +73,7 @@ export type WorkspaceTabDataByKind = {
   };
   diff: { path: string; oldContent: string; newContent: string };
   file: { path: string; content: string; savedContent: string; isDirty: boolean; isTemporary: boolean };
+  image: { path: string; dataUrl: string; isTemporary: boolean };
   terminal: {
     title: string;
     /** Stable terminal pane identity used by observer correlation. */
@@ -107,6 +108,10 @@ export type WorkspaceTab =
       data: WorkspaceTabDataByKind["file"];
     })
   | (WorkspaceTabBase & {
+      kind: "image";
+      data: WorkspaceTabDataByKind["image"];
+    })
+  | (WorkspaceTabBase & {
       kind: "terminal";
       data: WorkspaceTabDataByKind["terminal"];
     });
@@ -127,6 +132,13 @@ export type OpenWorkspaceTabInput =
       kind: "file";
       path: string;
       content?: string;
+      temporary?: boolean;
+    }
+  | {
+      workspaceId?: string;
+      kind: "image";
+      path: string;
+      dataUrl: string;
       temporary?: boolean;
     }
   | {

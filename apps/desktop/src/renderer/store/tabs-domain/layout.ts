@@ -66,7 +66,7 @@ export function renameTabsForEntryRenameState(
     if (tab.workspaceId !== workspaceId) {
       return tab;
     }
-    if (tab.kind !== "file" && tab.kind !== "diff") {
+    if (tab.kind !== "file" && tab.kind !== "diff" && tab.kind !== "image") {
       return tab;
     }
 
@@ -78,6 +78,17 @@ export function renameTabsForEntryRenameState(
     const nextTitle = remappedPath.split("/").filter(Boolean).at(-1) ?? remappedPath;
     didChange = true;
     if (tab.kind === "file") {
+      return {
+        ...tab,
+        title: nextTitle,
+        data: {
+          ...tab.data,
+          path: remappedPath,
+        },
+      };
+    }
+
+    if (tab.kind === "image") {
       return {
         ...tab,
         title: nextTitle,

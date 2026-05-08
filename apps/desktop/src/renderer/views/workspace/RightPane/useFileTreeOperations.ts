@@ -15,8 +15,10 @@ import {
   pasteEntries,
   readExternalClipboardSourcePaths as readExternalClipboardSourcePathsFromRpc,
   readFile,
+  readFileAsDataUrl,
   renameEntry,
 } from "../../../commands/fileCommands";
+import { isImageFile } from "../../../helpers/editorLanguage";
 import { useCommands } from "../../../hooks/useCommands";
 import { tabStore } from "../../../store/tabStore";
 import { workspaceStore } from "../../../store/workspaceStore";
@@ -887,6 +889,24 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
       }
 
       try {
+        if (isImageFile(path)) {
+          const absolutePath = resolveWorkspaceAbsolutePath(selectedWorkspaceWorktreePath, path);
+          const result = await readFileAsDataUrl({ absolutePath });
+          if (!result.ok) {
+            console.error("Failed to read image file as data URL", result.error);
+            return;
+          }
+          openTab({
+            workspaceId: selectedWorkspaceId,
+            kind: "image",
+            path,
+            dataUrl: result.dataUrl,
+            temporary: Boolean(options?.temporary),
+          });
+          requestFileTreeSelection(path, false);
+          return;
+        }
+
         const response = await readFile({
           workspaceWorktreePath: selectedWorkspaceWorktreePath,
           relativePath: path,

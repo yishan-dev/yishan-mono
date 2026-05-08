@@ -89,6 +89,14 @@ export type AuthTokensResult = {
   error?: string;
 };
 
+export type ReadFileAsDataUrlInput = {
+  absolutePath: string;
+};
+
+export type ReadFileAsDataUrlResult =
+  | { ok: true; dataUrl: string }
+  | { ok: false; error: string };
+
 export type DesktopHostBridge = {
   openLocalFolderDialog: (input?: OpenLocalFolderDialogInput) => Promise<string | null>;
   toggleMainWindowMaximized: () => Promise<{ ok: true }>;
@@ -96,6 +104,7 @@ export type DesktopHostBridge = {
   openEntryInExternalApp: (input: OpenEntryInExternalAppInput) => Promise<{ ok: true }>;
   openExternalUrl: (input: OpenExternalUrlInput) => Promise<OpenExternalUrlResult>;
   readExternalClipboardSourcePaths: () => Promise<ExternalClipboardReadOutcome>;
+  readFileAsDataUrl: (input: ReadFileAsDataUrlInput) => Promise<ReadFileAsDataUrlResult>;
   dispatchNotification: (input: DispatchNotificationInput) => Promise<NotificationDispatchResult>;
   playNotificationSound: (input: PlayNotificationSoundInput) => Promise<NotificationSoundPreviewResult>;
   getPendingUpdate: () => Promise<DesktopUpdateEventPayload | null>;
@@ -131,6 +140,7 @@ export const HOST_IPC_CHANNELS = {
   openEntryInExternalApp: "desktop:host/open-entry-in-external-app",
   openExternalUrl: "desktop:host/open-external-url",
   readExternalClipboardSourcePaths: "desktop:host/read-external-clipboard-source-paths",
+  readFileAsDataUrl: "desktop:host/read-file-as-data-url",
   dispatchNotification: "desktop:host/dispatch-notification",
   playNotificationSound: "desktop:host/play-notification-sound",
   getPendingUpdate: "desktop:host/get-pending-update",

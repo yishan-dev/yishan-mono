@@ -131,6 +131,14 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 
+  if (input.kind === "image") {
+    return {
+      path: input.path,
+      dataUrl: input.dataUrl,
+      isTemporary: Boolean(input.temporary),
+    } as WorkspaceTabDataByKind[T["kind"]];
+  }
+
   return {
     title: input.title?.trim() || "Terminal",
     launchCommand: input.launchCommand?.trim() || undefined,

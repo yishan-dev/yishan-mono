@@ -19,6 +19,12 @@ export function findExistingTab(
     );
   }
 
+  if (input.kind === "image") {
+    return tabs.find(
+      (tab) => tab.workspaceId === targetWorkspaceId && tab.kind === "image" && tab.data.path === input.path,
+    );
+  }
+
   if (input.reuseExisting === false) {
     return undefined;
   }

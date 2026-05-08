@@ -1,5 +1,5 @@
-import { statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
 import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
@@ -298,6 +298,33 @@ export class DesktopApplication {
 
     ipcMain.handle(HOST_IPC_CHANNELS.readExternalClipboardSourcePaths, async () => {
       return await readExternalClipboardSourcePathsFromSystem();
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.readFileAsDataUrl, async (_event, input) => {
+      try {
+        const absolutePath = String(input?.absolutePath ?? "");
+        if (!absolutePath) {
+          return { ok: false, error: "absolutePath is required" };
+        }
+        const ext = extname(absolutePath).toLowerCase().replace(".", "");
+        const mimeMap: Record<string, string> = {
+          png: "image/png",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          gif: "image/gif",
+          svg: "image/svg+xml",
+          webp: "image/webp",
+          bmp: "image/bmp",
+          ico: "image/x-icon",
+          avif: "image/avif",
+        };
+        const mime = mimeMap[ext] ?? "application/octet-stream";
+        const buffer = readFileSync(absolutePath);
+        const base64 = buffer.toString("base64");
+        return { ok: true, dataUrl: `data:${mime};base64,${base64}` };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.dispatchNotification, async (_event, input) => {
