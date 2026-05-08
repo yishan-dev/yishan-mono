@@ -7,7 +7,7 @@ import { randomToken, sha256Hex } from "@/auth/security";
 
 export type SessionUser = Pick<
   typeof users.$inferSelect,
-  "id" | "email" | "name" | "avatarUrl" | "notificationPreferences"
+  "id" | "email" | "name" | "avatarUrl" | "userPreferences"
 >;
 
 export async function createSession(
@@ -43,7 +43,7 @@ export async function getSessionUser(db: AppDb, token: string): Promise<SessionU
       email: users.email,
       name: users.name,
       avatarUrl: users.avatarUrl,
-      notificationPreferences: users.notificationPreferences,
+      userPreferences: users.userPreferences,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))

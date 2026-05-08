@@ -141,6 +141,18 @@
         }
       }
     },
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred app language.",
+      "selectLabel": "Application language",
+      "errors": {
+        "saveFailed": "Failed to save language preference."
+      },
+      "options": {
+        "en": "English",
+        "zh": "Chinese"
+      }
+    },
     "daemon": {
       "title": "Daemon",
       "description": "Inspect the local daemon used for workspaces, terminals, and background services.",

@@ -2,11 +2,8 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppDb } from "@/db/client";
 import { oauthAccounts, users } from "@/db/schema";
-import {
-  type NotificationPreferences,
-  type NotificationPreferencesPatch,
-  normalizeNotificationPreferences,
-} from "@/lib/notification-preferences";
+import type { NotificationPreferencesPatch } from "@/lib/notification-preferences";
+import { mergeUserPreferences, type UserPreferences, type UserPreferencesPatch } from "@/lib/user-preferences";
 import { newId } from "@/lib/id";
 import type { OAuthProfile } from "@/types";
 
@@ -20,7 +17,7 @@ export class UserService {
         email: users.email,
         name: users.name,
         avatarUrl: users.avatarUrl,
-        notificationPreferences: users.notificationPreferences,
+        userPreferences: users.userPreferences,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -116,20 +113,16 @@ export class UserService {
     });
   }
 
-  async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
-    const rows = await this.db
-      .select({ notificationPreferences: users.notificationPreferences })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+  async getUserPreferences(userId: string): Promise<UserPreferences> {
+    const rows = await this.db.select({ userPreferences: users.userPreferences }).from(users).where(eq(users.id, userId)).limit(1);
 
-    const originalPreferences = rows[0]?.notificationPreferences;
-    const normalizedPreferences = normalizeNotificationPreferences(originalPreferences);
+    const originalPreferences = rows[0]?.userPreferences;
+    const normalizedPreferences = mergeUserPreferences(originalPreferences, {});
     if (JSON.stringify(originalPreferences ?? null) !== JSON.stringify(normalizedPreferences)) {
       await this.db
         .update(users)
         .set({
-          notificationPreferences: normalizedPreferences,
+          userPreferences: normalizedPreferences,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
@@ -138,31 +131,28 @@ export class UserService {
     return normalizedPreferences;
   }
 
-  async updateNotificationPreferences(
-    userId: string,
-    patch: NotificationPreferencesPatch,
-  ): Promise<NotificationPreferences> {
-    const currentPreferences = await this.getNotificationPreferences(userId);
-    const mergedPreferences = normalizeNotificationPreferences(
-      {
-        ...currentPreferences,
-        ...patch,
-        eventSounds: {
-          ...currentPreferences.eventSounds,
-          ...patch.eventSounds,
-        },
-      },
-      currentPreferences,
-    );
+  async updateUserPreferences(userId: string, patch: UserPreferencesPatch): Promise<UserPreferences> {
+    const currentPreferences = await this.getUserPreferences(userId);
+    const mergedPreferences = mergeUserPreferences(currentPreferences, patch);
 
     await this.db
       .update(users)
       .set({
-        notificationPreferences: mergedPreferences,
+        userPreferences: mergedPreferences,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
 
     return mergedPreferences;
+  }
+
+  async updateLanguagePreference(userId: string, languagePreference: string): Promise<string> {
+    const preferences = await this.updateUserPreferences(userId, { languagePreference });
+    return preferences.languagePreference;
+  }
+
+  async updateNotificationPreferences(userId: string, patch: NotificationPreferencesPatch) {
+    const preferences = await this.updateUserPreferences(userId, { notificationPreferences: patch });
+    return preferences.notificationPreferences;
   }
 }

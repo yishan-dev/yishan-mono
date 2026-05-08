@@ -125,6 +125,18 @@
         }
       }
     },
+    "language": {
+      "title": "语言",
+      "description": "选择你偏好的应用语言。",
+      "selectLabel": "应用语言",
+      "errors": {
+        "saveFailed": "保存语言偏好失败。"
+      },
+      "options": {
+        "en": "English",
+        "zh": "中文"
+      }
+    },
     "daemon": {
       "title": "守护进程",
       "description": "查看用于工作区、终端和后台服务的本地守护进程。",

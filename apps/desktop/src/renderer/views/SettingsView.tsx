@@ -26,6 +26,7 @@ import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
+import { LanguageSettingsView } from "./settings/LanguageSettingsView";
 import {
   type NotificationSettingsFocusItemId,
   isNotificationSettingsFocusItemId,
@@ -94,11 +95,15 @@ export function SettingsView() {
       selectedTabParam === "account" ||
       selectedTabParam === "agents" ||
       selectedTabParam === "appearance" ||
+      selectedTabParam === "language" ||
       selectedTabParam === "daemon" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
     ) {
+      if (selectedTabParam === "language") {
+        return "appearance";
+      }
       return selectedTabParam;
     }
     return "account";
@@ -280,15 +285,18 @@ export function SettingsView() {
             <AgentSettingsView />
           </SettingsErrorBoundary>
         ) : selectedTab === "appearance" ? (
-          <ThemePreferencePicker
-            preference={themePreference}
-            onChange={setThemePreference}
-            title={t("settings.appearance.theme.title")}
-            description={t("settings.appearance.theme.description")}
-            lightLabel={t("settings.appearance.theme.options.light")}
-            darkLabel={t("settings.appearance.theme.options.dark")}
-            systemLabel={t("settings.appearance.theme.options.system")}
-          />
+          <Stack spacing={2}>
+            <ThemePreferencePicker
+              preference={themePreference}
+              onChange={setThemePreference}
+              title={t("settings.appearance.theme.title")}
+              description={t("settings.appearance.theme.description")}
+              lightLabel={t("settings.appearance.theme.options.light")}
+              darkLabel={t("settings.appearance.theme.options.dark")}
+              systemLabel={t("settings.appearance.theme.options.system")}
+            />
+            <LanguageSettingsView />
+          </Stack>
         ) : selectedTab === "daemon" ? (
           <DaemonSettingsView />
         ) : selectedTab === "terminal" ? (

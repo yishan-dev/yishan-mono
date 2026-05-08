@@ -8,6 +8,13 @@
       "when": 1777754282890,
       "tag": "0000_fresh_hitman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778220575852,
+      "tag": "0001_milky_captain_flint",
+      "breakpoints": true
     }
   ]
 }
