@@ -381,7 +381,40 @@ export function MainPaneView() {
                   flexDirection: "column",
                 }}
               >
-                <ImagePreview path={tab.data.path} dataUrl={tab.data.dataUrl} />
+                <ImagePreview
+                  path={tab.data.path}
+                  dataUrl={tab.data.dataUrl}
+                  onCopyPath={async (filePath) => {
+                    if (!navigator.clipboard) {
+                      return;
+                    }
+
+                    try {
+                      await navigator.clipboard.writeText(filePath);
+                    } catch (error) {
+                      console.error("Failed to copy workspace file path", error);
+                    }
+                  }}
+                  onOpenExternalApp={async (filePath) => {
+                    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+                    if (!workspaceWorktreePath) {
+                      return;
+                    }
+
+                    try {
+                      await openEntryInExternalApp({
+                        workspaceWorktreePath,
+                        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+                        relativePath: filePath,
+                      });
+                    } catch (error) {
+                      console.error("Failed to open workspace file externally", error);
+                    }
+                  }}
+                  openExternalAppLabel={
+                    lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
+                  }
+                />
               </Box>
             );
           }
