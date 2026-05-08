@@ -73,7 +73,13 @@ describe("notificationCommands", () => {
     const preferences = await getNotificationPreferences();
     expect(preferences.soundEnabled).toBe(false);
     expect(preferences.enabledEventTypes).toContain("pending-question");
-    expect(mocks.requestJson).not.toHaveBeenCalled();
+    expect(mocks.requestJson).toHaveBeenCalledWith("/notification-preferences", {
+      method: "PUT",
+      body: expect.objectContaining({
+        schemaVersion: 2,
+        enabledEventTypes: ["run-finished", "run-failed", "pending-question"],
+      }),
+    });
 
     const cached = JSON.parse(window.localStorage.getItem("notifications.preferences.v1") ?? "{}");
     expect(cached.soundEnabled).toBe(false);

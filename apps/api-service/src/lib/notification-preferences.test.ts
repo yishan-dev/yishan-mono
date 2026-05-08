@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeNotificationPreferences } from "./notification-preferences";
+import { CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION, normalizeNotificationPreferences } from "./notification-preferences";
 
 describe("normalizeNotificationPreferences", () => {
   it("enables newly added notification events for existing preference snapshots", () => {
@@ -19,5 +19,6 @@ describe("normalizeNotificationPreferences", () => {
 
     expect(preferences.enabledEventTypes).toContain("pending-question");
     expect(preferences.eventSounds["pending-question"]).toBe("ping");
+    expect(preferences.schemaVersion).toBe(CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION);
   });
 });

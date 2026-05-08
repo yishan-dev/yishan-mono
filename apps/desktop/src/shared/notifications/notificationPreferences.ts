@@ -5,8 +5,10 @@ export type NotificationSoundId = (typeof SUPPORTED_NOTIFICATION_SOUND_IDS)[numb
 export type NotificationEventSoundMap = Record<NotificationEventType, NotificationSoundId>;
 export const SUPPORTED_NOTIFICATION_CATEGORIES = ["ai-task"] as const;
 export type NotificationCategory = (typeof SUPPORTED_NOTIFICATION_CATEGORIES)[number];
+export const CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION = 2;
 
 export type NotificationPreferences = {
+  schemaVersion: number;
   enabled: boolean;
   osEnabled: boolean;
   soundEnabled: boolean;
@@ -27,6 +29,7 @@ const DEFAULT_EVENT_SOUNDS: NotificationEventSoundMap = {
 
 /** Default notification preferences used when callers do not provide an override. */
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  schemaVersion: CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
   enabled: true,
   osEnabled: true,
   soundEnabled: true,

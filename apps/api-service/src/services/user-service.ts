@@ -123,7 +123,19 @@ export class UserService {
       .where(eq(users.id, userId))
       .limit(1);
 
-    return normalizeNotificationPreferences(rows[0]?.notificationPreferences);
+    const originalPreferences = rows[0]?.notificationPreferences;
+    const normalizedPreferences = normalizeNotificationPreferences(originalPreferences);
+    if (JSON.stringify(originalPreferences ?? null) !== JSON.stringify(normalizedPreferences)) {
+      await this.db
+        .update(users)
+        .set({
+          notificationPreferences: normalizedPreferences,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+
+    return normalizedPreferences;
   }
 
   async updateNotificationPreferences(

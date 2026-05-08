@@ -4,7 +4,10 @@ import type {
   NotificationSoundId,
 } from "../../shared/notifications/notificationPreferences";
 import { NOTIFICATION_PREFERENCES_STORAGE_KEY } from "../../shared/notifications/notificationConstants";
-import { DEFAULT_NOTIFICATION_PREFERENCES } from "../../shared/notifications/notificationPreferences";
+import {
+  CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from "../../shared/notifications/notificationPreferences";
 import { requestJson } from "../api/restClient";
 import { getDesktopHostBridge } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
@@ -15,10 +18,13 @@ export async function getNotificationPreferences() {
   if (currentUserPreferences) {
     const normalized = normalizeNotificationPreferences(currentUserPreferences);
     cacheNotificationPreferences(normalized);
+    persistMigratedNotificationPreferences(currentUserPreferences, normalized);
     return normalized;
   }
 
-  return getCachedNotificationPreferences();
+  const cachedPreferences = getCachedNotificationPreferences();
+  cacheNotificationPreferences(cachedPreferences);
+  return cachedPreferences;
 }
 
 /** Updates notification preferences through api-service and refreshes local cache/session state. */
@@ -106,6 +112,7 @@ function normalizeNotificationPreferences(input: Partial<NotificationPreferences
   const fallback = DEFAULT_NOTIFICATION_PREFERENCES;
   const candidate = input ?? fallback;
   return {
+    schemaVersion: CURRENT_NOTIFICATION_PREFERENCES_SCHEMA_VERSION,
     enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
     osEnabled: typeof candidate.osEnabled === "boolean" ? candidate.osEnabled : fallback.osEnabled,
     soundEnabled: typeof candidate.soundEnabled === "boolean" ? candidate.soundEnabled : fallback.soundEnabled,
@@ -127,4 +134,17 @@ function normalizeNotificationPreferences(input: Partial<NotificationPreferences
         ? [...new Set(candidate.enabledCategories)]
         : [...fallback.enabledCategories],
   };
+}
+
+function persistMigratedNotificationPreferences(
+  originalPreferences: Partial<NotificationPreferences>,
+  normalizedPreferences: NotificationPreferences,
+): void {
+  if (JSON.stringify(originalPreferences) === JSON.stringify(normalizedPreferences)) {
+    return;
+  }
+
+  void updateNotificationPreferences(normalizedPreferences).catch(() => {
+    // Migration persistence is best-effort; callers already use the normalized in-memory snapshot.
+  });
 }
