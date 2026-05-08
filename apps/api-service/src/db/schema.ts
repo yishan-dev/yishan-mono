@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
-  notificationPreferences: jsonb("notification_preferences"),
+  userPreferences: jsonb("user_preferences"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });

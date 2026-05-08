@@ -1,15 +1,23 @@
 import type { AppContext } from "@/hono";
-import { normalizeNotificationPreferences } from "@/lib/notification-preferences";
-import type { UpdateNotificationPreferencesBodyInput } from "@/validation/user";
+import { normalizeUserPreferences } from "@/lib/user-preferences";
+import type { UpdateLanguagePreferenceBodyInput, UpdateNotificationPreferencesBodyInput } from "@/validation/user";
 
 export async function meHandler(c: AppContext) {
   const user = c.get("sessionUser");
+  const userPreferences = normalizeUserPreferences(user.userPreferences);
   return c.json({
     user: {
       ...user,
-      notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences),
+      languagePreference: userPreferences.languagePreference,
+      notificationPreferences: userPreferences.notificationPreferences,
     },
   });
+}
+
+export async function updateLanguagePreferenceHandler(c: AppContext, body: UpdateLanguagePreferenceBodyInput) {
+  const actorUser = c.get("sessionUser");
+  const languagePreference = await c.get("services").user.updateLanguagePreference(actorUser.id, body.languagePreference);
+  return c.json({ languagePreference });
 }
 
 export async function updateNotificationPreferencesHandler(

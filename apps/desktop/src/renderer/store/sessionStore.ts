@@ -2,12 +2,14 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { NotificationPreferences } from "../../shared/notifications/notificationPreferences";
+import type { SupportedLanguageCode } from "../i18n";
 
 export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  languagePreference?: SupportedLanguageCode;
   notificationPreferences?: NotificationPreferences;
 };
 

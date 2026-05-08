@@ -7,6 +7,7 @@ import { RestApiError } from "../../api/restClient";
 import { getSessionBootstrapData } from "../../api/sessionApi";
 import { getAuthStatus, getDaemonInfo } from "../../commands/appCommands";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
+import { setAppLanguage } from "../../i18n";
 import { rendererQueryClient } from "../../queryClient";
 import { authStore } from "../../store/authStore";
 import { sessionStore } from "../../store/sessionStore";
@@ -164,6 +165,9 @@ export function ApplicationRouterView() {
             organizations: sessionData.organizations,
             selectedOrganizationId: previousSelectedOrganizationId,
           });
+          if (sessionData.currentUser.languagePreference) {
+            await setAppLanguage(sessionData.currentUser.languagePreference);
+          }
           bootstrappedSessionData = true;
         }
 

@@ -1,11 +1,18 @@
-import { BiBell, BiChip, type BiCog, BiGitBranch, BiPalette, BiTerminal, BiUser } from "react-icons/bi";
+import { BiBell, BiChip, type BiCog, BiGitBranch, BiPalette, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
 import { AGENT_SETTINGS_LABEL_KEY_BY_KIND, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
 import {
   NOTIFICATION_SETTINGS_SEARCH_ITEMS,
   type NotificationSettingsFocusItemId,
 } from "./notificationSettingsCatalog";
 
-export type SettingsTab = "account" | "agents" | "appearance" | "daemon" | "notifications" | "terminal" | "workspace";
+export type SettingsTab =
+  | "account"
+  | "agents"
+  | "appearance"
+  | "daemon"
+  | "notifications"
+  | "terminal"
+  | "workspace";
 
 export type SettingsNavSection = {
   titleKey: string;
@@ -144,6 +151,22 @@ const APPEARANCE_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   },
 ];
 
+const LANGUAGE_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "language-selection",
+    tab: "appearance",
+    icon: BiWorld,
+    labelKey: "settings.language.title",
+    sectionLabelKey: "settings.items.appearance",
+    keywordKeys: [
+      "settings.language.description",
+      "settings.language.selectLabel",
+      "settings.language.options.en",
+      "settings.language.options.zh",
+    ],
+  },
+];
+
 const AGENT_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   {
     id: "agent-settings",
@@ -204,6 +227,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...ACCOUNT_SEARCH_ITEMS,
   ...AGENT_SEARCH_ITEMS,
   ...APPEARANCE_SEARCH_ITEMS,
+  ...LANGUAGE_SEARCH_ITEMS,
   ...DAEMON_SEARCH_ITEMS,
   ...GIT_WORKSPACE_SEARCH_ITEMS,
   ...TERMINAL_SEARCH_ITEMS,

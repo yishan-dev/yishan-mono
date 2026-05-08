@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_LANGUAGE_CODES } from "@/lib/user-preferences";
 
 const notificationEventTypeSchema = z.enum(["run-finished", "run-failed", "pending-question"]);
 const notificationSoundIdSchema = z.enum(["chime", "ping", "pop", "zip", "alert"]);
@@ -39,3 +40,9 @@ export const updateNotificationPreferencesBodySchema = z
   });
 
 export type UpdateNotificationPreferencesBodyInput = z.infer<typeof updateNotificationPreferencesBodySchema>;
+
+export const updateLanguagePreferenceBodySchema = z.object({
+  languagePreference: z.enum(SUPPORTED_LANGUAGE_CODES),
+});
+
+export type UpdateLanguagePreferenceBodyInput = z.infer<typeof updateLanguagePreferenceBodySchema>;

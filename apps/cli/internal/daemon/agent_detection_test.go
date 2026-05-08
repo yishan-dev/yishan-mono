@@ -167,6 +167,42 @@ func TestListAgentCLIDetectionStatusesWithOptionsSkipsExcludedDirectories(t *tes
 	}
 }
 
+func TestListAgentCLIDetectionStatusesWithOptionsTreatsBrokenWrapperAsUndetected(t *testing.T) {
+	t.Setenv("PATH", "")
+
+	if runtime.GOOS == "windows" {
+		t.Skip("test currently targets unix-style executable permissions")
+	}
+
+	binDir := t.TempDir()
+	brokenWrapperPath := filepath.Join(binDir, "gemini")
+	brokenWrapper := "#!/bin/sh\necho 'yishan wrapper: real gemini not found in PATH' 1>&2\nexit 1\n"
+	if err := os.WriteFile(brokenWrapperPath, []byte(brokenWrapper), 0o755); err != nil {
+		t.Fatalf("write broken wrapper %q: %v", brokenWrapperPath, err)
+	}
+
+	statuses := listAgentCLIDetectionStatusesWithOptions(agentDetectionOptions{
+		PathValue:      binDir,
+		PathExtValue:   ".COM;.EXE;.BAT;.CMD",
+		IsWindows:      false,
+		ExcludedDirs:   map[string]struct{}{},
+		VersionTimeout: 500 * time.Millisecond,
+	})
+
+	for _, status := range statuses {
+		if status.AgentKind != "gemini" {
+			continue
+		}
+
+		if status.Detected {
+			t.Fatalf("expected gemini broken wrapper to be treated as undetected")
+		}
+		if status.Version != "" {
+			t.Fatalf("expected gemini version to be empty, got %q", status.Version)
+		}
+	}
+}
+
 func TestResolveUserShellUsesEnvVariable(t *testing.T) {
 	t.Setenv("SHELL", "/bin/custom-shell")
 
