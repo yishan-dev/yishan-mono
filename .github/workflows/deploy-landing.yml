@@ -35,6 +35,8 @@ jobs:
       - name: Build
         working-directory: apps/landing
         run: bun run build
+        env:
+          NEXT_PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
