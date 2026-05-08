@@ -121,14 +121,7 @@ export class DesktopApplication {
       event.preventDefault();
       this.hasProcessedBeforeQuit = true;
 
-      const shouldStopDaemon = isDevMode() || (this.cachedDaemonQuitOnExit ?? false);
-      const cleanup = shouldStopDaemon
-        ? this.daemonManager.stop().catch((error: unknown) => {
-            console.warn("Failed to stop daemon service during desktop shutdown", error);
-          })
-        : Promise.resolve();
-
-      void cleanup.finally(() => {
+      void this.runBeforeQuitCleanup().finally(() => {
         app.quit();
       });
     });
@@ -360,9 +353,26 @@ export class DesktopApplication {
       // Mark quit intent before electron-updater closes windows so the
       // macOS close handler does not convert update restart into a hide.
       this.isQuitting = true;
-      autoUpdater.quitAndInstall();
-      return { ok: true };
+      if (!this.hasProcessedBeforeQuit) {
+        this.hasProcessedBeforeQuit = true;
+        await this.runBeforeQuitCleanup();
+      }
+      autoUpdater.quitAndInstall(false, true);
+      return { ok: true as const };
     });
+  }
+
+  private async runBeforeQuitCleanup(): Promise<void> {
+    const shouldStopDaemon = isDevMode() || (this.cachedDaemonQuitOnExit ?? false);
+    if (!shouldStopDaemon) {
+      return;
+    }
+
+    try {
+      await this.daemonManager.stop();
+    } catch (error: unknown) {
+      console.warn("Failed to stop daemon service during desktop shutdown", error);
+    }
   }
 
   /** Focuses the main window when menu actions should bring the app forward. */
