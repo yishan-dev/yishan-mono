@@ -273,7 +273,7 @@ describe("FileEditor", () => {
   it("runs file path header actions", () => {
     const onCopyPath = vi.fn();
     const onOpenExternalApp = vi.fn();
-    const { getByLabelText } = render(
+    const { getByRole } = render(
       <ThemeProvider theme={createAppTheme("dark")}>
         <FileEditor
           path="src/components/App.tsx"
@@ -284,8 +284,8 @@ describe("FileEditor", () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(getByLabelText("Copy file path"));
-    fireEvent.click(getByLabelText("Open in external app"));
+    fireEvent.click(getByRole("button", { name: "Copy file path" }));
+    fireEvent.click(getByRole("button", { name: "Open in external app" }));
 
     expect(onCopyPath).toHaveBeenCalledWith("src/components/App.tsx");
     expect(onOpenExternalApp).toHaveBeenCalledWith("src/components/App.tsx");

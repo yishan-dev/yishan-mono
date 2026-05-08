@@ -258,7 +258,6 @@ describe("getShortcutDefinitions", () => {
     expect(openEntryInExternalApp).toHaveBeenCalledWith({
       workspaceWorktreePath: "/tmp/workspace-1",
       appId: "cursor",
-      relativePath: "src/App.tsx",
     });
   });
 
@@ -315,7 +314,6 @@ describe("getShortcutDefinitions", () => {
     expect(openEntryInExternalApp).toHaveBeenCalledWith({
       workspaceWorktreePath: "/tmp/workspace-1",
       appId: "system-file-manager",
-      relativePath: "src/App.tsx",
     });
   });
 
