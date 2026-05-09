@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
 import { SYSTEM_FILE_MANAGER_APP_ID } from "../../shared/contracts/externalApps";
-import { THREE_COL_GAP_PX, THREE_COL_SPLITTER_PX, ThreeColumnLayout } from "../components/ThreeColumnLayout";
+import { SplitPaneLayout } from "../components/SplitPaneLayout";
 import { subscribeAppActionEvent } from "../events";
 import { useAllWorkspacesGitSync } from "../hooks/useAllWorkspacesGitSync";
 import { useCommands } from "../hooks/useCommands";
@@ -25,22 +25,10 @@ import { TerminalRecoveryCoordinator } from "./workspace/terminal/terminalRecove
 const LEFT_MIN_WIDTH = 240;
 const RIGHT_MIN_WIDTH = 280;
 const MAIN_MIN_WIDTH = 520;
+const SEPARATOR_PX = 16;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function getSplitterPx(): number {
-  return typeof THREE_COL_SPLITTER_PX === "number"
-    ? THREE_COL_SPLITTER_PX
-    : Number.parseFloat(THREE_COL_SPLITTER_PX) || 1;
-}
-
-function getLayoutOverhead(hasLeft: boolean, hasRight: boolean): number {
-  const splitterPx = getSplitterPx();
-  const items = 1 + (hasLeft ? 2 : 0) + (hasRight ? 2 : 0);
-  const gaps = Math.max(0, items - 1) * THREE_COL_GAP_PX;
-  const splitters = (hasLeft ? splitterPx : 0) + (hasRight ? splitterPx : 0);
-  return gaps + splitters;
 }
 
 /** Renders the workspace dashboard and tracks notification/running-task state for pane indicators. */
@@ -122,7 +110,9 @@ export function WorkspaceView() {
         if (!selectedWorkspaceId) {
           return;
         }
-        const selectedWorkspace = workspaceStore.getState().workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
+        const selectedWorkspace = workspaceStore
+          .getState()
+          .workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
         if (!selectedWorkspace?.worktreePath) {
           return;
         }
@@ -147,12 +137,8 @@ export function WorkspaceView() {
         cmd.undoFileTreeOperation();
         return;
       }
-
     });
-  }, [
-    cmd,
-    navigate,
-  ]);
+  }, [cmd, navigate]);
 
   useEffect(() => {
     let disposed = false;
@@ -242,13 +228,15 @@ export function WorkspaceView() {
     };
   }, [cmd, selectedWorkspaceId, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
 
+  const leftSep = leftCollapsed ? 0 : SEPARATOR_PX;
+  const rightSep = rightCollapsed ? 0 : SEPARATOR_PX;
   const maxLeftWidth = Math.max(
     LEFT_MIN_WIDTH,
-    containerWidth - getLayoutOverhead(true, !rightCollapsed) - MAIN_MIN_WIDTH - (rightCollapsed ? 0 : rightWidth),
+    containerWidth - leftSep - rightSep - MAIN_MIN_WIDTH - (rightCollapsed ? 0 : rightWidth),
   );
   const maxRightWidth = Math.max(
     RIGHT_MIN_WIDTH,
-    containerWidth - getLayoutOverhead(!leftCollapsed, true) - MAIN_MIN_WIDTH - (leftCollapsed ? 0 : leftWidth),
+    containerWidth - leftSep - rightSep - MAIN_MIN_WIDTH - (leftCollapsed ? 0 : leftWidth),
   );
 
   const resolvedLeftWidth = clamp(leftWidth, LEFT_MIN_WIDTH, maxLeftWidth);
@@ -308,17 +296,14 @@ export function WorkspaceView() {
 
   return (
     <WorkspacePaneVisibilityProvider value={paneVisibility}>
-      <ThreeColumnLayout
+      <SplitPaneLayout
         layoutRef={layoutRef}
-        leftCollapsed={leftCollapsed}
-        rightCollapsed={rightCollapsed}
-        leftResizeLabel={t("layout.resize.left")}
-        rightResizeLabel={t("layout.resize.right")}
-        onResizeLeftStart={resizeLeftStart}
-        onResizeLeftMove={resizeLeftMove}
-        onResizeRightStart={resizeRightStart}
-        onResizeRightMove={resizeRightMove}
-        left={
+        position="left"
+        collapsed={leftCollapsed}
+        resizeLabel={t("layout.resize.left")}
+        onResizeStart={resizeLeftStart}
+        onResizeMove={resizeLeftMove}
+        sideContent={
           <Box sx={{ width: resolvedLeftWidth, minWidth: resolvedLeftWidth, height: "100%" }}>
             <LeftPaneView
               onCreateRepository={() => {
@@ -328,13 +313,22 @@ export function WorkspaceView() {
             />
           </Box>
         }
-        main={<MainPaneView />}
-        right={
-          <Box sx={{ width: resolvedRightWidth, minWidth: resolvedRightWidth, height: "100%" }}>
-            <RightPaneView onToggleRightPane={onToggleRightPane} />
-          </Box>
-        }
-      />
+      >
+        <SplitPaneLayout
+          position="right"
+          collapsed={rightCollapsed}
+          resizeLabel={t("layout.resize.right")}
+          onResizeStart={resizeRightStart}
+          onResizeMove={resizeRightMove}
+          sideContent={
+            <Box sx={{ width: resolvedRightWidth, minWidth: resolvedRightWidth, height: "100%" }}>
+              <RightPaneView onToggleRightPane={onToggleRightPane} />
+            </Box>
+          }
+        >
+          <MainPaneView />
+        </SplitPaneLayout>
+      </SplitPaneLayout>
       <CreateProjectDialogView open={isCreateRepoOpen} onClose={() => setIsCreateRepoOpen(false)} />
       <WorkspaceLifecycleNoticeView />
     </WorkspacePaneVisibilityProvider>
