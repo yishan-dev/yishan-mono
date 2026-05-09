@@ -234,6 +234,17 @@ export async function createProject(input: {
   }
 
   tabStore.getState().setSelectedWorkspaceId(workspaceStore.getState().selectedWorkspaceId);
+
+  // Ensure the context folder and symlinks are created for the new project's
+  // known worktree paths. Without this, the `.my-context` directory is never
+  // initialised for the primary workspace that already exists on disk.
+  if (project.contextEnabled) {
+    await syncProjectContextLinks({
+      projectId: project.id,
+      repoKey: project.repoKey ?? null,
+      enabled: true,
+    });
+  }
 }
 
 /** Deletes one project in backend and then removes it from local store state. */
