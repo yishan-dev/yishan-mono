@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildCreatedWorkspaceState, countWorkspaceGitChanges, normalizeCreateWorkspaceInput } from "./workspaceHelpers";
+import {
+  applyCreatedWorkspaceState,
+  countWorkspaceGitChanges,
+  normalizeCreateWorkspaceInput,
+} from "./workspaceHelpers";
 
 describe("workspaceHelpers", () => {
   it("normalizes create-workspace input and applies defaults", () => {
@@ -45,7 +49,7 @@ describe("workspaceHelpers", () => {
       gitChangeTotalsByWorkspaceId: {},
     };
 
-    const nextState = buildCreatedWorkspaceState(state, {
+    applyCreatedWorkspaceState(state, {
       projectId: "repo-1",
       normalizedName: "feature-a",
       normalizedTitle: "feature-a",
@@ -59,7 +63,7 @@ describe("workspaceHelpers", () => {
       },
     });
 
-    expect(nextState.workspaces).toHaveLength(1);
-    expect(nextState.workspaces?.[0]?.worktreePath).toBe("/tmp/worktrees/feature-a");
+    expect(state.workspaces).toHaveLength(1);
+    expect(state.workspaces?.[0]?.worktreePath).toBe("/tmp/worktrees/feature-a");
   });
 });

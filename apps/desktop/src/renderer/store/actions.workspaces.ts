@@ -1,8 +1,8 @@
 import {
-  buildCreatedWorkspaceState,
-  buildDeletedWorkspaceState,
-  buildRenamedWorkspaceBranchState,
-  buildRenamedWorkspaceState,
+  applyCreatedWorkspaceState,
+  applyDeletedWorkspaceState,
+  applyRenamedWorkspaceBranchState,
+  applyRenamedWorkspaceState,
 } from "../helpers/workspaceHelpers";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";
 
@@ -34,8 +34,8 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) => ({
-        ...buildCreatedWorkspaceState(state, {
+      set((state) => {
+        applyCreatedWorkspaceState(state, {
           projectId: resolvedProjectId,
           normalizedName: name,
           normalizedTitle: name,
@@ -48,8 +48,8 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
             branch,
             worktreePath: worktreePath ?? "",
           },
-        }),
-      }));
+        });
+      });
     },
     closeWorkspace: ({ projectId, repoId, workspaceId }) => {
       const resolvedProjectId = resolveProjectId({ projectId, repoId });
@@ -57,12 +57,12 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) =>
-        buildDeletedWorkspaceState(state, {
+      set((state) => {
+        applyDeletedWorkspaceState(state, {
           projectId: resolvedProjectId,
           workspaceId,
-        }),
-      );
+        });
+      });
     },
     renameWorkspace: ({ projectId, repoId, workspaceId, name }) => {
       const normalizedName = name.trim();
@@ -71,13 +71,13 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) => ({
-        ...buildRenamedWorkspaceState(state, {
+      set((state) => {
+        applyRenamedWorkspaceState(state, {
           projectId: resolvedProjectId,
           workspaceId,
           normalizedName,
-        }),
-      }));
+        });
+      });
     },
     renameWorkspaceBranch: ({ projectId, repoId, workspaceId, branch }) => {
       const normalizedBranch = branch.trim();
@@ -86,13 +86,13 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
         return;
       }
 
-      set((state) => ({
-        ...buildRenamedWorkspaceBranchState(state, {
+      set((state) => {
+        applyRenamedWorkspaceBranchState(state, {
           projectId: resolvedProjectId,
           workspaceId,
           normalizedBranch,
-        }),
-      }));
+        });
+      });
     },
     setWorkspaceGitChangesCount: (workspaceId, count) => {
       if (!workspaceId) {

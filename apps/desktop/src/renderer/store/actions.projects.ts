@@ -1,10 +1,11 @@
 import {
-  buildCreatedRepoState,
-  buildDeletedRepoState,
-  buildHydratedStateFromApiData,
-  buildUpdatedRepoConfigState,
+  applyCreatedRepoState,
+  applyDeletedRepoState,
+  applyHydratedStateFromApiData,
+  applyUpdatedRepoConfigState,
   normalizeCreateRepoInput,
 } from "../helpers/projectHelpers";
+import { sessionStore } from "./sessionStore";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";
 
 type WorkspaceRepoActions = Pick<
@@ -46,22 +47,34 @@ export function createWorkspaceRepoActions(
       return;
     }
 
-    set((state) =>
-      buildCreatedRepoState(state, {
+    const organizationId = sessionStore.getState().selectedOrganizationId?.trim() ?? "";
+
+    set((state) => {
+      applyCreatedRepoState(state, {
         name,
         source,
         normalizedPath,
         normalizedGitUrl,
         resolvedPath,
         backendProject,
-      }),
-    );
+      });
+
+      // Persist selection + display preferences into organization-scoped storage.
+      if (organizationId) {
+        state.organizationPreferencesById ??= {};
+        state.organizationPreferencesById[organizationId] ??= {};
+        const orgPrefs = state.organizationPreferencesById[organizationId];
+        orgPrefs.selectedProjectId = state.selectedProjectId;
+        orgPrefs.selectedWorkspaceId = state.selectedWorkspaceId;
+        orgPrefs.displayProjectIds = state.displayProjectIds;
+      }
+    });
   };
 
   return {
     load: (organizationId, projects, workspaces) => {
       set((state) => {
-        Object.assign(state, buildHydratedStateFromApiData(state, organizationId, projects, workspaces));
+        applyHydratedStateFromApiData(state, organizationId, projects, workspaces);
       });
     },
     createProject,
@@ -70,10 +83,14 @@ export function createWorkspaceRepoActions(
         return;
       }
 
-      set((state) => buildDeletedRepoState(state, projectId));
+      set((state) => {
+        applyDeletedRepoState(state, projectId);
+      });
     },
     updateProjectConfig: (projectId, config) => {
-      set((state) => buildUpdatedRepoConfigState(state, projectId, config));
+      set((state) => {
+        applyUpdatedRepoConfigState(state, projectId, config);
+      });
     },
     incrementFileTreeRefreshVersion: (workspaceWorktreePath, changedRelativePaths) => {
       const normalizedWorkspaceWorktreePath = workspaceWorktreePath?.trim() ?? "";
