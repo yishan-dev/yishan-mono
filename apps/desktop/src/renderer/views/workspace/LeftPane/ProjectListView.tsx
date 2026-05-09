@@ -405,6 +405,10 @@ export function ProjectListView() {
   };
 
   const hoveredWorkspace = workspaces.find((workspace) => workspace.id === hoveredWorkspaceId);
+  const isHoveredWorkspacePrimary = Boolean(
+    hoveredWorkspace &&
+      (hoveredWorkspace.kind === "local" || displayWorkspaceIdByProjectId[hoveredWorkspace.repoId] === hoveredWorkspace.id),
+  );
   const isWorkspaceInfoOpen = Boolean(workspaceInfoAnchorEl) && Boolean(hoveredWorkspace);
 
   useEffect(() => {
@@ -839,6 +843,7 @@ export function ProjectListView() {
         open={isWorkspaceInfoOpen}
         anchorEl={workspaceInfoAnchorEl}
         workspace={hoveredWorkspace}
+        isPrimaryWorkspace={isHoveredWorkspacePrimary}
         currentBranch={hoveredWorkspaceCurrentBranch}
         onMouseEnter={handleWorkspaceInfoPopoverMouseEnter}
         onMouseLeave={handleWorkspaceInfoPopoverMouseLeave}
