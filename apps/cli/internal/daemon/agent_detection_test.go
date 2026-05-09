@@ -92,6 +92,7 @@ func TestListAgentCLIDetectionStatusesWithOptionsDetectsVersion(t *testing.T) {
 	if cursorStatus.Version != "" {
 		t.Fatalf("expected cursor version to be empty, got %q", cursorStatus.Version)
 	}
+
 }
 
 func TestListAgentCLIDetectionStatusesWithOptionsDetectsAgentBinaryNames(t *testing.T) {
@@ -244,6 +245,127 @@ func TestResolveUserShellReturnsEmptyWhenNothingAvailable(t *testing.T) {
 
 	if result != "" {
 		t.Fatalf("expected empty string on windows, got %q", result)
+	}
+}
+
+func TestListAgentCLIDetectionStatusesCachesWithinTTL(t *testing.T) {
+	t.Setenv("PATH", "")
+	t.Setenv(agentDetectionCacheTTLEnvKey, "5m")
+	resetAgentDetectionCacheForTest()
+	t.Cleanup(resetAgentDetectionCacheForTest)
+
+	if runtime.GOOS == "windows" {
+		t.Skip("test currently targets unix-style executable permissions")
+	}
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+	writeExecutableScript(t, binDir, "opencode", "0.11.3")
+
+	firstStatuses := ListAgentCLIDetectionStatuses()
+	firstByAgent := map[string]AgentCLIDetectionStatus{}
+	for _, status := range firstStatuses {
+		firstByAgent[status.AgentKind] = status
+	}
+	if firstByAgent["opencode"].Version != "0.11.3" {
+		t.Fatalf("expected first detection to read opencode version 0.11.3, got %q", firstByAgent["opencode"].Version)
+	}
+
+	writeExecutableScript(t, binDir, "opencode", "9.9.9")
+	secondStatuses := ListAgentCLIDetectionStatuses()
+	secondByAgent := map[string]AgentCLIDetectionStatus{}
+	for _, status := range secondStatuses {
+		secondByAgent[status.AgentKind] = status
+	}
+
+	if secondByAgent["opencode"].Version != "0.11.3" {
+		t.Fatalf("expected cached opencode version 0.11.3 within TTL, got %q", secondByAgent["opencode"].Version)
+	}
+}
+
+func TestListAgentCLIDetectionStatusesRefreshesAfterTTLExpiry(t *testing.T) {
+	t.Setenv("PATH", "")
+	t.Setenv(agentDetectionCacheTTLEnvKey, "50ms")
+	resetAgentDetectionCacheForTest()
+	t.Cleanup(resetAgentDetectionCacheForTest)
+
+	if runtime.GOOS == "windows" {
+		t.Skip("test currently targets unix-style executable permissions")
+	}
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+	writeExecutableScript(t, binDir, "opencode", "0.11.3")
+
+	_ = ListAgentCLIDetectionStatuses()
+	writeExecutableScript(t, binDir, "opencode", "9.9.9")
+	time.Sleep(80 * time.Millisecond)
+
+	statuses := ListAgentCLIDetectionStatuses()
+	statusByAgent := map[string]AgentCLIDetectionStatus{}
+	for _, status := range statuses {
+		statusByAgent[status.AgentKind] = status
+	}
+
+	if statusByAgent["opencode"].Version != "9.9.9" {
+		t.Fatalf("expected refreshed opencode version 9.9.9 after TTL expiry, got %q", statusByAgent["opencode"].Version)
+	}
+}
+
+func TestListAgentCLIDetectionStatusesUsesCachedResultWhenPathChangesWithinTTL(t *testing.T) {
+	t.Setenv(agentDetectionCacheTTLEnvKey, "5m")
+	resetAgentDetectionCacheForTest()
+	t.Cleanup(resetAgentDetectionCacheForTest)
+
+	if runtime.GOOS == "windows" {
+		t.Skip("test currently targets unix-style executable permissions")
+	}
+
+	firstBinDir := t.TempDir()
+	secondBinDir := t.TempDir()
+	writeExecutableScript(t, firstBinDir, "opencode", "0.11.3")
+	writeExecutableScript(t, secondBinDir, "opencode", "2.0.0")
+
+	t.Setenv("PATH", firstBinDir)
+	_ = ListAgentCLIDetectionStatuses()
+
+	t.Setenv("PATH", secondBinDir)
+	statuses := ListAgentCLIDetectionStatuses()
+	statusByAgent := map[string]AgentCLIDetectionStatus{}
+	for _, status := range statuses {
+		statusByAgent[status.AgentKind] = status
+	}
+
+	if statusByAgent["opencode"].Version != "0.11.3" {
+		t.Fatalf("expected cached result to be reused within TTL and stay at 0.11.3, got %q", statusByAgent["opencode"].Version)
+	}
+}
+
+func TestListAgentCLIDetectionStatusesForceRefreshBypassesTTLCache(t *testing.T) {
+	t.Setenv("PATH", "")
+	t.Setenv(agentDetectionCacheTTLEnvKey, "5m")
+	resetAgentDetectionCacheForTest()
+	t.Cleanup(resetAgentDetectionCacheForTest)
+
+	if runtime.GOOS == "windows" {
+		t.Skip("test currently targets unix-style executable permissions")
+	}
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+	writeExecutableScript(t, binDir, "opencode", "0.11.3")
+
+	_ = ListAgentCLIDetectionStatusesWithRefresh(false)
+	writeExecutableScript(t, binDir, "opencode", "8.8.8")
+
+	statuses := ListAgentCLIDetectionStatusesWithRefresh(true)
+	statusByAgent := map[string]AgentCLIDetectionStatus{}
+	for _, status := range statuses {
+		statusByAgent[status.AgentKind] = status
+	}
+
+	if statusByAgent["opencode"].Version != "8.8.8" {
+		t.Fatalf("expected force refresh to bypass cache and return 8.8.8, got %q", statusByAgent["opencode"].Version)
 	}
 }
 

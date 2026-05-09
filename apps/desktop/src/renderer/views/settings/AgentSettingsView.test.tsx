@@ -97,7 +97,7 @@ describe("AgentSettingsView", () => {
 
     render(<AgentSettingsView />);
 
-    const recheckButton = screen.getByRole("button", { name: "settings.agents.actions.recheckAll" });
+    const recheckButton = screen.getByRole("button", { name: "settings.agents.actions.rescanAll" });
     expect(recheckButton.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(recheckButton);

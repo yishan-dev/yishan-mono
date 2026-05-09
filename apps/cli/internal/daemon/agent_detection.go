@@ -7,12 +7,16 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 const managedBinDirEnvKey = "MANAGED_BIN_DIR"
+const agentDetectionCacheTTLEnvKey = "AGENT_CLI_DETECTION_CACHE_TTL"
+const defaultAgentDetectionCacheTTL = time.Hour
 
 const loginShellPathTimeout = 3 * time.Second
 
@@ -36,6 +40,17 @@ var supportedAgentCLIs = []supportedAgentCLI{
 	{Kind: "cursor-agent", Commands: []string{"cursor"}},
 }
 
+type cachedAgentDetectionResult struct {
+	CacheKey  string
+	ExpiresAt time.Time
+	Statuses  []AgentCLIDetectionStatus
+}
+
+var (
+	agentDetectionCacheMu sync.Mutex
+	agentDetectionCache   cachedAgentDetectionResult
+)
+
 // AgentCLIDetectionStatus captures one supported agent CLI detection result.
 type AgentCLIDetectionStatus struct {
 	AgentKind string `json:"agentKind"`
@@ -53,6 +68,17 @@ type agentDetectionOptions struct {
 
 // ListAgentCLIDetectionStatuses returns detection statuses for all supported desktop agent CLIs.
 func ListAgentCLIDetectionStatuses() []AgentCLIDetectionStatus {
+	return ListAgentCLIDetectionStatusesWithRefresh(false)
+}
+
+func ListAgentCLIDetectionStatusesWithRefresh(forceRefresh bool) []AgentCLIDetectionStatus {
+	ttl := resolveAgentDetectionCacheTTL()
+	if !forceRefresh {
+		if statuses, ok := loadAnyCachedAgentDetectionStatuses(ttl); ok {
+			return statuses
+		}
+	}
+
 	options := agentDetectionOptions{
 		PathValue:      resolveDetectionPathValue(),
 		PathExtValue:   os.Getenv("PATHEXT"),
@@ -60,8 +86,116 @@ func ListAgentCLIDetectionStatuses() []AgentCLIDetectionStatus {
 		ExcludedDirs:   resolveExcludedDirectories(),
 		VersionTimeout: 2 * time.Second,
 	}
+	return ListAgentCLIDetectionStatusesWithRuntimeOptions(forceRefresh, options, ttl)
+}
 
-	return listAgentCLIDetectionStatusesWithOptions(options)
+func ListAgentCLIDetectionStatusesWithRuntimeOptions(forceRefresh bool, options agentDetectionOptions, ttl time.Duration) []AgentCLIDetectionStatus {
+	cacheKey := buildAgentDetectionCacheKey(options)
+
+	if !forceRefresh {
+		if statuses, ok := loadCachedAgentDetectionStatuses(cacheKey, ttl); ok {
+			return statuses
+		}
+	}
+
+	statuses := listAgentCLIDetectionStatusesWithOptions(options)
+	storeCachedAgentDetectionStatuses(cacheKey, ttl, statuses)
+
+	return statuses
+}
+
+func resolveAgentDetectionCacheTTL() time.Duration {
+	raw := strings.TrimSpace(os.Getenv(agentDetectionCacheTTLEnvKey))
+	if raw == "" {
+		return defaultAgentDetectionCacheTTL
+	}
+
+	ttl, err := time.ParseDuration(raw)
+	if err != nil || ttl <= 0 {
+		return defaultAgentDetectionCacheTTL
+	}
+
+	return ttl
+}
+
+func buildAgentDetectionCacheKey(options agentDetectionOptions) string {
+	excludedDirs := make([]string, 0, len(options.ExcludedDirs))
+	for dir := range options.ExcludedDirs {
+		excludedDirs = append(excludedDirs, dir)
+	}
+	slices.Sort(excludedDirs)
+
+	return strings.Join([]string{
+		options.PathValue,
+		options.PathExtValue,
+		strconv.FormatBool(options.IsWindows),
+		strings.Join(excludedDirs, ";"),
+	}, "|")
+}
+
+func loadCachedAgentDetectionStatuses(cacheKey string, ttl time.Duration) ([]AgentCLIDetectionStatus, bool) {
+	if ttl <= 0 {
+		return nil, false
+	}
+
+	now := time.Now()
+	agentDetectionCacheMu.Lock()
+	defer agentDetectionCacheMu.Unlock()
+
+	if agentDetectionCache.CacheKey != cacheKey {
+		return nil, false
+	}
+	if now.After(agentDetectionCache.ExpiresAt) {
+		return nil, false
+	}
+
+	return cloneAgentDetectionStatuses(agentDetectionCache.Statuses), true
+}
+
+func loadAnyCachedAgentDetectionStatuses(ttl time.Duration) ([]AgentCLIDetectionStatus, bool) {
+	if ttl <= 0 {
+		return nil, false
+	}
+
+	now := time.Now()
+	agentDetectionCacheMu.Lock()
+	defer agentDetectionCacheMu.Unlock()
+
+	if now.After(agentDetectionCache.ExpiresAt) {
+		return nil, false
+	}
+	if len(agentDetectionCache.Statuses) == 0 {
+		return nil, false
+	}
+
+	return cloneAgentDetectionStatuses(agentDetectionCache.Statuses), true
+}
+
+func storeCachedAgentDetectionStatuses(cacheKey string, ttl time.Duration, statuses []AgentCLIDetectionStatus) {
+	if ttl <= 0 {
+		return
+	}
+
+	agentDetectionCacheMu.Lock()
+	defer agentDetectionCacheMu.Unlock()
+
+	agentDetectionCache = cachedAgentDetectionResult{
+		CacheKey:  cacheKey,
+		ExpiresAt: time.Now().Add(ttl),
+		Statuses:  cloneAgentDetectionStatuses(statuses),
+	}
+}
+
+func cloneAgentDetectionStatuses(statuses []AgentCLIDetectionStatus) []AgentCLIDetectionStatus {
+	cloned := make([]AgentCLIDetectionStatus, len(statuses))
+	copy(cloned, statuses)
+	return cloned
+}
+
+func resetAgentDetectionCacheForTest() {
+	agentDetectionCacheMu.Lock()
+	defer agentDetectionCacheMu.Unlock()
+	agentDetectionCache = cachedAgentDetectionResult{}
 }
 
 func resolveDetectionPathValue() string {

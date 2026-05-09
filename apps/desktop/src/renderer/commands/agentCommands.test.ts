@@ -17,6 +17,7 @@ vi.mock("../rpc/rpcTransport", () => ({
 
 describe("agentCommands", () => {
   it("normalizes detection statuses in supported-agent order", async () => {
+    const consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
     mocks.listDetectionStatuses.mockResolvedValueOnce([
       { agentKind: "claude", detected: true },
       { agentKind: "codex", detected: 1 },
@@ -24,6 +25,8 @@ describe("agentCommands", () => {
     ]);
 
     const statuses = await listAgentDetectionStatuses();
+
+    expect(mocks.listDetectionStatuses).toHaveBeenCalledWith(undefined);
 
     expect(statuses).toEqual([
       { agentKind: "opencode", detected: false },
@@ -34,5 +37,18 @@ describe("agentCommands", () => {
       { agentKind: "copilot", detected: false },
       { agentKind: "cursor", detected: false },
     ]);
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      "[agentCommands] Ignoring unsupported detected CLI tools: ignored",
+    );
+    consoleInfoSpy.mockRestore();
+  });
+
+  it("passes refresh flag for manual recheck", async () => {
+    mocks.listDetectionStatuses.mockResolvedValueOnce([]);
+
+    await listAgentDetectionStatuses(true);
+
+    expect(mocks.listDetectionStatuses).toHaveBeenCalledWith({ refresh: true });
   });
 });

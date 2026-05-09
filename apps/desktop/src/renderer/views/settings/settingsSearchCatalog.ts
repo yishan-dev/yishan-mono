@@ -197,7 +197,7 @@ const AGENT_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
       "settings.agents.status.notDetected",
       "settings.agents.status.checking",
       "settings.agents.inUse",
-      "settings.agents.actions.recheckAll",
+      "settings.agents.actions.rescanAll",
     ],
   },
   ...SUPPORTED_DESKTOP_AGENT_KINDS.map((agentKind) => ({

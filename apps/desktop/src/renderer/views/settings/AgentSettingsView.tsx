@@ -88,7 +88,7 @@ export function AgentSettingsView() {
 
       try {
         const statuses = await withTimeout(
-          listAgentDetectionStatuses(),
+          listAgentDetectionStatuses(isManualRefresh),
           AGENT_DETECTION_TIMEOUT_MS,
           `Agent detection timed out after ${AGENT_DETECTION_TIMEOUT_MS}ms`,
         );
@@ -152,7 +152,7 @@ export function AgentSettingsView() {
             disabled={isRefreshing}
             startIcon={isRefreshing || isLoading ? <CircularProgress size={14} /> : null}
           >
-            {t("settings.agents.actions.recheckAll")}
+            {t("settings.agents.actions.rescanAll")}
           </Button>
         }
       />

@@ -94,7 +94,7 @@
       "loadError": "加载智能体检测状态失败。",
       "inUse": "使用中",
       "actions": {
-        "recheckAll": "全部重新检测"
+        "rescanAll": "全部重新扫描"
       },
       "status": {
         "checking": "检测中...",

@@ -110,7 +110,7 @@
       "loadError": "Failed to load agent detection statuses.",
       "inUse": "In use",
       "actions": {
-        "recheckAll": "Recheck All"
+        "rescanAll": "Rescan All"
       },
       "status": {
         "checking": "Checking...",
