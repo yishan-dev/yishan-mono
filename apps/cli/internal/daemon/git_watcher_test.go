@@ -246,3 +246,150 @@ func TestWorktreeWatcher_DetectsFileChangesInWorktree(t *testing.T) {
 		t.Fatal("timed out waiting for workspaceFilesChanged event")
 	}
 }
+
+func TestWorktreeWatcher_DetectsFileChangesInSubdirectory(t *testing.T) {
+	root := evalSymlinks(t, t.TempDir())
+
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "nested", "deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	hub := newEventHub()
+	watchers := newWorkspaceWatchers(hub)
+	defer watchers.Close()
+
+	subID, events := hub.Subscribe()
+	defer hub.Unsubscribe(subID)
+
+	watchers.Watch(root)
+
+	time.Sleep(100 * time.Millisecond)
+	if err := os.WriteFile(filepath.Join(root, "nested", "deep", "child.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case event := <-events:
+		if event.Topic != "workspaceFilesChanged" {
+			t.Fatalf("expected topic 'workspaceFilesChanged', got %q", event.Topic)
+		}
+		payload, ok := event.Payload.(map[string]any)
+		if !ok {
+			t.Fatal("expected map payload")
+		}
+		paths, ok := payload["changedRelativePaths"].([]string)
+		if !ok {
+			t.Fatal("expected []string changedRelativePaths")
+		}
+		found := false
+		for _, p := range paths {
+			if p == "nested/deep/child.txt" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected changed path nested/deep/child.txt, got %v", paths)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for workspaceFilesChanged event")
+	}
+}
+
+func TestWorktreeWatcher_WatchesNewDirectoriesAndCleansDeletedDirectoryWatches(t *testing.T) {
+	root := evalSymlinks(t, t.TempDir())
+
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	hub := newEventHub()
+	watchers := newWorkspaceWatchers(hub)
+	defer watchers.Close()
+
+	subID, events := hub.Subscribe()
+	defer hub.Unsubscribe(subID)
+
+	watchers.Watch(root)
+
+	entry := watchers.entries[root]
+	if entry == nil {
+		t.Fatal("expected watcher entry for root")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	newDir := filepath.Join(root, "created", "sub")
+	if err := os.MkdirAll(newDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(newDir, "file.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-events:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for file event from new directory")
+	}
+
+	entry.mu.Lock()
+	_, watched := entry.watchedDirs[newDir]
+	entry.mu.Unlock()
+	if !watched {
+		t.Fatalf("expected new directory %q to be watched", newDir)
+	}
+
+	if err := os.RemoveAll(filepath.Join(root, "created")); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	entry.mu.Lock()
+	_, stillWatched := entry.watchedDirs[newDir]
+	entry.mu.Unlock()
+	if stillWatched {
+		t.Fatalf("expected deleted directory %q watch to be cleaned up", newDir)
+	}
+}
+
+func TestWorktreeWatcher_ExcludesCommonLargeDirectories(t *testing.T) {
+	root := evalSymlinks(t, t.TempDir())
+
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "dist"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	hub := newEventHub()
+	watchers := newWorkspaceWatchers(hub)
+	defer watchers.Close()
+
+	watchers.Watch(root)
+
+	entry := watchers.entries[root]
+	if entry == nil {
+		t.Fatal("expected watcher entry for root")
+	}
+
+	entry.mu.Lock()
+	_, nodeModulesWatched := entry.watchedDirs[filepath.Join(root, "node_modules")]
+	_, distWatched := entry.watchedDirs[filepath.Join(root, "dist")]
+	_, buildWatched := entry.watchedDirs[filepath.Join(root, "build")]
+	entry.mu.Unlock()
+
+	if nodeModulesWatched || distWatched || buildWatched {
+		t.Fatalf("expected excluded directories to be unwatched, got node_modules=%t dist=%t build=%t", nodeModulesWatched, distWatched, buildWatched)
+	}
+}
