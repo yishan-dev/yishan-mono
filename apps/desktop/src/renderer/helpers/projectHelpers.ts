@@ -63,8 +63,7 @@ export function readPersistedWorkspacePreferencesByOrg(
       }
 
       return {
-        selectedProjectId:
-          typeof scopedPreferences.selectedProjectId === "string" ? scopedPreferences.selectedProjectId : undefined,
+        selectedProjectId: typeof scopedPreferences.selectedProjectId === "string" ? scopedPreferences.selectedProjectId : undefined,
         selectedWorkspaceId:
           typeof scopedPreferences.selectedWorkspaceId === "string" ? scopedPreferences.selectedWorkspaceId : undefined,
         displayProjectIds: Array.isArray(scopedPreferences.displayProjectIds)
@@ -96,9 +95,12 @@ export function readPersistedWorkspacePreferencesByOrg(
 
 /** Returns only entries keyed by workspace ids that still exist after snapshot reconciliation. */
 function filterWorkspaceScopedRecord<T>(record: Record<string, T>, workspaceIdSet: Set<string>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(record).filter(([workspaceId]) => workspaceIdSet.has(workspaceId)),
-  ) as Record<string, T>;
+  for (const key of Object.keys(record)) {
+    if (!workspaceIdSet.has(key)) {
+      delete record[key];
+    }
+  }
+  return record;
 }
 
 /** Maps backend API data into workspace projects and open workspaces. */
@@ -171,12 +173,12 @@ function mapApiData(projects: ProjectRecord[], workspacesFromApi: WorkspaceRecor
 }
 
 /** Reconciles current state with backend snapshot while preserving compatible UI-only state. */
-export function buildHydratedStateFromApiData(
+export function applyHydratedStateFromApiData(
   state: ProjectStoreSlice,
   organizationId: string,
   projects: ProjectRecord[],
   workspacesFromApi: WorkspaceRecord[],
-): Partial<ProjectStoreSlice> {
+): void {
   const normalizedOrganizationId = organizationId.trim();
   const orgPreferences =
     normalizedOrganizationId.length > 0 ? state.organizationPreferencesById?.[normalizedOrganizationId] : undefined;
@@ -187,6 +189,7 @@ export function buildHydratedStateFromApiData(
     preferredProjectId: orgPreferences?.selectedProjectId,
     preferredWorkspaceId: orgPreferences?.selectedWorkspaceId,
   });
+
   const nextProjectIdSet = new Set(mappedProjects.map((project) => project.id));
   const baseDisplayProjectIds = orgPreferences?.displayProjectIds ?? [];
   const filteredDisplayProjectIds = baseDisplayProjectIds.filter((projectId) => nextProjectIdSet.has(projectId));
@@ -203,29 +206,33 @@ export function buildHydratedStateFromApiData(
       : shouldResetPersistedDisplayProjectIds
         ? mappedProjects.map((project) => project.id)
         : filteredDisplayProjectIds;
-  const nextLastUsedExternalAppId = orgPreferences?.lastUsedExternalAppId;
-  const nextWorkspaceIdSet = new Set(workspaces.map((workspace) => workspace.id));
-  const nextOrganizationPreferencesById =
-    normalizedOrganizationId.length === 0
-      ? state.organizationPreferencesById
-      : {
-          ...(state.organizationPreferencesById ?? {}),
-          [normalizedOrganizationId]: {
-            selectedProjectId: nextBaseState.selectedProjectId,
-            selectedWorkspaceId: nextBaseState.selectedWorkspaceId,
-            displayProjectIds: nextDisplayProjectIds,
-            lastUsedExternalAppId: nextLastUsedExternalAppId,
-          },
-        };
 
-  return {
-    ...nextBaseState,
-    displayProjectIds: nextDisplayProjectIds,
-    lastUsedExternalAppId: nextLastUsedExternalAppId,
-    organizationPreferencesById: nextOrganizationPreferencesById,
-    gitChangesCountByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangesCountByWorkspaceId, nextWorkspaceIdSet),
-    gitChangeTotalsByWorkspaceId: filterWorkspaceScopedRecord(state.gitChangeTotalsByWorkspaceId, nextWorkspaceIdSet),
-  };
+  state.projects = nextBaseState.projects;
+  state.workspaces = nextBaseState.workspaces;
+  state.selectedProjectId = nextBaseState.selectedProjectId;
+  state.selectedWorkspaceId = nextBaseState.selectedWorkspaceId;
+  state.displayProjectIds = nextDisplayProjectIds;
+  state.lastUsedExternalAppId = orgPreferences?.lastUsedExternalAppId;
+
+  if (normalizedOrganizationId.length > 0) {
+    state.organizationPreferencesById ??= {};
+    state.organizationPreferencesById[normalizedOrganizationId] = {
+      selectedProjectId: nextBaseState.selectedProjectId,
+      selectedWorkspaceId: nextBaseState.selectedWorkspaceId,
+      displayProjectIds: nextDisplayProjectIds,
+      lastUsedExternalAppId: orgPreferences?.lastUsedExternalAppId,
+    };
+  }
+
+  const nextWorkspaceIdSet = new Set(workspaces.map((workspace) => workspace.id));
+  state.gitChangesCountByWorkspaceId = filterWorkspaceScopedRecord(
+    { ...(state.gitChangesCountByWorkspaceId ?? {}) },
+    nextWorkspaceIdSet,
+  );
+  state.gitChangeTotalsByWorkspaceId = filterWorkspaceScopedRecord(
+    { ...(state.gitChangeTotalsByWorkspaceId ?? {}) },
+    nextWorkspaceIdSet,
+  );
 }
 
 /** Normalizes create-repo input and returns empty strings when invalid. */
@@ -243,8 +250,8 @@ export function normalizeCreateRepoInput(input: {
   };
 }
 
-/** Builds optimistic local state for a newly created repo. */
-export function buildCreatedRepoState(
+/** Applies optimistic local state for a newly created repo. */
+export function applyCreatedRepoState(
   state: ProjectStoreSlice,
   input: {
     name: string;
@@ -254,8 +261,7 @@ export function buildCreatedRepoState(
     resolvedPath: string;
     backendProject: WorkspaceProjectRecord;
   },
-): Partial<ProjectStoreSlice> {
-  const currentProjects = state.projects;
+): void {
   const currentDisplayProjectIds = state.displayProjectIds;
   const nextRepoId = input.backendProject.id;
   const repoPath = (input.backendProject.localPath ?? input.resolvedPath).trim();
@@ -282,71 +288,58 @@ export function buildCreatedRepoState(
     updatedAt: new Date().toISOString(),
     createdByUserId: "",
   } satisfies WorkspaceProjectRecord;
-  return {
-    projects: [...currentProjects, nextProject],
-    workspaces: state.workspaces,
-    displayProjectIds: [...currentDisplayProjectIds, nextRepoId],
-    selectedProjectId: nextRepoId,
-    selectedWorkspaceId: "",
-  };
+
+  state.projects.push(nextProject);
+  state.displayProjectIds = [...currentDisplayProjectIds, nextRepoId];
+  state.selectedProjectId = nextRepoId;
+  state.selectedWorkspaceId = "";
 }
 
 /** Removes a repo and all workspace-scoped UI state derived from that repo. */
-export function buildDeletedRepoState(state: ProjectStoreSlice, repoId: string): Partial<ProjectStoreSlice> {
-  const currentDisplayProjectIds = state.displayProjectIds;
-  const nextProjects = state.projects.filter((project) => project.id !== repoId);
+export function applyDeletedRepoState(state: ProjectStoreSlice, repoId: string): void {
+  state.projects = state.projects.filter((project) => project.id !== repoId);
   const deletedWorkspaceIdSet = new Set(
     state.workspaces
       .filter((workspace) => (workspace.projectId ?? workspace.repoId) === repoId)
       .map((workspace) => workspace.id),
   );
-  const nextWorkspaces = state.workspaces.filter((workspace) => (workspace.projectId ?? workspace.repoId) !== repoId);
-  const nextGitChangesCountByWorkspaceId = { ...state.gitChangesCountByWorkspaceId };
-  const nextGitChangeTotalsByWorkspaceId = { ...state.gitChangeTotalsByWorkspaceId };
+  state.workspaces = state.workspaces.filter((workspace) => (workspace.projectId ?? workspace.repoId) !== repoId);
+  state.displayProjectIds = state.displayProjectIds.filter((id) => id !== repoId);
+
   for (const workspaceId of deletedWorkspaceIdSet) {
-    delete nextGitChangesCountByWorkspaceId[workspaceId];
-    delete nextGitChangeTotalsByWorkspaceId[workspaceId];
+    delete state.gitChangesCountByWorkspaceId[workspaceId];
+    delete state.gitChangeTotalsByWorkspaceId[workspaceId];
   }
 
-  const nextSelectedProjectId =
-    state.selectedProjectId === repoId ? (nextProjects[0]?.id ?? "") : state.selectedProjectId;
-  const nextSelectedWorkspaceId = nextWorkspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)
-    ? state.selectedWorkspaceId
-    : (nextWorkspaces.find((workspace) => (workspace.projectId ?? workspace.repoId) === nextSelectedProjectId)?.id ??
-      nextWorkspaces[0]?.id ??
-      "");
+  if (state.selectedProjectId === repoId) {
+    state.selectedProjectId = state.projects[0]?.id ?? "";
+  }
 
-  return {
-    projects: nextProjects,
-    workspaces: nextWorkspaces,
-    displayProjectIds: currentDisplayProjectIds.filter((id) => id !== repoId),
-    selectedProjectId: nextSelectedProjectId,
-    selectedWorkspaceId: nextSelectedWorkspaceId,
-    gitChangesCountByWorkspaceId: nextGitChangesCountByWorkspaceId,
-    gitChangeTotalsByWorkspaceId: nextGitChangeTotalsByWorkspaceId,
-  };
+  if (!state.workspaces.some((workspace) => workspace.id === state.selectedWorkspaceId)) {
+    const nextSelectedWorkspaceId =
+      state.workspaces.find((workspace) => (workspace.projectId ?? workspace.repoId) === state.selectedProjectId)?.id ??
+      state.workspaces[0]?.id ??
+      "";
+    state.selectedWorkspaceId = nextSelectedWorkspaceId;
+  }
 }
 
 /** Applies repo config updates to local state after save attempts. */
-export function buildUpdatedRepoConfigState(
+export function applyUpdatedRepoConfigState(
   state: Pick<WorkspaceStoreState, "projects">,
   repoId: string,
   config: RepoConfigUpdate,
-): Pick<WorkspaceStoreState, "projects"> {
-  return {
-    projects: state.projects.map((project) =>
-      project.id === repoId
-        ? {
-            ...project,
-            name: config.name,
-            worktreePath: config.worktreePath ?? project.worktreePath,
-            contextEnabled: config.contextEnabled ?? project.contextEnabled,
-            icon: config.icon,
-            color: config.color,
-            setupScript: config.setupScript,
-            postScript: config.postScript,
-          }
-        : project,
-    ),
-  };
+): void {
+  const project = state.projects.find((project) => project.id === repoId);
+  if (!project) {
+    return;
+  }
+
+  project.name = config.name;
+  project.worktreePath = config.worktreePath ?? project.worktreePath;
+  project.contextEnabled = config.contextEnabled ?? project.contextEnabled;
+  project.icon = config.icon ?? project.icon;
+  project.color = config.color ?? project.color;
+  project.setupScript = config.setupScript ?? project.setupScript;
+  project.postScript = config.postScript ?? project.postScript;
 }

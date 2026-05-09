@@ -30,8 +30,8 @@ export function normalizeCreateWorkspaceInput(input: {
   };
 }
 
-/** Builds local state for a newly created workspace without adding implicit tabs. */
-export function buildCreatedWorkspaceState(
+/** Applies a newly created workspace to the draft state and updates selection. */
+export function applyCreatedWorkspaceState(
   state: WorkspaceStoreSlice,
   input: {
     projectId: string;
@@ -47,7 +47,7 @@ export function buildCreatedWorkspaceState(
       worktreePath: string;
     };
   },
-): Partial<WorkspaceStoreSlice> {
+): void {
   const nextWorkspaceId = input.backendWorkspace.workspaceId;
   const nextWorkspace = {
     id: nextWorkspaceId,
@@ -62,97 +62,66 @@ export function buildCreatedWorkspaceState(
     worktreePath: input.backendWorkspace.worktreePath,
   };
   const existingWorkspaceIndex = state.workspaces.findIndex((workspace) => workspace.id === nextWorkspaceId);
-  const nextWorkspaces =
-    existingWorkspaceIndex >= 0
-      ? state.workspaces.map((workspace, index) =>
-          index === existingWorkspaceIndex
-            ? {
-                ...workspace,
-                ...nextWorkspace,
-              }
-            : workspace,
-        )
-      : [...state.workspaces, nextWorkspace];
+  if (existingWorkspaceIndex >= 0) {
+    Object.assign(state.workspaces[existingWorkspaceIndex], nextWorkspace);
+  } else {
+    state.workspaces.push(nextWorkspace);
+  }
 
-  return {
-    workspaces: nextWorkspaces,
-    selectedProjectId: input.projectId,
-    selectedWorkspaceId: nextWorkspaceId,
-  };
+  state.selectedProjectId = input.projectId;
+  state.selectedWorkspaceId = nextWorkspaceId;
 }
 
-/** Removes one workspace and recalculates selection and tab state. */
-export function buildDeletedWorkspaceState(
+/** Removes one workspace from draft state and recalculates selection. */
+export function applyDeletedWorkspaceState(
   state: WorkspaceStoreSlice,
   input: { projectId: string; workspaceId: string },
-): Partial<WorkspaceStoreSlice> {
-  const nextWorkspaces = state.workspaces.filter((workspace) => workspace.id !== input.workspaceId);
-  const nextGitChangesCountByWorkspaceId = {
-    ...state.gitChangesCountByWorkspaceId,
-  };
-  const nextGitChangeTotalsByWorkspaceId = {
-    ...state.gitChangeTotalsByWorkspaceId,
-  };
-  delete nextGitChangesCountByWorkspaceId[input.workspaceId];
-  delete nextGitChangeTotalsByWorkspaceId[input.workspaceId];
+): void {
+  const removedIndex = state.workspaces.findIndex((workspace) => workspace.id === input.workspaceId);
+  if (removedIndex >= 0) {
+    state.workspaces.splice(removedIndex, 1);
+  }
 
-  const nextSelectedProjectId = state.projects.some((project) => project.id === state.selectedProjectId)
-    ? state.selectedProjectId
-    : (state.projects[0]?.id ?? "");
+  delete state.gitChangesCountByWorkspaceId[input.workspaceId];
+  delete state.gitChangeTotalsByWorkspaceId[input.workspaceId];
 
-  const nextSelectedWorkspaceId =
-    state.selectedWorkspaceId === input.workspaceId
-      ? (nextWorkspaces.find((workspace) => resolveWorkspaceProjectId(workspace) === input.projectId)?.id ??
-        nextWorkspaces[0]?.id ??
-        "")
-      : state.selectedWorkspaceId;
+  if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
+    state.selectedProjectId = state.projects[0]?.id ?? "";
+  }
 
-  return {
-    workspaces: nextWorkspaces,
-    selectedProjectId: nextSelectedProjectId,
-    selectedWorkspaceId: nextSelectedWorkspaceId,
-    gitChangesCountByWorkspaceId: nextGitChangesCountByWorkspaceId,
-    gitChangeTotalsByWorkspaceId: nextGitChangeTotalsByWorkspaceId,
-  };
+  if (state.selectedWorkspaceId === input.workspaceId) {
+    state.selectedWorkspaceId =
+      state.workspaces.find((workspace) => resolveWorkspaceProjectId(workspace) === input.projectId)?.id ??
+      state.workspaces[0]?.id ??
+      "";
+  }
 }
 
-/** Applies a workspace rename when repo and workspace ids both match. */
-export function buildRenamedWorkspaceState(
+/** Applies a workspace rename to the matching workspace in draft state. */
+export function applyRenamedWorkspaceState(
   state: Pick<WorkspaceStoreState, "workspaces">,
   input: { projectId: string; workspaceId: string; normalizedName: string },
-): Pick<WorkspaceStoreState, "workspaces"> {
-  return {
-    workspaces: state.workspaces.map((workspace) => {
-      if (workspace.id !== input.workspaceId || resolveWorkspaceProjectId(workspace) !== input.projectId) {
-        return workspace;
-      }
-
-      return {
-        ...workspace,
-        name: input.normalizedName,
-        title: input.normalizedName,
-      };
-    }),
-  };
+): void {
+  const workspace = state.workspaces.find(
+    (workspace) => workspace.id === input.workspaceId && resolveWorkspaceProjectId(workspace) === input.projectId,
+  );
+  if (workspace) {
+    workspace.name = input.normalizedName;
+    workspace.title = input.normalizedName;
+  }
 }
 
-/** Applies a workspace branch rename when repo and workspace ids both match. */
-export function buildRenamedWorkspaceBranchState(
+/** Applies a workspace branch rename to the matching workspace in draft state. */
+export function applyRenamedWorkspaceBranchState(
   state: Pick<WorkspaceStoreState, "workspaces">,
   input: { projectId: string; workspaceId: string; normalizedBranch: string },
-): Pick<WorkspaceStoreState, "workspaces"> {
-  return {
-    workspaces: state.workspaces.map((workspace) => {
-      if (workspace.id !== input.workspaceId || resolveWorkspaceProjectId(workspace) !== input.projectId) {
-        return workspace;
-      }
-
-      return {
-        ...workspace,
-        branch: input.normalizedBranch,
-      };
-    }),
-  };
+): void {
+  const workspace = state.workspaces.find(
+    (workspace) => workspace.id === input.workspaceId && resolveWorkspaceProjectId(workspace) === input.projectId,
+  );
+  if (workspace) {
+    workspace.branch = input.normalizedBranch;
+  }
 }
 
 /** Counts changed files from staged, unstaged, and untracked groups. */

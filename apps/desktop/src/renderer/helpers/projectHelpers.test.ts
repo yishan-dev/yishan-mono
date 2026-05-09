@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildHydratedStateFromApiData,
+  applyHydratedStateFromApiData,
   normalizeCreateRepoInput,
   readPersistedWorkspacePreferencesByOrg,
 } from "./projectHelpers";
@@ -78,7 +78,7 @@ describe("projectHelpers", () => {
       },
     };
 
-    const hydrated = buildHydratedStateFromApiData(
+    applyHydratedStateFromApiData(
       initialState,
       "org-1",
       [
@@ -103,7 +103,7 @@ describe("projectHelpers", () => {
       [],
     );
 
-    expect(hydrated.displayProjectIds).toEqual(["repo-1"]);
+    expect(initialState.displayProjectIds).toEqual(["repo-1"]);
   });
 
   it("defaults to all projects when persisted display ids are empty", () => {
@@ -122,7 +122,7 @@ describe("projectHelpers", () => {
       },
     };
 
-    const hydrated = buildHydratedStateFromApiData(
+    applyHydratedStateFromApiData(
       initialState,
       "org-1",
       [
@@ -147,7 +147,7 @@ describe("projectHelpers", () => {
       [],
     );
 
-    expect(hydrated.displayProjectIds).toEqual(["repo-1"]);
+    expect(initialState.displayProjectIds).toEqual(["repo-1"]);
   });
 
   it("keeps empty display ids when no projects exist", () => {
@@ -166,9 +166,9 @@ describe("projectHelpers", () => {
       },
     };
 
-    const hydrated = buildHydratedStateFromApiData(initialState, "org-1", [], []);
+    applyHydratedStateFromApiData(initialState, "org-1", [], []);
 
-    expect(hydrated.displayProjectIds).toEqual([]);
+    expect(initialState.displayProjectIds).toEqual([]);
   });
 
   it("maps primary workspace display names to local", () => {
@@ -183,7 +183,7 @@ describe("projectHelpers", () => {
       organizationPreferencesById: {},
     };
 
-    const hydrated = buildHydratedStateFromApiData(
+    applyHydratedStateFromApiData(
       initialState,
       "org-1",
       [
@@ -223,7 +223,7 @@ describe("projectHelpers", () => {
       ],
     );
 
-    expect(hydrated.workspaces?.[0]).toEqual(
+    expect(initialState.workspaces?.[0]).toEqual(
       expect.objectContaining({
         id: "workspace-1",
         name: "local",

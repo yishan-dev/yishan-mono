@@ -1,8 +1,8 @@
 import {
-  buildCreatedRepoState,
-  buildDeletedRepoState,
-  buildHydratedStateFromApiData,
-  buildUpdatedRepoConfigState,
+  applyCreatedRepoState,
+  applyDeletedRepoState,
+  applyHydratedStateFromApiData,
+  applyUpdatedRepoConfigState,
   normalizeCreateRepoInput,
 } from "../helpers/projectHelpers";
 import { sessionStore } from "./sessionStore";
@@ -50,7 +50,7 @@ export function createWorkspaceRepoActions(
     const organizationId = sessionStore.getState().selectedOrganizationId?.trim() ?? "";
 
     set((state) => {
-      const nextPartial = buildCreatedRepoState(state, {
+      applyCreatedRepoState(state, {
         name,
         source,
         normalizedPath,
@@ -59,36 +59,22 @@ export function createWorkspaceRepoActions(
         backendProject,
       });
 
-      // Ensure newly-created projects persist selection + display preferences.
-      // Existing selection flows call `setSelectedProjectId` / `setDisplayProjectIds`,
-      // but createProject previously bypassed organization-scoped preferences.
+      // Persist selection + display preferences into organization-scoped storage.
       if (organizationId) {
-        const nextSelectedProjectId = nextPartial.selectedProjectId ?? state.selectedProjectId;
-        const nextSelectedWorkspaceId = nextPartial.selectedWorkspaceId ?? state.selectedWorkspaceId;
-        const nextDisplayProjectIds = nextPartial.displayProjectIds ?? state.displayProjectIds;
-
-        return {
-          ...nextPartial,
-          organizationPreferencesById: {
-            ...(state.organizationPreferencesById ?? {}),
-            [organizationId]: {
-              ...(state.organizationPreferencesById?.[organizationId] ?? {}),
-              selectedProjectId: nextSelectedProjectId,
-              selectedWorkspaceId: nextSelectedWorkspaceId,
-              displayProjectIds: nextDisplayProjectIds,
-            },
-          },
-        };
+        state.organizationPreferencesById ??= {};
+        state.organizationPreferencesById[organizationId] ??= {};
+        const orgPrefs = state.organizationPreferencesById[organizationId];
+        orgPrefs.selectedProjectId = state.selectedProjectId;
+        orgPrefs.selectedWorkspaceId = state.selectedWorkspaceId;
+        orgPrefs.displayProjectIds = state.displayProjectIds;
       }
-
-      return nextPartial;
     });
   };
 
   return {
     load: (organizationId, projects, workspaces) => {
       set((state) => {
-        Object.assign(state, buildHydratedStateFromApiData(state, organizationId, projects, workspaces));
+        applyHydratedStateFromApiData(state, organizationId, projects, workspaces);
       });
     },
     createProject,
@@ -97,10 +83,14 @@ export function createWorkspaceRepoActions(
         return;
       }
 
-      set((state) => buildDeletedRepoState(state, projectId));
+      set((state) => {
+        applyDeletedRepoState(state, projectId);
+      });
     },
     updateProjectConfig: (projectId, config) => {
-      set((state) => buildUpdatedRepoConfigState(state, projectId, config));
+      set((state) => {
+        applyUpdatedRepoConfigState(state, projectId, config);
+      });
     },
     incrementFileTreeRefreshVersion: (workspaceWorktreePath, changedRelativePaths) => {
       const normalizedWorkspaceWorktreePath = workspaceWorktreePath?.trim() ?? "";

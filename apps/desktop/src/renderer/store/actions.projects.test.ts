@@ -43,7 +43,7 @@ type TestState = {
   gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
 };
 
-/** Creates a minimal state harness for pure repo store actions. */
+/** Creates a minimal state harness for repo store actions with immer-style mutation. */
 function createHarness(overrides?: Partial<TestState>) {
   let state: TestState = {
     organizationPreferencesById: {
@@ -121,12 +121,12 @@ function createHarness(overrides?: Partial<TestState>) {
     ...overrides,
   };
 
-  const set = ((updater: Partial<TestState> | ((current: TestState) => Partial<TestState> | TestState)) => {
-    const partial = typeof updater === "function" ? updater(state) : updater;
-    state = {
-      ...state,
-      ...partial,
-    };
+  const set = ((updater: ((current: TestState) => void) | Partial<TestState>) => {
+    if (typeof updater === "function") {
+      updater(state);
+    } else {
+      Object.assign(state, updater);
+    }
   }) as Parameters<typeof createWorkspaceRepoActions>[0];
 
   const get = (() => state) as unknown as Parameters<typeof createWorkspaceRepoActions>[1];
