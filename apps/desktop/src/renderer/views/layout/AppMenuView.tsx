@@ -353,7 +353,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                   startIcon={<LuKeyboard size={14} />}
                   sx={menuItemButtonSx}
                   onClick={() => {
-                    navigate("/keybindings");
+                    navigate("/settings?tab=keybindings");
                     setMenuAnchor(null);
                   }}
                 >

@@ -44,6 +44,10 @@ vi.mock("./settings/GitWorkspaceSettingsView", () => ({
   GitWorkspaceSettingsView: () => <div data-testid="git-workspace-settings-panel" />,
 }));
 
+vi.mock("./settings/KeybindingsSettingsView", () => ({
+  KeybindingsSettingsView: () => <div data-testid="keybindings-settings-panel" />,
+}));
+
 describe("SettingsView", () => {
   afterEach(() => {
     window.localStorage.removeItem(LAYOUT_STORE_STORAGE_KEY);
@@ -342,5 +346,19 @@ describe("SettingsView", () => {
     fireEvent.click(screen.getByRole("button", { name: /settings\.agents\.items\.codex/ }));
 
     expect(screen.getByTestId("agent-settings-panel")).toBeTruthy();
+  });
+
+  it("renders keybindings panel when keybindings tab is selected", () => {
+    render(
+      <AppThemePreferenceProvider>
+        <MemoryRouter initialEntries={["/settings?tab=keybindings"]}>
+          <Routes>
+            <Route path="/settings" element={<SettingsView />} />
+          </Routes>
+        </MemoryRouter>
+      </AppThemePreferenceProvider>,
+    );
+
+    expect(screen.getByTestId("keybindings-settings-panel")).toBeTruthy();
   });
 });
