@@ -266,6 +266,38 @@ func (m *Manager) Stop(req StopRequest) (StopResponse, error) {
 	return StopResponse{Stopped: true}, nil
 }
 
+func (m *Manager) StopAllForWorkspace(workspaceID string) []error {
+	m.mu.RLock()
+	var targets []*session
+	for _, s := range m.sessions {
+		if s.workspaceID == workspaceID {
+			targets = append(targets, s)
+		}
+	}
+	m.mu.RUnlock()
+
+	var errs []error
+	for _, s := range targets {
+		if s.running.Load() {
+			if err := stopListeningProcessesForSession(s); err != nil {
+				errs = append(errs, fmt.Errorf("session %s: cleanup port-listening processes: %w", s.id, err))
+			}
+			if err := stopProcess(s.cmd); err != nil {
+				errs = append(errs, fmt.Errorf("session %s: stop process: %w", s.id, err))
+			}
+			s.running.Store(false)
+		}
+		_ = s.pty.Close()
+		s.closeSubscribers()
+
+		m.mu.Lock()
+		delete(m.sessions, s.id)
+		m.mu.Unlock()
+	}
+
+	return errs
+}
+
 func (m *Manager) KillProcess(req KillProcessRequest) (KillProcessResponse, error) {
 	if req.PID <= 0 {
 		return KillProcessResponse{}, NewRPCError(-32602, "pid is required")

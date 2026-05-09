@@ -90,7 +90,8 @@ func (m *Manager) List() []Workspace {
 // CloseResult captures the outcome of a workspace close operation, including
 // any post-hook execution result.
 type CloseResult struct {
-	PostHookResult *HookResult `json:"postHookResult,omitempty"`
+	PostHookResult        *HookResult `json:"postHookResult,omitempty"`
+	TerminalCleanupErrors []string    `json:"terminalCleanupErrors,omitempty"`
 }
 
 func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) (CloseResult, error) {
@@ -100,6 +101,15 @@ func (m *Manager) CloseWorkspace(ctx context.Context, req CloseRequest) (CloseRe
 	}
 
 	var result CloseResult
+
+	cleanupErrors := m.terminals.StopAllForWorkspace(req.WorkspaceID)
+	if len(cleanupErrors) > 0 {
+		messages := make([]string, len(cleanupErrors))
+		for i, e := range cleanupErrors {
+			messages[i] = e.Error()
+		}
+		result.TerminalCleanupErrors = messages
+	}
 
 	// Run the post hook before tearing down the workspace so the hook can
 	// still access workspace files and git state. Hook failures are
