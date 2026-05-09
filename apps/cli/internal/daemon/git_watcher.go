@@ -23,6 +23,7 @@ type worktreeWatcher struct {
 	contextDir     string // resolved absolute path of the context symlink target (empty if none)
 	resolvedGitDir string // actual git directory (may differ from .git when using git worktrees)
 	fw             *fsnotify.Watcher
+	watchedDirs    map[string]bool
 	events         *eventHub
 	fileTimer      *time.Timer
 	gitTimer       *time.Timer
@@ -31,9 +32,9 @@ type worktreeWatcher struct {
 }
 
 type workspaceWatchers struct {
-	mu       sync.Mutex
-	entries  map[string]*worktreeWatcher
-	events   *eventHub
+	mu      sync.Mutex
+	entries map[string]*worktreeWatcher
+	events  *eventHub
 }
 
 func newWorkspaceWatchers(events *eventHub) *workspaceWatchers {
@@ -108,12 +109,13 @@ func (ws *workspaceWatchers) Watch(worktreePath string) {
 		path:           worktreePath,
 		resolvedGitDir: resolvedGitDir,
 		fw:             fw,
+		watchedDirs:    make(map[string]bool),
 		events:         ws.events,
 		done:           make(chan struct{}),
 	}
 
-	if err := fw.Add(worktreePath); err != nil {
-		log.Debug().Err(err).Str("target", worktreePath).Msg("failed to watch worktree root")
+	if err := entry.addWorkspaceRecursive(worktreePath); err != nil {
+		log.Debug().Err(err).Str("target", worktreePath).Msg("failed to recursively watch workspace")
 	}
 
 	gitTargets := []string{
@@ -192,6 +194,19 @@ func (w *worktreeWatcher) consume() {
 			if !ok {
 				return
 			}
+
+			if event.Has(fsnotify.Create) {
+				if fi, err := os.Stat(event.Name); err == nil && fi.IsDir() && w.shouldWatchWorkspaceDir(event.Name) {
+					if err := w.addWorkspaceRecursive(event.Name); err != nil {
+						log.Debug().Err(err).Str("target", event.Name).Msg("failed to watch newly created directory")
+					}
+				}
+			}
+
+			if event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename) {
+				w.removeWorkspaceWatchesForPath(event.Name)
+			}
+
 			// Classify as a git event if the changed path is inside the .git
 			// entry (standard repos) or inside the resolved git directory
 			// (git worktrees where .git is a file pointing elsewhere).
@@ -221,6 +236,103 @@ func (w *worktreeWatcher) consume() {
 		case <-w.fw.Errors:
 		}
 	}
+}
+
+func (w *worktreeWatcher) addWorkspaceRecursive(root string) error {
+	if !w.shouldWatchWorkspaceDir(root) {
+		return nil
+	}
+
+	if err := w.addSingleWorkspaceWatch(root); err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		if path != root && !w.shouldWatchWorkspaceDir(path) {
+			return filepath.SkipDir
+		}
+		if path == root {
+			return nil
+		}
+		if err := w.addSingleWorkspaceWatch(path); err != nil {
+			log.Debug().Err(err).Str("target", path).Msg("failed to add workspace directory watch")
+		}
+		return nil
+	})
+}
+
+func (w *worktreeWatcher) addSingleWorkspaceWatch(path string) error {
+	w.mu.Lock()
+	if w.watchedDirs[path] {
+		w.mu.Unlock()
+		return nil
+	}
+	w.mu.Unlock()
+
+	if err := w.fw.Add(path); err != nil {
+		return err
+	}
+
+	w.mu.Lock()
+	w.watchedDirs[path] = true
+	w.mu.Unlock()
+
+	return nil
+}
+
+func (w *worktreeWatcher) removeWorkspaceWatchesForPath(path string) {
+	prefix := path + string(filepath.Separator)
+
+	w.mu.Lock()
+	toRemove := make([]string, 0)
+	for watched := range w.watchedDirs {
+		if watched == path || strings.HasPrefix(watched, prefix) {
+			toRemove = append(toRemove, watched)
+		}
+	}
+	w.mu.Unlock()
+
+	for _, watched := range toRemove {
+		_ = w.fw.Remove(watched)
+		w.mu.Lock()
+		delete(w.watchedDirs, watched)
+		w.mu.Unlock()
+	}
+}
+
+func (w *worktreeWatcher) shouldWatchWorkspaceDir(path string) bool {
+	rel, err := filepath.Rel(w.path, path)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+
+	rel = filepath.Clean(rel)
+	parts := strings.Split(rel, string(filepath.Separator))
+	for i, part := range parts {
+		switch part {
+		case ".git":
+			if i == 0 {
+				return false
+			}
+		case "node_modules", "dist", "build":
+			return false
+		case "objects":
+			if i > 0 && parts[i-1] == ".git" {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (w *worktreeWatcher) scheduleFileEmit(relPath string) {
