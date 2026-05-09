@@ -16,6 +16,14 @@ type TestState = {
     setupScript?: string;
     postScript?: string;
   }>;
+  organizationPreferencesById?: Record<
+    string,
+    {
+      selectedProjectId?: string;
+      selectedWorkspaceId?: string;
+      displayProjectIds?: string[];
+    }
+  >;
   workspaces: Array<{
     id: string;
     repoId: string;
@@ -38,6 +46,13 @@ type TestState = {
 /** Creates a minimal state harness for pure repo store actions. */
 function createHarness(overrides?: Partial<TestState>) {
   let state: TestState = {
+    organizationPreferencesById: {
+      "org-1": {
+        selectedProjectId: "repo-1",
+        selectedWorkspaceId: "workspace-1",
+        displayProjectIds: ["repo-1", "repo-2"],
+      },
+    },
     projects: [
       {
         id: "repo-1",
@@ -124,6 +139,52 @@ function createHarness(overrides?: Partial<TestState>) {
 }
 
 describe("createWorkspaceRepoActions", () => {
+  it("persists organization-scoped selection + display filter when creating a new project", async () => {
+    const { actions, getState } = createHarness({
+      projects: [],
+      workspaces: [],
+      displayProjectIds: [],
+      organizationPreferencesById: { "org-1": {} },
+    });
+
+    const { sessionStore } = await import("./sessionStore");
+    sessionStore.setState({ selectedOrganizationId: "org-1" });
+
+    actions.createProject({
+      name: "Repo 1",
+      source: "local",
+      path: "/tmp/repo-1",
+      backendProject: {
+        id: "repo-1",
+        name: "Repo 1",
+        key: "repo-1",
+        repoKey: "repo-1",
+        localPath: "/tmp/repo-1",
+        worktreePath: "/tmp/repo-1",
+        gitUrl: "",
+        repoUrl: null,
+        contextEnabled: true,
+        sourceType: "git-local",
+        repoProvider: null,
+        icon: "folder",
+        color: "#1E66F5",
+        setupScript: "",
+        postScript: "",
+        defaultBranch: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        createdByUserId: "user-1",
+      },
+    });
+
+    const state = getState();
+    expect(state.organizationPreferencesById?.["org-1"]).toEqual({
+      selectedProjectId: "repo-1",
+      selectedWorkspaceId: "",
+      displayProjectIds: ["repo-1"],
+    });
+  });
+
   it("deletes one project and all child workspace state", () => {
     const harness = createHarness();
     harness.actions.deleteProject("repo-1");

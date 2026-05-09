@@ -5,6 +5,7 @@ import {
   buildUpdatedRepoConfigState,
   normalizeCreateRepoInput,
 } from "../helpers/projectHelpers";
+import { sessionStore } from "./sessionStore";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";
 
 type WorkspaceRepoActions = Pick<
@@ -46,16 +47,42 @@ export function createWorkspaceRepoActions(
       return;
     }
 
-    set((state) =>
-      buildCreatedRepoState(state, {
+    const organizationId = sessionStore.getState().selectedOrganizationId?.trim() ?? "";
+
+    set((state) => {
+      const nextPartial = buildCreatedRepoState(state, {
         name,
         source,
         normalizedPath,
         normalizedGitUrl,
         resolvedPath,
         backendProject,
-      }),
-    );
+      });
+
+      // Ensure newly-created projects persist selection + display preferences.
+      // Existing selection flows call `setSelectedProjectId` / `setDisplayProjectIds`,
+      // but createProject previously bypassed organization-scoped preferences.
+      if (organizationId) {
+        const nextSelectedProjectId = nextPartial.selectedProjectId ?? state.selectedProjectId;
+        const nextSelectedWorkspaceId = nextPartial.selectedWorkspaceId ?? state.selectedWorkspaceId;
+        const nextDisplayProjectIds = nextPartial.displayProjectIds ?? state.displayProjectIds;
+
+        return {
+          ...nextPartial,
+          organizationPreferencesById: {
+            ...(state.organizationPreferencesById ?? {}),
+            [organizationId]: {
+              ...(state.organizationPreferencesById?.[organizationId] ?? {}),
+              selectedProjectId: nextSelectedProjectId,
+              selectedWorkspaceId: nextSelectedWorkspaceId,
+              displayProjectIds: nextDisplayProjectIds,
+            },
+          },
+        };
+      }
+
+      return nextPartial;
+    });
   };
 
   return {
