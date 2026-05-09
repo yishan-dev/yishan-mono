@@ -101,11 +101,11 @@ describe("loadTerminalAddons", () => {
     loadTerminalAddons(terminal, logger);
 
     const preventDefault = vi.fn();
-    mocks.webLinksOpenHandler?.({ preventDefault } as unknown as MouseEvent, "https://yishan.dev/docs");
+    mocks.webLinksOpenHandler?.({ preventDefault } as unknown as MouseEvent, "https://yishan.io/docs");
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledWith("https://yishan.dev/docs");
+      expect(mocks.openExternalUrl).toHaveBeenCalledWith("https://yishan.io/docs");
     });
     expect(logger.warn).not.toHaveBeenCalled();
     expect(windowOpen).not.toHaveBeenCalled();

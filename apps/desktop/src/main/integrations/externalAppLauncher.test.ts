@@ -141,9 +141,9 @@ describe("launchPath", () => {
   it("opens valid external URLs through Electron shell", async () => {
     resetMocks();
 
-    const result = await openExternalUrl("https://yishan.dev/docs");
+    const result = await openExternalUrl("https://yishan.io/docs");
 
-    expect(mocks.shellOpenExternal).toHaveBeenCalledWith("https://yishan.dev/docs");
+    expect(mocks.shellOpenExternal).toHaveBeenCalledWith("https://yishan.io/docs");
     expect(result).toEqual({ opened: true });
   });
 
@@ -169,9 +169,9 @@ describe("launchPath", () => {
     resetMocks();
     mocks.shellOpenExternal.mockRejectedValueOnce(new Error("boom"));
 
-    const result = await openExternalUrl("https://yishan.dev/docs");
+    const result = await openExternalUrl("https://yishan.io/docs");
 
-    expect(mocks.shellOpenExternal).toHaveBeenCalledWith("https://yishan.dev/docs");
+    expect(mocks.shellOpenExternal).toHaveBeenCalledWith("https://yishan.io/docs");
     expect(result).toEqual({ opened: false, reason: "open-failed" });
   });
 });

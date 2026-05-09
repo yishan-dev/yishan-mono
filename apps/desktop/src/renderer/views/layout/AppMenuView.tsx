@@ -381,7 +381,7 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
                   startIcon={<LuMail size={14} />}
                   sx={menuItemButtonSx}
                   onClick={() => {
-                    handleOpenExternalUrl("mailto:support@yishan.dev");
+                    handleOpenExternalUrl("mailto:support@yishan.io");
                   }}
                 >
                   {t("org.menu.contactUs")}

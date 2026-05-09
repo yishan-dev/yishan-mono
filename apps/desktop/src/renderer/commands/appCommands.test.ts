@@ -58,7 +58,7 @@ describe("appCommands", () => {
     await ensureAgentGlobalConfigExternalDirectoryPermission({ agentKind: "claude" });
     await toggleMainWindowMaximized();
     await getMainWindowFullscreenState();
-    await openExternalUrl("https://yishan.dev/docs");
+    await openExternalUrl("https://yishan.io/docs");
     await getAuthStatus();
     await getDaemonInfo();
     await login();
@@ -69,7 +69,7 @@ describe("appCommands", () => {
     expect(mocks.ensureAgentGlobalConfigExternalDirectoryPermission).toHaveBeenCalledWith({ agentKind: "claude" });
     expect(mocks.toggleMainWindowMaximized).toHaveBeenCalledWith();
     expect(mocks.getMainWindowFullscreenState).toHaveBeenCalledWith();
-    expect(mocks.openExternalUrl).toHaveBeenCalledWith({ url: "https://yishan.dev/docs" });
+    expect(mocks.openExternalUrl).toHaveBeenCalledWith({ url: "https://yishan.io/docs" });
     expect(mocks.getAuthStatus).toHaveBeenCalledWith();
     expect(mocks.getDaemonInfo).toHaveBeenCalledWith();
     expect(mocks.login).toHaveBeenCalledWith();
