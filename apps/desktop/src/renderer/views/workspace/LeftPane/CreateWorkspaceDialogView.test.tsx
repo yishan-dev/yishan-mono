@@ -174,7 +174,9 @@ describe("CreateWorkspaceDialogView", () => {
       throw new Error("Branch select not found");
     }
     fireEvent.mouseDown(branchSelect);
-    fireEvent.click(await screen.findByRole("option", { name: "feature/alpha" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "feature/alpha" }));
+    const openListbox = await screen.findByRole("listbox");
+    fireEvent.keyDown(openListbox, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: /workspace\.actions\.create/ }));
 
     await waitFor(() => {

@@ -341,6 +341,9 @@ export type GitDiffContentResponse = {
 export type GitBranchListResponse = {
   currentBranch: string;
   branches: string[];
+  localBranches?: string[];
+  remoteBranches?: string[];
+  worktreeBranches?: string[];
 };
 
 export type TerminalCreateSessionResponse = {
