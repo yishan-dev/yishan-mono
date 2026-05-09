@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OPEN_CREATE_WORKSPACE_DIALOG_EVENT } from "../../../commands/workspaceCommands";
+import { inspectGitRepository } from "../../../commands/gitCommands";
 import { ProjectListView } from "./ProjectListView";
 
 const mocked = vi.hoisted(() => {
@@ -751,6 +752,96 @@ describe("ProjectListView", () => {
       vi.advanceTimersByTime(121);
     });
     expect(screen.queryByTestId("workspace-info-popper")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("does not show source branch for primary workspace when current branch is not main", async () => {
+    vi.useFakeTimers();
+    vi.mocked(inspectGitRepository).mockResolvedValueOnce({ isGitRepository: true, currentBranch: "feature/live-branch" });
+    mocked.stateRef.current = {
+      ...mocked.stateRef.current,
+      projects: [
+        {
+          id: "repo-1",
+          name: "Repo 1",
+          path: "/tmp/worktrees/workspace-1",
+          missing: false,
+          worktreePath: "/tmp/worktrees/workspace-1",
+          icon: "folder",
+          color: "#111111",
+        },
+      ],
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          name: "Workspace 1",
+          title: "Workspace 1",
+          sourceBranch: "main",
+          branch: "main",
+          summaryId: "summary-1",
+          worktreePath: "/tmp/worktrees/workspace-1",
+        },
+      ],
+      selectedProjectId: "repo-1",
+      selectedWorkspaceId: "workspace-1",
+      displayProjectIds: ["repo-1"],
+    };
+    renderProjectListView();
+
+    fireEvent.mouseEnter(screen.getByTestId("workspace-row-workspace-1"));
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    const infoPopper = screen.getByTestId("workspace-info-popper");
+    expect(infoPopper.textContent).toContain("workspace.info.branch: feature/live-branch");
+    expect(infoPopper.textContent).not.toContain("workspace.info.sourceBranch:");
+    vi.useRealTimers();
+  });
+
+  it("shows source branch fallback for primary workspace on main when source metadata is unavailable", async () => {
+    vi.useFakeTimers();
+    vi.mocked(inspectGitRepository).mockResolvedValueOnce({ isGitRepository: true, currentBranch: "main" });
+    mocked.stateRef.current = {
+      ...mocked.stateRef.current,
+      projects: [
+        {
+          id: "repo-1",
+          name: "Repo 1",
+          path: "/tmp/worktrees/workspace-1",
+          missing: false,
+          worktreePath: "/tmp/worktrees/workspace-1",
+          icon: "folder",
+          color: "#111111",
+        },
+      ],
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          name: "Workspace 1",
+          title: "Workspace 1",
+          sourceBranch: "",
+          branch: "main",
+          summaryId: "summary-1",
+          worktreePath: "/tmp/worktrees/workspace-1",
+        },
+      ],
+      selectedProjectId: "repo-1",
+      selectedWorkspaceId: "workspace-1",
+      displayProjectIds: ["repo-1"],
+    };
+    renderProjectListView();
+
+    fireEvent.mouseEnter(screen.getByTestId("workspace-row-workspace-1"));
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    const infoPopper = screen.getByTestId("workspace-info-popper");
+    expect(infoPopper.textContent).toContain("workspace.info.branch: main");
+    expect(infoPopper.textContent).toContain("workspace.info.sourceBranch: workspace.info.unavailable");
     vi.useRealTimers();
   });
 });
