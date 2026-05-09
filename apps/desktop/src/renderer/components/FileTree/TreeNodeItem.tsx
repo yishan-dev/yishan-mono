@@ -3,7 +3,7 @@ import { TreeItem } from "@mui/x-tree-view";
 import type { DragEvent, KeyboardEvent, MouseEvent, RefObject } from "react";
 import { getFileTreeIcon } from "../fileTreeIcons";
 import { getParentDirectoryPath, sortNodes } from "./treeUtils";
-import type { TreeNode } from "./types";
+import type { FileTreeGitChangeKind, TreeNode } from "./types";
 
 type NodeContextMenuInput = {
   basePath: string;
@@ -13,6 +13,7 @@ type NodeContextMenuInput = {
 
 type TreeNodeItemProps = {
   node: TreeNode;
+  gitChangesByPath: Record<string, FileTreeGitChangeKind>;
   ignoredPathSet: Set<string>;
   loadedDirectoryPathSet: Set<string>;
   expandableDirectoryPathSet: Set<string>;
@@ -29,8 +30,34 @@ type TreeNodeItemProps = {
   onExternalDrop: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
 };
 
-function renderLabel(node: TreeNode, isIgnored: boolean, isExpanded: boolean) {
+function getGitChangeIndicatorMeta(kind: FileTreeGitChangeKind): {
+  textColor: string;
+} {
+  if (kind === "added") {
+    return {
+      textColor: "success.main",
+    };
+  }
+
+  if (kind === "renamed") {
+    return {
+      textColor: "info.main",
+    };
+  }
+
+  return {
+    textColor: "warning.main",
+  };
+}
+
+function renderLabel(
+  node: TreeNode,
+  isIgnored: boolean,
+  isExpanded: boolean,
+  gitChangeKind: FileTreeGitChangeKind | undefined,
+) {
   const icon = getFileTreeIcon(node.path, node.isDirectory || node.children.size > 0, isExpanded);
+  const indicatorMeta = gitChangeKind ? getGitChangeIndicatorMeta(gitChangeKind) : null;
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, whiteSpace: "nowrap" }}>
@@ -38,9 +65,11 @@ function renderLabel(node: TreeNode, isIgnored: boolean, isExpanded: boolean) {
       <Box
         component="span"
         data-ignored={isIgnored ? "true" : "false"}
+        data-git-change-kind={gitChangeKind ?? "none"}
         style={{ userSelect: "none", WebkitUserSelect: "none" }}
         sx={{
-          color: isIgnored ? "text.disabled" : "text.primary",
+          color: isIgnored ? "text.disabled" : indicatorMeta?.textColor ?? "text.primary",
+          fontWeight: indicatorMeta ? 500 : 400,
         }}
       >
         {node.name}
@@ -107,6 +136,7 @@ function EditingLabel({
 /** Renders one file-tree node with rename/edit UI and recursive children. */
 export function TreeNodeItem({
   node,
+  gitChangesByPath,
   ignoredPathSet,
   loadedDirectoryPathSet,
   expandableDirectoryPathSet,
@@ -128,6 +158,7 @@ export function TreeNodeItem({
   const isLoadedDirectory = loadedDirectoryPathSet.has(node.path);
   const isExpandableDirectory = expandableDirectoryPathSet.has(node.path);
   const isExpanded = expandedPathSet.has(node.path);
+  const gitChangeKind = gitChangesByPath[node.path];
 
   if (!isDirectory) {
     const parentPath = getParentDirectoryPath(node.path);
@@ -148,7 +179,7 @@ export function TreeNodeItem({
             />
           ) : (
             <Box onDragOver={onExternalDragOver} onDrop={(event) => onExternalDrop(event, node.path, false)}>
-              {renderLabel(node, isIgnored, false)}
+              {renderLabel(node, isIgnored, false, gitChangeKind)}
             </Box>
           )
         }
@@ -185,7 +216,7 @@ export function TreeNodeItem({
           />
         ) : (
           <Box onDragOver={onExternalDragOver} onDrop={(event) => onExternalDrop(event, node.path, true)}>
-            {renderLabel(node, isIgnored, isExpanded)}
+            {renderLabel(node, isIgnored, isExpanded, gitChangeKind)}
           </Box>
         )
       }
@@ -198,9 +229,10 @@ export function TreeNodeItem({
       ) : null}
       {children.map((child) => (
         <TreeNodeItem
-          key={child.path}
-          node={child}
-          ignoredPathSet={ignoredPathSet}
+            key={child.path}
+            node={child}
+            gitChangesByPath={gitChangesByPath}
+            ignoredPathSet={ignoredPathSet}
           loadedDirectoryPathSet={loadedDirectoryPathSet}
           expandableDirectoryPathSet={expandableDirectoryPathSet}
           expandedPathSet={expandedPathSet}
