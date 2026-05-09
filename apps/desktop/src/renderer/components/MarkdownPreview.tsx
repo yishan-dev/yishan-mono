@@ -1,15 +1,40 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
 import remarkGfm from "remark-gfm";
+import { openExternalUrl } from "../commands/appCommands";
+import { isIssueTrackerUrl } from "../helpers/issueLinks";
+import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
 import { MermaidBlock } from "./MermaidBlock";
 
 type MarkdownPreviewProps = {
   content: string;
 };
+
+async function openMarkdownLink(url: string): Promise<void> {
+  let result: Awaited<ReturnType<typeof openExternalUrl>> | null = null;
+  try {
+    result = await openExternalUrl(url);
+  } catch {
+    result = { opened: false, reason: "open-failed" };
+  }
+
+  if (result.opened) {
+    return;
+  }
+
+  enqueueWorkspaceErrorNotice({
+    title: "Failed to open external issue link",
+    message: "Could not open issue link in external app (" + result.reason + ").",
+  });
+}
+
+function shouldOpenExternally(url: string): boolean {
+  return isIssueTrackerUrl(url);
+}
 
 /** Recursively extracts plain text from React node trees (strings, elements with children, arrays). */
 function extractTextContent(node: React.ReactNode): string {
@@ -270,6 +295,8 @@ function useMarkdownStyles(theme: Theme) {
 export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   const theme = useTheme();
   const styles = useMarkdownStyles(theme);
+  const useExternalIssueLinks = true;
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(
