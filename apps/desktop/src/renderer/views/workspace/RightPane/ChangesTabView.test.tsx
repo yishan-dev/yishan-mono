@@ -347,6 +347,7 @@ describe("ChangesTabView", () => {
         deletions: 0,
         oldContent: "old",
         newContent: "new",
+        diffSource: { kind: "workspace" },
       });
     });
   });
