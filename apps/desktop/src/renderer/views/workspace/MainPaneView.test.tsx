@@ -121,6 +121,14 @@ vi.mock("../../components/FileEditor", () => ({
   ),
 }));
 
+vi.mock("../../components/UnsupportedFileView", () => ({
+  UnsupportedFileView: ({ path, hint }: { path: string; hint?: string }) => (
+    <div data-testid="unsupported-file-view" data-hint={hint ?? ""}>
+      {path}
+    </div>
+  ),
+}));
+
 vi.mock("./LaunchView", () => ({
   LaunchView: () => <div data-testid="launch-view" />,
 }));
@@ -214,6 +222,64 @@ describe("MainPaneView", () => {
 
     expect(screen.getByTestId("tab-bar").textContent).toContain("Chat A");
     expect(screen.getByText("Chat is currently disabled.")).toBeTruthy();
+  });
+
+  it("renders unsupported file view for unsupported file tabs", () => {
+    mocked.stateRef.current = {
+      ...buildStoreState(false),
+      tabs: [
+        {
+          id: "tab-unsupported-1",
+          workspaceId: "workspace-1",
+          title: "main.sqlite",
+          pinned: false,
+          kind: "file",
+          data: {
+            path: "data/main.sqlite",
+            content: "",
+            savedContent: "",
+            isDirty: false,
+            isTemporary: false,
+            isUnsupported: true,
+          },
+        },
+      ],
+      selectedTabId: "tab-unsupported-1",
+    };
+
+    render(<MainPaneView />);
+
+    expect(screen.getByTestId("unsupported-file-view").textContent).toContain("data/main.sqlite");
+    expect(screen.queryByTestId("file-editor-view")).toBeNull();
+  });
+
+  it("renders large-file unsupported hint for large file tabs", () => {
+    mocked.stateRef.current = {
+      ...buildStoreState(false),
+      tabs: [
+        {
+          id: "tab-large-1",
+          workspaceId: "workspace-1",
+          title: "big.log",
+          pinned: false,
+          kind: "file",
+          data: {
+            path: "logs/big.log",
+            content: "",
+            savedContent: "",
+            isDirty: false,
+            isTemporary: false,
+            isUnsupported: true,
+            unsupportedReason: "size",
+          },
+        },
+      ],
+      selectedTabId: "tab-large-1",
+    };
+
+    render(<MainPaneView />);
+
+    expect(screen.getByTestId("unsupported-file-view").getAttribute("data-hint")).toBe("files.unsupported.hintLarge");
   });
 
   it("passes terminal tab id to terminal view", () => {

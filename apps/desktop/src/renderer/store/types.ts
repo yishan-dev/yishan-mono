@@ -83,6 +83,8 @@ export type WorkspaceTabDataByKind = {
     savedContent: string;
     isDirty: boolean;
     isTemporary: boolean;
+    isUnsupported?: boolean;
+    unsupportedReason?: "type" | "size";
     isDeleted?: boolean;
   };
   image: { path: string; dataUrl: string; isTemporary: boolean };
@@ -146,6 +148,8 @@ export type OpenWorkspaceTabInput =
       path: string;
       content?: string;
       temporary?: boolean;
+      isUnsupported?: boolean;
+      unsupportedReason?: "type" | "size";
     }
   | {
       workspaceId?: string;

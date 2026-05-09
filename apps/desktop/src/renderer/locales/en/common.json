@@ -563,6 +563,13 @@
       },
       "progress": "{{mode}} {{processed}} / {{total}}",
       "progressWithPath": "{{mode}} {{processed}} / {{total}} · {{path}}"
+    },
+    "unsupported": {
+      "title": "Unsupported file type",
+      "description": "This file type is not supported for editor tabs yet.",
+      "descriptionLarge": "This file is too large to open safely in an editor tab.",
+      "hint": "Try opening it with an external app.",
+      "hintLarge": "Use an external app or CLI tools to inspect large files."
     }
   },
   "terminal": {

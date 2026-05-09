@@ -163,3 +163,75 @@ export function isImageFile(path: string): boolean {
   const ext = getFileExtension(path);
   return IMAGE_EXTENSIONS.has(ext);
 }
+
+/**
+ * Set of file extensions that should open in an unsupported file view.
+ *
+ * We keep this as a broad binary/non-text extension list so common large/binary
+ * assets do not open as broken text tabs.
+ */
+const UNSUPPORTED_FILE_TAB_EXTENSIONS = new Set([
+  // Databases
+  "sqlite",
+  "sqlite3",
+  "db",
+  "mdb",
+  "accdb",
+  "parquet",
+  "feather",
+  "orc",
+
+  // Archives / packages
+  "zip",
+  "tar",
+  "gz",
+  "tgz",
+  "bz2",
+  "xz",
+  "7z",
+  "rar",
+  "iso",
+  "dmg",
+
+  // Documents / binaries
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+
+  // Compiled / executable
+  "exe",
+  "dll",
+  "so",
+  "dylib",
+  "o",
+  "obj",
+  "a",
+  "lib",
+  "class",
+  "jar",
+  "war",
+  "ear",
+  "wasm",
+
+  // Media (non-image)
+  "mp3",
+  "wav",
+  "flac",
+  "aac",
+  "ogg",
+  "mp4",
+  "mov",
+  "mkv",
+  "webm",
+  "avi",
+]);
+
+/** Returns true when the given file path should open in the unsupported file view. */
+export function isUnsupportedFileTab(path: string): boolean {
+  const ext = getFileExtension(path);
+  return UNSUPPORTED_FILE_TAB_EXTENSIONS.has(ext);
+}

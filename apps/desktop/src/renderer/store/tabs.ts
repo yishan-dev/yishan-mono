@@ -130,6 +130,8 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       savedContent: fileContent,
       isDirty: false,
       isTemporary: Boolean(input.temporary),
+      ...(input.isUnsupported ? { isUnsupported: true } : {}),
+      ...(input.unsupportedReason ? { unsupportedReason: input.unsupportedReason } : {}),
       isDeleted: false,
     } as WorkspaceTabDataByKind[T["kind"]];
   }

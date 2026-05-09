@@ -7,6 +7,7 @@ import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shar
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
 import { ImagePreview } from "../../components/ImagePreview";
+import { UnsupportedFileView } from "../../components/UnsupportedFileView";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
 import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
@@ -337,6 +338,35 @@ export function MainPaneView() {
           }
 
           if (tab.kind === "file") {
+            if (tab.data.isUnsupported) {
+              return (
+                <Box
+                  key={tab.id}
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: isSelected ? "flex" : "none",
+                    flexDirection: "column",
+                  }}
+                >
+                  <UnsupportedFileView
+                    path={tab.data.path}
+                    title={t("files.unsupported.title")}
+                    description={
+                      tab.data.unsupportedReason === "size"
+                        ? t("files.unsupported.descriptionLarge")
+                        : t("files.unsupported.description")
+                    }
+                    hint={
+                      tab.data.unsupportedReason === "size"
+                        ? t("files.unsupported.hintLarge")
+                        : t("files.unsupported.hint")
+                    }
+                  />
+                </Box>
+              );
+            }
+
             return (
               <Box
                 key={tab.id}
