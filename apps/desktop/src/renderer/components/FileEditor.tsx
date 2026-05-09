@@ -154,7 +154,7 @@ export function FileEditor({
   }, [monacoTheme]);
 
   useEffect(() => {
-    editorRef.current?.updateOptions({ readOnly: isDeleted });
+    editorRef.current?.updateOptions?.({ readOnly: isDeleted });
   }, [isDeleted]);
 
   // Focus the editor when requested.
