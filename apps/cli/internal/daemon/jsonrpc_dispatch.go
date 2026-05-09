@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"yishan/apps/cli/internal/api"
+	cliruntime "yishan/apps/cli/internal/runtime"
 	"yishan/apps/cli/internal/workspace"
 )
 
@@ -162,6 +164,20 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			h.events.Unsubscribe(subscriptionID)
 		})
 		return map[string]bool{"subscribed": true}, nil
+	case MethodAppPersistAuthTokens:
+		var req api.TokenUpdate
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		req.AccessToken = strings.TrimSpace(req.AccessToken)
+		req.RefreshToken = strings.TrimSpace(req.RefreshToken)
+		if req.AccessToken == "" {
+			return nil, workspace.NewRPCError(-32602, "accessToken is required")
+		}
+		if err := cliruntime.PersistAuthTokens(req); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"ok": true}, nil
 	case MethodFileRead:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {

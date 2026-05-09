@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -11,6 +13,28 @@ import (
 	"yishan/apps/cli/internal/buildinfo"
 	cliruntime "yishan/apps/cli/internal/runtime"
 )
+
+func isReauthRequiredError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var refreshErr *api.TokenRefreshError
+	if errors.As(err, &refreshErr) {
+		return true
+	}
+
+	var apiErr *api.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusUnauthorized
+	}
+
+	return false
+}
+
+func formatReauthRequiredMessage(operation string) string {
+	return fmt.Sprintf("%s requires an authenticated API session; your refresh token may be expired. Run `yishan login` and retry", operation)
+}
 
 type WorkspaceCreation struct {
 	ID             string
@@ -50,6 +74,9 @@ func createRemoteWorkspace(_ context.Context, creation WorkspaceCreation) error 
 		SourceBranch: creation.SourceBranch,
 	})
 	if err != nil {
+		if isReauthRequiredError(err) {
+			return fmt.Errorf("%s: %w", formatReauthRequiredMessage("remote workspace creation"), err)
+		}
 		return fmt.Errorf("create API workspace for project %q: %w", creation.ProjectID, err)
 	}
 	return nil
@@ -71,6 +98,9 @@ func closeRemoteWorkspace(_ context.Context, closing WorkspaceClose) error {
 		Branch:    closing.Branch,
 	})
 	if err != nil {
+		if isReauthRequiredError(err) {
+			return fmt.Errorf("%s: %w", formatReauthRequiredMessage("remote workspace close"), err)
+		}
 		return fmt.Errorf("close API workspace for project %q: %w", closing.ProjectID, err)
 	}
 	return nil
@@ -109,6 +139,9 @@ func registerRemoteNode(registration NodeRegistration) error {
 		},
 	})
 	if err != nil {
+		if isReauthRequiredError(err) {
+			return fmt.Errorf("%s: %w", formatReauthRequiredMessage("daemon node registration"), err)
+		}
 		return fmt.Errorf("register node %q: %w", registration.ID, err)
 	}
 	return nil

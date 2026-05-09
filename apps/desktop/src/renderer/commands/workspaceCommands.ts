@@ -133,6 +133,10 @@ function notifyWorkspaceCloseFailure(input: { workspaceName?: string; error: unk
   enqueueWorkspaceErrorNotice({ title, message });
 }
 
+function isReauthRequiredRemoteSyncWarning(message: string): boolean {
+  return /authenticated api session|refresh token|unauthorized|yishan login/i.test(message);
+}
+
 function createWorkspaceId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
@@ -317,9 +321,13 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<stri
         project?.setupScript?.trim() || "",
       );
       if (created.remoteSyncWarning?.trim()) {
+        const remoteSyncWarning = created.remoteSyncWarning.trim();
+        const remoteSyncMessage = isReauthRequiredRemoteSyncWarning(remoteSyncWarning)
+          ? `Remote sync needs re-authentication. Sign in again and retry sync from workspace actions. ${remoteSyncWarning}`
+          : `Remote sync failed. Sign in again to sync this workspace. ${remoteSyncWarning}`;
         enqueueWorkspaceErrorNotice({
           title: "Workspace created locally",
-          message: `Remote sync failed. Sign in again to sync this workspace. ${created.remoteSyncWarning}`,
+          message: remoteSyncMessage,
         });
       }
 
