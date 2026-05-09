@@ -99,7 +99,7 @@ API-backed subcommands:
 - `org member add|remove`
 - `node list|create|delete`
 - `project list|create`
-- `workspace list|create`
+- `workspace list|get|create|close`
 
 Organization context:
 
@@ -108,6 +108,17 @@ Organization context:
 - Clear active org: `yishan org clear`
 - Commands with `--org-id` fall back to active org when flag is omitted.
 - `workspace create` creates workspace metadata via API first; for local nodes it then provisions via local daemon using the returned workspace id.
+
+Workspace lifecycle examples:
+
+- Create a primary workspace:
+  - `yishan workspace create --project-id <project-id> --kind primary --local-path /absolute/path/to/repo`
+- Create a worktree workspace:
+  - `yishan workspace create --project-id <project-id> --kind worktree --branch feature/my-branch --source-branch main --name feature-my-branch`
+- Close a workspace by id:
+  - `yishan workspace close --project-id <project-id> --workspace-id <workspace-id>`
+- Get a workspace by id:
+  - `yishan workspace get --project-id <project-id> --workspace-id <workspace-id>`
 
 Terminal subscriptions stream server notifications:
 
