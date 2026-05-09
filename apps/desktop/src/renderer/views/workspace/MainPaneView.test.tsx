@@ -57,6 +57,12 @@ vi.mock("../../hooks/useCommands", () => ({
       toggleTabPinned: state.toggleTabPinned,
       reorderTab: state.reorderTab,
       renameTab: state.renameTab,
+      readFile: state.readFile,
+      readDiff: state.readDiff,
+      readCommitDiff: state.readCommitDiff,
+      readBranchComparisonDiff: state.readBranchComparisonDiff,
+      refreshFileTabFromDisk: state.refreshFileTabFromDisk,
+      refreshDiffTabContent: state.refreshDiffTabContent,
       updateFileTabContent: state.updateFileTabContent,
       markFileTabSaved: state.markFileTabSaved,
     };
@@ -110,7 +116,9 @@ vi.mock("../../components/TabBar", () => ({
 }));
 
 vi.mock("../../components/FileEditor", () => ({
-  FileEditor: () => <div data-testid="file-editor-view" />,
+  FileEditor: ({ isDeleted }: { isDeleted?: boolean }) => (
+    <div data-testid="file-editor-view" data-is-deleted={isDeleted ? "true" : "false"} />
+  ),
 }));
 
 vi.mock("./LaunchView", () => ({
@@ -187,6 +195,12 @@ function buildStoreState(isInitializing: boolean) {
     toggleTabPinned: vi.fn(),
     reorderTab: vi.fn(),
     renameTab: vi.fn(),
+    readFile: vi.fn(),
+    readDiff: vi.fn(),
+    readCommitDiff: vi.fn(),
+    readBranchComparisonDiff: vi.fn(),
+    refreshFileTabFromDisk: vi.fn(),
+    refreshDiffTabContent: vi.fn(),
     updateFileTabContent: vi.fn(),
     markFileTabSaved: vi.fn(),
   };
@@ -242,6 +256,12 @@ describe("MainPaneView", () => {
       toggleTabPinned: vi.fn(),
       reorderTab: vi.fn(),
       renameTab: vi.fn(),
+      readFile: vi.fn(),
+      readDiff: vi.fn(),
+      readCommitDiff: vi.fn(),
+      readBranchComparisonDiff: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
     };
@@ -310,6 +330,12 @@ describe("MainPaneView", () => {
       toggleTabPinned: vi.fn(),
       reorderTab: vi.fn(),
       renameTab: vi.fn(),
+      readFile: vi.fn(),
+      readDiff: vi.fn(),
+      readCommitDiff: vi.fn(),
+      readBranchComparisonDiff: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
     };
@@ -373,6 +399,12 @@ describe("MainPaneView", () => {
       toggleTabPinned: vi.fn(),
       reorderTab: vi.fn(),
       renameTab: vi.fn(),
+      readFile: vi.fn(),
+      readDiff: vi.fn(),
+      readCommitDiff: vi.fn(),
+      readBranchComparisonDiff: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
     };
@@ -437,6 +469,12 @@ describe("MainPaneView", () => {
       toggleTabPinned: vi.fn(),
       reorderTab: vi.fn(),
       renameTab: vi.fn(),
+      readFile: vi.fn(),
+      readDiff: vi.fn(),
+      readCommitDiff: vi.fn(),
+      readBranchComparisonDiff: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
     };

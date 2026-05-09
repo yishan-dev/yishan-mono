@@ -130,6 +130,7 @@ export function openTabState(
                   ...tab.data,
                   oldContent: nextOldContent,
                   newContent: nextNewContent,
+                  source: input.diffSource,
                 },
               }
             : tab,

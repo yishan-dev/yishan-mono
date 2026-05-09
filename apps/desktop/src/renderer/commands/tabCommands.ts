@@ -189,3 +189,13 @@ export function updateFileTabContent(tabId: string, content: string) {
 export function markFileTabSaved(tabId: string) {
   readTabStoreState().markFileTabSaved(tabId);
 }
+
+/** Refreshes one non-dirty file tab from disk state. */
+export function refreshFileTabFromDisk(input: { tabId: string; content: string; deleted: boolean }) {
+  readTabStoreState().refreshFileTabFromDisk(input);
+}
+
+/** Refreshes one diff tab content in place. */
+export function refreshDiffTabContent(input: { tabId: string; oldContent: string; newContent: string }) {
+  readTabStoreState().refreshDiffTabContent(input);
+}

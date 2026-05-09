@@ -554,6 +554,11 @@ export function ChangesTabView() {
         deletions: 0,
         oldContent: response.oldContent,
         newContent: response.newContent,
+        diffSource: commitHash
+          ? { kind: "commit", commitHash }
+          : targetBranch
+            ? { kind: "branch", targetBranch }
+            : { kind: "workspace" },
       });
     } catch (error) {
       console.error("Failed to load workspace commit file diff", error);
@@ -795,6 +800,7 @@ export function ChangesTabView() {
                   deletions: file.deletions,
                   oldContent: response.oldContent,
                   newContent: response.newContent,
+                  diffSource: { kind: "workspace" },
                 });
               } catch (error) {
                 console.error("Failed to load workspace workspace diff", error);

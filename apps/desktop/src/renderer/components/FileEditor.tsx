@@ -11,6 +11,7 @@ type MarkdownViewMode = "editor" | "split" | "preview";
 type FileEditorProps = {
   path: string;
   content: string;
+  isDeleted?: boolean;
   focusRequestKey?: number;
   onContentChange?: (content: string) => void;
   onSave?: (content: string) => void | Promise<void>;
@@ -24,6 +25,7 @@ type FileEditorProps = {
 export function FileEditor({
   path,
   content,
+  isDeleted = false,
   focusRequestKey = 0,
   onContentChange,
   onSave,
@@ -113,6 +115,7 @@ export function FileEditor({
       renderLineHighlight: "line",
       tabSize: 2,
       insertSpaces: true,
+      readOnly: isDeleted,
     });
 
     // Register Cmd/Ctrl+S save shortcut
@@ -132,7 +135,7 @@ export function FileEditor({
       model.dispose();
       editorRef.current = null;
     };
-  }, [monacoTheme, path]);
+  }, [isDeleted, monacoTheme, path]);
 
   // Sync external content changes into the editor.
   useEffect(() => {
@@ -149,6 +152,10 @@ export function FileEditor({
   useEffect(() => {
     monaco.editor.setTheme(monacoTheme);
   }, [monacoTheme]);
+
+  useEffect(() => {
+    editorRef.current?.updateOptions?.({ readOnly: isDeleted });
+  }, [isDeleted]);
 
   // Focus the editor when requested.
   useEffect(() => {
@@ -224,6 +231,11 @@ export function FileEditor({
         <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, flex: 1 }}>
           {path}
         </Typography>
+        {isDeleted ? (
+          <Typography variant="caption" color="error.main" sx={{ mr: 1 }}>
+            File deleted
+          </Typography>
+        ) : null}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
           {/* Markdown view mode toggles */}
           {isMarkdown ? (

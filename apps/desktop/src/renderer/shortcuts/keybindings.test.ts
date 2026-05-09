@@ -36,6 +36,8 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
       renameTabsForEntryRename: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
     } as TabStoreState,
     workspaceStoreState: {
       projects: [],
@@ -91,6 +93,8 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
       renameTab: vi.fn(),
       updateFileTabContent: vi.fn(),
       markFileTabSaved: vi.fn(),
+      refreshFileTabFromDisk: vi.fn(),
+      refreshDiffTabContent: vi.fn(),
       setDisplayRepoIds: vi.fn(),
       setLeftWidth: vi.fn(),
       setRightWidth: vi.fn(),

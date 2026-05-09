@@ -39,6 +39,8 @@ const mocks = vi.hoisted(() => ({
     renameTab: vi.fn(),
     updateFileTabContent: vi.fn(),
     markFileTabSaved: vi.fn(),
+    refreshFileTabFromDisk: vi.fn(),
+    refreshDiffTabContent: vi.fn(),
   },
   workspaceStoreState: {
     projects: [],
