@@ -184,13 +184,13 @@
       "columns": {
         "session": "会话",
         "workspace": "工作区",
-        "repo": "仓库",
+        "repo": "项目",
         "pid": "PID",
         "status": "状态",
         "actions": "操作"
       },
       "unknownWorkspace": "未知工作区",
-      "unknownRepo": "未知仓库",
+      "unknownRepo": "未知项目",
       "status": {
         "running": "运行中",
         "exited": "已退出"

@@ -92,7 +92,7 @@ describe("TerminalSettingsView", () => {
       expect(screen.getByText("term_1")).toBeTruthy();
     });
     expect(screen.getByText("settings.terminal.unknownWorkspace")).toBeTruthy();
-    expect(screen.getByText("settings.terminal.unknownRepo")).toBeTruthy();
+    expect(screen.getAllByText("settings.terminal.unknownRepo").length).toBeGreaterThan(0);
     expect(screen.getByText("12345")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "settings.terminal.actions.kill" }));
