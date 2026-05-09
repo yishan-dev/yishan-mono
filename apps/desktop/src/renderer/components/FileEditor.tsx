@@ -342,7 +342,7 @@ export function FileEditor({
         {isMarkdown && showPreview ? (
           <Box
             sx={{
-              flex: `0 0 ${Math.round((1 - editorPaneRatio) * 100)}%`,
+              flex: showEditor ? `0 0 ${Math.round((1 - editorPaneRatio) * 100)}%` : 1,
               minHeight: 0,
               minWidth: 0,
               display: "flex",
