@@ -69,6 +69,7 @@
       "agents": "智能体",
       "appearance": "外观",
       "daemon": "守护进程",
+      "keybindings": "键盘快捷键",
       "notifications": "通知",
       "terminal": "终端",
       "workspace": "工作区"

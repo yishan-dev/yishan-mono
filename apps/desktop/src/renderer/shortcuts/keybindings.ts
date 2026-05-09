@@ -7,7 +7,8 @@ import type { KeyBindingScope, ShortContext, ShortcutDefinition, SupportedKeyBin
 export type { KeyBindingScope, ShortContext, ShortcutDefinition, SupportedKeyBinding } from "./types";
 
 const WORKSPACE_ROUTE = "/";
-const KEYBINDINGS_ROUTE = "/keybindings";
+const SETTINGS_ROUTE = "/settings";
+const SETTINGS_KEYBINDINGS_ROUTE = "/settings?tab=keybindings";
 
 const TAB_INDEX_HOTKEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
   .flatMap((index) => [`ctrl+${index}`, `command+${index}`])
@@ -224,8 +225,8 @@ const SHORTCUT_REGISTRY: readonly ShortcutRegistryItem[] = [
     descriptionKey: "keybindings.actions.openKeybindings",
     scope: "global",
     keys: "ctrl+/,command+/",
-    target: { command: ACTIONS.NAVIGATE, payload: { path: KEYBINDINGS_ROUTE } },
-    shouldRun: (context, event) => context.pathname !== KEYBINDINGS_ROUTE && !isEditableTarget(event.target),
+    target: { command: ACTIONS.NAVIGATE, payload: { path: SETTINGS_KEYBINDINGS_ROUTE } },
+    shouldRun: (context, event) => context.pathname !== SETTINGS_ROUTE && !isEditableTarget(event.target),
   },
   {
     id: "close-keybindings",
@@ -233,7 +234,7 @@ const SHORTCUT_REGISTRY: readonly ShortcutRegistryItem[] = [
     scope: "global",
     keys: "esc",
     target: { command: ACTIONS.NAVIGATE, payload: { path: WORKSPACE_ROUTE } },
-    shouldRun: (context) => context.pathname === KEYBINDINGS_ROUTE,
+    shouldRun: (context) => context.pathname === SETTINGS_ROUTE,
   },
   {
     id: "new-tab",

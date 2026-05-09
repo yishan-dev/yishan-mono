@@ -121,9 +121,6 @@ function RouterControls() {
       <button type="button" onClick={() => navigate("/settings")}>
         to-settings
       </button>
-      <button type="button" onClick={() => navigate("/keybindings")}>
-        to-keybindings
-      </button>
       <button type="button" onClick={() => navigate("/unknown")}>
         to-unknown
       </button>
@@ -140,7 +137,6 @@ function renderApplicationRouter(initialEntry = "/") {
         <Route path="/" element={<ApplicationRouterView />}>
           <Route index element={null} />
           <Route path="settings" element={<div data-testid="settings-overlay">settings-overlay</div>} />
-          <Route path="keybindings" element={<div data-testid="keybindings-overlay">keybindings-overlay</div>} />
         </Route>
         <Route path="*" element={<NotFoundRouteView />} />
       </Routes>
@@ -207,7 +203,6 @@ describe("ApplicationRouterView", () => {
 
     expect(await screen.findByTestId("workspace-input")).toBeTruthy();
     expect(screen.queryByTestId("settings-overlay")).toBeNull();
-    expect(screen.queryByTestId("keybindings-overlay")).toBeNull();
   });
 
   it("renders first organization setup when authenticated user has no organizations", async () => {
@@ -416,16 +411,13 @@ describe("ApplicationRouterView", () => {
     expect((screen.getByTestId("workspace-input") as HTMLInputElement).value).toBe("sticky-state");
   });
 
-  it("shows keybindings as overlay while preserving workspace state", async () => {
+  it("shows settings overlay with keybindings tab while preserving workspace state", async () => {
     authStore.setState({ isAuthenticated: true, authStatusResolved: true });
     renderApplicationRouter("/");
 
-    const input = (await screen.findByTestId("workspace-input")) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "workspace-value" } });
-    fireEvent.click(screen.getByText("to-keybindings"));
+    fireEvent.click(screen.getByText("to-settings"));
 
-    expect(screen.getByTestId("keybindings-overlay")).toBeTruthy();
-    expect((screen.getByTestId("workspace-input") as HTMLInputElement).value).toBe("workspace-value");
+    expect(await screen.findByTestId("settings-overlay")).toBeTruthy();
   });
 
   it("shows not-found state for unknown routes and allows returning", async () => {

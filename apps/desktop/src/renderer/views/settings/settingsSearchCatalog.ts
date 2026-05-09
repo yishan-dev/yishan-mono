@@ -1,4 +1,4 @@
-import { BiBell, BiChip, type BiCog, BiGitBranch, BiPalette, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
+import { BiBell, BiChip, type BiCog, BiGitBranch, BiPalette, BiSolidKeyboard, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
 import { AGENT_SETTINGS_LABEL_KEY_BY_KIND, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
 import {
   NOTIFICATION_SETTINGS_SEARCH_ITEMS,
@@ -10,6 +10,7 @@ export type SettingsTab =
   | "agents"
   | "appearance"
   | "daemon"
+  | "keybindings"
   | "notifications"
   | "terminal"
   | "workspace";
@@ -44,6 +45,7 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
+      { tab: "keybindings", labelKey: "settings.items.keybindings", icon: BiSolidKeyboard },
       { tab: "agents", labelKey: "settings.items.agents", icon: BiChip },
     ],
   },
@@ -167,6 +169,21 @@ const LANGUAGE_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   },
 ];
 
+const KEYBINDINGS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "keybindings-list",
+    tab: "keybindings",
+    icon: BiSolidKeyboard,
+    labelKey: "keybindings.title",
+    sectionLabelKey: "settings.items.keybindings",
+    keywordKeys: [
+      "keybindings.subtitle",
+      "keybindings.scope.global",
+      "keybindings.scope.workspace",
+    ],
+  },
+];
+
 const AGENT_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   {
     id: "agent-settings",
@@ -228,6 +245,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...AGENT_SEARCH_ITEMS,
   ...APPEARANCE_SEARCH_ITEMS,
   ...LANGUAGE_SEARCH_ITEMS,
+  ...KEYBINDINGS_SEARCH_ITEMS,
   ...DAEMON_SEARCH_ITEMS,
   ...GIT_WORKSPACE_SEARCH_ITEMS,
   ...TERMINAL_SEARCH_ITEMS,

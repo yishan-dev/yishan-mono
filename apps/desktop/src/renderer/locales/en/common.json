@@ -70,6 +70,7 @@
       "agents": "Agents",
       "appearance": "Appearance",
       "daemon": "Daemon",
+      "keybindings": "Keyboard Shortcuts",
       "notifications": "Notifications",
       "terminal": "Terminal",
       "workspace": "Workspace"

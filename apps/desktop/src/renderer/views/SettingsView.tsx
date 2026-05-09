@@ -24,6 +24,7 @@ import { AccountSettingsView } from "./settings/AccountSettingsView";
 import { AgentSettingsView } from "./settings/AgentSettingsView";
 import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
+import { KeybindingsSettingsView } from "./settings/KeybindingsSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
 import { LanguageSettingsView } from "./settings/LanguageSettingsView";
@@ -95,8 +96,9 @@ export function SettingsView() {
       selectedTabParam === "account" ||
       selectedTabParam === "agents" ||
       selectedTabParam === "appearance" ||
-      selectedTabParam === "language" ||
       selectedTabParam === "daemon" ||
+      selectedTabParam === "keybindings" ||
+      selectedTabParam === "language" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
@@ -301,6 +303,8 @@ export function SettingsView() {
           <DaemonSettingsView />
         ) : selectedTab === "terminal" ? (
           <TerminalSettingsView />
+        ) : selectedTab === "keybindings" ? (
+          <KeybindingsSettingsView />
         ) : selectedTab === "workspace" ? (
           <GitWorkspaceSettingsView />
         ) : (

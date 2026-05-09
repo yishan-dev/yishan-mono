@@ -14,9 +14,8 @@ import { AppThemePreferenceProvider, useThemePreference } from "./hooks/useTheme
 import { i18n } from "./i18n";
 import { rendererQueryClient } from "./queryClient";
 import { createAppTheme } from "./theme";
-import { KeyBindingsView } from "./views/KeyBindingsView";
-import { SettingsView } from "./views/SettingsView";
 import { AppShell } from "./views/layout/AppShell";
+import { SettingsView } from "./views/SettingsView";
 import { ApplicationRouterView, NotFoundRouteView } from "./views/layout/ApplicationRouterView";
 
 /** Renders app routes with a shared theme-preference context. */
@@ -48,14 +47,6 @@ function AppRoot() {
                   element={
                     <WorkspaceOverlay>
                       <SettingsView />
-                    </WorkspaceOverlay>
-                  }
-                />
-                <Route
-                  path="keybindings"
-                  element={
-                    <WorkspaceOverlay>
-                      <KeyBindingsView />
                     </WorkspaceOverlay>
                   }
                 />
