@@ -62,15 +62,19 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		resp := h.handleRequest(r.Context(), connState, payload)
-		if resp == nil {
-			continue
-		}
+		// Dispatch JSON-RPC requests asynchronously so that slow handlers
+		// never block the read loop (and therefore never starve terminal input).
+		reqCtx := r.Context()
+		go func(ctx context.Context, data []byte) {
+			resp := h.handleRequest(ctx, connState, data)
+			if resp == nil {
+				return
+			}
 
-		if err := connState.WriteJSON(resp); err != nil {
-			log.Error().Err(err).Msg("websocket write failed")
-			return
-		}
+			if err := connState.WriteJSON(resp); err != nil {
+				log.Error().Err(err).Msg("websocket write failed")
+			}
+		}(reqCtx, payload)
 	}
 }
 

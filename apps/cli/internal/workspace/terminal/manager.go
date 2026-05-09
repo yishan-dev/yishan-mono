@@ -367,7 +367,7 @@ func (m *Manager) Subscribe(req SubscribeRequest) (Subscription, error) {
 	}
 
 	id := m.nextSubID.Add(1)
-	ch := make(chan Event, 64)
+	ch := make(chan Event, 256)
 
 	s.subsMu.Lock()
 	s.subs[id] = ch
