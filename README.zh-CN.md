@@ -1,4 +1,8 @@
-# ![Yishan logo](apps/desktop/src/assets/images/yishan-transparent.png) Yishan
+<p align="center">
+  <img src="apps/desktop/src/assets/images/yishan-transparent.png" alt="Yishan logo" width="100" height="100" />
+</p>
+
+<h1 align="center">Yishan</h1>
 
 [English](README.md)
 
