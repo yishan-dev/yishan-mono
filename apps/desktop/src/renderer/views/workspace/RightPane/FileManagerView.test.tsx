@@ -190,6 +190,8 @@ vi.mock("react-i18next", () => ({
         "files.actions.openInExplorer": "Open in Explorer",
         "files.actions.openInExternalApp": "Open in...",
         "files.actions.openInExternalAppQuick": "Open in Cursor",
+        "files.unsupported.title": "Unsupported file type",
+        "files.unsupported.description": "This file type is not supported for editor tabs yet.",
         "files.delete.confirmFile": `Delete file '${params?.path ?? ""}'?`,
         "files.delete.confirmDirectory": `Delete folder '${params?.path ?? ""}' and all contents?`,
         "common.actions.cancel": "Cancel",
@@ -460,6 +462,61 @@ describe("FileManagerView file search", () => {
         path: "src/readme.md",
         content: "test-file-content",
         temporary: false,
+      });
+    });
+  });
+
+  it("opens unsupported files with unsupported tab payload", async () => {
+    render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect(mocks.listFiles).toHaveBeenCalled();
+    });
+
+    getFileTreeProps().onOpenEntry?.({
+      path: "data/main.sqlite",
+      isDirectory: false,
+    });
+
+    await waitFor(() => {
+      expect(mocks.openTab).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+        kind: "file",
+        path: "data/main.sqlite",
+        content: "",
+        temporary: false,
+        isUnsupported: true,
+        unsupportedReason: "type",
+      });
+      expect(mocks.readFile).not.toHaveBeenCalledWith({
+        workspaceWorktreePath: "/tmp/repo",
+        relativePath: "data/main.sqlite",
+      });
+    });
+  });
+
+  it("opens large files with unsupported size payload", async () => {
+    mocks.readFile.mockResolvedValue({ content: "a".repeat(2 * 1024 * 1024 + 1) });
+    render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect(mocks.listFiles).toHaveBeenCalled();
+    });
+
+    getFileTreeProps().onOpenEntry?.({
+      path: "logs/big.log",
+      isDirectory: false,
+    });
+
+    await waitFor(() => {
+      expect(mocks.openTab).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+        kind: "file",
+        path: "logs/big.log",
+        content: "",
+        temporary: false,
+        isUnsupported: true,
+        unsupportedReason: "size",
       });
     });
   });

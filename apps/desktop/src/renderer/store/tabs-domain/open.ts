@@ -146,8 +146,13 @@ export function openTabState(
     if (input.kind === "file" && existingTab.kind === "file") {
       const nextContent = input.content;
       const isOpeningTemporary = Boolean(input.temporary);
+      const isUnsupported = Boolean(input.isUnsupported);
+      const unsupportedReason = input.unsupportedReason;
       if (typeof nextContent !== "string") {
-        if (existingTab.data.isTemporary === isOpeningTemporary) {
+        if (
+          existingTab.data.isTemporary === isOpeningTemporary &&
+          Boolean(existingTab.data.isUnsupported) === isUnsupported
+        ) {
           return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
         }
 
@@ -159,6 +164,8 @@ export function openTabState(
                   data: {
                     ...tab.data,
                     isTemporary: isOpeningTemporary,
+                    ...(isUnsupported ? { isUnsupported: true } : {}),
+                    ...(unsupportedReason ? { unsupportedReason } : {}),
                   },
                 }
               : tab,
@@ -178,6 +185,8 @@ export function openTabState(
                   savedContent: nextContent,
                   isDirty: false,
                   isTemporary: isOpeningTemporary,
+                  ...(isUnsupported ? { isUnsupported: true } : {}),
+                  ...(unsupportedReason ? { unsupportedReason } : {}),
                 },
               }
             : tab,
@@ -248,6 +257,8 @@ export function openTabState(
                   savedContent: typeof nextContent === "string" ? nextContent : tab.data.savedContent,
                   isDirty: false,
                   isTemporary: true,
+                  ...(input.isUnsupported ? { isUnsupported: true } : {}),
+                  ...(input.unsupportedReason ? { unsupportedReason: input.unsupportedReason } : {}),
                 },
               }
             : tab,

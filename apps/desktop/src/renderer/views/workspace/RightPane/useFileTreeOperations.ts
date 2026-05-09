@@ -18,7 +18,7 @@ import {
   readFileAsDataUrl,
   renameEntry,
 } from "../../../commands/fileCommands";
-import { isImageFile } from "../../../helpers/editorLanguage";
+import { isImageFile, isUnsupportedFileTab } from "../../../helpers/editorLanguage";
 import { useCommands } from "../../../hooks/useCommands";
 import { tabStore } from "../../../store/tabStore";
 import { workspaceStore } from "../../../store/workspaceStore";
@@ -101,6 +101,7 @@ type WorkspaceTreeCacheEntry = {
 export const CONTEXT_DIRECTORY_PATHS = [".my-context"];
 const EMPTY_CHANGED_RELATIVE_PATHS: string[] = [];
 const INVALID_DIRECTORY_LIST_PATH_ERROR_MESSAGE = "relativePath must point to a directory under rootPath";
+const LARGE_FILE_OPEN_THRESHOLD_BYTES = 2 * 1024 * 1024;
 
 function isContextDirectoryPath(path: string): boolean {
   const normalizedPath = normalizeRelativePath(path).replace(/\/+$/, "");
@@ -278,6 +279,15 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   }
 
   return btoa(binary);
+}
+
+/** Returns the UTF-8 byte length for one string. */
+function getUtf8ByteLength(value: string): number {
+  if (typeof TextEncoder !== "undefined") {
+    return new TextEncoder().encode(value).length;
+  }
+
+  return value.length;
 }
 
 /** Maps one clipboard MIME type to a best-effort file extension for payload import. */
@@ -889,6 +899,20 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
       }
 
       try {
+        if (isUnsupportedFileTab(path)) {
+          openTab({
+            workspaceId: selectedWorkspaceId,
+            kind: "file",
+            path,
+            content: "",
+            temporary: Boolean(options?.temporary),
+            isUnsupported: true,
+            unsupportedReason: "type",
+          });
+          requestFileTreeSelection(path, false);
+          return;
+        }
+
         if (isImageFile(path)) {
           const absolutePath = resolveWorkspaceAbsolutePath(selectedWorkspaceWorktreePath, path);
           const result = await readFileAsDataUrl({ absolutePath });
@@ -911,6 +935,20 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
           workspaceWorktreePath: selectedWorkspaceWorktreePath,
           relativePath: path,
         });
+
+        if (getUtf8ByteLength(response.content) > LARGE_FILE_OPEN_THRESHOLD_BYTES) {
+          openTab({
+            workspaceId: selectedWorkspaceId,
+            kind: "file",
+            path,
+            content: "",
+            temporary: Boolean(options?.temporary),
+            isUnsupported: true,
+            unsupportedReason: "size",
+          });
+          requestFileTreeSelection(path, false);
+          return;
+        }
 
         openTab({
           workspaceId: selectedWorkspaceId,

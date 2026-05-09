@@ -7,6 +7,7 @@ import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shar
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
 import { ImagePreview } from "../../components/ImagePreview";
+import { UnsupportedFileView } from "../../components/UnsupportedFileView";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
 import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
@@ -156,7 +157,13 @@ export function MainPaneView() {
     (): RefreshableOpenTab[] =>
       workspaceTabs.reduce<RefreshableOpenTab[]>((result, tab) => {
         if (tab.kind === "file") {
-          result.push({ id: tab.id, kind: "file", path: tab.data.path, isDirty: tab.data.isDirty });
+          result.push({
+            id: tab.id,
+            kind: "file",
+            path: tab.data.path,
+            isDirty: tab.data.isDirty,
+            isUnsupported: Boolean(tab.data.isUnsupported),
+          });
           return result;
         }
 
@@ -337,6 +344,65 @@ export function MainPaneView() {
           }
 
           if (tab.kind === "file") {
+            if (tab.data.isUnsupported) {
+              return (
+                <Box
+                  key={tab.id}
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: isSelected ? "flex" : "none",
+                    flexDirection: "column",
+                  }}
+                >
+                  <UnsupportedFileView
+                    path={tab.data.path}
+                    title={t("files.unsupported.title")}
+                    description={
+                      tab.data.unsupportedReason === "size"
+                        ? t("files.unsupported.descriptionLarge")
+                        : t("files.unsupported.description")
+                    }
+                    hint={
+                      tab.data.unsupportedReason === "size"
+                        ? t("files.unsupported.hintLarge")
+                        : t("files.unsupported.hint")
+                    }
+                    onCopyPath={async (filePath) => {
+                      if (!navigator.clipboard) {
+                        return;
+                      }
+
+                      try {
+                        await navigator.clipboard.writeText(filePath);
+                      } catch (error) {
+                        console.error("Failed to copy workspace file path", error);
+                      }
+                    }}
+                    onOpenExternalApp={async (filePath) => {
+                      const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+                      if (!workspaceWorktreePath) {
+                        return;
+                      }
+
+                      try {
+                        await openEntryInExternalApp({
+                          workspaceWorktreePath,
+                          appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+                          relativePath: filePath,
+                        });
+                      } catch (error) {
+                        console.error("Failed to open workspace file externally", error);
+                      }
+                    }}
+                    openExternalAppLabel={
+                      lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
+                    }
+                  />
+                </Box>
+              );
+            }
+
             return (
               <Box
                 key={tab.id}

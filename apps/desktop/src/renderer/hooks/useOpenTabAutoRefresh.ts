@@ -7,6 +7,7 @@ export type RefreshableOpenTab =
       kind: "file";
       path: string;
       isDirty: boolean;
+      isUnsupported?: boolean;
     }
   | {
       id: string;
@@ -76,6 +77,10 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
         await Promise.all(
           tabs.map(async (tab) => {
             if (tab.kind === "file") {
+              if (tab.isUnsupported) {
+                return;
+              }
+
               if (tab.isDirty) {
                 return;
               }
