@@ -33,6 +33,7 @@ export function FileEditor({
 }: FileEditorProps) {
   const theme = useTheme();
   const editorHostRef = useRef<HTMLDivElement | null>(null);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const contentRef = useRef(content);
   const onContentChangeRef = useRef(onContentChange);
@@ -42,6 +43,7 @@ export function FileEditor({
   const [viewMode, setViewMode] = useState<MarkdownViewMode>(() =>
     isMarkdownFile(path) ? "split" : "editor",
   );
+  const [editorPaneRatio, setEditorPaneRatio] = useState(0.5);
 
   // Reset view mode when switching between markdown and non-markdown files.
   // When entering a markdown file from a non-markdown file (viewMode is "editor"),
@@ -170,10 +172,37 @@ export function FileEditor({
       });
       return () => window.cancelAnimationFrame(frame);
     }
-  }, [showEditor]);
+  }, [showEditor, editorPaneRatio]);
 
   const handleSetViewMode = useCallback((mode: MarkdownViewMode) => {
     setViewMode(mode);
+  }, []);
+
+  const handleStartSplitDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!splitContainerRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    const container = splitContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    const minRatio = 0.2;
+    const maxRatio = 0.8;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const x = moveEvent.clientX - rect.left;
+      const rawRatio = x / rect.width;
+      const clampedRatio = Math.min(maxRatio, Math.max(minRatio, rawRatio));
+      setEditorPaneRatio(clampedRatio);
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
   }, []);
 
   return (
@@ -257,12 +286,12 @@ export function FileEditor({
       </Box>
 
       {/* Content area */}
-      <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>
+      <Box ref={splitContainerRef} sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>
         {/* Monaco editor pane */}
         <Box
           ref={editorHostRef}
           sx={{
-            flex: showPreview && showEditor ? 1 : showEditor ? 1 : 0,
+            flex: showPreview && showEditor ? `0 0 ${Math.round(editorPaneRatio * 100)}%` : showEditor ? 1 : 0,
             minHeight: 0,
             minWidth: 0,
             display: showEditor ? "block" : "none",
@@ -272,10 +301,27 @@ export function FileEditor({
         {/* Divider between editor and preview */}
         {showEditor && showPreview ? (
           <Box
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={handleStartSplitDrag}
             sx={{
-              width: "1px",
-              bgcolor: "divider",
+              width: 8,
+              cursor: "col-resize",
+              position: "relative",
               flexShrink: 0,
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                top: 0,
+                bottom: 0,
+                width: "1px",
+                bgcolor: "divider",
+              },
+              "&:hover::before": {
+                bgcolor: "primary.main",
+              },
             }}
           />
         ) : null}
@@ -284,7 +330,7 @@ export function FileEditor({
         {isMarkdown && showPreview ? (
           <Box
             sx={{
-              flex: 1,
+              flex: `0 0 ${Math.round((1 - editorPaneRatio) * 100)}%`,
               minHeight: 0,
               minWidth: 0,
               display: "flex",
