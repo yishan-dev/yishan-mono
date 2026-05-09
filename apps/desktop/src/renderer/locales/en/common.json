@@ -110,7 +110,7 @@
       "loadError": "Failed to load agent detection statuses.",
       "inUse": "In use",
       "actions": {
-        "recheckAll": "Recheck All"
+        "rescanAll": "Rescan All"
       },
       "status": {
         "checking": "Checking...",
@@ -200,20 +200,20 @@
       "columns": {
         "session": "Session",
         "workspace": "Workspace",
-        "repo": "Repository",
+        "repo": "Project",
         "pid": "PID",
         "status": "Status",
         "actions": "Actions"
       },
       "unknownWorkspace": "Unknown workspace",
-      "unknownRepo": "Unknown repository",
+      "unknownRepo": "Unknown project",
       "status": {
         "running": "Running",
         "exited": "Exited"
       },
       "actions": {
-        "kill": "Kill",
-        "killing": "Killing..."
+        "kill": "KILL",
+        "killing": "KILLING..."
       }
     },
     "comingSoon": "This settings page is coming soon."

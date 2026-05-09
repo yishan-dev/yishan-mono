@@ -144,20 +144,30 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if closeResult.PostHookResult != nil && closeResult.PostHookResult.Error != "" {
 			warnings = append(warnings, hookResultToWarning("post", req.PostHook, closeResult.PostHookResult))
 		}
-	result := map[string]any{
-		"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
-		"workspaceId":             req.WorkspaceID,
-		"lifecycleScriptWarnings": warnings,
-	}
-	if closeResult.PostHookResult != nil {
-		result["postHookResult"] = closeResult.PostHookResult
-	}
-	if len(closeResult.TerminalCleanupErrors) > 0 {
-		result["terminalCleanupErrors"] = closeResult.TerminalCleanupErrors
-	}
-	return result, nil
+		result := map[string]any{
+			"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
+			"workspaceId":             req.WorkspaceID,
+			"lifecycleScriptWarnings": warnings,
+		}
+		if closeResult.PostHookResult != nil {
+			result["postHookResult"] = closeResult.PostHookResult
+		}
+		if len(closeResult.TerminalCleanupErrors) > 0 {
+			result["terminalCleanupErrors"] = closeResult.TerminalCleanupErrors
+		}
+		return result, nil
 	case MethodAgentListDetectionStatuses:
-		return ListAgentCLIDetectionStatuses(), nil
+		refresh := false
+		if len(params) > 0 {
+			var req struct {
+				Refresh bool `json:"refresh"`
+			}
+			if err := decodeParams(params, &req); err != nil {
+				return nil, err
+			}
+			refresh = req.Refresh
+		}
+		return ListAgentCLIDetectionStatusesWithRefresh(refresh), nil
 	case MethodFrontendEventsStream:
 		subscriptionID, events := h.events.Subscribe()
 		connState.AttachEventStream(events, func() {

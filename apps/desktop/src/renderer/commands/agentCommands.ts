@@ -13,6 +13,7 @@ export type AgentDetectionStatus = {
 function normalizeAgentDetectionStatuses(payload: unknown): AgentDetectionStatus[] {
   const detectedByAgentKind = new Map<DesktopAgentKind, boolean>();
   const versionByAgentKind = new Map<DesktopAgentKind, string>();
+  const unsupportedAgentKinds = new Set<string>();
 
   if (Array.isArray(payload)) {
     for (const entry of payload) {
@@ -23,6 +24,9 @@ function normalizeAgentDetectionStatuses(payload: unknown): AgentDetectionStatus
       const record = entry as { agentKind?: unknown; detected?: unknown; version?: unknown };
       const rawAgentKind = typeof record.agentKind === "string" ? record.agentKind.trim() : "";
       if (!isDesktopAgentKind(rawAgentKind)) {
+        if (rawAgentKind.length > 0) {
+          unsupportedAgentKinds.add(rawAgentKind);
+        }
         continue;
       }
 
@@ -33,6 +37,12 @@ function normalizeAgentDetectionStatuses(payload: unknown): AgentDetectionStatus
     }
   }
 
+  if (unsupportedAgentKinds.size > 0) {
+    console.info(
+      `[agentCommands] Ignoring unsupported detected CLI tools: ${Array.from(unsupportedAgentKinds).sort().join(", ")}`,
+    );
+  }
+
   return SUPPORTED_DESKTOP_AGENT_KINDS.map((agentKind) => ({
     agentKind,
     detected: detectedByAgentKind.get(agentKind) ?? false,
@@ -41,8 +51,8 @@ function normalizeAgentDetectionStatuses(payload: unknown): AgentDetectionStatus
 }
 
 /** Lists supported desktop agents with current system detection state. */
-export async function listAgentDetectionStatuses(): Promise<AgentDetectionStatus[]> {
+export async function listAgentDetectionStatuses(forceRefresh = false): Promise<AgentDetectionStatus[]> {
   const client = await getDaemonClient();
-  const payload = await client.agent.listDetectionStatuses(undefined);
+  const payload = await client.agent.listDetectionStatuses(forceRefresh ? { refresh: true } : undefined);
   return normalizeAgentDetectionStatuses(payload);
 }

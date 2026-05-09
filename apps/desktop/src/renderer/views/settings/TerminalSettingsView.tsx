@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Table,
   TableBody,
@@ -157,6 +156,54 @@ export function TerminalSettingsView() {
   const workspaceRepoIdByWorkspaceId = useMemo(() => {
     return new Map(workspaces.map((workspace) => [workspace.id, workspace.repoId]));
   }, [workspaces]);
+  const groupedSessions = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        projectName: string;
+        sessions: Array<{
+          session: TerminalSessionSummary;
+          workspaceName: string;
+          actionKey: string;
+          isClosing: boolean;
+          isRunning: boolean;
+        }>;
+      }
+    >();
+
+    for (const session of sessions) {
+      const location = resolveSessionLocationLabel({
+        session,
+        repoNameById,
+        workspaceNameById,
+        workspaceRepoIdByWorkspaceId,
+        unknownWorkspaceLabel: t("settings.terminal.unknownWorkspace"),
+        unknownRepoLabel: t("settings.terminal.unknownRepo"),
+      });
+      const projectName = location.repoName;
+      const groupKey = projectName.trim().toLowerCase();
+      const existing = groups.get(groupKey);
+      const sessionRow = {
+        session,
+        workspaceName: location.workspaceName,
+        actionKey: buildSessionActionKey(session.sessionId),
+        isClosing: closingSessionIds.has(buildSessionActionKey(session.sessionId)),
+        isRunning: session.status === "running",
+      };
+
+      if (existing) {
+        existing.sessions.push(sessionRow);
+        continue;
+      }
+
+      groups.set(groupKey, {
+        projectName,
+        sessions: [sessionRow],
+      });
+    }
+
+    return Array.from(groups.values()).sort((left, right) => left.projectName.localeCompare(right.projectName));
+  }, [closingSessionIds, repoNameById, sessions, t, workspaceNameById, workspaceRepoIdByWorkspaceId]);
 
   return (
     <Box>
@@ -169,11 +216,25 @@ export function TerminalSettingsView() {
         ) : (
           <>
             {hasLoadError ? <Alert severity="error">{t("settings.terminal.loadError")}</Alert> : null}
-            <Table size="small" sx={{ mt: hasLoadError ? 1.5 : 0 }}>
+            <Table
+              size="small"
+              sx={{
+                mt: hasLoadError ? 1.5 : 0,
+                "& th": {
+                  fontWeight: 600,
+                  borderBottomColor: "divider",
+                },
+                "& th, & td": {
+                  borderBottomColor: "divider",
+                },
+                "& tbody tr:last-of-type td": {
+                  borderBottom: "none",
+                },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   <TableCell>{t("settings.terminal.columns.session")}</TableCell>
-                  <TableCell>{t("settings.terminal.columns.repo")}</TableCell>
                   <TableCell>{t("settings.terminal.columns.workspace")}</TableCell>
                   <TableCell>{t("settings.terminal.columns.pid")}</TableCell>
                   <TableCell>{t("settings.terminal.columns.status")}</TableCell>
@@ -183,40 +244,39 @@ export function TerminalSettingsView() {
               <TableBody>
                 {sessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={5}>
                       <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
                         {t("settings.terminal.empty")}
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sessions.map((session) => {
-                    const location = resolveSessionLocationLabel({
-                      session,
-                      repoNameById,
-                      workspaceNameById,
-                      workspaceRepoIdByWorkspaceId,
-                      unknownWorkspaceLabel: t("settings.terminal.unknownWorkspace"),
-                      unknownRepoLabel: t("settings.terminal.unknownRepo"),
-                    });
-                    const actionKey = buildSessionActionKey(session.sessionId);
-                    const isClosing = closingSessionIds.has(actionKey);
-                    const isRunning = session.status === "running";
-                    return (
+                  groupedSessions.flatMap((group) => [
+                    <TableRow key={`group-${group.projectName}`}>
+                      <TableCell colSpan={5} sx={{ py: 1, bgcolor: "background.default", fontWeight: 600 }}>
+                        {group.projectName}
+                      </TableCell>
+                    </TableRow>,
+                    ...group.sessions.map(({ session, workspaceName, actionKey, isClosing, isRunning }) => (
                       <TableRow key={session.sessionId}>
                         <TableCell sx={{ fontFamily: "monospace" }}>{session.sessionId}</TableCell>
-                        <TableCell>{location.repoName}</TableCell>
-                        <TableCell>{location.workspaceName}</TableCell>
+                        <TableCell>{workspaceName}</TableCell>
                         <TableCell sx={{ fontFamily: "monospace" }}>{session.pid}</TableCell>
                         <TableCell>
-                          <Chip
-                            size="small"
-                            label={
-                              isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")
-                            }
-                            color={isRunning ? "success" : "default"}
-                            variant={isRunning ? "filled" : "outlined"}
-                          />
+                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+                            <Box
+                              component="span"
+                              sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                bgcolor: isRunning ? "success.main" : "text.disabled",
+                              }}
+                            />
+                            <Typography variant="body2" color={isRunning ? "text.primary" : "text.secondary"}>
+                              {isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell align="right">
                           <Button
@@ -253,8 +313,8 @@ export function TerminalSettingsView() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    );
-                  })
+                    )),
+                  ])
                 )}
               </TableBody>
             </Table>
