@@ -3,10 +3,11 @@ import { useCallback, useRef, useState } from "react";
 
 type ColumnSeparatorProps = {
   ariaLabel: string;
+  orientation?: "horizontal" | "vertical";
   baseWidth?: string;
   hoverWidth?: string;
-  onResizeStart: (clientX: number) => void;
-  onResizeMove?: (clientX: number) => void;
+  onResizeStart: (clientPos: number) => void;
+  onResizeMove?: (clientPos: number) => void;
   onResizeEnd?: () => void;
 };
 
@@ -17,6 +18,7 @@ type ColumnSeparatorProps = {
  */
 export function ColumnSeparator({
   ariaLabel,
+  orientation = "horizontal",
   baseWidth = "3px",
   hoverWidth = "3px",
   onResizeStart,
@@ -25,30 +27,31 @@ export function ColumnSeparator({
 }: ColumnSeparatorProps) {
   const [dragging, setDragging] = useState(false);
   const separatorRef = useRef<HTMLDivElement>(null);
+  const isVertical = orientation === "vertical";
+  const clientAxis = isVertical ? "clientY" : "clientX";
+  const cursor = isVertical ? "row-resize" : "col-resize";
+  const sizeProp = isVertical
+    ? { height: baseWidth, minHeight: baseWidth, width: "100%" }
+    : { width: baseWidth, minWidth: baseWidth, height: "100%" };
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      // Only handle primary button (left click)
       if (event.button !== 0) return;
 
       event.preventDefault();
       setDragging(true);
-
-      // Capture the pointer so all subsequent pointer events are routed
-      // directly to this element, bypassing -webkit-app-region: drag zones.
       event.currentTarget.setPointerCapture(event.pointerId);
-
-      onResizeStart(event.clientX);
+      onResizeStart(event[clientAxis]);
     },
-    [onResizeStart],
+    [onResizeStart, clientAxis],
   );
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!dragging) return;
-      onResizeMove?.(event.clientX);
+      onResizeMove?.(event[clientAxis]);
     },
-    [dragging, onResizeMove],
+    [dragging, onResizeMove, clientAxis],
   );
 
   const handlePointerUp = useCallback(
@@ -62,19 +65,26 @@ export function ColumnSeparator({
     [dragging, onResizeEnd],
   );
 
+  const pseudoEdge = isVertical
+    ? { left: 0, right: 0, top: "50%", transform: "translateY(-50%)", height: "1px" }
+    : { top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: "1px" };
+
+  const hoverEdge = isVertical
+    ? { left: 0, right: 0, top: "50%", transform: "translateY(-50%)", height: hoverWidth }
+    : { top: 0, bottom: 0, left: "50%", transform: "translateX(-50%)", width: hoverWidth };
+
   return (
     <Box
       ref={separatorRef}
       role="separator"
       aria-label={ariaLabel}
+      aria-orientation={orientation}
       className="electron-webkit-app-region-no-drag"
       data-dragging={dragging ? "true" : "false"}
       sx={{
-        width: baseWidth,
-        minWidth: baseWidth,
-        height: "100%",
+        ...sizeProp,
         flexShrink: 0,
-        cursor: "col-resize",
+        cursor,
         borderRadius: 999,
         position: "relative",
         overflow: "visible",
@@ -83,11 +93,7 @@ export function ColumnSeparator({
         "&::before": {
           content: '""',
           position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "1px",
+          ...pseudoEdge,
           bgcolor: "divider",
           opacity: 0.55,
           pointerEvents: "none",
@@ -95,11 +101,7 @@ export function ColumnSeparator({
         "&::after": {
           content: '""',
           position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: hoverWidth,
+          ...hoverEdge,
           borderRadius: 999,
           bgcolor: "primary.main",
           opacity: 0,
