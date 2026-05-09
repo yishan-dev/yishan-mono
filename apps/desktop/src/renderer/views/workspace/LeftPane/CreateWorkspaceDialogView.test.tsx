@@ -169,12 +169,9 @@ describe("CreateWorkspaceDialogView", () => {
     fireEvent.change(screen.getByPlaceholderText("workspace.create.namePlaceholder"), {
       target: { value: "Feature Workspace" },
     });
-    const branchSelect = screen.getAllByRole("combobox")[1];
-    if (!branchSelect) {
-      throw new Error("Branch select not found");
-    }
-    fireEvent.mouseDown(branchSelect);
-    fireEvent.click(await screen.findByRole("option", { name: "feature/alpha" }));
+    const branchField = screen.getByPlaceholderText("Source branch");
+    fireEvent.click(branchField);
+    fireEvent.click(await screen.findByRole("menuitem", { name: "feature/alpha" }));
     fireEvent.click(screen.getByRole("button", { name: /workspace\.actions\.create/ }));
 
     await waitFor(() => {
@@ -525,10 +522,9 @@ describe("CreateWorkspaceDialogView", () => {
 
     expect(mocked.listGitBranches).not.toHaveBeenCalled();
     const comboBoxes = screen.getAllByRole("combobox");
-    expect(comboBoxes).toHaveLength(2);
-    for (const comboBox of comboBoxes) {
-      expect(comboBox.getAttribute("aria-disabled")).toBe("true");
-    }
+    expect(comboBoxes).toHaveLength(1);
+    expect(comboBoxes[0]?.getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByPlaceholderText("Source branch").getAttribute("disabled")).not.toBeNull();
     expect((screen.getByPlaceholderText("workspace.create.namePlaceholder") as HTMLInputElement).value).toBe(
       "Workspace One",
     );

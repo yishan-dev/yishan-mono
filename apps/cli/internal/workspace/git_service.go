@@ -59,6 +59,9 @@ type GitDiffContent struct {
 type GitBranchList struct {
 	CurrentBranch string   `json:"currentBranch"`
 	Branches      []string `json:"branches"`
+	LocalBranches []string `json:"localBranches,omitempty"`
+	RemoteBranches []string `json:"remoteBranches,omitempty"`
+	WorktreeBranches []string `json:"worktreeBranches,omitempty"`
 }
 
 type GitInspectResult struct {
@@ -337,29 +340,74 @@ func (s *GitService) ReadBranchComparisonDiff(ctx context.Context, root string, 
 }
 
 func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchList, error) {
-	out, err := gitCommand(ctx, root, "branch", "--all")
+	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
 	if err != nil {
 		return GitBranchList{}, err
 	}
 	currentOut, _ := gitCommand(ctx, root, "rev-parse", "--abbrev-ref", "HEAD")
 	current := strings.TrimSpace(currentOut)
 	set := map[string]bool{}
+	localSet := map[string]bool{}
+	remoteSet := map[string]bool{}
+	worktreeSet := map[string]bool{}
 	for line := range strings.SplitSeq(out, "\n") {
-		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "*"))
-		line = strings.TrimPrefix(line, "remotes/")
-		if line != "" {
-			set[line] = true
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
 		}
+
+		isCurrent := strings.HasPrefix(trimmed, "*")
+		isWorktree := strings.HasPrefix(trimmed, "+")
+		name := strings.TrimSpace(strings.TrimLeft(trimmed, "*+"))
+		name = strings.TrimPrefix(name, "remotes/")
+		if strings.HasSuffix(name, "->") || strings.Contains(name, " -> ") || name == "" {
+			continue
+		}
+
+		set[name] = true
+		if strings.Contains(trimmed, "remotes/") {
+			remoteSet[name] = true
+			continue
+		}
+
+		if isWorktree && !isCurrent {
+			worktreeSet[name] = true
+			continue
+		}
+
+		localSet[name] = true
 	}
 	branches := make([]string, 0, len(set))
 	for b := range set {
 		branches = append(branches, b)
 	}
+	localBranches := make([]string, 0, len(localSet))
+	for b := range localSet {
+		localBranches = append(localBranches, b)
+	}
+	remoteBranches := make([]string, 0, len(remoteSet))
+	for b := range remoteSet {
+		remoteBranches = append(remoteBranches, b)
+	}
+	worktreeBranches := make([]string, 0, len(worktreeSet))
+	for b := range worktreeSet {
+		worktreeBranches = append(worktreeBranches, b)
+	}
 	sort.Strings(branches)
+	sort.Strings(localBranches)
+	sort.Strings(remoteBranches)
+	sort.Strings(worktreeBranches)
 	if current != "" && !set[current] {
 		branches = append([]string{current}, branches...)
+		localBranches = append([]string{current}, localBranches...)
 	}
-	return GitBranchList{CurrentBranch: current, Branches: branches}, nil
+	return GitBranchList{
+		CurrentBranch: current,
+		Branches: branches,
+		LocalBranches: localBranches,
+		RemoteBranches: remoteBranches,
+		WorktreeBranches: worktreeBranches,
+	}, nil
 }
 
 func (s *GitService) PushBranch(ctx context.Context, root string) (string, error) {

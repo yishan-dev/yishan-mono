@@ -6,6 +6,8 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  InputAdornment,
+  Menu,
   MenuItem,
   Stack,
   TextField,
@@ -14,8 +16,9 @@ import {
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuGitBranch } from "react-icons/lu";
+import { LuChevronDown, LuFolderGit2, LuGitBranch } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
+import { BranchDropdown, type BranchDropdownGroups } from "../../../components/BranchDropdown";
 import {
   resolveSourceBranchState,
   resolveTargetBranchForCreate,
@@ -34,6 +37,69 @@ type CreateWorkspaceDialogViewProps = {
   workspaceId?: string;
   onClose: () => void;
 };
+
+
+function toUniqueSorted(values: string[]): string[] {
+  const normalizedValues = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  const preferredBranchOrder = new Map<string, number>([
+    ["main", 0],
+    ["master", 1],
+    ["origin/main", 0],
+    ["origin/master", 1],
+  ]);
+
+  return normalizedValues.sort((left, right) => {
+    const leftRank = preferredBranchOrder.get(left);
+    const rightRank = preferredBranchOrder.get(right);
+    if (leftRank !== undefined || rightRank !== undefined) {
+      return (leftRank ?? Number.MAX_SAFE_INTEGER) - (rightRank ?? Number.MAX_SAFE_INTEGER);
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
+function resolveSourceBranchGroups(input: {
+  branches: string[];
+  localBranches?: string[];
+  remoteBranches?: string[];
+  worktreeBranches?: string[];
+}): BranchDropdownGroups {
+  const hasExplicitGroups = Boolean(input.localBranches || input.remoteBranches || input.worktreeBranches);
+  if (hasExplicitGroups) {
+    return {
+      localBranches: toUniqueSorted(input.localBranches ?? []),
+      worktreeBranches: toUniqueSorted(input.worktreeBranches ?? []),
+      remoteBranches: toUniqueSorted(input.remoteBranches ?? []),
+    };
+  }
+
+  const localBranches: string[] = [];
+  const worktreeBranches: string[] = [];
+  const remoteBranches: string[] = [];
+
+  for (const branch of input.branches) {
+    const normalizedBranch = branch.trim();
+    if (!normalizedBranch) {
+      continue;
+    }
+    if (normalizedBranch.includes("/") && !normalizedBranch.startsWith("origin/")) {
+      worktreeBranches.push(normalizedBranch);
+      continue;
+    }
+    if (normalizedBranch.startsWith("origin/")) {
+      remoteBranches.push(normalizedBranch);
+      continue;
+    }
+    localBranches.push(normalizedBranch);
+  }
+
+  return {
+    localBranches: toUniqueSorted(localBranches),
+    worktreeBranches: toUniqueSorted(worktreeBranches),
+    remoteBranches: toUniqueSorted(remoteBranches),
+  };
+}
 
 const compactSelectSx = {
   "& .MuiOutlinedInput-root": {
@@ -87,7 +153,13 @@ export function CreateWorkspaceDialogView({
     projects.some((project) => project.id === repoId) ? repoId : (projects[0]?.id ?? ""),
   );
   const [sourceBranchOptions, setSourceBranchOptions] = useState<string[]>([]);
+  const [sourceBranchGroups, setSourceBranchGroups] = useState<BranchDropdownGroups>({
+    localBranches: [],
+    worktreeBranches: [],
+    remoteBranches: [],
+  });
   const [sourceBranch, setSourceBranch] = useState("");
+  const [sourceBranchMenuAnchorEl, setSourceBranchMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [isLoadingSourceBranches, setIsLoadingSourceBranches] = useState(false);
   const [name, setName] = useState("");
   const [targetBranch, setTargetBranch] = useState("");
@@ -181,11 +253,21 @@ export function CreateWorkspaceDialogView({
       const renameSourceBranch = selectedWorkspace?.sourceBranch?.trim() ?? "";
       if (isRenameMode && open) {
         setSourceBranchOptions(renameSourceBranch ? [renameSourceBranch] : []);
+        setSourceBranchGroups({
+          localBranches: renameSourceBranch ? [renameSourceBranch] : [],
+          worktreeBranches: [],
+          remoteBranches: [],
+        });
         setSourceBranch(renameSourceBranch);
         setIsLoadingSourceBranches(false);
         return;
       }
       setSourceBranchOptions([]);
+      setSourceBranchGroups({
+        localBranches: [],
+        worktreeBranches: [],
+        remoteBranches: [],
+      });
       setSourceBranch("");
       setIsLoadingSourceBranches(false);
       return;
@@ -194,13 +276,22 @@ export function CreateWorkspaceDialogView({
     let isCancelled = false;
 
     /** Applies one branch list into selector options while preserving manual current selection. */
-    const applySourceBranchState = (branches: string[]) => {
+    const applySourceBranchState = (branches: string[], nextGroups?: BranchDropdownGroups) => {
       const nextSourceBranchState = resolveSourceBranchState(branches, selectedRepo?.defaultBranch ?? "");
+      const resolvedGroups =
+        nextGroups ??
+        resolveSourceBranchGroups({
+          branches: nextSourceBranchState.options,
+        });
+      const remotePreferredBranch =
+        resolvedGroups.remoteBranches.find((branch) => branch === "origin/main" || branch === "origin/master") ?? "";
+      const preferredBranch = remotePreferredBranch || nextSourceBranchState.preferred;
       setSourceBranchOptions(nextSourceBranchState.options);
+      setSourceBranchGroups(resolvedGroups);
       setSourceBranch((currentValue) =>
         currentValue && nextSourceBranchState.options.includes(currentValue)
           ? currentValue
-          : nextSourceBranchState.preferred,
+          : preferredBranch,
       );
     };
 
@@ -212,7 +303,13 @@ export function CreateWorkspaceDialogView({
           return;
         }
 
-        applySourceBranchState(result.branches ?? []);
+        const nextGroups = resolveSourceBranchGroups({
+          branches: result.branches ?? [],
+          localBranches: result.localBranches,
+          remoteBranches: result.remoteBranches,
+          worktreeBranches: result.worktreeBranches,
+        });
+        applySourceBranchState(result.branches ?? [], nextGroups);
       } catch {
         if (isCancelled) {
           return;
@@ -345,6 +442,9 @@ export function CreateWorkspaceDialogView({
   const dialogTitle = isRenameMode ? t("workspace.rename.title") : t("workspace.create.title");
   const submitLabel = isRenameMode ? t("workspace.actions.rename") : t("workspace.actions.create");
   const canSubmitWorkspace = isRenameMode ? canRenameWorkspace : canCreateWorkspace;
+  const sourceBranchSelectValue = sourceBranchOptions.includes(sourceBranch) ? sourceBranch : "";
+  const isSourceBranchMenuOpen = Boolean(sourceBranchMenuAnchorEl);
+  const isSelectedSourceBranchWorktree = sourceBranchGroups.worktreeBranches.includes(sourceBranchSelectValue);
 
   return (
     <Dialog
@@ -365,6 +465,9 @@ export function CreateWorkspaceDialogView({
         <Stack spacing={2}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
             <Box sx={{ flex: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                Project
+              </Typography>
               <TextField
                 select
                 size="small"
@@ -376,6 +479,30 @@ export function CreateWorkspaceDialogView({
                 slotProps={{
                   select: {
                     displayEmpty: true,
+                    autoWidth: false,
+                    MenuProps: {
+                      slotProps: {
+                        paper: {
+                          sx: {
+                            width: "250px !important",
+                            minWidth: "250px !important",
+                            maxWidth: "250px !important",
+                          },
+                        },
+                        list: {
+                          sx: {
+                            width: "250px",
+                          },
+                        },
+                      },
+                      PaperProps: {
+                        sx: {
+                          width: "250px !important",
+                          minWidth: "250px !important",
+                          maxWidth: "250px !important",
+                        },
+                      },
+                    },
                     renderValue: (value) => {
                       const selectedValue = typeof value === "string" ? value : "";
                       const selectedValueRepo = projects.find((project) => project.id === selectedValue);
@@ -427,40 +554,67 @@ export function CreateWorkspaceDialogView({
             </Box>
 
             <Box sx={{ flex: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                Source branch
+              </Typography>
               <TextField
-                select
                 size="small"
                 fullWidth
-                value={sourceBranch}
-                onChange={(event) => setSourceBranch(event.target.value)}
+                value={sourceBranchSelectValue}
+                onClick={(event) => {
+                  if (isRenameMode || !selectedRepoId || sourceBranchOptions.length === 0) {
+                    return;
+                  }
+                  setSourceBranchMenuAnchorEl(event.currentTarget);
+                }}
                 sx={compactSelectSx}
-                slotProps={{
-                  select: {
-                    displayEmpty: true,
-                    renderValue: (value) => {
-                      const selectedValue = typeof value === "string" ? value : "";
-
-                      return (
-                        <Stack direction="row" alignItems="center" gap={1}>
-                          <LuGitBranch size={14} color="currentColor" />
-                          <Typography variant="body2" sx={{ fontWeight: 500, letterSpacing: 0.1 }}>
-                            {selectedValue || "Source branch"}
-                          </Typography>
-                        </Stack>
-                      );
-                    },
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <InputAdornment position="start" sx={{ mr: 0.75 }}>
+                      {isSelectedSourceBranchWorktree ? (
+                        <LuFolderGit2 size={14} color="currentColor" />
+                      ) : (
+                        <LuGitBranch size={14} color="currentColor" />
+                      )}
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end" sx={{ ml: 0.5, color: "text.secondary" }}>
+                      <LuChevronDown size={16} />
+                    </InputAdornment>
+                  ),
+                }}
+                placeholder="Source branch"
+                disabled={isRenameMode || !selectedRepoId || sourceBranchOptions.length === 0}
+              />
+              <Menu
+                open={isSourceBranchMenuOpen}
+                anchorEl={sourceBranchMenuAnchorEl}
+                onClose={() => setSourceBranchMenuAnchorEl(null)}
+                PaperProps={{
+                  sx: {
+                    minWidth: 250,
+                    maxWidth: 350,
                   },
                 }}
-                disabled={
-                  isRenameMode || !selectedRepoId || isLoadingSourceBranches || sourceBranchOptions.length === 0
-                }
               >
-                {sourceBranchOptions.map((branchOption) => (
-                  <MenuItem key={branchOption} value={branchOption}>
-                    {branchOption}
-                  </MenuItem>
-                ))}
-              </TextField>
+                <BranchDropdown
+                  groups={sourceBranchGroups}
+                  selectedValue={sourceBranchSelectValue}
+                  onSelect={(value) => {
+                    setSourceBranch(value);
+                    setSourceBranchMenuAnchorEl(null);
+                  }}
+                  localLabel="Local"
+                  branchesLabel="Branches"
+                  worktreesLabel="Worktrees"
+                  remoteLabel="Remote"
+                  emptyLocalLabel="No local branches"
+                  emptyWorktreeLabel="No worktree branches"
+                  emptyRemoteLabel="No remote branches"
+                />
+              </Menu>
             </Box>
           </Stack>
 
@@ -486,6 +640,13 @@ export function CreateWorkspaceDialogView({
                 fullWidth
                 placeholder={branchInputPlaceholder}
                 value={targetBranch}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start" sx={{ mr: 0.75 }}>
+                      <LuGitBranch size={14} color="currentColor" />
+                    </InputAdornment>
+                  ),
+                }}
                 onChange={(event) => {
                   setTargetBranch(event.target.value);
                   hasEditedTargetBranchRef.current = true;
