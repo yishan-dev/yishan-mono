@@ -21,6 +21,124 @@ type RepoChangesBySection = {
   untracked: ProjectGitChangesSection["files"];
 };
 
+function getParentPath(path: string): string {
+  const normalizedPath = path.replace(/\\/g, "/");
+  const slashIndex = normalizedPath.lastIndexOf("/");
+  return slashIndex <= 0 ? "" : normalizedPath.slice(0, slashIndex);
+}
+
+function getFileExtension(path: string): string {
+  const fileName = path.replace(/\\/g, "/").split("/").pop() ?? "";
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
+    return "";
+  }
+
+  return fileName.slice(dotIndex + 1).toLowerCase();
+}
+
+function reconcileRenameLikePairs(input: RepoChangesBySection): RepoChangesBySection {
+  const deletedUnstaged = input.unstaged.filter((file) => file.kind === "deleted");
+  const addedUntracked = input.untracked.filter((file) => file.kind === "added");
+  if (deletedUnstaged.length === 0 || addedUntracked.length === 0) {
+    return input;
+  }
+
+  const renamedByNewPath = new Map<string, ProjectGitChangesSection["files"][number]>();
+  const consumedDeletedPaths = new Set<string>();
+  const consumedAddedPaths = new Set<string>();
+
+  const addedCandidatesByPath = new Map(addedUntracked.map((file) => [file.path, file]));
+
+  for (const deletedFile of deletedUnstaged) {
+    const deletedExtension = getFileExtension(deletedFile.path);
+    const deletedParentPath = getParentPath(deletedFile.path);
+
+    const sameDirectoryCandidate = addedUntracked.find((candidate) => {
+      if (consumedAddedPaths.has(candidate.path)) {
+        return false;
+      }
+
+      if (getParentPath(candidate.path) !== deletedParentPath) {
+        return false;
+      }
+
+      if (!deletedExtension) {
+        return true;
+      }
+
+      return getFileExtension(candidate.path) === deletedExtension;
+    });
+
+    const extensionCandidate =
+      sameDirectoryCandidate ??
+      addedUntracked.find((candidate) => {
+        if (consumedAddedPaths.has(candidate.path)) {
+          return false;
+        }
+
+        return deletedExtension !== "" && getFileExtension(candidate.path) === deletedExtension;
+      });
+
+    const fallbackCandidate =
+      extensionCandidate ??
+      (() => {
+        const remainingAdded = addedUntracked.filter((candidate) => !consumedAddedPaths.has(candidate.path));
+        const remainingDeleted = deletedUnstaged.filter((candidate) => !consumedDeletedPaths.has(candidate.path));
+        if (remainingAdded.length === 1 && remainingDeleted.length === 1) {
+          return remainingAdded[0];
+        }
+
+        return null;
+      })();
+
+    if (!fallbackCandidate) {
+      continue;
+    }
+
+    consumedDeletedPaths.add(deletedFile.path);
+    consumedAddedPaths.add(fallbackCandidate.path);
+    const existingRename = renamedByNewPath.get(fallbackCandidate.path);
+    if (existingRename) {
+      renamedByNewPath.set(fallbackCandidate.path, {
+        ...existingRename,
+        additions: Math.max(existingRename.additions, fallbackCandidate.additions, deletedFile.additions),
+        deletions: Math.max(existingRename.deletions, fallbackCandidate.deletions, deletedFile.deletions),
+      });
+      continue;
+    }
+
+    renamedByNewPath.set(fallbackCandidate.path, {
+      path: fallbackCandidate.path,
+      kind: "renamed",
+      additions: Math.max(fallbackCandidate.additions, deletedFile.additions),
+      deletions: Math.max(fallbackCandidate.deletions, deletedFile.deletions),
+    });
+  }
+
+  if (renamedByNewPath.size === 0) {
+    return input;
+  }
+
+  const nextUnstaged = [
+    ...input.unstaged.filter((file) => !consumedDeletedPaths.has(file.path)),
+    ...renamedByNewPath.values(),
+  ];
+  const nextUntracked = input.untracked.filter((file) => {
+    if (!consumedAddedPaths.has(file.path)) {
+      return true;
+    }
+
+    return !addedCandidatesByPath.has(file.path);
+  });
+
+  return {
+    ...input,
+    unstaged: dedupeRepoChangeFiles(nextUnstaged),
+    untracked: dedupeRepoChangeFiles(nextUntracked),
+  };
+}
+
 /** Normalizes one workspace-relative path for consistent rendering and diff lookups. */
 function normalizeWorkspaceRelativePath(relativePath: string): string {
   const normalizedPath = relativePath.trim().replace(/\\/g, "/");
@@ -85,7 +203,7 @@ function dedupeRepoChangeFiles(files: ProjectGitChangesSection["files"]): Projec
 }
 
 function normalizeProjectGitChangeKind(kind: string): ProjectGitChangeKind {
-  if (kind === "added" || kind === "deleted" || kind === "modified") {
+  if (kind === "added" || kind === "deleted" || kind === "modified" || kind === "renamed") {
     return kind;
   }
 
@@ -289,7 +407,7 @@ export function ChangesTabView() {
         ),
       };
 
-      setRepoChangesBySection(dedupedResponse);
+      setRepoChangesBySection(reconcileRenameLikePairs(dedupedResponse));
       if (shouldShowLoadingForRequest && repoChangesLoadRequestIdRef.current === requestId) {
         pendingWorkspaceSwitchLoadPathRef.current = null;
         setIsRepoChangesLoading(false);

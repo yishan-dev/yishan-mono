@@ -14,7 +14,7 @@ import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, u
 import { LuChevronDown, LuChevronRight, LuCopy, LuCornerUpLeft, LuMinus, LuPlus } from "react-icons/lu";
 import { GitChangeTotals } from "./GitChangeTotals";
 
-export type ProjectGitChangeKind = "added" | "modified" | "deleted";
+export type ProjectGitChangeKind = "added" | "modified" | "deleted" | "renamed";
 
 export type ProjectGitChangeItem = {
   path: string;
@@ -62,15 +62,19 @@ function getChangeColors(kind: ProjectGitChangeKind, sectionId: string) {
     return { icon: "?", color: "info.main" };
   }
 
+  if (kind === "renamed") {
+    return { icon: "R", color: "info.main" };
+  }
+
   if (kind === "added") {
-    return { icon: "+", color: "success.main" };
+    return { icon: "A", color: "success.main" };
   }
 
   if (kind === "deleted") {
-    return { icon: "-", color: "error.main" };
+    return { icon: "D", color: "error.main" };
   }
 
-  return { icon: "●", color: "warning.light" };
+  return { icon: "M", color: "warning.light" };
 }
 
 /** Groups changed files by parent folder so list rows stay compact. */
@@ -584,7 +588,7 @@ export function ProjectGitChangesList({
                                           {fileName}
                                         </Typography>
 
-                                        {file.additions > 0 || file.deletions > 0 ? (
+                                        {file.kind !== "renamed" && (file.additions > 0 || file.deletions > 0) ? (
                                           <GitChangeTotals
                                             testId={`changes-file-stats-${section.id}-${file.path}`}
                                             additions={file.additions}

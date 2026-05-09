@@ -9,8 +9,11 @@ export type FileTreeContextMenuRequest = {
   startRename?: () => void;
 };
 
+export type FileTreeGitChangeKind = "added" | "modified" | "deleted" | "renamed";
+
 export type FileTreeProps = {
   files: string[];
+  gitChangesByPath?: Record<string, FileTreeGitChangeKind>;
   ignoredPaths?: string[];
   loadedDirectoryPaths?: string[];
   expandableDirectoryPaths?: string[];

@@ -319,4 +319,48 @@ describe("ChangesTabView", () => {
     expect(screen.queryByTestId("changes-file-untracked-.openwork/")).toBeNull();
     expect(screen.queryByTestId("changes-section-untracked")).toBeNull();
   });
+
+  it("maps renamed git entries to renamed status instead of modified", async () => {
+    mocks.listGitChanges.mockResolvedValue({
+      unstaged: [{ path: "src/new-name.ts", kind: "renamed", additions: 0, deletions: 0 }],
+      staged: [],
+      untracked: [],
+    });
+    mocks.readDiff.mockResolvedValue({ oldContent: "old", newContent: "new" });
+
+    render(<ChangesTabView />);
+
+    const renamedIndicator = await screen.findByTestId("changes-file-indicator-unstaged-src/new-name.ts");
+    expect(renamedIndicator.textContent).toBe("R");
+
+    fireEvent.click(screen.getByText("new-name.ts"));
+
+    await waitFor(() => {
+      expect(mocks.openTab).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+        kind: "diff",
+        path: "src/new-name.ts",
+        changeKind: "renamed",
+        additions: 0,
+        deletions: 0,
+        oldContent: "old",
+        newContent: "new",
+      });
+    });
+  });
+
+  it("reconciles unstaged delete + untracked add pairs as renamed", async () => {
+    mocks.listGitChanges.mockResolvedValue({
+      unstaged: [{ path: "src/old-name.ts", kind: "deleted", additions: 0, deletions: 0 }],
+      staged: [],
+      untracked: [{ path: "src/new-name.ts", kind: "added", additions: 0, deletions: 0 }],
+    });
+
+    render(<ChangesTabView />);
+
+    const renamedIndicator = await screen.findByTestId("changes-file-indicator-unstaged-src/new-name.ts");
+    expect(renamedIndicator.textContent).toBe("R");
+    expect(screen.queryByTestId("changes-file-unstaged-src/old-name.ts")).toBeNull();
+    expect(screen.queryByTestId("changes-file-untracked-src/new-name.ts")).toBeNull();
+  });
 });
