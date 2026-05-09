@@ -157,7 +157,13 @@ export function MainPaneView() {
     (): RefreshableOpenTab[] =>
       workspaceTabs.reduce<RefreshableOpenTab[]>((result, tab) => {
         if (tab.kind === "file") {
-          result.push({ id: tab.id, kind: "file", path: tab.data.path, isDirty: tab.data.isDirty });
+          result.push({
+            id: tab.id,
+            kind: "file",
+            path: tab.data.path,
+            isDirty: tab.data.isDirty,
+            isUnsupported: Boolean(tab.data.isUnsupported),
+          });
           return result;
         }
 
@@ -361,6 +367,36 @@ export function MainPaneView() {
                       tab.data.unsupportedReason === "size"
                         ? t("files.unsupported.hintLarge")
                         : t("files.unsupported.hint")
+                    }
+                    onCopyPath={async (filePath) => {
+                      if (!navigator.clipboard) {
+                        return;
+                      }
+
+                      try {
+                        await navigator.clipboard.writeText(filePath);
+                      } catch (error) {
+                        console.error("Failed to copy workspace file path", error);
+                      }
+                    }}
+                    onOpenExternalApp={async (filePath) => {
+                      const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+                      if (!workspaceWorktreePath) {
+                        return;
+                      }
+
+                      try {
+                        await openEntryInExternalApp({
+                          workspaceWorktreePath,
+                          appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+                          relativePath: filePath,
+                        });
+                      } catch (error) {
+                        console.error("Failed to open workspace file externally", error);
+                      }
+                    }}
+                    openExternalAppLabel={
+                      lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
                     }
                   />
                 </Box>
