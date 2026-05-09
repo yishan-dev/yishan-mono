@@ -221,10 +221,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         return;
       }
 
-      const inputData = encodeSingleAsciiInput(data);
-
       // Send input to PTY immediately — this is the latency-critical path.
-      void writeTerminalInput({ sessionId, data: inputData ?? data }).catch((error) => {
+      void writeTerminalInput({ sessionId, data }).catch((error) => {
         reportTerminalAsyncError("write terminal input", error);
       });
     });
@@ -597,18 +595,4 @@ function isTerminalAttached(terminal: Terminal): boolean {
   }
 
   return Boolean(terminal.element);
-}
-
-/** Avoids TextEncoder work on the held-key hot path. */
-function encodeSingleAsciiInput(data: string): Uint8Array | null {
-  if (data.length !== 1) {
-    return null;
-  }
-
-  const code = data.charCodeAt(0);
-  if (code > 0x7f) {
-    return null;
-  }
-
-  return new Uint8Array([code]);
 }

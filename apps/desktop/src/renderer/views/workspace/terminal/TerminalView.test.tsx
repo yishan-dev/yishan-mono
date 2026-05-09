@@ -998,7 +998,7 @@ describe("TerminalView", () => {
     await waitFor(() => {
       expect(mocked.writeTerminalInput).toHaveBeenCalledWith({
         sessionId: "session-shift-enter",
-        data: new Uint8Array([0x0a]),
+        data: "\n",
       });
     });
 
@@ -1016,7 +1016,7 @@ describe("TerminalView", () => {
     expect(mocked.writeTerminalInput).toHaveBeenCalledTimes(2);
   });
 
-  it("encodes single ASCII key input and renders only PTY echo", async () => {
+  it("sends single ASCII key input as string and renders only PTY echo", async () => {
     const state = buildStoreState();
     mocked.stateRef.current = state;
     mocked.createTerminalSession.mockResolvedValueOnce({
@@ -1045,7 +1045,7 @@ describe("TerminalView", () => {
 
     expect(mocked.writeTerminalInput).toHaveBeenCalledWith({
       sessionId: "session-ascii-input",
-      data: new Uint8Array([0x61]),
+      data: "a",
     });
     expect(mocked.xtermWrite).not.toHaveBeenCalledWith("a", expect.any(Function));
     mocked.xtermWrite.mockClear();
