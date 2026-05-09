@@ -121,8 +121,32 @@ async function refreshAccessTokenRequest(refreshToken: string): Promise<string |
       return undefined;
     }
 
-    const payload = (await response.json()) as { accessToken?: string };
-    return payload.accessToken?.trim() || undefined;
+    const payload = (await response.json()) as {
+      accessToken?: string;
+      refreshToken?: string;
+      accessTokenExpiresAt?: string;
+      refreshTokenExpiresAt?: string;
+    };
+    const accessToken = payload.accessToken?.trim() || undefined;
+    if (!accessToken) {
+      return undefined;
+    }
+
+    try {
+      const daemonClient = await getDaemonClient();
+      await daemonClient.app.persistAuthTokens({
+        accessToken,
+        refreshToken: payload.refreshToken?.trim() || undefined,
+        accessTokenExpiresAt: payload.accessTokenExpiresAt?.trim() || undefined,
+        refreshTokenExpiresAt: payload.refreshTokenExpiresAt?.trim() || undefined,
+      });
+    } catch {
+      // Best-effort daemon sync. Keep in-memory token so current renderer
+      // request can still recover even if daemon persistence is temporarily
+      // unavailable.
+    }
+
+    return accessToken;
   } catch {
     return undefined;
   }
@@ -253,3 +277,4 @@ export async function requestJson<T>(
 
   return (await response.json()) as T;
 }
+import { getDaemonClient } from "../rpc/rpcTransport";

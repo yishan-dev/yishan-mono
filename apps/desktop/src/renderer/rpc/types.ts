@@ -16,6 +16,7 @@ export type DaemonRpcClient = {
     getDefaultWorktreeLocation: (input?: unknown) => Promise<{ worktreePath: string }>;
     checkAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
     ensureAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
+    persistAuthTokens: (input: Rpc.PersistAuthTokensInput) => Promise<{ ok: boolean }>;
   };
   workspace: {
     list: (input?: unknown) => Promise<unknown>;

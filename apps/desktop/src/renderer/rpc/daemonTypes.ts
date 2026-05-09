@@ -78,6 +78,13 @@ export type WorkspaceCreateInput = {
   setupHook?: string;
 };
 
+export type PersistAuthTokensInput = {
+  accessToken: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
+};
+
 export type WorkspaceSyncContextLinkInput = {
   repoKey: string;
   enabled: boolean;

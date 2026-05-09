@@ -136,7 +136,11 @@ func Run(cfg RunConfig, statePath string) error {
 			Endpoint:             "http://" + actualAddr,
 			AgentDetectionStatus: agentDetectionStatus,
 		}); err != nil {
-			return fmt.Errorf("register daemon node: %w", err)
+			if isReauthRequiredError(err) {
+				log.Warn().Err(err).Msg("daemon started without remote node registration; re-authentication required")
+			} else {
+				return fmt.Errorf("register daemon node: %w", err)
+			}
 		}
 	}
 
