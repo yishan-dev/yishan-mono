@@ -142,15 +142,18 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if closeResult.PostHookResult != nil && closeResult.PostHookResult.Error != "" {
 			warnings = append(warnings, hookResultToWarning("post", req.PostHook, closeResult.PostHookResult))
 		}
-		result := map[string]any{
-			"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
-			"workspaceId":             req.WorkspaceID,
-			"lifecycleScriptWarnings": warnings,
-		}
-		if closeResult.PostHookResult != nil {
-			result["postHookResult"] = closeResult.PostHookResult
-		}
-		return result, nil
+	result := map[string]any{
+		"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
+		"workspaceId":             req.WorkspaceID,
+		"lifecycleScriptWarnings": warnings,
+	}
+	if closeResult.PostHookResult != nil {
+		result["postHookResult"] = closeResult.PostHookResult
+	}
+	if len(closeResult.TerminalCleanupErrors) > 0 {
+		result["terminalCleanupErrors"] = closeResult.TerminalCleanupErrors
+	}
+	return result, nil
 	case MethodAgentListDetectionStatuses:
 		return ListAgentCLIDetectionStatuses(), nil
 	case MethodFrontendEventsStream:

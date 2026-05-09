@@ -52,6 +52,7 @@ type CloseWorkspaceResponse = {
   workspace: { id: string; status: string };
   workspaceId: string;
   lifecycleScriptWarnings: WorkspaceLifecycleScriptWarning[];
+  terminalCleanupErrors?: string[];
 };
 
 /**
@@ -210,6 +211,13 @@ async function closeWorkspaceInBackground(input: {
     "post",
     input.postHook || "",
   );
+  if (closed.terminalCleanupErrors && closed.terminalCleanupErrors.length > 0) {
+    const details = closed.terminalCleanupErrors.join("; ");
+    enqueueWorkspaceErrorNotice({
+      title: "Some processes did not shut down cleanly",
+      message: `Workspace "${input.workspaceName}" closed, but ${closed.terminalCleanupErrors.length} process(es) could not be terminated. Ports or resources may still be in use. Details: ${details}`,
+    });
+  }
 }
 
 type WorkspaceStoreFacade = typeof workspaceStore & {
