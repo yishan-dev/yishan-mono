@@ -1,9 +1,12 @@
 import { Box, IconButton, Tooltip, Typography, useTheme } from "@mui/material";
-import { useEffect, useMemo, useRef } from "react";
-import { LuCopy, LuExternalLink } from "react-icons/lu";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuCode, LuColumns2, LuCopy, LuEye, LuExternalLink } from "react-icons/lu";
 import { getFileTreeIcon } from "./fileTreeIcons";
-import { getLanguageId } from "../helpers/editorLanguage";
+import { getLanguageId, isMarkdownFile } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
+import { MarkdownPreview } from "./MarkdownPreview";
+
+type MarkdownViewMode = "editor" | "split" | "preview";
 
 type FileEditorProps = {
   path: string;
@@ -16,7 +19,8 @@ type FileEditorProps = {
   openExternalAppLabel?: string;
 };
 
-/** Renders a Monaco file editor with local edit tracking and Cmd/Ctrl+S save shortcut. */
+/** Renders a Monaco file editor with local edit tracking and Cmd/Ctrl+S save shortcut.
+ *  For Markdown files, supports split-pane and preview-only modes. */
 export function FileEditor({
   path,
   content,
@@ -34,11 +38,30 @@ export function FileEditor({
   const onContentChangeRef = useRef(onContentChange);
   const onSaveRef = useRef(onSave);
 
+  const isMarkdown = useMemo(() => isMarkdownFile(path), [path]);
+  const [viewMode, setViewMode] = useState<MarkdownViewMode>(() =>
+    isMarkdownFile(path) ? "split" : "editor",
+  );
+
+  // Reset view mode when switching between markdown and non-markdown files.
+  // When entering a markdown file from a non-markdown file (viewMode is "editor"),
+  // default to "split". When leaving markdown, always reset to "editor".
+  useEffect(() => {
+    if (isMarkdown) {
+      setViewMode((prev) => (prev === "editor" ? "split" : prev));
+    } else {
+      setViewMode("editor");
+    }
+  }, [isMarkdown]);
+
   const monacoTheme = useMemo(
     () => (theme.palette.mode === "dark" ? YISHAN_THEME_DARK : YISHAN_THEME_LIGHT),
     [theme.palette.mode],
   );
   const fileIcon = useMemo(() => getFileTreeIcon(path, false), [path]);
+
+  const showEditor = viewMode === "editor" || viewMode === "split";
+  const showPreview = viewMode === "preview" || viewMode === "split";
 
   useEffect(() => {
     contentRef.current = content;
@@ -138,8 +161,24 @@ export function FileEditor({
     };
   }, [focusRequestKey]);
 
+  // Trigger Monaco layout when the editor pane visibility changes, so it
+  // recalculates its dimensions after being hidden/shown.
+  useEffect(() => {
+    if (showEditor) {
+      const frame = window.requestAnimationFrame(() => {
+        editorRef.current?.layout();
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [showEditor]);
+
+  const handleSetViewMode = useCallback((mode: MarkdownViewMode) => {
+    setViewMode(mode);
+  }, []);
+
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      {/* Toolbar */}
       <Box
         sx={{
           minHeight: 34,
@@ -157,6 +196,33 @@ export function FileEditor({
           {path}
         </Typography>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
+          {/* Markdown view mode toggles */}
+          {isMarkdown ? (
+            <>
+              <MarkdownViewModeToggle
+                mode="editor"
+                currentMode={viewMode}
+                icon={<LuCode size={14} />}
+                tooltip="Source editor"
+                onSelect={handleSetViewMode}
+              />
+              <MarkdownViewModeToggle
+                mode="split"
+                currentMode={viewMode}
+                icon={<LuColumns2 size={14} />}
+                tooltip="Split view"
+                onSelect={handleSetViewMode}
+              />
+              <MarkdownViewModeToggle
+                mode="preview"
+                currentMode={viewMode}
+                icon={<LuEye size={14} />}
+                tooltip="Preview"
+                onSelect={handleSetViewMode}
+              />
+              <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 0.5 }} />
+            </>
+          ) : null}
           <Tooltip title="Copy file path" arrow>
             <span>
               <IconButton
@@ -189,7 +255,88 @@ export function FileEditor({
           </Tooltip>
         </Box>
       </Box>
-      <Box ref={editorHostRef} sx={{ flex: 1, minHeight: 0 }} />
+
+      {/* Content area */}
+      <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>
+        {/* Monaco editor pane */}
+        <Box
+          ref={editorHostRef}
+          sx={{
+            flex: showPreview && showEditor ? 1 : showEditor ? 1 : 0,
+            minHeight: 0,
+            minWidth: 0,
+            display: showEditor ? "block" : "none",
+          }}
+        />
+
+        {/* Divider between editor and preview */}
+        {showEditor && showPreview ? (
+          <Box
+            sx={{
+              width: "1px",
+              bgcolor: "divider",
+              flexShrink: 0,
+            }}
+          />
+        ) : null}
+
+        {/* Markdown preview pane */}
+        {isMarkdown && showPreview ? (
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <MarkdownPreview content={content} />
+          </Box>
+        ) : null}
+      </Box>
     </Box>
+  );
+}
+
+/** A single toggle button for switching Markdown view modes. */
+function MarkdownViewModeToggle({
+  mode,
+  currentMode,
+  icon,
+  tooltip,
+  onSelect,
+}: {
+  mode: MarkdownViewMode;
+  currentMode: MarkdownViewMode;
+  icon: React.ReactNode;
+  tooltip: string;
+  onSelect: (mode: MarkdownViewMode) => void;
+}) {
+  const isActive = mode === currentMode;
+
+  return (
+    <Tooltip title={tooltip} arrow>
+      <span>
+        <IconButton
+          size="small"
+          aria-label={tooltip}
+          aria-pressed={isActive}
+          onClick={() => onSelect(mode)}
+          sx={{
+            p: 0.375,
+            color: isActive ? "primary.main" : "text.secondary",
+            bgcolor: isActive ? "action.selected" : "transparent",
+            borderRadius: 0.75,
+            "&:hover": {
+              bgcolor: isActive ? "action.selected" : "action.hover",
+            },
+          }}
+        >
+          {icon}
+        </IconButton>
+      </span>
+    </Tooltip>
   );
 }

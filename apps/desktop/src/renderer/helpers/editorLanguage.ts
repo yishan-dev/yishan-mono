@@ -132,6 +132,15 @@ export function getSupportedExtensions(): string[] {
   return Object.keys(LANGUAGE_MAP);
 }
 
+/** Set of file extensions recognized as Markdown formats. */
+const MARKDOWN_EXTENSIONS = new Set(["md", "mdx"]);
+
+/** Returns true when the given file path refers to a Markdown file. */
+export function isMarkdownFile(path: string): boolean {
+  const ext = getFileExtension(path);
+  return MARKDOWN_EXTENSIONS.has(ext);
+}
+
 /** Set of file extensions recognized as previewable image formats. */
 const IMAGE_EXTENSIONS = new Set([
   "png",

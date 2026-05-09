@@ -49,6 +49,7 @@ vi.mock("../helpers/monacoSetup", () => ({
             mockEditorState.editorValue = value;
           },
           focus: () => mockEditorState.editorFocus(),
+          layout: vi.fn(),
           addCommand: (keybinding: number, handler: () => void) => {
             mockEditorState.addCommandCalls.push({ keybinding, handler });
           },
@@ -85,7 +86,11 @@ vi.mock("../helpers/editorLanguage", () => ({
     if (path.endsWith(".unknown")) return null;
     if (path.endsWith(".ts")) return "typescript";
     if (path.endsWith(".py")) return "python";
+    if (path.endsWith(".md") || path.endsWith(".mdx")) return "markdown";
     return "plaintext";
+  },
+  isMarkdownFile: (path: string) => {
+    return path.endsWith(".md") || path.endsWith(".mdx");
   },
 }));
 
