@@ -145,6 +145,7 @@ func (s *GitService) ListChanges(ctx context.Context, root string) (GitChangesBy
 		indexStatus := line[0]
 		worktreeStatus := line[1]
 		path := strings.TrimSpace(line[3:])
+		path = normalizeStatusPath(path)
 		if path == "" {
 			continue
 		}
@@ -606,6 +607,21 @@ func parseNumstat(raw string) map[string][2]int {
 
 func statValue(v [2]int) (int, int) {
 	return v[0], v[1]
+}
+
+func normalizeStatusPath(path string) string {
+	trimmedPath := strings.TrimSpace(path)
+	if trimmedPath == "" {
+		return ""
+	}
+
+	arrowIndex := strings.LastIndex(trimmedPath, " -> ")
+	if arrowIndex <= 0 {
+		return strings.Trim(trimmedPath, "\"")
+	}
+
+	renameDestinationPath := strings.TrimSpace(trimmedPath[arrowIndex+4:])
+	return strings.Trim(renameDestinationPath, "\"")
 }
 
 func mapStatusToKind(status byte) string {

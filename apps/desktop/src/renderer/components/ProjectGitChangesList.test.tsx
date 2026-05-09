@@ -65,7 +65,7 @@ describe("ProjectGitChangesList", () => {
     expect(screen.queryByRole("button", { name: "Revert Untracked" })).toBeNull();
   });
 
-  it("shows question-mark badge for untracked files", () => {
+  it("shows char badges for untracked and added files", () => {
     render(
       <ProjectGitChangesList
         sections={[
@@ -84,7 +84,61 @@ describe("ProjectGitChangesList", () => {
     );
 
     expect(screen.getByTestId("changes-file-indicator-untracked-.openwork/config.json").textContent).toBe("?");
-    expect(screen.getByTestId("changes-file-indicator-unstaged-src/app.ts").textContent).toBe("+");
+    expect(screen.getByTestId("changes-file-indicator-unstaged-src/app.ts").textContent).toBe("A");
+  });
+
+  it("shows char badges for modified and deleted files", () => {
+    render(
+      <ProjectGitChangesList
+        sections={[
+          {
+            id: "unstaged",
+            label: "Unstaged",
+            files: [
+              { path: "src/app.ts", kind: "modified", additions: 1, deletions: 0 },
+              { path: "src/old.ts", kind: "deleted", additions: 0, deletions: 1 },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("changes-file-indicator-unstaged-src/app.ts").textContent).toBe("M");
+    expect(screen.getByTestId("changes-file-indicator-unstaged-src/old.ts").textContent).toBe("D");
+  });
+
+  it("shows rename badge for renamed files", () => {
+    render(
+      <ProjectGitChangesList
+        sections={[
+          {
+            id: "unstaged",
+            label: "Unstaged",
+            files: [{ path: "src/new-name.ts", kind: "renamed", additions: 0, deletions: 0 }],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("changes-file-indicator-unstaged-src/new-name.ts").textContent).toBe("R");
+  });
+
+  it("hides line stats for renamed files", () => {
+    const renamedPath = "src/new-name.ts";
+
+    render(
+      <ProjectGitChangesList
+        sections={[
+          {
+            id: "unstaged",
+            label: "Unstaged",
+            files: [{ path: renamedPath, kind: "renamed", additions: 12, deletions: 8 }],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTestId(`changes-file-stats-unstaged-${renamedPath}`)).toBeNull();
   });
 
   it("hides stage and revert actions in read-only mode", () => {
