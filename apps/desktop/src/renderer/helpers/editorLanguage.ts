@@ -96,6 +96,10 @@ const LANGUAGE_MAP: Record<string, string> = {
   // GraphQL
   graphql: "graphql",
   gql: "graphql",
+
+  // Mermaid
+  mmd: "mermaid",
+  mermaid: "mermaid",
 };
 
 /**

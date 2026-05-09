@@ -16,6 +16,8 @@ vi.stubGlobal("self", globalThis);
 
 vi.mock("monaco-editor", () => ({
   languages: {
+    register: vi.fn(),
+    setMonarchTokensProvider: vi.fn(),
     typescript: {
       typescriptDefaults,
       javascriptDefaults,

@@ -66,6 +66,78 @@ jsDefaults.setDiagnosticsOptions({
   noSyntaxValidation: false,
 });
 
+// -- Mermaid language registration -----------------------------------------
+// Registers a Monarch tokenizer for Mermaid diagram syntax. Since Monaco's
+// built-in Markdown tokenizer uses `nextEmbedded: "$1"` for fenced code blocks,
+// having a registered "mermaid" language means ```mermaid blocks automatically
+// receive syntax highlighting in Markdown files.
+
+monaco.languages.register({ id: "mermaid" });
+monaco.languages.setMonarchTokensProvider("mermaid", {
+  defaultToken: "",
+  tokenPostfix: ".mermaid",
+
+  keywords: [
+    "graph", "flowchart", "sequenceDiagram", "classDiagram", "stateDiagram",
+    "stateDiagram-v2", "erDiagram", "gantt", "pie", "gitGraph", "journey",
+    "quadrantChart", "requirementDiagram", "mindmap", "timeline", "sankey-beta",
+    "xychart-beta", "block-beta",
+    "subgraph", "end",
+    "participant", "actor", "activate", "deactivate", "loop", "alt", "else",
+    "opt", "par", "critical", "break", "rect", "note", "over",
+    "class", "section", "title", "dateFormat", "axisFormat", "excludes",
+    "state", "direction",
+    "LR", "RL", "TB", "BT", "TD",
+  ],
+
+  operators: ["-->", "---", "-.->", "==>", "--", "-..-", "==", "-->|", "|", ":::", "->", "<->"],
+
+  tokenizer: {
+    root: [
+      // Comments
+      [/%%.*$/, "comment"],
+
+      // Strings
+      [/"[^"]*"/, "string"],
+      [/'[^']*'/, "string"],
+
+      // Diagram type declarations (first keyword on a line)
+      [/^\s*(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|gitGraph|journey|quadrantChart|requirementDiagram|mindmap|timeline|sankey-beta|xychart-beta|block-beta)\b/, "type"],
+
+      // Keywords
+      [/\b(subgraph|end|participant|actor|activate|deactivate|loop|alt|else|opt|par|critical|break|rect|note|over|class|section|title|dateFormat|axisFormat|excludes|state|direction|LR|RL|TB|BT|TD)\b/, "keyword"],
+
+      // Arrow operators and connections
+      [/-->\|[^|]*\|/, "operator"],
+      [/--?>/, "operator"],
+      [/==>/, "operator"],
+      [/-\.->/, "operator"],
+      [/~~>/, "operator"],
+      [/<-->/, "operator"],
+      [/---/, "operator"],
+      [/===/, "operator"],
+
+      // Node shapes: brackets, parens, braces, etc.
+      [/[[\](){}|<>]/, "delimiter"],
+
+      // Labels on edges (text after |)
+      [/\|[^|]*\|/, "string"],
+
+      // Class/style definitions
+      [/:::\s*\w+/, "attribute.name"],
+
+      // Numbers
+      [/\b\d+\b/, "number"],
+
+      // Identifiers (node names)
+      [/[a-zA-Z_]\w*/, "variable"],
+
+      // Whitespace
+      [/\s+/, "white"],
+    ],
+  },
+});
+
 // -- Custom editor themes (shared by FileEditor and FileDiffViewer) --------
 
 export const YISHAN_THEME_LIGHT = "yishan-light";

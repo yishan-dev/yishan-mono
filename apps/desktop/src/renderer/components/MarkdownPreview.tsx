@@ -1,13 +1,27 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
+import rehypeMermaidLite from "rehype-mermaid-lite";
 import remarkGfm from "remark-gfm";
+import { MermaidBlock } from "./MermaidBlock";
 
 type MarkdownPreviewProps = {
   content: string;
 };
+
+/** Recursively extracts plain text from React node trees (strings, elements with children, arrays). */
+function extractTextContent(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractTextContent).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return extractTextContent(node.props.children);
+  }
+  return "";
+}
 
 /** highlight.js token colors inspired by GitHub's light/dark themes, applied via sx. */
 function getCodeHighlightStyles(mode: "light" | "dark") {
@@ -258,7 +272,30 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   const styles = useMarkdownStyles(theme);
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
-  const rehypePlugins = useMemo(() => [rehypeHighlight], []);
+  const rehypePlugins = useMemo(
+    () => [
+      rehypeMermaidLite,
+      rehypeHighlight,
+    ],
+    [],
+  );
+
+  // Custom component override for <pre> blocks to intercept mermaid diagrams.
+  // rehype-mermaid transforms mermaid fenced blocks into:
+  // <pre class="mermaid">diagram source</pre>
+  const components = useMemo(
+    () => ({
+      pre: ({ className, children, ...props }: React.ComponentProps<"pre">) => {
+        if (typeof className === "string" && className.split(/\s+/).includes("mermaid")) {
+          const code = extractTextContent(children).replace(/\n$/, "");
+          return <MermaidBlock code={code} />;
+        }
+
+        return <pre className={className} {...props}>{children}</pre>;
+      },
+    }),
+    [],
+  );
 
   if (!content.trim()) {
     return (
@@ -288,7 +325,11 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
         ...styles.container,
       }}
     >
-      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins}>
+      <Markdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins as never}
+        components={components}
+      >
         {content}
       </Markdown>
     </Box>
