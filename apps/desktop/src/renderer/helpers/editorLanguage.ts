@@ -96,6 +96,10 @@ const LANGUAGE_MAP: Record<string, string> = {
   // GraphQL
   graphql: "graphql",
   gql: "graphql",
+
+  // Mermaid
+  mmd: "mermaid",
+  mermaid: "mermaid",
 };
 
 /**
@@ -130,6 +134,15 @@ export function isLanguageSupported(path: string): boolean {
 /** Returns the list of supported file extensions. Mainly useful for tests. */
 export function getSupportedExtensions(): string[] {
   return Object.keys(LANGUAGE_MAP);
+}
+
+/** Set of file extensions recognized as Markdown formats. */
+const MARKDOWN_EXTENSIONS = new Set(["md", "mdx"]);
+
+/** Returns true when the given file path refers to a Markdown file. */
+export function isMarkdownFile(path: string): boolean {
+  const ext = getFileExtension(path);
+  return MARKDOWN_EXTENSIONS.has(ext);
 }
 
 /** Set of file extensions recognized as previewable image formats. */
