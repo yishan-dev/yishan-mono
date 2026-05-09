@@ -58,7 +58,7 @@ export type RepoWorkspaceItem = {
   kind?: "managed" | "local";
 };
 
-export type DiffFileChangeKind = "added" | "modified" | "deleted";
+export type DiffFileChangeKind = "added" | "modified" | "deleted" | "renamed";
 
 export type DiffTabSource =
   | { kind: "workspace" }

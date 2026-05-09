@@ -13,16 +13,24 @@ import {
   resolveDestinationDirectoryPath,
   resolveUniqueChildName,
 } from "./treeUtils";
-import type { EditingEntry, FileTreeContextMenuRequest, FileTreeProps, TreeNode } from "./types";
+import type {
+  EditingEntry,
+  FileTreeContextMenuRequest,
+  FileTreeGitChangeKind,
+  FileTreeProps,
+  TreeNode,
+} from "./types";
 import { useVisibleFileTree } from "./useVisibleFileTree";
 
 const EMPTY_IGNORED_PATHS: string[] = [];
 const EMPTY_LOADED_DIRECTORY_PATHS: string[] = [];
 const EMPTY_EXPANDABLE_DIRECTORY_PATHS: string[] = [];
+const EMPTY_GIT_CHANGES_BY_PATH: Record<string, FileTreeGitChangeKind> = {};
 
 /** Renders workspace files as one tree and exposes user intents to the owning view. */
 export function FileTree({
   files,
+  gitChangesByPath,
   ignoredPaths = EMPTY_IGNORED_PATHS,
   loadedDirectoryPaths = EMPTY_LOADED_DIRECTORY_PATHS,
   expandableDirectoryPaths = EMPTY_EXPANDABLE_DIRECTORY_PATHS,
@@ -46,6 +54,7 @@ export function FileTree({
   onDropExternalEntries,
   onItemContextMenu,
 }: FileTreeProps) {
+  const gitChangesByPathResolved = gitChangesByPath ?? EMPTY_GIT_CHANGES_BY_PATH;
   const [editingEntry, setEditingEntry] = useState<EditingEntry | null>(null);
   const [editingName, setEditingName] = useState("");
   const [selectedEntryPath, setSelectedEntryPath] = useState("");
@@ -485,6 +494,7 @@ export function FileTree({
           <TreeNodeItem
             key={node.path}
             node={node}
+            gitChangesByPath={gitChangesByPathResolved}
             ignoredPathSet={ignoredPathSet}
             loadedDirectoryPathSet={loadedDirectoryPathSet}
             expandableDirectoryPathSet={expandableDirectoryPathSet}

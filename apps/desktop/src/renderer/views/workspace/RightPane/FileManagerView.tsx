@@ -19,8 +19,9 @@ import { FileQuickOpenDialog } from "../../../components/FileQuickOpenDialog";
 import { FileTree } from "../../../components/FileTree";
 import { FileTreeToolbar } from "../../../components/FileTree/FileTreeToolbar";
 import { resolveDestinationDirectoryPath } from "../../../components/FileTree/treeUtils";
-import type { FileTreeContextMenuRequest } from "../../../components/FileTree/types";
+import type { FileTreeContextMenuRequest, FileTreeGitChangeKind } from "../../../components/FileTree/types";
 import { getRendererPlatform } from "../../../helpers/platform";
+import { useCommands } from "../../../hooks/useCommands";
 import { useContextMenuState } from "../../../hooks/useContextMenuState";
 import { useSuppressNativeContextMenuWhileOpen } from "../../../hooks/useSuppressNativeContextMenuWhileOpen";
 import { searchFiles } from "../../../search/fileSearch";
@@ -31,6 +32,78 @@ import { buildWorkspaceFileTreeContextMenuItems } from "./buildWorkspaceFileTree
 import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
 
 const MAX_FILE_SEARCH_RESULTS = 100;
+
+function normalizeGitChangeKind(kind: string): FileTreeGitChangeKind {
+  if (kind === "added" || kind === "modified" || kind === "deleted" || kind === "renamed") {
+    return kind;
+  }
+
+  return "modified";
+}
+
+function mergeGitChangeKinds(
+  currentKind: FileTreeGitChangeKind | undefined,
+  nextKind: FileTreeGitChangeKind,
+): FileTreeGitChangeKind {
+  if (!currentKind || currentKind === nextKind) {
+    return nextKind;
+  }
+
+  if (currentKind === "deleted" || nextKind === "deleted") {
+    return "deleted";
+  }
+
+  if (currentKind === "renamed" || nextKind === "renamed") {
+    return "renamed";
+  }
+
+  if (currentKind === "added" || nextKind === "added") {
+    return "added";
+  }
+
+  return "modified";
+}
+
+function normalizeGitChangePath(path: string): string {
+  const trimmedPath = path.trim().replace(/\\/g, "/");
+  if (!trimmedPath) {
+    return "";
+  }
+
+  const braceRenameMatch = trimmedPath.match(/^(.*)\{[^{}]* => ([^{}]+)\}(.*)$/);
+  let normalizedPath = braceRenameMatch
+    ? `${braceRenameMatch[1] ?? ""}${braceRenameMatch[2] ?? ""}${braceRenameMatch[3] ?? ""}`
+    : trimmedPath;
+
+  if (normalizedPath.includes(" -> ")) {
+    const renamedParts = normalizedPath.split(" -> ");
+    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
+  } else if (normalizedPath.includes(" => ")) {
+    const renamedParts = normalizedPath.split(" => ");
+    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
+  }
+
+  return normalizedPath.trim().replace(/^"+|"+$/g, "").replace(/^\/+|\/+$/g, "");
+}
+
+function areGitChangeMapsEqual(
+  leftMap: Record<string, FileTreeGitChangeKind>,
+  rightMap: Record<string, FileTreeGitChangeKind>,
+): boolean {
+  const leftKeys = Object.keys(leftMap);
+  const rightKeys = Object.keys(rightMap);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    if (leftMap[key] !== rightMap[key]) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 type FileManagerViewProps = {
   openFileSearchRequestKey?: number;
@@ -89,9 +162,20 @@ export function FileManagerView({
     onUndoLastEntryOperation,
   } = useFileTreeOperations();
   const rendererPlatform = getRendererPlatform();
+  const { listGitChanges } = useCommands();
   const canOpenInExternalApp = isExternalAppPlatformSupported(rendererPlatform);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
+  const selectedWorkspaceWorktreePath = workspaceStore(
+    (state) => state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.worktreePath?.trim() ?? "",
+  );
+  const workspaceGitRefreshVersion = workspaceStore((state) => {
+    if (!selectedWorkspaceWorktreePath) {
+      return 0;
+    }
+
+    return state.gitRefreshVersionByWorktreePath?.[selectedWorkspaceWorktreePath] ?? 0;
+  });
   const lastUsedWorkspaceExternalAppPreset = lastUsedExternalAppId
     ? findExternalAppPreset(lastUsedExternalAppId)
     : null;
@@ -118,9 +202,11 @@ export function FileManagerView({
   const [lastHandledDeleteSelectionRequestId, setLastHandledDeleteSelectionRequestId] = useState(0);
   const [lastHandledUndoRequestId, setLastHandledUndoRequestId] = useState(0);
   const [expandedItemsByWorkspaceId, setExpandedItemsByWorkspaceId] = useState<Record<string, string[]>>({});
+  const [gitChangesByPath, setGitChangesByPath] = useState<Record<string, FileTreeGitChangeKind>>({});
   const selectedTabId = tabStore((state) => state.selectedTabId);
   const tabs = tabStore((state) => state.tabs);
   const lastRevealedTabIdRef = useRef("");
+  const gitChangeLoadRequestIdRef = useRef(0);
 
   const expandedItems = selectedWorkspaceId ? (expandedItemsByWorkspaceId[selectedWorkspaceId] ?? []) : [];
 
@@ -234,6 +320,55 @@ export function FileManagerView({
 
     void onUndoLastEntryOperation();
   }, [canUndoLastEntryOperation, lastHandledUndoRequestId, onUndoLastEntryOperation, undoRequestId]);
+
+  useEffect(() => {
+    const requestId = gitChangeLoadRequestIdRef.current + 1;
+    gitChangeLoadRequestIdRef.current = requestId;
+
+    if (!selectedWorkspaceWorktreePath) {
+      setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
+      return;
+    }
+
+    void workspaceGitRefreshVersion;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const sections = await listGitChanges({
+          workspaceWorktreePath: selectedWorkspaceWorktreePath,
+        });
+
+        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const nextMap: Record<string, FileTreeGitChangeKind> = {};
+        for (const file of [...sections.unstaged, ...sections.staged, ...sections.untracked]) {
+          const normalizedPath = normalizeGitChangePath(file.path);
+          if (!normalizedPath || normalizedPath.endsWith("/")) {
+            continue;
+          }
+
+          const nextKind = normalizeGitChangeKind(file.kind);
+          nextMap[normalizedPath] = mergeGitChangeKinds(nextMap[normalizedPath], nextKind);
+        }
+
+        setGitChangesByPath((currentMap) => (areGitChangeMapsEqual(currentMap, nextMap) ? currentMap : nextMap));
+      } catch (error) {
+        console.error("Failed to load file-tree git changes", error);
+        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listGitChanges, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
 
   const openSearchResult = useCallback(
     async (path: string) => {
@@ -497,6 +632,7 @@ export function FileManagerView({
       />
       <FileTree
         files={visibleTreeFiles}
+        gitChangesByPath={gitChangesByPath}
         ignoredPaths={ignoredRepoPaths}
         loadedDirectoryPaths={loadedDirectoryPaths}
         expandableDirectoryPaths={CONTEXT_DIRECTORY_PATHS}

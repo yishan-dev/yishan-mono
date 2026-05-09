@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => {
   const pasteEntries = vi.fn();
   const importEntries = vi.fn();
   const importFilePayloads = vi.fn();
+  const listGitChanges = vi.fn();
   const subscribeWorkspaceGitChanged = vi.fn<(listener: unknown) => () => void>(() => () => {});
   const openTab = vi.fn();
   const closeTab = vi.fn();
@@ -103,6 +104,7 @@ const mocks = vi.hoisted(() => {
     pasteEntries,
     importEntries,
     importFilePayloads,
+    listGitChanges,
     subscribeWorkspaceGitChanged,
     openTab,
     closeTab,
@@ -134,7 +136,7 @@ vi.mock("../../../commands/gitCommands", () => ({
   readDiff: vi.fn(),
   readCommitDiff: vi.fn(),
   readBranchComparisonDiff: vi.fn(),
-  listGitChanges: vi.fn(),
+  listGitChanges: (...args: unknown[]) => mocks.listGitChanges(...args),
   trackGitChanges: vi.fn(),
   unstageGitChanges: vi.fn(),
   revertGitChanges: vi.fn(),
@@ -205,6 +207,7 @@ function getFileTreeProps() {
 
   return mocks.repoFileTreePropsRef.current as {
     files: string[];
+    gitChangesByPath?: Record<string, string>;
     expandedItems?: string[];
     loadedDirectoryPaths?: string[];
     selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
@@ -245,6 +248,7 @@ function createDeferred<T>() {
 describe("FileManagerView file search", () => {
   beforeEach(() => {
     mocks.subscribeWorkspaceGitChanged.mockImplementation(() => () => {});
+    mocks.listGitChanges.mockResolvedValue({ unstaged: [], staged: [], untracked: [] });
     mocks.readExternalClipboardSourcePaths.mockResolvedValue({
       kind: "empty",
       sourcePaths: [],
@@ -603,6 +607,7 @@ describe("FileManagerView file search", () => {
 describe("FileManagerView lazy preload", () => {
   beforeEach(() => {
     mocks.subscribeWorkspaceGitChanged.mockImplementation(() => () => {});
+    mocks.listGitChanges.mockResolvedValue({ unstaged: [], staged: [], untracked: [] });
     mocks.readExternalClipboardSourcePaths.mockResolvedValue({
       kind: "empty",
       sourcePaths: [],
@@ -732,6 +737,7 @@ describe("FileManagerView lazy preload", () => {
 
 describe("FileManagerView external file tree refresh", () => {
   beforeEach(() => {
+    mocks.listGitChanges.mockResolvedValue({ unstaged: [], staged: [], untracked: [] });
     mocks.readExternalClipboardSourcePaths.mockResolvedValue({
       kind: "empty",
       sourcePaths: [],
@@ -1177,6 +1183,7 @@ describe("FileManagerView undo operations", () => {
 describe("FileManagerView external clipboard paste", () => {
   beforeEach(() => {
     mocks.subscribeWorkspaceGitChanged.mockImplementation(() => () => {});
+    mocks.listGitChanges.mockResolvedValue({ unstaged: [], staged: [], untracked: [] });
     mocks.readExternalClipboardSourcePaths.mockResolvedValue({
       kind: "empty",
       sourcePaths: [],

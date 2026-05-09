@@ -177,6 +177,48 @@ func TestGitServiceValidation(t *testing.T) {
 	}
 }
 
+func TestGitServiceListChangesRenameScenarios(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewGitService()
+
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("seed\n"), 0o644); err != nil {
+		t.Fatalf("write seed file: %v", err)
+	}
+	runGit(t, root, "add", "a.txt")
+	runGit(t, root, "commit", "-m", "seed")
+
+	runGit(t, root, "mv", "a.txt", "b.txt")
+	runGit(t, root, "add", "-A")
+	changes, err := svc.ListChanges(context.Background(), root)
+	if err != nil {
+		t.Fatalf("list changes for staged rename: %v", err)
+	}
+	if len(changes.Untracked) != 0 {
+		t.Fatalf("expected no untracked entries for staged rename, got %+v", changes.Untracked)
+	}
+	if len(changes.Staged) != 1 || changes.Staged[0].Kind != "renamed" || changes.Staged[0].Path != "b.txt" {
+		t.Fatalf("expected one staged renamed entry for b.txt, got %+v", changes.Staged)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "b.txt"), []byte("seed\nextra\n"), 0o644); err != nil {
+		t.Fatalf("update renamed file: %v", err)
+	}
+	changes, err = svc.ListChanges(context.Background(), root)
+	if err != nil {
+		t.Fatalf("list changes for renamed+modified: %v", err)
+	}
+	if len(changes.Untracked) != 0 {
+		t.Fatalf("expected no untracked entries for renamed+modified, got %+v", changes.Untracked)
+	}
+	if len(changes.Staged) != 1 || changes.Staged[0].Kind != "renamed" || changes.Staged[0].Path != "b.txt" {
+		t.Fatalf("expected staged rename entry for b.txt, got %+v", changes.Staged)
+	}
+	if len(changes.Unstaged) != 1 || changes.Unstaged[0].Kind != "modified" || changes.Unstaged[0].Path != "b.txt" {
+		t.Fatalf("expected unstaged modified entry for b.txt, got %+v", changes.Unstaged)
+	}
+}
+
 func TestGitServiceFetchRemotes(t *testing.T) {
 	remote := filepath.Join(t.TempDir(), "remote.git")
 	runGit(t, t.TempDir(), "init", "--bare", remote)
