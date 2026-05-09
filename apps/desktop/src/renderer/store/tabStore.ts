@@ -11,6 +11,8 @@ import {
   openTabState,
   renameTabsForEntryRenameState,
   renameTabState,
+  refreshDiffTabContentState,
+  refreshFileTabFromDiskState,
   reorderTabState,
   resolveSessionTabState,
   toggleTabPinnedState,
@@ -50,6 +52,8 @@ export type TabStoreState = {
   renameTabsForEntryRename: (workspaceId: string, fromPath: string, toPath: string) => void;
   updateFileTabContent: (tabId: string, content: string) => void;
   markFileTabSaved: (tabId: string) => void;
+  refreshFileTabFromDisk: (input: { tabId: string; content: string; deleted: boolean }) => void;
+  refreshDiffTabContent: (input: { tabId: string; oldContent: string; newContent: string }) => void;
 };
 
 /** Creates a client-only tab id for local UI tab lifecycle. */
@@ -243,6 +247,12 @@ export const tabStore = create<TabStoreState>()(
     },
     markFileTabSaved: (tabId) => {
       set((state) => markFileTabSavedState(state, tabId));
+    },
+    refreshFileTabFromDisk: (input) => {
+      set((state) => refreshFileTabFromDiskState(state, input) ?? state);
+    },
+    refreshDiffTabContent: (input) => {
+      set((state) => refreshDiffTabContentState(state, input) ?? state);
     },
     };
   }),

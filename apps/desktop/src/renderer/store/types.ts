@@ -60,6 +60,11 @@ export type RepoWorkspaceItem = {
 
 export type DiffFileChangeKind = "added" | "modified" | "deleted";
 
+export type DiffTabSource =
+  | { kind: "workspace" }
+  | { kind: "commit"; commitHash: string }
+  | { kind: "branch"; targetBranch: string };
+
 export type WorkspaceGitChangeTotals = {
   additions: number;
   deletions: number;
@@ -71,8 +76,15 @@ export type WorkspaceTabDataByKind = {
     agentKind?: DesktopAgentKind;
     isInitializing?: boolean;
   };
-  diff: { path: string; oldContent: string; newContent: string };
-  file: { path: string; content: string; savedContent: string; isDirty: boolean; isTemporary: boolean };
+  diff: { path: string; oldContent: string; newContent: string; source?: DiffTabSource };
+  file: {
+    path: string;
+    content: string;
+    savedContent: string;
+    isDirty: boolean;
+    isTemporary: boolean;
+    isDeleted?: boolean;
+  };
   image: { path: string; dataUrl: string; isTemporary: boolean };
   terminal: {
     title: string;
@@ -126,6 +138,7 @@ export type OpenWorkspaceTabInput =
       deletions: number;
       oldContent?: string;
       newContent?: string;
+      diffSource?: DiffTabSource;
     }
   | {
       workspaceId?: string;

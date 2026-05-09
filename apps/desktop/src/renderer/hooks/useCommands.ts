@@ -69,6 +69,8 @@ import {
   createTab as createTabCommand,
   markFileTabSaved as markFileTabSavedCommand,
   openTab as openTabCommand,
+  refreshDiffTabContent as refreshDiffTabContentCommand,
+  refreshFileTabFromDisk as refreshFileTabFromDiskCommand,
   renameTabsForEntryRename as renameTabsForEntryRenameCommand,
   renameTab as renameTabCommand,
   reorderTab as reorderTabCommand,
@@ -213,6 +215,8 @@ export type Commands = {
   renameTabsForEntryRename: typeof renameTabsForEntryRenameCommand;
   updateFileTabContent: typeof updateFileTabContentCommand;
   markFileTabSaved: typeof markFileTabSavedCommand;
+  refreshFileTabFromDisk: typeof refreshFileTabFromDiskCommand;
+  refreshDiffTabContent: typeof refreshDiffTabContentCommand;
 };
 
 /** Returns UI-facing command handlers wired to command modules and pure store actions. */
@@ -310,6 +314,8 @@ export function useCommands(): Commands {
       renameTabsForEntryRename: renameTabsForEntryRenameCommand,
       updateFileTabContent: updateFileTabContentCommand,
       markFileTabSaved: markFileTabSavedCommand,
+      refreshFileTabFromDisk: refreshFileTabFromDiskCommand,
+      refreshDiffTabContent: refreshDiffTabContentCommand,
       refreshWorkspaceGitChanges: refreshWorkspaceGitChangesCommand,
     }),
     [],

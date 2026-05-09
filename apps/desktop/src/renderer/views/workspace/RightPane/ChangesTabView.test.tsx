@@ -204,6 +204,7 @@ describe("ChangesTabView", () => {
         deletions: 0,
         oldContent: "old",
         newContent: "new",
+        diffSource: { kind: "commit", commitHash: "abc123456" },
       });
     });
   });
@@ -263,6 +264,7 @@ describe("ChangesTabView", () => {
         deletions: 0,
         oldContent: "old",
         newContent: "new",
+        diffSource: { kind: "branch", targetBranch: "origin/main" },
       });
     });
   });

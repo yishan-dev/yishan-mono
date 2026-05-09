@@ -7,6 +7,8 @@ import {
   createSessionTabOptimisticState,
   markFileTabSavedState,
   openTabState,
+  refreshDiffTabContentState,
+  refreshFileTabFromDiskState,
   renameTabsForEntryRenameState,
   renameTabState,
   reorderTabState,
@@ -423,6 +425,94 @@ describe("tabs-domain layout and session", () => {
 
     expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.savedContent : undefined).toBe("a2");
     expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.isDirty : undefined).toBe(false);
+  });
+
+  it("refreshes a clean file tab from disk", () => {
+    const state = createBaseState();
+    const patch = refreshFileTabFromDiskState(state, {
+      tabId: "file-1",
+      content: "from-disk",
+      deleted: false,
+    });
+
+    const nextFileTab = patch?.tabs?.find((tab) => tab.id === "file-1");
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.content : undefined).toBe("from-disk");
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.savedContent : undefined).toBe("from-disk");
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.isDirty : undefined).toBe(false);
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.isDeleted : undefined).toBe(false);
+  });
+
+  it("marks file tab deleted when disk read reports missing file", () => {
+    const state = createBaseState();
+    const patch = refreshFileTabFromDiskState(state, {
+      tabId: "file-1",
+      content: "",
+      deleted: true,
+    });
+
+    const nextFileTab = patch?.tabs?.find((tab) => tab.id === "file-1");
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.isDeleted : undefined).toBe(true);
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.content : undefined).toBe("");
+    expect(nextFileTab && nextFileTab.kind === "file" ? nextFileTab.data.savedContent : undefined).toBe("");
+  });
+
+  it("does not overwrite dirty file tab during disk refresh", () => {
+    const state: WorkspaceTabStateSlice = {
+      ...createBaseState(),
+      tabs: createBaseState().tabs.map((tab) =>
+        tab.id === "file-1" && tab.kind === "file"
+          ? {
+              ...tab,
+              data: {
+                ...tab.data,
+                content: "local-edits",
+                savedContent: "a1",
+                isDirty: true,
+              },
+            }
+          : tab,
+      ),
+    };
+
+    const patch = refreshFileTabFromDiskState(state, {
+      tabId: "file-1",
+      content: "from-disk",
+      deleted: false,
+    });
+
+    expect(patch).toBeNull();
+  });
+
+  it("refreshes diff tab content in place", () => {
+    const state = createBaseState();
+    const withDiff: WorkspaceTabStateSlice = {
+      ...state,
+      tabs: [
+        ...state.tabs,
+        {
+          id: "diff-1",
+          workspaceId: "workspace-1",
+          title: "a.ts",
+          pinned: false,
+          kind: "diff",
+          data: {
+            path: "src/a.ts",
+            oldContent: "old",
+            newContent: "new",
+          },
+        },
+      ],
+    };
+
+    const patch = refreshDiffTabContentState(withDiff, {
+      tabId: "diff-1",
+      oldContent: "old-next",
+      newContent: "new-next",
+    });
+
+    const nextDiffTab = patch?.tabs?.find((tab) => tab.id === "diff-1");
+    expect(nextDiffTab && nextDiffTab.kind === "diff" ? nextDiffTab.data.oldContent : undefined).toBe("old-next");
+    expect(nextDiffTab && nextDiffTab.kind === "diff" ? nextDiffTab.data.newContent : undefined).toBe("new-next");
   });
 });
 

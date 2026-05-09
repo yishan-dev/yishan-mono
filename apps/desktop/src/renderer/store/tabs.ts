@@ -104,6 +104,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
         path: input.path,
         oldContent: input.oldContent,
         newContent: input.newContent,
+        source: input.diffSource,
       } as WorkspaceTabDataByKind[T["kind"]];
     }
 
@@ -117,6 +118,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       path: input.path,
       oldContent,
       newContent,
+      source: input.diffSource,
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 
@@ -128,6 +130,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       savedContent: fileContent,
       isDirty: false,
       isTemporary: Boolean(input.temporary),
+      isDeleted: false,
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 

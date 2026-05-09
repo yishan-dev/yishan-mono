@@ -11,6 +11,7 @@ import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
 import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
 import { useCommands } from "../../hooks/useCommands";
+import { type RefreshableOpenTab, useOpenTabAutoRefresh } from "../../hooks/useOpenTabAutoRefresh";
 import { agentSettingsStore } from "../../store/agentSettingsStore";
 import { tabStore } from "../../store/tabStore";
 import { workspaceStore } from "../../store/workspaceStore";
@@ -110,6 +111,12 @@ export function MainPaneView() {
     renameTab,
     renameTabsForEntryRename,
     renameEntry,
+    readBranchComparisonDiff,
+    readCommitDiff,
+    readDiff,
+    readFile,
+    refreshDiffTabContent,
+    refreshFileTabFromDisk,
     updateFileTabContent,
     markFileTabSaved,
     writeFile,
@@ -144,6 +151,37 @@ export function MainPaneView() {
   const enabledAgentKindSet = useMemo(() => new Set(enabledAgentKinds), [enabledAgentKinds]);
   const [focusContentRequestKey, setFocusContentRequestKey] = useState(0);
   const didTrackSelectedTabRef = useRef(false);
+
+  const refreshableTabs = useMemo(
+    (): RefreshableOpenTab[] =>
+      workspaceTabs.reduce<RefreshableOpenTab[]>((result, tab) => {
+        if (tab.kind === "file") {
+          result.push({ id: tab.id, kind: "file", path: tab.data.path, isDirty: tab.data.isDirty });
+          return result;
+        }
+
+        if (tab.kind === "diff") {
+          result.push({ id: tab.id, kind: "diff", path: tab.data.path, source: tab.data.source });
+          return result;
+        }
+
+        return result;
+      }, []),
+    [workspaceTabs],
+  );
+
+  useOpenTabAutoRefresh({
+    workspaceWorktreePath: selectedWorkspace?.worktreePath,
+    tabs: refreshableTabs,
+    commands: {
+      readFile,
+      readDiff,
+      readCommitDiff,
+      readBranchComparisonDiff,
+      refreshFileTabFromDisk,
+      refreshDiffTabContent,
+    },
+  });
 
   const handleSelectTab = (tabId: string) => {
     setSelectedTabId(tabId);
@@ -312,6 +350,7 @@ export function MainPaneView() {
                 <FileEditor
                   path={tab.data.path}
                   content={tab.data.content ?? ""}
+                  isDeleted={Boolean(tab.data.isDeleted)}
                   focusRequestKey={isSelected ? focusContentRequestKey : 0}
                   onContentChange={(nextContent) => {
                     updateFileTabContent(tab.id, nextContent);
