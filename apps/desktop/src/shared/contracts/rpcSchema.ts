@@ -25,6 +25,7 @@ export type RpcSchema = {
         createdAt: string;
         agent?: string;
         workspaceId?: string;
+        workspaceName?: string;
         sessionId?: string;
         navigationPath?: string;
         notificationEventType?: NotificationEventType;

@@ -37,6 +37,7 @@ type BackendEventStoreBindingsDependencies = {
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
   getNotificationPreferences?: () => Promise<NotificationPreferences>;
   isRelevantTerminalFocused?: (payload: NotificationEventPayload) => boolean;
+  resolveWorkspaceLabel?: (workspaceId: string) => string | undefined;
 };
 
 const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindingsDependencies = {
@@ -91,7 +92,61 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   },
   getNotificationPreferences,
   isRelevantTerminalFocused: isRelevantTerminalFocusedForNotification,
+  resolveWorkspaceLabel: (workspaceId) => {
+    const state = workspaceStore.getState();
+    const workspace = state.workspaces.find((candidate) => candidate.id === workspaceId);
+    const workspaceName = workspace?.name?.trim();
+    if (!workspaceName) {
+      return undefined;
+    }
+
+    const projectName = state.projects.find((project) => project.id === workspace.projectId)?.name?.trim();
+    return projectName ? `${projectName} / ${workspaceName}` : workspaceName;
+  },
 };
+
+function resolveWorkspaceCopyLabel(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+): string | undefined {
+  const workspaceId = payload.workspaceId?.trim();
+  if (workspaceId) {
+    const resolvedWorkspaceLabel = dependencies.resolveWorkspaceLabel?.(workspaceId)?.trim();
+    if (resolvedWorkspaceLabel) {
+      return resolvedWorkspaceLabel;
+    }
+  }
+
+  const workspaceName = payload.workspaceName?.trim();
+  return workspaceName || undefined;
+}
+
+function rewriteWorkspaceIdentifier(
+  value: string | undefined,
+  workspaceId: string | undefined,
+  workspaceLabel: string | undefined,
+): string | undefined {
+  if (!value) {
+    return value;
+  }
+  if (!workspaceId || !workspaceLabel || workspaceId === workspaceLabel) {
+    return value;
+  }
+
+  return value.split(workspaceId).join(workspaceLabel);
+}
+
+function buildSystemNotificationCopy(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+): { title: string; body?: string } {
+  const workspaceId = payload.workspaceId?.trim();
+  const workspaceLabel = resolveWorkspaceCopyLabel(payload, dependencies);
+  return {
+    title: rewriteWorkspaceIdentifier(payload.title, workspaceId, workspaceLabel) ?? payload.title,
+    body: rewriteWorkspaceIdentifier(payload.body, workspaceId, workspaceLabel),
+  };
+}
 
 /**
  * Resolves one observer lifecycle status from notification observer metadata.
@@ -222,11 +277,10 @@ async function dispatchPreferenceBackedNotification(
     return;
   }
 
+  const notificationCopy = buildSystemNotificationCopy(payload, dependencies);
+
   if (preferences.osEnabled) {
-    await dependencies.dispatchSystemNotification({
-      title: payload.title,
-      body: payload.body,
-    });
+    await dependencies.dispatchSystemNotification(notificationCopy);
   }
 
   if (preferences.soundEnabled && preferences.volume > 0) {
@@ -295,11 +349,9 @@ export function createBackendEventStoreBindings(
           // Preference resolution and delivery failures should not block store state updates.
         });
       } else if (payload.showSystemNotification && !suppressNotificationEffects) {
+        const notificationCopy = buildSystemNotificationCopy(payload, dependencies);
         void dependencies
-          .dispatchSystemNotification({
-            title: payload.title,
-            body: payload.body,
-          })
+          .dispatchSystemNotification(notificationCopy)
           .catch(() => {
             // Notification delivery failures should not block store state updates.
           });

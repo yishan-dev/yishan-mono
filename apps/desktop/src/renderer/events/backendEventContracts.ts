@@ -128,6 +128,7 @@ function isNotificationEventPayload(
     payload.body,
     payload.agent,
     payload.workspaceId,
+    payload.workspaceName,
     payload.sessionId,
     payload.navigationPath,
   ];
