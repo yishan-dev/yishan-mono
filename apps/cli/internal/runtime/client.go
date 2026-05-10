@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/config"
@@ -46,6 +47,10 @@ func PersistAuthTokens(update api.TokenUpdate) error {
 		return fmt.Errorf("runtime config is not initialized")
 	}
 
+	if shouldRejectStaleTokenUpdate(appCfg, update) {
+		return nil
+	}
+
 	if err := config.UpdateFile(appCfg.ConfigPath, func(cfg *viper.Viper) {
 		cfg.Set("api_base_url", appCfg.API.BaseURL)
 		cfg.Set("api_token", update.AccessToken)
@@ -74,4 +79,33 @@ func PersistAuthTokens(update api.TokenUpdate) error {
 	}
 
 	return nil
+}
+
+func shouldRejectStaleTokenUpdate(cfg *config.Config, incoming api.TokenUpdate) bool {
+	currentRefreshExpiry, currentRefreshOK := parseExpiry(cfg.API.RefreshTokenExpiresAt)
+	incomingRefreshExpiry, incomingRefreshOK := parseExpiry(incoming.RefreshTokenExpiresAt)
+	if currentRefreshOK && incomingRefreshOK && incomingRefreshExpiry.Before(currentRefreshExpiry) {
+		return true
+	}
+
+	currentAccessExpiry, currentAccessOK := parseExpiry(cfg.API.AccessTokenExpiresAt)
+	incomingAccessExpiry, incomingAccessOK := parseExpiry(incoming.AccessTokenExpiresAt)
+	if currentAccessOK && incomingAccessOK && incomingAccessExpiry.Before(currentAccessExpiry) {
+		return true
+	}
+
+	return false
+}
+
+func parseExpiry(raw string) (time.Time, bool) {
+	if raw == "" {
+		return time.Time{}, false
+	}
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
 }
