@@ -6,13 +6,35 @@ type RendererHostBridge = {
     authenticated: boolean;
     accessToken?: string;
     refreshToken?: string;
+    accessTokenExpiresAt?: string;
+    refreshTokenExpiresAt?: string;
   }>;
 };
 
 type AuthTokens = {
   accessToken: string;
   refreshToken?: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
 };
+
+const ACCESS_TOKEN_EARLY_REFRESH_WINDOW_MS = 30_000;
+const REFRESH_TOKEN_EXPIRY_GUARD_WINDOW_MS = 30_000;
+
+function parseTimestamp(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+function isWithinWindow(timestampMs: number | undefined, windowMs: number): boolean {
+  if (timestampMs === undefined) {
+    return false;
+  }
+  return Date.now() >= timestampMs - windowMs;
+}
 
 // ---------------------------------------------------------------------------
 // Auth-expired event bus
@@ -89,10 +111,49 @@ async function resolveAuthTokens(): Promise<AuthTokens | undefined> {
     return {
       accessToken: cachedAccessToken ?? authTokens.accessToken,
       refreshToken: authTokens.refreshToken,
+      accessTokenExpiresAt: authTokens.accessTokenExpiresAt,
+      refreshTokenExpiresAt: authTokens.refreshTokenExpiresAt,
     };
   } catch {
     return undefined;
   }
+}
+
+async function ensureFreshAccessToken(tokens: AuthTokens): Promise<AuthTokens | undefined> {
+  const refreshTokenExpiryMs = parseTimestamp(tokens.refreshTokenExpiresAt);
+  if (tokens.refreshToken && isWithinWindow(refreshTokenExpiryMs, REFRESH_TOKEN_EXPIRY_GUARD_WINDOW_MS)) {
+    console.warn("[restClient] Refresh token is expired or near expiry; ending authenticated session", {
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+      guardWindowMs: REFRESH_TOKEN_EXPIRY_GUARD_WINDOW_MS,
+    });
+    emitAuthExpired();
+    return undefined;
+  }
+
+  const accessTokenExpiryMs = parseTimestamp(tokens.accessTokenExpiresAt);
+  const shouldRefreshAccessToken = tokens.refreshToken && isWithinWindow(accessTokenExpiryMs, ACCESS_TOKEN_EARLY_REFRESH_WINDOW_MS);
+  if (!shouldRefreshAccessToken) {
+    return tokens;
+  }
+
+  console.info("[restClient] Proactively refreshing access token before expiry", {
+    accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+    earlyRefreshWindowMs: ACCESS_TOKEN_EARLY_REFRESH_WINDOW_MS,
+  });
+
+  const freshAccessToken = await refreshAccessToken(tokens.refreshToken);
+  if (!freshAccessToken) {
+    console.warn("[restClient] Proactive access token refresh failed; ending authenticated session");
+    emitAuthExpired();
+    return undefined;
+  }
+
+  console.info("[restClient] Proactive access token refresh succeeded");
+
+  return {
+    ...tokens,
+    accessToken: freshAccessToken,
+  };
 }
 
 function resolveApiBaseUrl(): string {
@@ -236,18 +297,19 @@ export async function requestJson<T>(
   },
 ): Promise<T> {
   const tokens = await resolveAuthTokens();
+  const freshTokens = tokens ? await ensureFreshAccessToken(tokens) : undefined;
   const baseUrl = resolveApiBaseUrl();
   const url = new URL(path, baseUrl).toString();
   const method = input?.method ?? "GET";
   const hasBody = input?.body !== undefined;
-  const headers = buildHeaders(tokens?.accessToken, hasBody);
+  const headers = buildHeaders(freshTokens?.accessToken, hasBody);
 
   const response = await executeFetch(url, method, headers, input?.body);
 
   // On 401, attempt to refresh the access token and retry the request once.
   if (response.status === 401) {
-    if (tokens?.refreshToken) {
-      const freshAccessToken = await refreshAccessToken(tokens.refreshToken);
+    if (freshTokens?.refreshToken) {
+      const freshAccessToken = await refreshAccessToken(freshTokens.refreshToken);
       if (freshAccessToken) {
         const retryHeaders = buildHeaders(freshAccessToken, hasBody);
         const retryResponse = await executeFetch(url, method, retryHeaders, input?.body);
