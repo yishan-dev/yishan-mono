@@ -29,6 +29,7 @@ const rpcMocks = vi.hoisted(() => ({
   list: vi.fn(),
   closeWorkspace: vi.fn(),
   listGitChanges: vi.fn(),
+  getBranchDiffSummary: vi.fn(),
   renameGitBranch: vi.fn(),
   enqueueWorkspaceErrorNotice: vi.fn(),
   enqueueWorkspaceLifecycleWarnings: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("../rpc/rpcTransport", () => ({
   getDaemonClient: vi.fn(async () => ({
     git: {
       listChanges: rpcMocks.listGitChanges,
+      getBranchDiffSummary: rpcMocks.getBranchDiffSummary,
       renameBranch: rpcMocks.renameGitBranch,
     },
     workspace: {
@@ -524,6 +526,87 @@ describe("workspaceCommands", () => {
     expect(setWorkspaceGitChangesCount).toHaveBeenCalledWith("workspace-1", 3);
     expect(setWorkspaceGitChangeTotals).toHaveBeenCalledWith("workspace-1", {
       additions: 3,
+      deletions: 1,
+    });
+  });
+
+  it("combines branch diff summary with uncommitted changes when sourceBranch is configured", async () => {
+    const setWorkspaceGitChangesCount = vi.fn();
+    const setWorkspaceGitChangeTotals = vi.fn();
+    workspaceStore.setState({
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          name: "Feature A",
+          title: "Feature A",
+          summaryId: "",
+          sourceBranch: "main",
+          branch: "feature-a",
+          worktreePath: "/tmp/worktrees/feature-a",
+        },
+      ],
+      setWorkspaceGitChangesCount,
+      setWorkspaceGitChangeTotals,
+    });
+    rpcMocks.listGitChanges.mockResolvedValueOnce({
+      staged: [{ path: "a.ts", kind: "modified", additions: 1, deletions: 0 }],
+      unstaged: [],
+      untracked: [],
+    });
+    rpcMocks.getBranchDiffSummary.mockResolvedValueOnce({
+      fileCount: 5,
+      additions: 40,
+      deletions: 10,
+    });
+
+    await refreshWorkspaceGitChanges("workspace-1", "/tmp/worktrees/feature-a");
+
+    expect(rpcMocks.getBranchDiffSummary).toHaveBeenCalledWith({
+      workspaceWorktreePath: "/tmp/worktrees/feature-a",
+      targetBranch: "origin/main",
+    });
+    // Combined count: branchDiff fileCount (5) + uncommitted (1) = 6
+    expect(setWorkspaceGitChangesCount).toHaveBeenCalledWith("workspace-1", 6);
+    // Combined totals: branchDiff (40+10) + uncommitted (1+0) = 41+10
+    expect(setWorkspaceGitChangeTotals).toHaveBeenCalledWith("workspace-1", {
+      additions: 41,
+      deletions: 10,
+    });
+  });
+
+  it("falls back to uncommitted-only count when branch diff summary fails", async () => {
+    const setWorkspaceGitChangesCount = vi.fn();
+    const setWorkspaceGitChangeTotals = vi.fn();
+    workspaceStore.setState({
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          name: "Feature A",
+          title: "Feature A",
+          summaryId: "",
+          sourceBranch: "main",
+          branch: "feature-a",
+          worktreePath: "/tmp/worktrees/feature-a",
+        },
+      ],
+      setWorkspaceGitChangesCount,
+      setWorkspaceGitChangeTotals,
+    });
+    rpcMocks.listGitChanges.mockResolvedValueOnce({
+      staged: [],
+      unstaged: [{ path: "b.ts", kind: "modified", additions: 2, deletions: 1 }],
+      untracked: [],
+    });
+    rpcMocks.getBranchDiffSummary.mockRejectedValueOnce(new Error("target branch not found"));
+
+    await refreshWorkspaceGitChanges("workspace-1", "/tmp/worktrees/feature-a");
+
+    // Should fall back to uncommitted-only count
+    expect(setWorkspaceGitChangesCount).toHaveBeenCalledWith("workspace-1", 1);
+    expect(setWorkspaceGitChangeTotals).toHaveBeenCalledWith("workspace-1", {
+      additions: 2,
       deletions: 1,
     });
   });

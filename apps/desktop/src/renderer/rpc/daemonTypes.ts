@@ -340,6 +340,12 @@ export type GitCommitComparisonResponse = {
   commits: GitCommit[];
 };
 
+export type GitBranchDiffSummaryResponse = {
+  fileCount: number;
+  additions: number;
+  deletions: number;
+};
+
 export type GitDiffContentResponse = {
   oldContent: string;
   newContent: string;

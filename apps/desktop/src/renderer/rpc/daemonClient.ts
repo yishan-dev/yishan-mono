@@ -111,6 +111,7 @@ export class DaemonClient {
     commitChanges: this.commitGitChanges.bind(this),
     getBranchStatus: this.getGitBranchStatus.bind(this),
     listCommitsToTarget: this.listGitCommitsToTarget.bind(this),
+    getBranchDiffSummary: this.getGitBranchDiffSummary.bind(this),
     readCommitDiff: this.readGitCommitDiff.bind(this),
     readBranchComparisonDiff: this.readGitBranchComparisonDiff.bind(this),
     listBranches: this.listGitBranches.bind(this),
@@ -843,6 +844,16 @@ export class DaemonClient {
       throw new Error("targetBranch is required");
     }
     return (await this.invoke("git.commitsToTarget", { workspaceId, targetBranch })) as Rpc.GitCommitComparisonResponse;
+  }
+
+  private async getGitBranchDiffSummary(input: Rpc.GitTargetBranchInput): Promise<Rpc.GitBranchDiffSummaryResponse> {
+    const record = asRecord(input);
+    const workspaceId = await this.resolveWorkspaceId(input);
+    const targetBranch = readOptionalString(record?.targetBranch);
+    if (!targetBranch) {
+      throw new Error("targetBranch is required");
+    }
+    return (await this.invoke("git.branchDiffSummary", { workspaceId, targetBranch })) as Rpc.GitBranchDiffSummaryResponse;
   }
 
   private async readGitCommitDiff(input: Rpc.GitCommitDiffInput): Promise<Rpc.GitDiffContentResponse> {

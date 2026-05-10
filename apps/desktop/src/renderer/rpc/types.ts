@@ -53,6 +53,7 @@ export type DaemonRpcClient = {
     commitChanges: (input: Rpc.GitCommitInput) => Promise<string>;
     getBranchStatus: (input: Rpc.GitWorktreeInput) => Promise<Rpc.GitBranchStatusResponse>;
     listCommitsToTarget: (input: Rpc.GitTargetBranchInput) => Promise<Rpc.GitCommitComparisonResponse>;
+    getBranchDiffSummary: (input: Rpc.GitTargetBranchInput) => Promise<Rpc.GitBranchDiffSummaryResponse>;
     listBranches: (input: Rpc.GitWorktreeInput) => Promise<Rpc.GitBranchListResponse>;
     pushBranch: (input: Rpc.GitWorktreeInput) => Promise<string>;
     publishBranch: (input: Rpc.GitWorktreeInput) => Promise<string>;
