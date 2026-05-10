@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Chip, CircularProgress, Stack, Switch } from "@mui/material";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentIcon } from "../../components/AgentIcon";
 import { SettingsCard, SettingsControlRow, SettingsRows, SettingsSectionHeader } from "../../components/settings";
@@ -9,6 +9,7 @@ import {
   SUPPORTED_DESKTOP_AGENT_KINDS,
 } from "../../helpers/agentSettings";
 import { withTimeout } from "../../helpers/withTimeout";
+import { useLatestRequestGuard } from "../../hooks/useLatestRequestGuard";
 import { useCommands } from "../../hooks/useCommands";
 import { agentSettingsStore } from "../../store/agentSettingsStore";
 
@@ -69,15 +70,13 @@ export function AgentSettingsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasLoadError, setHasLoadError] = useState(false);
-  const latestDetectionLoadIdRef = useRef(0);
-  const isMountedRef = useRef(true);
+  const requestGuard = useLatestRequestGuard();
 
   /** Loads current per-agent detection state and updates the view model. */
   const loadDetectionStatuses = useCallback(
     async (isManualRefresh: boolean) => {
-      const loadId = latestDetectionLoadIdRef.current + 1;
-      latestDetectionLoadIdRef.current = loadId;
-      const isLatestMountedLoad = () => isMountedRef.current && latestDetectionLoadIdRef.current === loadId;
+      const loadId = requestGuard.beginRequest();
+      const isLatestMountedLoad = () => requestGuard.isCurrentRequest(loadId);
       const refreshStartedAt = isManualRefresh ? Date.now() : null;
 
       if (isManualRefresh) {
@@ -122,20 +121,13 @@ export function AgentSettingsView() {
         }
       }
     },
-    [listAgentDetectionStatuses],
+    [listAgentDetectionStatuses, requestGuard],
   );
 
   useEffect(() => {
     /** Performs initial agent detection load for the settings panel. */
     void loadDetectionStatuses(false);
   }, [loadDetectionStatuses]);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   return (
     <Box>

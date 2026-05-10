@@ -139,6 +139,37 @@ export function SettingsView() {
       .sort((left, right) => left.rank - right.rank);
   }, [normalizedSearchQuery, t]);
 
+  const selectedTabContentByTab = useMemo<Record<SettingsTab, ReactNode>>(
+    () => ({
+      notifications: <NotificationSettingsView focusItemId={focusedNotificationItemId} />,
+      account: <AccountSettingsView />,
+      agents: (
+        <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
+          <AgentSettingsView />
+        </SettingsErrorBoundary>
+      ),
+      appearance: (
+        <Stack spacing={2}>
+          <ThemePreferencePicker
+            preference={themePreference}
+            onChange={setThemePreference}
+            title={t("settings.appearance.theme.title")}
+            description={t("settings.appearance.theme.description")}
+            lightLabel={t("settings.appearance.theme.options.light")}
+            darkLabel={t("settings.appearance.theme.options.dark")}
+            systemLabel={t("settings.appearance.theme.options.system")}
+          />
+          <LanguageSettingsView />
+        </Stack>
+      ),
+      daemon: <DaemonSettingsView />,
+      terminal: <TerminalSettingsView />,
+      keybindings: <KeybindingsSettingsView />,
+      workspace: <GitWorkspaceSettingsView />,
+    }),
+    [focusedNotificationItemId, setThemePreference, t, themePreference],
+  );
+
   return (
     <SettingsPageLayout
       sidebar={
@@ -159,9 +190,9 @@ export function SettingsView() {
               </IconButton>
             </Tooltip>
           </Box>
-        <Typography variant="body2" sx={{ px: 1, mb: 1.25, fontWeight: 700 }}>
-          {t("settings.title")}
-        </Typography>
+          <Typography variant="body2" sx={{ px: 1, mb: 1.25, fontWeight: 700 }}>
+            {t("settings.title")}
+          </Typography>
 
         <SearchInput
           placeholder={t("settings.searchPlaceholder")}
@@ -252,40 +283,11 @@ export function SettingsView() {
         </>
       }
     >
-      {selectedTab === "notifications" ? (
-          <NotificationSettingsView focusItemId={focusedNotificationItemId} />
-        ) : selectedTab === "account" ? (
-          <AccountSettingsView />
-        ) : selectedTab === "agents" ? (
-          <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
-            <AgentSettingsView />
-          </SettingsErrorBoundary>
-        ) : selectedTab === "appearance" ? (
-          <Stack spacing={2}>
-            <ThemePreferencePicker
-              preference={themePreference}
-              onChange={setThemePreference}
-              title={t("settings.appearance.theme.title")}
-              description={t("settings.appearance.theme.description")}
-              lightLabel={t("settings.appearance.theme.options.light")}
-              darkLabel={t("settings.appearance.theme.options.dark")}
-              systemLabel={t("settings.appearance.theme.options.system")}
-            />
-            <LanguageSettingsView />
-          </Stack>
-        ) : selectedTab === "daemon" ? (
-          <DaemonSettingsView />
-        ) : selectedTab === "terminal" ? (
-          <TerminalSettingsView />
-        ) : selectedTab === "keybindings" ? (
-          <KeybindingsSettingsView />
-        ) : selectedTab === "workspace" ? (
-          <GitWorkspaceSettingsView />
-        ) : (
-          <Box>
-            <SettingsSectionHeader title={t("settings.title")} description={t("settings.comingSoon")} />
-          </Box>
-        )}
+      {selectedTabContentByTab[selectedTab] ?? (
+        <Box>
+          <SettingsSectionHeader title={t("settings.title")} description={t("settings.comingSoon")} />
+        </Box>
+      )}
     </SettingsPageLayout>
   );
 }
