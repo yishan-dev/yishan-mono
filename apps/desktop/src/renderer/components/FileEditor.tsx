@@ -1,9 +1,9 @@
 import { Box, IconButton, Tooltip, Typography, useTheme } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuCode, LuColumns2, LuCopy, LuEye, LuExternalLink } from "react-icons/lu";
-import { getFileTreeIcon } from "./fileTreeIcons";
+import { LuCode, LuColumns2, LuEye } from "react-icons/lu";
 import { getLanguageId, isMarkdownFile } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
+import { FileViewerToolbar } from "./FileViewerToolbar";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 type MarkdownViewMode = "editor" | "split" | "preview";
@@ -62,7 +62,7 @@ export function FileEditor({
     () => (theme.palette.mode === "dark" ? YISHAN_THEME_DARK : YISHAN_THEME_LIGHT),
     [theme.palette.mode],
   );
-  const fileIcon = useMemo(() => getFileTreeIcon(path, false), [path]);
+
 
   const showEditor = viewMode === "editor" || viewMode === "split";
   const showPreview = viewMode === "preview" || viewMode === "split";
@@ -214,31 +214,20 @@ export function FileEditor({
 
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      {/* Toolbar */}
-      <Box
-        sx={{
-          minHeight: 34,
-          px: 1.5,
-          borderBottom: 1,
-          borderColor: "divider",
-          display: "flex",
-          alignItems: "center",
-          bgcolor: (muiTheme) =>
-            muiTheme.palette.mode === "dark" ? "background.default" : muiTheme.palette.background.paper,
-        }}
-      >
-        <Box component="img" src={fileIcon} alt="" sx={{ width: 14, height: 14, mr: 0.75, flexShrink: 0 }} />
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, flex: 1 }}>
-          {path}
-        </Typography>
-        {isDeleted ? (
-          <Typography variant="caption" color="error.main" sx={{ mr: 1 }}>
-            File deleted
-          </Typography>
-        ) : null}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
-          {/* Markdown view mode toggles */}
-          {isMarkdown ? (
+      <FileViewerToolbar
+        path={path}
+        onCopyPath={onCopyPath}
+        onOpenExternalApp={onOpenExternalApp}
+        openExternalAppLabel={openExternalAppLabel}
+        statusContent={
+          isDeleted ? (
+            <Typography variant="caption" color="error.main" sx={{ mr: 1 }}>
+              File deleted
+            </Typography>
+          ) : null
+        }
+        actions={
+          isMarkdown ? (
             <>
               <MarkdownViewModeToggle
                 mode="editor"
@@ -263,39 +252,9 @@ export function FileEditor({
               />
               <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 0.5 }} />
             </>
-          ) : null}
-          <Tooltip title="Copy file path" arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label="Copy file path"
-                onClick={() => {
-                  void onCopyPath?.(path);
-                }}
-                disabled={!onCopyPath}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuCopy size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={openExternalAppLabel} arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label={openExternalAppLabel}
-                onClick={() => {
-                  void onOpenExternalApp?.(path);
-                }}
-                disabled={!onOpenExternalApp}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuExternalLink size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
+          ) : undefined
+        }
+      />
 
       {/* Content area */}
       <Box ref={splitContainerRef} sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>

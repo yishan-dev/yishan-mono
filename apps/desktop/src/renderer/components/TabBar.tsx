@@ -30,6 +30,22 @@ function isAgentCreateOption(option: TabBarCreateOption): option is AgentCreateO
   return option !== "terminal";
 }
 
+const dirtyDotSx = {
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  bgcolor: "primary.main",
+  flexShrink: 0,
+} as const;
+
+/** Renders one small colored dot indicating unsaved changes on a tab. */
+function TabDirtyDot({ tabId, isDirty }: { tabId: string; isDirty?: boolean }) {
+  if (!isDirty) {
+    return null;
+  }
+  return <Box component="span" data-testid={`tab-dirty-dot-${tabId}`} aria-hidden sx={dirtyDotSx} />;
+}
+
 type TabBarProps = {
   tabs: WorkspaceTab[];
   selectedTabId: string;
@@ -500,20 +516,7 @@ export function TabBar({
             }}
           >
             {getTabIcon?.(tab)}
-            {tab.isDirty ? (
-              <Box
-                component="span"
-                data-testid={`tab-dirty-dot-${tab.id}`}
-                aria-hidden
-                sx={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  bgcolor: "primary.main",
-                  flexShrink: 0,
-                }}
-              />
-            ) : null}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
             <Box
               ref={editingRef}
               component="div"
@@ -558,20 +561,7 @@ export function TabBar({
             }}
           >
             {getTabIcon?.(tab)}
-            {tab.isDirty ? (
-              <Box
-                component="span"
-                data-testid={`tab-dirty-dot-${tab.id}`}
-                aria-hidden
-                sx={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  bgcolor: "primary.main",
-                  flexShrink: 0,
-                }}
-              />
-            ) : null}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
             <Box
               component="span"
               style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
