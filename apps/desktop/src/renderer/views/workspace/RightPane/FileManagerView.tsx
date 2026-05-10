@@ -8,7 +8,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  type ExternalAppId,
   findExternalAppPreset,
   isExternalAppPlatformSupported,
 } from "../../../../shared/contracts/externalApps";
@@ -16,7 +15,6 @@ import { ContextMenu } from "../../../components/ContextMenu";
 import { FileQuickOpenDialog } from "../../../components/FileQuickOpenDialog";
 import { FileTree } from "../../../components/FileTree";
 import { FileTreeToolbar } from "../../../components/FileTree/FileTreeToolbar";
-import { resolveDestinationDirectoryPath } from "../../../components/FileTree/treeUtils";
 import type { FileTreeContextMenuRequest } from "../../../components/FileTree/types";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
@@ -25,8 +23,9 @@ import { useSuppressNativeContextMenuWhileOpen } from "../../../hooks/useSuppres
 import { tabStore } from "../../../store/tabStore";
 import { workspaceFileTreeStore } from "../../../store/workspaceFileTreeStore";
 import { workspaceStore } from "../../../store/workspaceStore";
-import { buildWorkspaceFileTreeContextMenuItems } from "./buildWorkspaceFileTreeContextMenuItems";
 import { useFileSearchController } from "./useFileSearchController";
+import { useFileTreeContextMenuItems } from "./useFileTreeContextMenuItems";
+import { useFileTreeCreateEntryRequest } from "./useFileTreeCreateEntryRequest";
 import { useFileTreeGitChanges } from "./useFileTreeGitChanges";
 import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
 
@@ -87,7 +86,7 @@ export function FileManagerView({
     onUndoLastEntryOperation,
   } = useFileTreeOperations();
   const rendererPlatform = getRendererPlatform();
-  const { listGitChanges } = useCommands();
+  const cmd = useCommands();
   const canOpenInExternalApp = isExternalAppPlatformSupported(rendererPlatform);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
@@ -105,12 +104,7 @@ export function FileManagerView({
     ? findExternalAppPreset(lastUsedExternalAppId)
     : null;
 
-  const [, setCreateEntryRequestId] = useState(0);
-  const [createEntryRequest, setCreateEntryRequest] = useState<{
-    kind: "file" | "folder";
-    basePath?: string;
-    requestId: number;
-  } | null>(null);
+  const { createEntryRequest, requestCreateFile, requestCreateFolder } = useFileTreeCreateEntryRequest();
   const {
     menu: contextMenu,
     openMenu: openContextMenu,
@@ -163,7 +157,7 @@ export function FileManagerView({
     [ignoredSearchRepoPathSet, searchRepoFiles],
   );
   const gitChangesByPath = useFileTreeGitChanges({
-    listGitChanges,
+    listGitChanges: cmd.listGitChanges,
     selectedWorkspaceWorktreePath,
     workspaceGitRefreshVersion,
   });
@@ -255,136 +249,28 @@ export function FileManagerView({
 
   const fileOperationModeLabel = fileOperationState ? t(`files.operations.modes.${fileOperationState.mode}`) : "";
 
-  const contextPasteDestination = resolveDestinationDirectoryPath(
-    contextMenu?.targetPath ?? "",
-    Boolean(contextMenu?.targetIsDirectory),
-  );
-  const showOpenInExternalAppMenuItem = Boolean(canOpenInExternalApp && contextMenu?.targetPath);
-  const showOpenInLastUsedExternalAppMenuItem = Boolean(
-    showOpenInExternalAppMenuItem && lastUsedWorkspaceExternalAppPreset,
-  );
-  const contextMenuItems = buildWorkspaceFileTreeContextMenuItems({
-    labels: {
-      createFile: t("files.actions.createFile"),
-      createFolder: t("files.actions.createFolder"),
-      rename: t("files.actions.rename"),
-      delete: t("files.actions.delete"),
-      copy: t("files.actions.copy"),
-      cut: t("files.actions.cut"),
-      paste: t("files.actions.paste"),
-      copyPath: t("files.actions.copyPath"),
-      copyRelativePath: t("files.actions.copyRelativePath"),
-      openInFileManager:
-        rendererPlatform === "win32" ? t("files.actions.openInExplorer") : t("files.actions.openInFinder"),
-      openInExternalApp: t("files.actions.openInExternalApp"),
-      openInLastUsedExternalApp: lastUsedWorkspaceExternalAppPreset
-        ? t("files.actions.openInExternalAppQuick", { app: lastUsedWorkspaceExternalAppPreset.label })
-        : "",
-    },
-    canCreateAtContext: !contextMenu?.targetPath || Boolean(contextMenu.targetIsDirectory),
-    canCreateFile: Boolean(onCreateFile),
-    canCreateFolder: Boolean(onCreateFolder),
-    canRenameEntry: Boolean(onRenameEntry),
-    canDeleteEntry: Boolean(onDeleteEntry),
-    canCopyEntry: Boolean(onCopyEntry),
-    canCutEntry: Boolean(onCutEntry),
-    canPasteEntries: Boolean(canPasteEntries),
-    canCopyPath: Boolean(onCopyPath),
-    canCopyRelativePath: Boolean(onCopyRelativePath),
-    canOpenInFileManager: Boolean(onOpenInFileManager),
-    showOpenInExternalAppMenuItem,
-    showOpenInLastUsedExternalAppMenuItem,
-    contextBasePath: contextMenu?.basePath ?? "",
-    contextTargetPath: contextMenu?.targetPath ?? "",
-    contextPasteDestination,
+  const { items: contextMenuItems, anchorPosition: contextMenuAnchorPosition } = useFileTreeContextMenuItems({
+    t,
+    rendererPlatform,
+    contextMenu,
+    closeContextMenu,
+    canOpenInExternalApp,
     lastUsedWorkspaceExternalAppPreset,
+    canPasteEntries,
     handlers: {
-      startCreate: (_basePath, isDirectory) => {
-        if (!contextMenu) {
-          return;
-        }
-        if (isDirectory) {
-          contextMenu.startCreateFolder();
-          closeContextMenu();
-          return;
-        }
-        contextMenu.startCreateFile();
-        closeContextMenu();
-      },
-      rename: () => {
-        contextMenu?.startRename?.();
-        closeContextMenu();
-      },
-      delete: async () => {
-        if (!onDeleteEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onDeleteEntry(contextMenu.targetPath);
-      },
-      copyEntry: async () => {
-        if (!onCopyEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyEntry(contextMenu.targetPath);
-      },
-      cutEntry: async () => {
-        if (!onCutEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCutEntry(contextMenu.targetPath);
-      },
-      pasteEntries: async (destinationPath: string) => {
-        if (!onPasteEntries || !canPasteEntries) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onPasteEntries(destinationPath);
-      },
-      copyPath: async () => {
-        if (!onCopyPath || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyPath(contextMenu.targetPath);
-      },
-      copyRelativePath: async () => {
-        if (!onCopyRelativePath || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyRelativePath(contextMenu.targetPath);
-      },
-      openInFileManager: async () => {
-        if (!onOpenInFileManager || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onOpenInFileManager(contextMenu.targetPath);
-      },
-      openInExternalApp: async (appId: ExternalAppId) => {
-        if (!onOpenInExternalApp) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onOpenInExternalApp({ appId, path: contextMenu?.targetPath || undefined });
-      },
+      onCreateFile,
+      onCreateFolder,
+      onRenameEntry,
+      onDeleteEntry,
+      onCopyPath,
+      onCopyRelativePath,
+      onOpenInFileManager,
+      onOpenInExternalApp,
+      onCopyEntry,
+      onCutEntry,
+      onPasteEntries,
     },
   });
-  const contextMenuAnchorPosition =
-    contextMenu && typeof contextMenu.mouseX === "number" && typeof contextMenu.mouseY === "number"
-      ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
-      : undefined;
 
   const fileOperationProgressText = fileOperationState
     ? fileOperationState.currentPath
@@ -430,18 +316,10 @@ export function FileManagerView({
         canCreateFolder={Boolean(onCreateFolder)}
         canRefresh={Boolean(onRefresh)}
         onCreateFile={() => {
-          setCreateEntryRequestId((current) => {
-            const requestId = current + 1;
-            setCreateEntryRequest({ kind: "file", requestId });
-            return requestId;
-          });
+          requestCreateFile();
         }}
         onCreateFolder={() => {
-          setCreateEntryRequestId((current) => {
-            const requestId = current + 1;
-            setCreateEntryRequest({ kind: "folder", requestId });
-            return requestId;
-          });
+          requestCreateFolder();
         }}
         onRefresh={() => {
           void onRefresh?.();
