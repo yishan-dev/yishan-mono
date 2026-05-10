@@ -1,7 +1,7 @@
 import { Box, IconButton, Tooltip, Typography } from "@mui/material";
-import { useCallback, useMemo, useState } from "react";
-import { LuCopy, LuExternalLink, LuMaximize2, LuMinus, LuPlus } from "react-icons/lu";
-import { getFileTreeIcon } from "./fileTreeIcons";
+import { useCallback, useState } from "react";
+import { LuMaximize2, LuMinus, LuPlus } from "react-icons/lu";
+import { FileViewerToolbar } from "./FileViewerToolbar";
 import { getFileName } from "../store/tabs";
 
 type ImagePreviewProps = {
@@ -26,7 +26,6 @@ export function ImagePreview({
   openExternalAppLabel = "Open in external app",
 }: ImagePreviewProps) {
   const fileName = getFileName(path);
-  const fileIcon = useMemo(() => getFileTreeIcon(path, false), [path]);
   // zoom === ZOOM_FIT means "fit to view" (auto-scale); any positive value is a manual scale factor.
   const [zoom, setZoom] = useState<number>(ZOOM_FIT);
 
@@ -62,103 +61,60 @@ export function ImagePreview({
         overflow: "hidden",
       }}
     >
-      {/* Toolbar */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          px: 1.5,
-          borderBottom: 1,
-          borderColor: "divider",
-          minHeight: 34,
-          bgcolor: (muiTheme) =>
-            muiTheme.palette.mode === "dark" ? "background.default" : muiTheme.palette.background.paper,
-        }}
-      >
-        {/* File path (left) */}
-        <Box component="img" src={fileIcon} alt="" sx={{ width: 14, height: 14, mr: 0.75, flexShrink: 0 }} />
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, flex: 1 }}>
-          {path}
-        </Typography>
-
-        {/* Zoom controls (right) */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
-          <Tooltip title="Zoom out">
-            <span>
-              <IconButton
-                size="small"
-                onClick={handleZoomOut}
-                disabled={!isFitToView && zoom <= ZOOM_MIN}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuMinus size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ minWidth: 36, textAlign: "center", userSelect: "none" }}
-          >
-            {zoomPercent}
-          </Typography>
-          <Tooltip title="Zoom in">
-            <span>
-              <IconButton
-                size="small"
-                onClick={handleZoomIn}
-                disabled={zoom >= ZOOM_MAX}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuPlus size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title="Fit to view">
-            <span>
-              <IconButton
-                size="small"
-                onClick={handleZoomFit}
-                disabled={isFitToView}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuMaximize2 size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 0.5 }} />
-          <Tooltip title="Copy file path" arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label="Copy file path"
-                onClick={() => {
-                  void onCopyPath?.(path);
-                }}
-                disabled={!onCopyPath}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuCopy size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={openExternalAppLabel} arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label={openExternalAppLabel}
-                onClick={() => {
-                  void onOpenExternalApp?.(path);
-                }}
-                disabled={!onOpenExternalApp}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuExternalLink size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
+      <FileViewerToolbar
+        path={path}
+        onCopyPath={onCopyPath}
+        onOpenExternalApp={onOpenExternalApp}
+        openExternalAppLabel={openExternalAppLabel}
+        actions={
+          <>
+            <Tooltip title="Zoom out">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleZoomOut}
+                  disabled={!isFitToView && zoom <= ZOOM_MIN}
+                  sx={{ p: 0.375, color: "text.secondary" }}
+                >
+                  <LuMinus size={14} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ minWidth: 36, textAlign: "center", userSelect: "none" }}
+            >
+              {zoomPercent}
+            </Typography>
+            <Tooltip title="Zoom in">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleZoomIn}
+                  disabled={zoom >= ZOOM_MAX}
+                  sx={{ p: 0.375, color: "text.secondary" }}
+                >
+                  <LuPlus size={14} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Fit to view">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleZoomFit}
+                  disabled={isFitToView}
+                  sx={{ p: 0.375, color: "text.secondary" }}
+                >
+                  <LuMaximize2 size={14} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 0.5 }} />
+          </>
+        }
+      />
 
       {/* Image canvas */}
       <Box

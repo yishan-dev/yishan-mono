@@ -2,6 +2,7 @@ import { Box, IconButton, Tooltip, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LuColumns2, LuFileText, LuDiff, LuRows2 } from "react-icons/lu";
+import { isBinaryPath } from "../helpers/binaryExtensions";
 import { getLanguageId } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
 
@@ -10,61 +11,6 @@ type FileDiffViewerProps = {
   oldContent: string;
   newContent: string;
 };
-
-const BINARY_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "bmp",
-  "ico",
-  "svg",
-  "webp",
-  "tiff",
-  "tif",
-  "avif",
-  "mp3",
-  "mp4",
-  "wav",
-  "ogg",
-  "flac",
-  "aac",
-  "webm",
-  "mkv",
-  "avi",
-  "mov",
-  "wmv",
-  "flv",
-  "pdf",
-  "zip",
-  "tar",
-  "gz",
-  "bz2",
-  "xz",
-  "7z",
-  "rar",
-  "dmg",
-  "iso",
-  "woff",
-  "woff2",
-  "ttf",
-  "otf",
-  "eot",
-  "exe",
-  "dll",
-  "so",
-  "dylib",
-  "class",
-  "o",
-  "obj",
-  "pyc",
-  "wasm",
-]);
-
-function isBinaryPath(filePath: string): boolean {
-  const extension = filePath.split(".").pop()?.toLowerCase() ?? "";
-  return BINARY_EXTENSIONS.has(extension);
-}
 
 export function FileDiffViewer({ filePath, oldContent, newContent }: FileDiffViewerProps) {
   const theme = useTheme();

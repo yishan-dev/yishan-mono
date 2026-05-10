@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Chip, CircularProgress, Snackbar, Typography } from "@mui/material";
+import { CenteredSpinner } from "../../components/CenteredSpinner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonInfoResult } from "../../../main/ipc";
@@ -154,9 +155,7 @@ export function DaemonSettingsView() {
       />
       <SettingsCard>
         {isLoading ? (
-          <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress size={20} />
-          </Box>
+          <CenteredSpinner />
         ) : (
           <>
             {hasLoadError ? <Alert severity="error">{t("settings.daemon.loadError")}</Alert> : null}

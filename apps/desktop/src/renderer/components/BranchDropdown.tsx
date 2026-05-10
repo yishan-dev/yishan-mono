@@ -29,6 +29,26 @@ type SourceBranchOption = {
   kind: "branch" | "worktree";
 };
 
+/** Builds one list of branch dropdown options with an empty-state fallback. */
+function buildBranchOptions(
+  branches: string[],
+  prefix: string,
+  indent: number,
+  kind: "branch" | "worktree",
+  emptyLabel: string,
+): SourceBranchOption[] {
+  if (branches.length === 0) {
+    return [{ key: `${prefix}-empty`, value: "", label: emptyLabel, indent, kind }];
+  }
+  return branches.map((branch) => ({
+    key: `${prefix}-${branch}`,
+    value: branch,
+    label: branch,
+    indent,
+    kind,
+  }));
+}
+
 export function BranchDropdown({
   groups,
   selectedValue,
@@ -49,36 +69,9 @@ export function BranchDropdown({
   }, [groups.remoteBranches, selectedValue]);
   const [activeSection, setActiveSection] = useState<"local" | "remote">(inferredInitialSection);
 
-  const localOptions: SourceBranchOption[] =
-    groups.localBranches.length > 0
-      ? groups.localBranches.map((branchOption) => ({
-          key: `local-${branchOption}`,
-          value: branchOption,
-          label: branchOption,
-          indent: 4,
-          kind: "branch",
-        }))
-      : [{ key: "local-empty", value: "", label: emptyLocalLabel, indent: 4, kind: "branch" }];
-  const worktreeOptions: SourceBranchOption[] =
-    groups.worktreeBranches.length > 0
-      ? groups.worktreeBranches.map((branchOption) => ({
-          key: `worktree-${branchOption}`,
-          value: branchOption,
-          label: branchOption,
-          indent: 4,
-          kind: "worktree",
-        }))
-      : [{ key: "worktree-empty", value: "", label: emptyWorktreeLabel, indent: 4, kind: "worktree" }];
-  const remoteOptions: SourceBranchOption[] =
-    groups.remoteBranches.length > 0
-      ? groups.remoteBranches.map((branchOption) => ({
-          key: `remote-${branchOption}`,
-          value: branchOption,
-          label: branchOption,
-          indent: 2,
-          kind: "branch",
-        }))
-      : [{ key: "remote-empty", value: "", label: emptyRemoteLabel, indent: 2, kind: "branch" }];
+  const localOptions = buildBranchOptions(groups.localBranches, "local", 4, "branch", emptyLocalLabel);
+  const worktreeOptions = buildBranchOptions(groups.worktreeBranches, "worktree", 4, "worktree", emptyWorktreeLabel);
+  const remoteOptions = buildBranchOptions(groups.remoteBranches, "remote", 2, "branch", emptyRemoteLabel);
 
   const renderOption = (option: SourceBranchOption) => (
     <MenuItem

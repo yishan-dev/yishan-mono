@@ -30,6 +30,22 @@ function isAgentCreateOption(option: TabBarCreateOption): option is AgentCreateO
   return option !== "terminal";
 }
 
+const dirtyDotSx = {
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  bgcolor: "primary.main",
+  flexShrink: 0,
+} as const;
+
+/** Renders one small colored dot indicating unsaved changes on a tab. */
+function TabDirtyDot({ tabId, isDirty }: { tabId: string; isDirty?: boolean }) {
+  if (!isDirty) {
+    return null;
+  }
+  return <Box component="span" data-testid={`tab-dirty-dot-${tabId}`} aria-hidden sx={dirtyDotSx} />;
+}
+
 type TabBarProps = {
   tabs: WorkspaceTab[];
   selectedTabId: string;
@@ -456,6 +472,148 @@ export function TabBar({
   const pinnedTabs = tabs.filter((tab) => tab.pinned);
   const unpinnedTabs = tabs.filter((tab) => !tab.pinned);
 
+  const renderTabItem = (tab: WorkspaceTab) => {
+    const active = tab.id === selectedTabId;
+    const editing = tab.id === editingTabId;
+    const pinned = tab.pinned;
+
+    return (
+      <Box
+        key={tab.id}
+        ref={(element: HTMLDivElement | null) => {
+          tabItemRefs.current[tab.id] = element;
+        }}
+        draggable={canDragTabs && !editing}
+        onContextMenu={(event) => handleContextMenu(event, tab)}
+        onDragStart={(event) => handleTabDragStart(event, tab)}
+        onDragOver={(event) => handleTabDragOver(event, tab)}
+        onDrop={(event) => handleTabDrop(event, tab)}
+        onDragEnd={resetDragState}
+        sx={{
+          ...buildTabContainerSx(active, editing),
+          ...(dropTarget?.tabId === tab.id && {
+            ...(dropTarget.position === "before"
+              ? {
+                  boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
+                }
+              : {
+                  boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
+                }),
+          }),
+          opacity: draggedTabId === tab.id ? 0.9 : 1,
+        }}
+      >
+        {editing ? (
+          <Box
+            className="tab-content"
+            sx={{
+              py: 0.75,
+              pl: 0.5,
+              pr: 0.25,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            {getTabIcon?.(tab)}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
+            <Box
+              ref={editingRef}
+              component="div"
+              contentEditable
+              suppressContentEditableWarning
+              aria-label={renameTabLabel}
+              onKeyDown={(event) => handleRenameKeyDown(event, tab)}
+              onInput={(event) => {
+                editingDraftRef.current = event.currentTarget.textContent ?? "";
+              }}
+              onBlur={() => handleRenameBlur(tab)}
+              sx={{
+                typography: "body2",
+                color: active ? "text.primary" : "text.secondary",
+                minWidth: 24,
+                maxWidth: 220,
+                outline: "none",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {tab.title || untitledLabel}
+            </Box>
+          </Box>
+        ) : (
+          <ButtonBase
+            className="tab-content"
+            disableRipple
+            onClick={() => onSelectTab(tab.id)}
+            onDoubleClick={() => beginRename(tab)}
+            sx={{
+              typography: "body2",
+              color: active ? "text.primary" : "text.secondary",
+              py: 1,
+              pl: 0.5,
+              pr: 0.25,
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            {getTabIcon?.(tab)}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
+            <Box
+              component="span"
+              style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
+              sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {tab.title || untitledLabel}
+            </Box>
+          </ButtonBase>
+        )}
+        {pinned ? (
+          <IconButton
+            className="tab-pin"
+            size="small"
+            aria-label={unpinTabActionLabel}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePinTab?.(tab.id);
+            }}
+            disabled={editing || !onTogglePinTab}
+            sx={{
+              color: active ? "text.primary" : "text.secondary",
+              p: 0.5,
+              mr: -2,
+              display: editing ? "none" : "inline-flex",
+            }}
+          >
+            <LuPin size={14} />
+          </IconButton>
+        ) : (
+          <IconButton
+            className="tab-close"
+            size="small"
+            aria-label={closeTabActionLabel}
+            onClick={(event) => {
+              event.stopPropagation();
+              onCloseTab(tab.id);
+            }}
+            disabled={editing}
+            sx={{
+              color: active ? "text.primary" : "text.secondary",
+              p: 0.5,
+              mr: -2,
+              display: editing ? "none" : "inline-flex",
+            }}
+          >
+            <LuX size={14} />
+          </IconButton>
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, height: "100%" }}>
       <Box
@@ -467,173 +625,7 @@ export function TabBar({
           height: "100%",
         }}
       >
-        {pinnedTabs.map((tab) => {
-          const active = tab.id === selectedTabId;
-          const editing = tab.id === editingTabId;
-          const pinned = tab.pinned;
-
-          return (
-            <Box
-              key={tab.id}
-              ref={(element: HTMLDivElement | null) => {
-                tabItemRefs.current[tab.id] = element;
-              }}
-              draggable={canDragTabs && !editing}
-              onContextMenu={(event) => handleContextMenu(event, tab)}
-              onDragStart={(event) => handleTabDragStart(event, tab)}
-              onDragOver={(event) => handleTabDragOver(event, tab)}
-              onDrop={(event) => handleTabDrop(event, tab)}
-              onDragEnd={resetDragState}
-              sx={{
-                ...buildTabContainerSx(active, editing),
-                ...(dropTarget?.tabId === tab.id && {
-                  ...(dropTarget.position === "before"
-                    ? {
-                        boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
-                      }
-                    : {
-                        boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
-                      }),
-                }),
-                opacity: draggedTabId === tab.id ? 0.9 : 1,
-              }}
-            >
-              {editing ? (
-                <Box
-                  className="tab-content"
-                  sx={{
-                    py: 0.75,
-                    pl: 0.5,
-                    pr: 0.25,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  {getTabIcon?.(tab)}
-                  {tab.isDirty ? (
-                    <Box
-                      component="span"
-                      data-testid={`tab-dirty-dot-${tab.id}`}
-                      aria-hidden
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                  <Box
-                    ref={editingRef}
-                    component="div"
-                    contentEditable
-                    suppressContentEditableWarning
-                    aria-label={renameTabLabel}
-                    onKeyDown={(event) => handleRenameKeyDown(event, tab)}
-                    onInput={(event) => {
-                      editingDraftRef.current = event.currentTarget.textContent ?? "";
-                    }}
-                    onBlur={() => handleRenameBlur(tab)}
-                    sx={{
-                      typography: "body2",
-                      color: active ? "text.primary" : "text.secondary",
-                      minWidth: 24,
-                      maxWidth: 220,
-                      outline: "none",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {tab.title || untitledLabel}
-                  </Box>
-                </Box>
-              ) : (
-                <ButtonBase
-                  className="tab-content"
-                  disableRipple
-                  onClick={() => onSelectTab(tab.id)}
-                  onDoubleClick={() => beginRename(tab)}
-                  sx={{
-                    typography: "body2",
-                    color: active ? "text.primary" : "text.secondary",
-                    py: 1,
-                    pl: 0.5,
-                    pr: 0.25,
-                    whiteSpace: "nowrap",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  {getTabIcon?.(tab)}
-                  {tab.isDirty ? (
-                    <Box
-                      component="span"
-                      data-testid={`tab-dirty-dot-${tab.id}`}
-                      aria-hidden
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                  <Box
-                    component="span"
-                    style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
-                    sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    {tab.title || untitledLabel}
-                  </Box>
-                </ButtonBase>
-              )}
-              {pinned ? (
-                <IconButton
-                  className="tab-pin"
-                  size="small"
-                  aria-label={unpinTabActionLabel}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onTogglePinTab?.(tab.id);
-                  }}
-                  disabled={editing || !onTogglePinTab}
-                  sx={{
-                    color: active ? "text.primary" : "text.secondary",
-                    p: 0.5,
-                    mr: -2,
-                    display: editing ? "none" : "inline-flex",
-                  }}
-                >
-                  <LuPin size={14} />
-                </IconButton>
-              ) : (
-                <IconButton
-                  className="tab-close"
-                  size="small"
-                  aria-label={closeTabActionLabel}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCloseTab(tab.id);
-                  }}
-                  disabled={editing}
-                  sx={{
-                    color: active ? "text.primary" : "text.secondary",
-                    p: 0.5,
-                    mr: -2,
-                    display: editing ? "none" : "inline-flex",
-                  }}
-                >
-                  <LuX size={14} />
-                </IconButton>
-              )}
-            </Box>
-          );
-        })}
+        {pinnedTabs.map(renderTabItem)}
         <Box
           ref={scrollableTabsContainerRef}
           onDragOver={handleTabsContainerDragOver}
@@ -653,173 +645,7 @@ export function TabBar({
             },
           }}
         >
-          {unpinnedTabs.map((tab) => {
-            const active = tab.id === selectedTabId;
-            const editing = tab.id === editingTabId;
-            const pinned = tab.pinned;
-
-            return (
-              <Box
-                key={tab.id}
-                ref={(element: HTMLDivElement | null) => {
-                  tabItemRefs.current[tab.id] = element;
-                }}
-                draggable={canDragTabs && !editing}
-                onContextMenu={(event) => handleContextMenu(event, tab)}
-                onDragStart={(event) => handleTabDragStart(event, tab)}
-                onDragOver={(event) => handleTabDragOver(event, tab)}
-                onDrop={(event) => handleTabDrop(event, tab)}
-                onDragEnd={resetDragState}
-                sx={{
-                  ...buildTabContainerSx(active, editing),
-                  ...(dropTarget?.tabId === tab.id && {
-                    ...(dropTarget.position === "before"
-                      ? {
-                          boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
-                        }
-                      : {
-                          boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
-                        }),
-                  }),
-                  opacity: draggedTabId === tab.id ? 0.9 : 1,
-                }}
-              >
-                {editing ? (
-                  <Box
-                    className="tab-content"
-                    sx={{
-                      py: 0.75,
-                      pl: 0.5,
-                      pr: 0.25,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                    }}
-                  >
-                    {getTabIcon?.(tab)}
-                    {tab.isDirty ? (
-                      <Box
-                        component="span"
-                        data-testid={`tab-dirty-dot-${tab.id}`}
-                        aria-hidden
-                        sx={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          bgcolor: "primary.main",
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Box
-                      ref={editingRef}
-                      component="div"
-                      contentEditable
-                      suppressContentEditableWarning
-                      aria-label={renameTabLabel}
-                      onKeyDown={(event) => handleRenameKeyDown(event, tab)}
-                      onInput={(event) => {
-                        editingDraftRef.current = event.currentTarget.textContent ?? "";
-                      }}
-                      onBlur={() => handleRenameBlur(tab)}
-                      sx={{
-                        typography: "body2",
-                        color: active ? "text.primary" : "text.secondary",
-                        minWidth: 24,
-                        maxWidth: 220,
-                        outline: "none",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {tab.title || untitledLabel}
-                    </Box>
-                  </Box>
-                ) : (
-                  <ButtonBase
-                    className="tab-content"
-                    disableRipple
-                    onClick={() => onSelectTab(tab.id)}
-                    onDoubleClick={() => beginRename(tab)}
-                    sx={{
-                      typography: "body2",
-                      color: active ? "text.primary" : "text.secondary",
-                      py: 1,
-                      pl: 0.5,
-                      pr: 0.25,
-                      whiteSpace: "nowrap",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                    }}
-                  >
-                    {getTabIcon?.(tab)}
-                    {tab.isDirty ? (
-                      <Box
-                        component="span"
-                        data-testid={`tab-dirty-dot-${tab.id}`}
-                        aria-hidden
-                        sx={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          bgcolor: "primary.main",
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Box
-                      component="span"
-                      style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
-                      sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      {tab.title || untitledLabel}
-                    </Box>
-                  </ButtonBase>
-                )}
-                {pinned ? (
-                  <IconButton
-                    className="tab-pin"
-                    size="small"
-                    aria-label={unpinTabActionLabel}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onTogglePinTab?.(tab.id);
-                    }}
-                    disabled={editing || !onTogglePinTab}
-                    sx={{
-                      color: active ? "text.primary" : "text.secondary",
-                      p: 0.5,
-                      mr: -2,
-                      display: editing ? "none" : "inline-flex",
-                    }}
-                  >
-                    <LuPin size={14} />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    className="tab-close"
-                    size="small"
-                    aria-label={closeTabActionLabel}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onCloseTab(tab.id);
-                    }}
-                    disabled={editing}
-                    sx={{
-                      color: active ? "text.primary" : "text.secondary",
-                      p: 0.5,
-                      mr: -2,
-                      display: editing ? "none" : "inline-flex",
-                    }}
-                  >
-                    <LuX size={14} />
-                  </IconButton>
-                )}
-              </Box>
-            );
-          })}
+          {unpinnedTabs.map(renderTabItem)}
         </Box>
       </Box>
       <IconButton

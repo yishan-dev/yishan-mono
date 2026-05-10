@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -11,6 +10,8 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { CenteredSpinner } from "../../components/CenteredSpinner";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSectionHeader } from "../../components/settings";
@@ -210,9 +211,7 @@ export function TerminalSettingsView() {
       <SettingsSectionHeader title={t("settings.terminal.title")} description={t("settings.terminal.description")} />
       <SettingsCard>
         {isLoading ? (
-          <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress size={20} />
-          </Box>
+          <CenteredSpinner />
         ) : (
           <>
             {hasLoadError ? <Alert severity="error">{t("settings.terminal.loadError")}</Alert> : null}
@@ -263,20 +262,10 @@ export function TerminalSettingsView() {
                         <TableCell>{workspaceName}</TableCell>
                         <TableCell sx={{ fontFamily: "monospace" }}>{session.pid}</TableCell>
                         <TableCell>
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-                            <Box
-                              component="span"
-                              sx={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                bgcolor: isRunning ? "success.main" : "text.disabled",
-                              }}
-                            />
-                            <Typography variant="body2" color={isRunning ? "text.primary" : "text.secondary"}>
-                              {isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")}
-                            </Typography>
-                          </Box>
+                          <StatusIndicator
+                            label={isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")}
+                            color={isRunning ? "success" : "disabled"}
+                          />
                         </TableCell>
                         <TableCell align="right">
                           <Button

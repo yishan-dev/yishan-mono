@@ -309,6 +309,7 @@ export class DaemonManager {
   private readonly run: CliCommandRunner;
   private readonly logger: DaemonLogger;
   private readonly fetchFn: typeof fetch;
+  private readonly preferCliStartPath: boolean;
   private ensureStartedInFlight: Promise<void> | null = null;
   private devDaemonChild: ChildProcess | null = null;
 
@@ -316,6 +317,7 @@ export class DaemonManager {
     this.run = options?.run ?? runCliCommand;
     this.logger = options?.logger ?? console;
     this.fetchFn = options?.fetch ?? fetch;
+    this.preferCliStartPath = Boolean(options?.run);
   }
 
   private async waitForHealthy(options?: { retryCount?: number; retryDelayMs?: number }): Promise<void> {
@@ -435,7 +437,7 @@ export class DaemonManager {
       // Continue to active recovery path.
     }
 
-    if (isDevMode()) {
+    if (isDevMode() && !this.preferCliStartPath) {
       try {
         await this.startDevForegroundDaemon();
       } catch (error) {

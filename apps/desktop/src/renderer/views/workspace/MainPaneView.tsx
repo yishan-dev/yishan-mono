@@ -4,9 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuSquareTerminal } from "react-icons/lu";
 import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shared/contracts/externalApps";
+import { copyToClipboard } from "../../helpers/clipboard";
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
 import { ImagePreview } from "../../components/ImagePreview";
+import { TabPanel } from "../../components/TabPanel";
 import { UnsupportedFileView } from "../../components/UnsupportedFileView";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
@@ -97,35 +99,33 @@ function buildTerminalInput(title: string) {
 /** Renders the primary workspace pane with tabbed content, per-tab views, and pane visibility controls. */
 export function MainPaneView() {
   const { t } = useTranslation();
+  const cmd = useCommands();
   const workspaces = workspaceStore((state) => state.workspaces);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const tabs = tabStore((state) => state.tabs);
   const selectedTabId = tabStore((state) => state.selectedTabId);
-  const {
-    setSelectedTabId,
-    openTab,
-    closeTab,
-    closeOtherTabs,
-    closeAllTabs,
-    toggleTabPinned,
-    reorderTab,
-    renameTab,
-    renameTabsForEntryRename,
-    renameEntry,
-    readBranchComparisonDiff,
-    readCommitDiff,
-    readDiff,
-    readFile,
-    refreshDiffTabContent,
-    refreshFileTabFromDisk,
-    updateFileTabContent,
-    markFileTabSaved,
-    writeFile,
-    openEntryInExternalApp,
-  } = useCommands();
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const lastUsedExternalAppPreset = lastUsedExternalAppId ? findExternalAppPreset(lastUsedExternalAppId) : null;
+  const externalAppLabel = lastUsedExternalAppPreset
+    ? `Open in ${lastUsedExternalAppPreset.label}`
+    : "Open in external app";
+  const handleOpenExternalApp = async (filePath: string) => {
+    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
+    if (!workspaceWorktreePath) {
+      return;
+    }
+
+    try {
+      await cmd.openEntryInExternalApp({
+        workspaceWorktreePath,
+        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
+        relativePath: filePath,
+      });
+    } catch (error) {
+      console.error("Failed to open workspace file externally", error);
+    }
+  };
   const inUseByAgentKind = agentSettingsStore((state) => state.inUseByAgentKind);
   const workspaceTabs = tabs.filter((tab) => tab.workspaceId === selectedWorkspaceId);
   const terminalTabs = tabs.filter((tab) => tab.kind === "terminal");
@@ -181,17 +181,17 @@ export function MainPaneView() {
     workspaceWorktreePath: selectedWorkspace?.worktreePath,
     tabs: refreshableTabs,
     commands: {
-      readFile,
-      readDiff,
-      readCommitDiff,
-      readBranchComparisonDiff,
-      refreshFileTabFromDisk,
-      refreshDiffTabContent,
+      readFile: cmd.readFile,
+      readDiff: cmd.readDiff,
+      readCommitDiff: cmd.readCommitDiff,
+      readBranchComparisonDiff: cmd.readBranchComparisonDiff,
+      refreshFileTabFromDisk: cmd.refreshFileTabFromDisk,
+      refreshDiffTabContent: cmd.refreshDiffTabContent,
     },
   });
 
   const handleSelectTab = (tabId: string) => {
-    setSelectedTabId(tabId);
+    cmd.setSelectedTabId(tabId);
   };
 
   useEffect(() => {
@@ -210,7 +210,7 @@ export function MainPaneView() {
   /** Handles tab creation from the tab bar type selector menu. */
   const handleCreateTab = (option: TabBarCreateOption) => {
     if (option === "terminal") {
-      openTab({
+      cmd.openTab({
         workspaceId: selectedWorkspaceId,
         ...buildTerminalInput(t("terminal.title")),
       });
@@ -221,7 +221,7 @@ export function MainPaneView() {
       return;
     }
 
-    openTab({
+    cmd.openTab({
       workspaceId: selectedWorkspaceId,
       ...buildAgentTerminalInput(option),
     });
@@ -256,11 +256,11 @@ export function MainPaneView() {
           tabs={tabBarTabs}
           selectedTabId={selectedTabId}
           onSelectTab={handleSelectTab}
-          onCloseTab={closeTab}
-          onCloseOtherTabs={closeOtherTabs}
-          onCloseAllTabs={closeAllTabs}
-          onTogglePinTab={toggleTabPinned}
-          onReorderTab={reorderTab}
+          onCloseTab={cmd.closeTab}
+          onCloseOtherTabs={cmd.closeOtherTabs}
+          onCloseAllTabs={cmd.closeAllTabs}
+          onTogglePinTab={cmd.toggleTabPinned}
+          onReorderTab={cmd.reorderTab}
           onCreateTab={handleCreateTab}
           onRenameTab={async (tabId, title) => {
             const tab = workspaceTabs.find((item) => item.id === tabId);
@@ -269,7 +269,7 @@ export function MainPaneView() {
             }
 
             if (tab.kind !== "file") {
-              renameTab(tabId, title, { userRenamed: true });
+              cmd.renameTab(tabId, title, { userRenamed: true });
               return;
             }
 
@@ -286,12 +286,12 @@ export function MainPaneView() {
             }
 
             try {
-              await renameEntry({
+              await cmd.renameEntry({
                 workspaceWorktreePath,
                 fromRelativePath: tab.data.path,
                 toRelativePath: targetPath,
               });
-              renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
+              cmd.renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
             } catch (error) {
               console.error("Failed to rename workspace file from tab", error);
             }
@@ -325,36 +325,20 @@ export function MainPaneView() {
           const isSelected = tab.id === selectedTabId;
           if (tab.kind === "diff") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <FileDiffViewer
                   filePath={tab.data.path}
                   oldContent={tab.data.oldContent ?? ""}
                   newContent={tab.data.newContent ?? ""}
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "file") {
             if (tab.data.isUnsupported) {
               return (
-                <Box
-                  key={tab.id}
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: isSelected ? "flex" : "none",
-                    flexDirection: "column",
-                  }}
-                >
+                <TabPanel key={tab.id} active={isSelected}>
                   <UnsupportedFileView
                     path={tab.data.path}
                     title={t("files.unsupported.title")}
@@ -368,51 +352,16 @@ export function MainPaneView() {
                         ? t("files.unsupported.hintLarge")
                         : t("files.unsupported.hint")
                     }
-                    onCopyPath={async (filePath) => {
-                      if (!navigator.clipboard) {
-                        return;
-                      }
-
-                      try {
-                        await navigator.clipboard.writeText(filePath);
-                      } catch (error) {
-                        console.error("Failed to copy workspace file path", error);
-                      }
-                    }}
-                    onOpenExternalApp={async (filePath) => {
-                      const workspaceWorktreePath = selectedWorkspace?.worktreePath;
-                      if (!workspaceWorktreePath) {
-                        return;
-                      }
-
-                      try {
-                        await openEntryInExternalApp({
-                          workspaceWorktreePath,
-                          appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
-                          relativePath: filePath,
-                        });
-                      } catch (error) {
-                        console.error("Failed to open workspace file externally", error);
-                      }
-                    }}
-                    openExternalAppLabel={
-                      lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
-                    }
+                    onCopyPath={copyToClipboard}
+                    onOpenExternalApp={handleOpenExternalApp}
+                    openExternalAppLabel={externalAppLabel}
                   />
-                </Box>
+                </TabPanel>
               );
             }
 
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <FileEditor
                   path={tab.data.path}
                   content={tab.data.content ?? ""}
@@ -420,122 +369,52 @@ export function MainPaneView() {
                   isDeleted={Boolean(tab.data.isDeleted)}
                   focusRequestKey={isSelected ? focusContentRequestKey : 0}
                   onContentChange={(nextContent) => {
-                    updateFileTabContent(tab.id, nextContent);
-                  }}
-                  onSave={async (nextContent) => {
+                     cmd.updateFileTabContent(tab.id, nextContent);
+                   }}
+                   onSave={async (nextContent) => {
                     const workspaceWorktreePath = selectedWorkspace?.worktreePath;
                     if (!workspaceWorktreePath) {
                       return;
                     }
 
                     try {
-                      await writeFile({
-                        workspaceWorktreePath,
-                        relativePath: tab.data.path,
-                        content: nextContent,
-                      });
+                       await cmd.writeFile({
+                         workspaceWorktreePath,
+                         relativePath: tab.data.path,
+                         content: nextContent,
+                       });
 
-                      updateFileTabContent(tab.id, nextContent);
-                      markFileTabSaved(tab.id);
+                       cmd.updateFileTabContent(tab.id, nextContent);
+                       cmd.markFileTabSaved(tab.id);
                     } catch (error) {
                       console.error("Failed to save workspace file", error);
                     }
                   }}
-                  onCopyPath={async (filePath) => {
-                    if (!navigator.clipboard) {
-                      return;
-                    }
-
-                    try {
-                      await navigator.clipboard.writeText(filePath);
-                    } catch (error) {
-                      console.error("Failed to copy workspace file path", error);
-                    }
-                  }}
-                  onOpenExternalApp={async (filePath) => {
-                    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
-                    if (!workspaceWorktreePath) {
-                      return;
-                    }
-
-                    try {
-                      await openEntryInExternalApp({
-                        workspaceWorktreePath,
-                        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
-                        relativePath: filePath,
-                      });
-                    } catch (error) {
-                      console.error("Failed to open workspace file externally", error);
-                    }
-                  }}
-                  openExternalAppLabel={
-                    lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
-                  }
+                  onCopyPath={copyToClipboard}
+                  onOpenExternalApp={handleOpenExternalApp}
+                  openExternalAppLabel={externalAppLabel}
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "image") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <ImagePreview
                   path={tab.data.path}
                   dataUrl={tab.data.dataUrl}
-                  onCopyPath={async (filePath) => {
-                    if (!navigator.clipboard) {
-                      return;
-                    }
-
-                    try {
-                      await navigator.clipboard.writeText(filePath);
-                    } catch (error) {
-                      console.error("Failed to copy workspace file path", error);
-                    }
-                  }}
-                  onOpenExternalApp={async (filePath) => {
-                    const workspaceWorktreePath = selectedWorkspace?.worktreePath;
-                    if (!workspaceWorktreePath) {
-                      return;
-                    }
-
-                    try {
-                      await openEntryInExternalApp({
-                        workspaceWorktreePath,
-                        appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
-                        relativePath: filePath,
-                      });
-                    } catch (error) {
-                      console.error("Failed to open workspace file externally", error);
-                    }
-                  }}
-                  openExternalAppLabel={
-                    lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
-                  }
+                  onCopyPath={copyToClipboard}
+                  onOpenExternalApp={handleOpenExternalApp}
+                  openExternalAppLabel={externalAppLabel}
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "session") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <Box
                   sx={{
                     flex: 1,
@@ -550,7 +429,7 @@ export function MainPaneView() {
                     Chat is currently disabled.
                   </Typography>
                 </Box>
-              </Box>
+              </TabPanel>
             );
           }
 
@@ -574,14 +453,9 @@ export function MainPaneView() {
           );
         })}
         {!hasWorkspaceTabs ? (
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-            }}
-          >
+          <TabPanel active>
             <LaunchView />
-          </Box>
+          </TabPanel>
         ) : null}
       </Box>
     </Box>

@@ -2,15 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import { ResourceUsageMenu, type ResourceUsageMenuRow } from "../../components/ResourceUsageMenu";
+import { formatCpuPercent, formatMemoryBytes } from "../../helpers/formatters";
+import { isTerminalTabWithSessionId } from "../../helpers/terminalTabUtils";
 import { useCommands } from "../../hooks/useCommands";
 import { useSharedTerminalResourceUsageSnapshot } from "../../hooks/useSharedTerminalResourceUsageSnapshot";
-import type { TabStoreState } from "../../store/tabStore";
 import { tabStore } from "../../store/tabStore";
 import { workspaceStore } from "../../store/workspaceStore";
 
 const MAX_VISIBLE_PROCESSES = 20;
-
-type TerminalTab = Extract<TabStoreState["tabs"][number], { kind: "terminal" }>;
 
 type ResourceUsageRouteCloseWatcherProps = {
   onClose: () => void;
@@ -29,32 +28,9 @@ function ResourceUsageRouteCloseWatcher({ onClose }: ResourceUsageRouteCloseWatc
   return null;
 }
 
-/** Formats one CPU percentage for compact metrics display. */
-function formatCpuPercent(value: number): string {
-  return `${Math.max(0, value).toFixed(1)}%`;
-}
-
-/** Formats one byte value to one concise MB/GB memory label. */
-function formatMemoryBytes(value: number): string {
-  const safeValue = Math.max(0, value);
-  const gb = safeValue / (1024 * 1024 * 1024);
-  if (gb >= 1) {
-    return `${gb.toFixed(1)} GB`;
-  }
-  const mb = safeValue / (1024 * 1024);
-  return `${mb.toFixed(0)} MB`;
-}
-
 /** Builds one stable row id for resource menu rendering. */
 function buildResourceUsageRowId(sessionId: string, pid: number): string {
   return `${sessionId}\u0000${pid}`;
-}
-
-/** Narrows one tab union entry to a terminal tab with a non-empty bound session id. */
-function isTerminalTabWithSessionId(
-  tab: TabStoreState["tabs"][number],
-): tab is TerminalTab & { data: TerminalTab["data"] & { sessionId: string } } {
-  return tab.kind === "terminal" && Boolean(tab.data.sessionId?.trim());
 }
 
 /** Renders one workspace-scoped CPU/memory summary and subprocess usage dropdown. */

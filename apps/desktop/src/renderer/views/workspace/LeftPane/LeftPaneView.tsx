@@ -1,24 +1,13 @@
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { LuPanelLeft, LuPlus } from "react-icons/lu";
+import { PaneHeader } from "../../../components/PaneHeader";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { getShortcutDisplayLabelById } from "../../../shortcuts/shortcutDisplay";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { AppMenuView } from "../../layout/AppMenuView";
 import { ProjectFilterPopoverView } from "./ProjectFilterPopoverView";
 import { ProjectListView } from "./ProjectListView";
-
-const paneHeaderSx = {
-  minHeight: 42,
-  px: 1.5,
-  py: 0.75,
-  borderBottom: 1,
-  borderColor: "divider",
-  bgcolor: "background.paper",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-} as const;
 
 type LeftPaneViewProps = {
   onCreateRepository?: () => void;
@@ -52,7 +41,7 @@ export function LeftPaneView({ onCreateRepository, onToggleLeftPane }: LeftPaneV
         overflow: "hidden",
       }}
     >
-      <Box component="header" className="electron-webkit-app-region-drag" sx={paneHeaderSx}>
+      <PaneHeader className="electron-webkit-app-region-drag" py={0.75}>
         <Box
           className="electron-webkit-app-region-no-drag"
           sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", minWidth: 0, pr: 0.5 }}
@@ -75,7 +64,7 @@ export function LeftPaneView({ onCreateRepository, onToggleLeftPane }: LeftPaneV
             </span>
           </Tooltip>
         </Stack>
-      </Box>
+      </PaneHeader>
       <ProjectListView />
       {filteredRepos.length === 0 ? (
         <Box sx={{ px: 2, pb: 1.5 }}>

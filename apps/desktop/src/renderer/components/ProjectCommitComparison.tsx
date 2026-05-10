@@ -2,6 +2,39 @@ import { Autocomplete, type AutocompleteRenderInputParams, Box, LinearProgress, 
 import { memo, useCallback, useMemo, useState } from "react";
 import { LuArrowRight, LuGitBranch } from "react-icons/lu";
 
+/** Renders one bordered pill displaying a git branch name with an icon. */
+function BranchBadge({ name, testId }: { name: string; testId: string }) {
+  return (
+    <Box
+      data-testid={testId}
+      title={name}
+      sx={{
+        color: "text.secondary",
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.5,
+        px: 0.625,
+        py: 0.375,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 0.75,
+        boxSizing: "border-box",
+      }}
+    >
+      <LuGitBranch size={12} color="currentColor" />
+      <Typography
+        variant="caption"
+        component="span"
+        sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
+        {name}
+      </Typography>
+    </Box>
+  );
+}
+
 export type ProjectCommitComparisonCommit = {
   hash: string;
   shortHash: string;
@@ -209,63 +242,11 @@ export const ProjectCommitComparison = memo(function ProjectCommitComparison({
   return (
     <Box sx={{ mt: 1, minWidth: 0 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0, overflow: "hidden" }}>
-        <Box
-          data-testid="commit-comparison-current-branch"
-          title={comparison.currentBranch}
-          sx={{
-            color: "text.secondary",
-            flex: "1 1 0",
-            minWidth: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            px: 0.625,
-            py: 0.375,
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 0.75,
-            boxSizing: "border-box",
-          }}
-        >
-          <LuGitBranch size={12} color="currentColor" />
-          <Typography
-            variant="caption"
-            component="span"
-            sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {comparison.currentBranch}
-          </Typography>
-        </Box>
+        <BranchBadge name={comparison.currentBranch} testId="commit-comparison-current-branch" />
         <Box sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
           <LuArrowRight size={13} color="currentColor" />
         </Box>
-        <Box
-          data-testid="commit-comparison-target-branch"
-          title={normalizedTargetBranch}
-          sx={{
-            flex: "1 1 0",
-            minWidth: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            color: "text.secondary",
-            px: 0.625,
-            py: 0.375,
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 0.75,
-            boxSizing: "border-box",
-          }}
-        >
-          <LuGitBranch size={12} color="currentColor" />
-          <Typography
-            variant="caption"
-            component="span"
-            sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {normalizedTargetBranch}
-          </Typography>
-        </Box>
+        <BranchBadge name={normalizedTargetBranch} testId="commit-comparison-target-branch" />
       </Box>
 
       <Autocomplete
