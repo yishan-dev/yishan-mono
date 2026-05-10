@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Table,
   TableBody,
   TableCell,
@@ -11,6 +10,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { CenteredSpinner } from "../../components/CenteredSpinner";
 import { StatusIndicator } from "../../components/StatusIndicator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -211,9 +211,7 @@ export function TerminalSettingsView() {
       <SettingsSectionHeader title={t("settings.terminal.title")} description={t("settings.terminal.description")} />
       <SettingsCard>
         {isLoading ? (
-          <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress size={20} />
-          </Box>
+          <CenteredSpinner />
         ) : (
           <>
             {hasLoadError ? <Alert severity="error">{t("settings.terminal.loadError")}</Alert> : null}
