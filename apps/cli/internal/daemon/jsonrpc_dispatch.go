@@ -308,6 +308,12 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return h.manager.GitListCommitsToTarget(ctx, req.WorkspaceID, req.TargetBranch)
+	case MethodGitBranchDiffSummary:
+		var req gitTargetBranchParams
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		return h.manager.GitBranchDiffSummary(ctx, req.WorkspaceID, req.TargetBranch)
 	case MethodGitCommitDiff:
 		var req gitCommitDiffParams
 		if err := decodeParams(params, &req); err != nil {

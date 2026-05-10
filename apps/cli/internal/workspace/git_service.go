@@ -51,6 +51,12 @@ type GitCommitComparison struct {
 	Commits         []GitCommit `json:"commits"`
 }
 
+type GitBranchDiffSummary struct {
+	FileCount int `json:"fileCount"`
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+}
+
 type GitDiffContent struct {
 	OldContent string `json:"oldContent"`
 	NewContent string `json:"newContent"`
@@ -319,6 +325,30 @@ func (s *GitService) ListCommitsToTarget(ctx context.Context, root string, targe
 		AllChangedFiles: allChangedFiles,
 		Commits:         commits,
 	}, nil
+}
+
+func (s *GitService) BranchDiffSummary(ctx context.Context, root string, targetBranch string) (GitBranchDiffSummary, error) {
+	if strings.TrimSpace(targetBranch) == "" {
+		return GitBranchDiffSummary{}, NewRPCError(-32602, "targetBranch is required")
+	}
+
+	// Use three-dot diff to compare HEAD against merge-base with targetBranch.
+	numstat, err := gitCommand(ctx, root, "diff", "--numstat", fmt.Sprintf("%s...HEAD", targetBranch))
+	if err != nil {
+		return GitBranchDiffSummary{}, err
+	}
+
+	stats := parseNumstat(numstat)
+	fileCount := 0
+	additions := 0
+	deletions := 0
+	for _, v := range stats {
+		fileCount++
+		additions += v[0]
+		deletions += v[1]
+	}
+
+	return GitBranchDiffSummary{FileCount: fileCount, Additions: additions, Deletions: deletions}, nil
 }
 
 func (s *GitService) ReadCommitDiff(ctx context.Context, root string, commitHash string, path string) (GitDiffContent, error) {

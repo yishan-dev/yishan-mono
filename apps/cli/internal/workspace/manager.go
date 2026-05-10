@@ -311,6 +311,14 @@ func (m *Manager) GitListCommitsToTarget(ctx context.Context, workspaceID string
 	return m.gits.ListCommitsToTarget(ctx, ws.Path, targetBranch)
 }
 
+func (m *Manager) GitBranchDiffSummary(ctx context.Context, workspaceID string, targetBranch string) (GitBranchDiffSummary, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return GitBranchDiffSummary{}, err
+	}
+	return m.gits.BranchDiffSummary(ctx, ws.Path, targetBranch)
+}
+
 func (m *Manager) GitReadCommitDiff(ctx context.Context, workspaceID string, commitHash string, path string) (GitDiffContent, error) {
 	ws, err := m.getWorkspace(workspaceID)
 	if err != nil {
