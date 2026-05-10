@@ -416,6 +416,7 @@ export function MainPaneView() {
                 <FileEditor
                   path={tab.data.path}
                   content={tab.data.content ?? ""}
+                  worktreePath={selectedWorkspace?.worktreePath}
                   isDeleted={Boolean(tab.data.isDeleted)}
                   focusRequestKey={isSelected ? focusContentRequestKey : 0}
                   onContentChange={(nextContent) => {
