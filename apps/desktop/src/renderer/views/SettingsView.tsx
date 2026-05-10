@@ -16,7 +16,7 @@ import type { BiCog } from "react-icons/bi";
 import { RxExit } from "react-icons/rx";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { SearchInput } from "../components/SearchInput";
-import { SettingsErrorBoundary, SettingsSectionHeader } from "../components/settings";
+import { SettingsErrorBoundary, SettingsPageLayout, SettingsSectionHeader } from "../components/settings";
 import { ThemePreferencePicker } from "../components/settings/ThemePreferencePicker";
 import { getRendererPlatform } from "../helpers/platform";
 import { useThemePreference } from "../hooks/useThemePreference";
@@ -140,42 +140,25 @@ export function SettingsView() {
   }, [normalizedSearchQuery, t]);
 
   return (
-    <Box
-      sx={{
-        height: "100%",
-        display: "flex",
-        minHeight: 0,
-        bgcolor: "background.default",
-      }}
-    >
-      <Box
-        sx={{
-          width: 240,
-          minWidth: 240,
-          borderRight: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          px: 1.25,
-          py: 1.5,
-          overflowY: "auto",
-        }}
-      >
-        <Box className="electron-webkit-app-region-drag" sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}>
-          {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
-          <Box sx={{ flex: 1 }} />
-          <Tooltip title={t("settings.back")} arrow>
-            <IconButton
-              className="electron-webkit-app-region-no-drag"
-              size="small"
-              onClick={() => navigate("/")}
-              data-testid="settings-back-button"
-              aria-label={t("settings.back")}
-              sx={{ transform: "rotate(180deg)" }}
-            >
-              <RxExit size={16} />
-            </IconButton>
-          </Tooltip>
-        </Box>
+    <SettingsPageLayout
+      sidebar={
+        <>
+          <Box className="electron-webkit-app-region-drag" sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}>
+            {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
+            <Box sx={{ flex: 1 }} />
+            <Tooltip title={t("settings.back")} arrow>
+              <IconButton
+                className="electron-webkit-app-region-no-drag"
+                size="small"
+                onClick={() => navigate("/")}
+                data-testid="settings-back-button"
+                aria-label={t("settings.back")}
+                sx={{ transform: "rotate(180deg)" }}
+              >
+                <RxExit size={16} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         <Typography variant="body2" sx={{ px: 1, mb: 1.25, fontWeight: 700 }}>
           {t("settings.title")}
         </Typography>
@@ -266,19 +249,10 @@ export function SettingsView() {
             ))}
           </Stack>
         )}
-      </Box>
-
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          px: 2.5,
-          pb: 2.5,
-          pt: shouldReserveMacWindowControlsInset ? 4.5 : 2.5,
-          overflowY: "auto",
-        }}
-      >
-        {selectedTab === "notifications" ? (
+        </>
+      }
+    >
+      {selectedTab === "notifications" ? (
           <NotificationSettingsView focusItemId={focusedNotificationItemId} />
         ) : selectedTab === "account" ? (
           <AccountSettingsView />
@@ -312,7 +286,6 @@ export function SettingsView() {
             <SettingsSectionHeader title={t("settings.title")} description={t("settings.comingSoon")} />
           </Box>
         )}
-      </Box>
-    </Box>
+    </SettingsPageLayout>
   );
 }

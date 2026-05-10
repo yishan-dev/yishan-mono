@@ -11,6 +11,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsCard, SettingsSectionHeader } from "../../components/settings";
@@ -263,20 +264,10 @@ export function TerminalSettingsView() {
                         <TableCell>{workspaceName}</TableCell>
                         <TableCell sx={{ fontFamily: "monospace" }}>{session.pid}</TableCell>
                         <TableCell>
-                          <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
-                            <Box
-                              component="span"
-                              sx={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                bgcolor: isRunning ? "success.main" : "text.disabled",
-                              }}
-                            />
-                            <Typography variant="body2" color={isRunning ? "text.primary" : "text.secondary"}>
-                              {isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")}
-                            </Typography>
-                          </Box>
+                          <StatusIndicator
+                            label={isRunning ? t("settings.terminal.status.running") : t("settings.terminal.status.exited")}
+                            color={isRunning ? "success" : "disabled"}
+                          />
                         </TableCell>
                         <TableCell align="right">
                           <Button

@@ -22,3 +22,4 @@ export {
 export { SettingsVolumeRow, type SettingsVolumeRowProps } from "./SettingsVolumeRow";
 export { SettingsCompactSelect, SettingsCompactTextField } from "./SettingsCompactControls";
 export { SettingsErrorBoundary, type SettingsErrorBoundaryProps } from "./SettingsErrorBoundary";
+export { SettingsPageLayout, type SettingsPageLayoutProps } from "./SettingsPageLayout";

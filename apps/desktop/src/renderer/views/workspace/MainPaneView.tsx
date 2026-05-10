@@ -7,6 +7,7 @@ import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shar
 import { FileEditor } from "../../components/FileEditor";
 import { FileDiffViewer } from "../../components/FileDiffViewer";
 import { ImagePreview } from "../../components/ImagePreview";
+import { TabPanel } from "../../components/TabPanel";
 import { UnsupportedFileView } from "../../components/UnsupportedFileView";
 import { TabBar, type TabBarCreateOption } from "../../components/TabBar";
 import { getFileTreeIcon } from "../../components/fileTreeIcons";
@@ -325,36 +326,20 @@ export function MainPaneView() {
           const isSelected = tab.id === selectedTabId;
           if (tab.kind === "diff") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <FileDiffViewer
                   filePath={tab.data.path}
                   oldContent={tab.data.oldContent ?? ""}
                   newContent={tab.data.newContent ?? ""}
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "file") {
             if (tab.data.isUnsupported) {
               return (
-                <Box
-                  key={tab.id}
-                  sx={{
-                    position: "absolute",
-                    inset: 0,
-                    display: isSelected ? "flex" : "none",
-                    flexDirection: "column",
-                  }}
-                >
+                <TabPanel key={tab.id} active={isSelected}>
                   <UnsupportedFileView
                     path={tab.data.path}
                     title={t("files.unsupported.title")}
@@ -399,20 +384,12 @@ export function MainPaneView() {
                       lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
                     }
                   />
-                </Box>
+                </TabPanel>
               );
             }
 
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <FileEditor
                   path={tab.data.path}
                   content={tab.data.content ?? ""}
@@ -471,21 +448,13 @@ export function MainPaneView() {
                     lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
                   }
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "image") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <ImagePreview
                   path={tab.data.path}
                   dataUrl={tab.data.dataUrl}
@@ -520,21 +489,13 @@ export function MainPaneView() {
                     lastUsedExternalAppPreset ? `Open in ${lastUsedExternalAppPreset.label}` : "Open in external app"
                   }
                 />
-              </Box>
+              </TabPanel>
             );
           }
 
           if (tab.kind === "session") {
             return (
-              <Box
-                key={tab.id}
-                sx={{
-                  position: "absolute",
-                  inset: 0,
-                  display: isSelected ? "flex" : "none",
-                  flexDirection: "column",
-                }}
-              >
+              <TabPanel key={tab.id} active={isSelected}>
                 <Box
                   sx={{
                     flex: 1,
@@ -549,7 +510,7 @@ export function MainPaneView() {
                     Chat is currently disabled.
                   </Typography>
                 </Box>
-              </Box>
+              </TabPanel>
             );
           }
 
@@ -573,14 +534,9 @@ export function MainPaneView() {
           );
         })}
         {!hasWorkspaceTabs ? (
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-            }}
-          >
+          <TabPanel active>
             <LaunchView />
-          </Box>
+          </TabPanel>
         ) : null}
       </Box>
     </Box>

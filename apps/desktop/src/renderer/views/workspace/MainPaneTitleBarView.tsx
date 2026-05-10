@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuChevronRight, LuFolderGit2, LuMonitor, LuPanelLeft, LuPanelRight } from "react-icons/lu";
 import { getMainWindowFullscreenState } from "../../commands/appCommands";
+import { PaneHeader } from "../../components/PaneHeader";
 import { renderProjectIcon } from "../../components/projectIcons";
 import { getRendererPlatform } from "../../helpers/platform";
 import { useCommands } from "../../hooks/useCommands";
@@ -11,17 +12,6 @@ import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
 import type { RepoWorkspaceItem, WorkspaceProjectRecord } from "../../store/types";
 import { workspaceStore } from "../../store/workspaceStore";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
-
-const titleBarSx = {
-  minHeight: 42,
-  px: 1.5,
-  borderBottom: 1,
-  borderColor: "divider",
-  bgcolor: "background.paper",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-} as const;
 
 /** Resolves the workspace displayed as local in the left pane for a project. */
 function resolvePrimaryWorkspaceId(project: WorkspaceProjectRecord | undefined, workspaces: RepoWorkspaceItem[]) {
@@ -123,7 +113,7 @@ export function MainPaneTitleBarView() {
 
   return (
     <>
-      <Box component="header" className="electron-webkit-app-region-drag" sx={titleBarSx}>
+      <PaneHeader className="electron-webkit-app-region-drag">
         <Box
           className="electron-webkit-app-region-no-drag"
           sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}
@@ -214,7 +204,7 @@ export function MainPaneTitleBarView() {
             </Tooltip>
           ) : null}
         </Box>
-      </Box>
+      </PaneHeader>
       <Menu
         open={isRepoMenuOpen}
         anchorEl={repoMenuAnchorEl}
