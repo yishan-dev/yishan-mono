@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { openExternalUrl } from "../commands/appCommands";
 import { readFileAsDataUrl } from "../commands/fileCommands";
@@ -35,6 +37,72 @@ function resolveRelativePath(baseDir: string, relativePath: string): string {
   }
   return parts.join("/");
 }
+
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    "div",
+    "span",
+    "details",
+    "summary",
+    "abbr",
+    "kbd",
+    "mark",
+    "sub",
+    "sup",
+    "br",
+    "wbr",
+    "figure",
+    "figcaption",
+    "picture",
+    "source",
+    "dl",
+    "dt",
+    "dd",
+    "cite",
+    "dfn",
+    "var",
+    "samp",
+    "ruby",
+    "rt",
+    "rp",
+    "bdi",
+    "bdo",
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": [
+      ...(defaultSchema.attributes?.["*"] ?? []),
+      "className",
+      "style",
+      "title",
+      "role",
+      "aria-*",
+      "data-*",
+    ],
+    img: [
+      ...(defaultSchema.attributes?.img ?? []),
+      "width",
+      "height",
+    ],
+    td: [
+      ...(defaultSchema.attributes?.td ?? []),
+      "colspan",
+      "rowspan",
+    ],
+    th: [
+      ...(defaultSchema.attributes?.th ?? []),
+      "colspan",
+      "rowspan",
+    ],
+    input: [
+      ...(defaultSchema.attributes?.input ?? []),
+      "checked",
+      "disabled",
+    ],
+  },
+};
 
 async function openMarkdownLink(url: string): Promise<void> {
   let result: Awaited<ReturnType<typeof openExternalUrl>> | null = null;
@@ -422,6 +490,8 @@ export function MarkdownPreview({ content, filePath, worktreePath }: MarkdownPre
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(
     () => [
+      rehypeRaw,
+      [rehypeSanitize, sanitizeSchema],
       rehypeMermaidLite,
       rehypeHighlight,
     ],
