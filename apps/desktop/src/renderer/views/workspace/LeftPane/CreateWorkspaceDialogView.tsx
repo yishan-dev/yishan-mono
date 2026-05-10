@@ -14,7 +14,7 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuChevronDown, LuFolderGit2, LuGitBranch } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +25,7 @@ import {
   suggestTargetBranchName,
 } from "../../../helpers/workspaceBranchNaming";
 import { renderProjectIcon } from "../../../components/projectIcons";
+import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
 import { buildWorkspaceNavigationPath } from "../../../navigation/workspaceNavigation";
 import { gitBranchStore, resolveGitBranchPrefix } from "../../../store/gitBranchStore";
@@ -442,14 +443,24 @@ export function CreateWorkspaceDialogView({
   const dialogTitle = isRenameMode ? t("workspace.rename.title") : t("workspace.create.title");
   const submitLabel = isRenameMode ? t("workspace.actions.rename") : t("workspace.actions.create");
   const canSubmitWorkspace = isRenameMode ? canRenameWorkspace : canCreateWorkspace;
+  const submitShortcutLabel = getRendererPlatform() === "darwin" ? "⌘↵" : "Ctrl+↵";
   const sourceBranchSelectValue = sourceBranchOptions.includes(sourceBranch) ? sourceBranch : "";
   const isSourceBranchMenuOpen = Boolean(sourceBranchMenuAnchorEl);
   const isSelectedSourceBranchWorktree = sourceBranchGroups.worktreeBranches.includes(sourceBranchSelectValue);
+
+  /** Submits the dialog form when Cmd+Enter (macOS) or Ctrl+Enter (Windows/Linux) is pressed. */
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && canSubmitWorkspace) {
+      event.preventDefault();
+      void (isRenameMode ? handleRenameWorkspace() : handleCreateWorkspace());
+    }
+  };
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
+      onKeyDown={handleDialogKeyDown}
       fullWidth
       maxWidth="sm"
       slotProps={{
@@ -665,6 +676,9 @@ export function CreateWorkspaceDialogView({
             {isCreatingWorkspace ? <CircularProgress size={16} color="inherit" /> : null}
             <Typography component="span" sx={{ mx: "auto", fontWeight: 500 }}>
               {submitLabel}
+            </Typography>
+            <Typography component="span" variant="caption" sx={{ opacity: 0.7 }}>
+              {submitShortcutLabel}
             </Typography>
           </Button>
         </Stack>
