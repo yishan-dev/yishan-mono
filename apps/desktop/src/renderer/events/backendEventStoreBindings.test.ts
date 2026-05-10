@@ -589,4 +589,105 @@ describe("createBackendEventStoreBindings", () => {
 
     stopBindings();
   });
+
+  it("rewrites workspace ids to workspace names for system notification copy", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: false,
+      volume: 0.6,
+      focusOnClick: true,
+      enabledEventTypes: ["run-failed" as const],
+      eventSounds: {
+        "run-finished": "chime" as const,
+        "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+      resolveWorkspaceLabel: (workspaceId) => (workspaceId === "workspace-1" ? "Orders / Payments" : undefined),
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run Failed",
+      body: "Workspace workspace-1 has stopped with an error.",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-failed",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Run Failed",
+      body: "Workspace Orders / Payments has stopped with an error.",
+    });
+    stopBindings();
+  });
+
+  it("keeps original copy when workspace name is unavailable", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      resolveWorkspaceLabel: () => undefined,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run Failed",
+      body: "Workspace workspace-2 has stopped with an error.",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-2",
+      showSystemNotification: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Run Failed",
+      body: "Workspace workspace-2 has stopped with an error.",
+    });
+    stopBindings();
+  });
 });
