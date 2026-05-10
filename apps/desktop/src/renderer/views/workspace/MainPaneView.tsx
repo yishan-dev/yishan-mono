@@ -99,32 +99,11 @@ function buildTerminalInput(title: string) {
 /** Renders the primary workspace pane with tabbed content, per-tab views, and pane visibility controls. */
 export function MainPaneView() {
   const { t } = useTranslation();
+  const cmd = useCommands();
   const workspaces = workspaceStore((state) => state.workspaces);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const tabs = tabStore((state) => state.tabs);
   const selectedTabId = tabStore((state) => state.selectedTabId);
-  const {
-    setSelectedTabId,
-    openTab,
-    closeTab,
-    closeOtherTabs,
-    closeAllTabs,
-    toggleTabPinned,
-    reorderTab,
-    renameTab,
-    renameTabsForEntryRename,
-    renameEntry,
-    readBranchComparisonDiff,
-    readCommitDiff,
-    readDiff,
-    readFile,
-    refreshDiffTabContent,
-    refreshFileTabFromDisk,
-    updateFileTabContent,
-    markFileTabSaved,
-    writeFile,
-    openEntryInExternalApp,
-  } = useCommands();
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const lastUsedExternalAppPreset = lastUsedExternalAppId ? findExternalAppPreset(lastUsedExternalAppId) : null;
@@ -138,7 +117,7 @@ export function MainPaneView() {
     }
 
     try {
-      await openEntryInExternalApp({
+      await cmd.openEntryInExternalApp({
         workspaceWorktreePath,
         appId: lastUsedExternalAppId ?? SYSTEM_FILE_MANAGER_APP_ID,
         relativePath: filePath,
@@ -202,17 +181,17 @@ export function MainPaneView() {
     workspaceWorktreePath: selectedWorkspace?.worktreePath,
     tabs: refreshableTabs,
     commands: {
-      readFile,
-      readDiff,
-      readCommitDiff,
-      readBranchComparisonDiff,
-      refreshFileTabFromDisk,
-      refreshDiffTabContent,
+      readFile: cmd.readFile,
+      readDiff: cmd.readDiff,
+      readCommitDiff: cmd.readCommitDiff,
+      readBranchComparisonDiff: cmd.readBranchComparisonDiff,
+      refreshFileTabFromDisk: cmd.refreshFileTabFromDisk,
+      refreshDiffTabContent: cmd.refreshDiffTabContent,
     },
   });
 
   const handleSelectTab = (tabId: string) => {
-    setSelectedTabId(tabId);
+    cmd.setSelectedTabId(tabId);
   };
 
   useEffect(() => {
@@ -231,7 +210,7 @@ export function MainPaneView() {
   /** Handles tab creation from the tab bar type selector menu. */
   const handleCreateTab = (option: TabBarCreateOption) => {
     if (option === "terminal") {
-      openTab({
+      cmd.openTab({
         workspaceId: selectedWorkspaceId,
         ...buildTerminalInput(t("terminal.title")),
       });
@@ -242,7 +221,7 @@ export function MainPaneView() {
       return;
     }
 
-    openTab({
+    cmd.openTab({
       workspaceId: selectedWorkspaceId,
       ...buildAgentTerminalInput(option),
     });
@@ -277,11 +256,11 @@ export function MainPaneView() {
           tabs={tabBarTabs}
           selectedTabId={selectedTabId}
           onSelectTab={handleSelectTab}
-          onCloseTab={closeTab}
-          onCloseOtherTabs={closeOtherTabs}
-          onCloseAllTabs={closeAllTabs}
-          onTogglePinTab={toggleTabPinned}
-          onReorderTab={reorderTab}
+          onCloseTab={cmd.closeTab}
+          onCloseOtherTabs={cmd.closeOtherTabs}
+          onCloseAllTabs={cmd.closeAllTabs}
+          onTogglePinTab={cmd.toggleTabPinned}
+          onReorderTab={cmd.reorderTab}
           onCreateTab={handleCreateTab}
           onRenameTab={async (tabId, title) => {
             const tab = workspaceTabs.find((item) => item.id === tabId);
@@ -290,7 +269,7 @@ export function MainPaneView() {
             }
 
             if (tab.kind !== "file") {
-              renameTab(tabId, title, { userRenamed: true });
+              cmd.renameTab(tabId, title, { userRenamed: true });
               return;
             }
 
@@ -307,12 +286,12 @@ export function MainPaneView() {
             }
 
             try {
-              await renameEntry({
+              await cmd.renameEntry({
                 workspaceWorktreePath,
                 fromRelativePath: tab.data.path,
                 toRelativePath: targetPath,
               });
-              renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
+              cmd.renameTabsForEntryRename(selectedWorkspaceId, tab.data.path, targetPath);
             } catch (error) {
               console.error("Failed to rename workspace file from tab", error);
             }
@@ -389,23 +368,23 @@ export function MainPaneView() {
                   isDeleted={Boolean(tab.data.isDeleted)}
                   focusRequestKey={isSelected ? focusContentRequestKey : 0}
                   onContentChange={(nextContent) => {
-                    updateFileTabContent(tab.id, nextContent);
-                  }}
-                  onSave={async (nextContent) => {
+                     cmd.updateFileTabContent(tab.id, nextContent);
+                   }}
+                   onSave={async (nextContent) => {
                     const workspaceWorktreePath = selectedWorkspace?.worktreePath;
                     if (!workspaceWorktreePath) {
                       return;
                     }
 
                     try {
-                      await writeFile({
-                        workspaceWorktreePath,
-                        relativePath: tab.data.path,
-                        content: nextContent,
-                      });
+                       await cmd.writeFile({
+                         workspaceWorktreePath,
+                         relativePath: tab.data.path,
+                         content: nextContent,
+                       });
 
-                      updateFileTabContent(tab.id, nextContent);
-                      markFileTabSaved(tab.id);
+                       cmd.updateFileTabContent(tab.id, nextContent);
+                       cmd.markFileTabSaved(tab.id);
                     } catch (error) {
                       console.error("Failed to save workspace file", error);
                     }
