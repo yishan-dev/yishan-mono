@@ -11,6 +11,7 @@ type MarkdownViewMode = "editor" | "split" | "preview";
 type FileEditorProps = {
   path: string;
   content: string;
+  worktreePath?: string;
   isDeleted?: boolean;
   focusRequestKey?: number;
   onContentChange?: (content: string) => void;
@@ -25,6 +26,7 @@ type FileEditorProps = {
 export function FileEditor({
   path,
   content,
+  worktreePath,
   isDeleted = false,
   focusRequestKey = 0,
   onContentChange,
@@ -350,7 +352,7 @@ export function FileEditor({
               overflow: "hidden",
             }}
           >
-            <MarkdownPreview content={content} />
+            <MarkdownPreview content={content} filePath={path} worktreePath={worktreePath} />
           </Box>
         ) : null}
       </Box>
