@@ -1,8 +1,6 @@
 import { Alert, Box, LinearProgress, Typography } from "@mui/material";
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -19,91 +17,18 @@ import { FileQuickOpenDialog } from "../../../components/FileQuickOpenDialog";
 import { FileTree } from "../../../components/FileTree";
 import { FileTreeToolbar } from "../../../components/FileTree/FileTreeToolbar";
 import { resolveDestinationDirectoryPath } from "../../../components/FileTree/treeUtils";
-import type { FileTreeContextMenuRequest, FileTreeGitChangeKind } from "../../../components/FileTree/types";
+import type { FileTreeContextMenuRequest } from "../../../components/FileTree/types";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
 import { useContextMenuState } from "../../../hooks/useContextMenuState";
 import { useSuppressNativeContextMenuWhileOpen } from "../../../hooks/useSuppressNativeContextMenuWhileOpen";
-import { searchFiles } from "../../../search/fileSearch";
 import { tabStore } from "../../../store/tabStore";
 import { workspaceFileTreeStore } from "../../../store/workspaceFileTreeStore";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { buildWorkspaceFileTreeContextMenuItems } from "./buildWorkspaceFileTreeContextMenuItems";
+import { useFileSearchController } from "./useFileSearchController";
+import { useFileTreeGitChanges } from "./useFileTreeGitChanges";
 import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
-
-const MAX_FILE_SEARCH_RESULTS = 100;
-
-function normalizeGitChangeKind(kind: string): FileTreeGitChangeKind {
-  if (kind === "added" || kind === "modified" || kind === "deleted" || kind === "renamed") {
-    return kind;
-  }
-
-  return "modified";
-}
-
-function mergeGitChangeKinds(
-  currentKind: FileTreeGitChangeKind | undefined,
-  nextKind: FileTreeGitChangeKind,
-): FileTreeGitChangeKind {
-  if (!currentKind || currentKind === nextKind) {
-    return nextKind;
-  }
-
-  if (currentKind === "deleted" || nextKind === "deleted") {
-    return "deleted";
-  }
-
-  if (currentKind === "renamed" || nextKind === "renamed") {
-    return "renamed";
-  }
-
-  if (currentKind === "added" || nextKind === "added") {
-    return "added";
-  }
-
-  return "modified";
-}
-
-function normalizeGitChangePath(path: string): string {
-  const trimmedPath = path.trim().replace(/\\/g, "/");
-  if (!trimmedPath) {
-    return "";
-  }
-
-  const braceRenameMatch = trimmedPath.match(/^(.*)\{[^{}]* => ([^{}]+)\}(.*)$/);
-  let normalizedPath = braceRenameMatch
-    ? `${braceRenameMatch[1] ?? ""}${braceRenameMatch[2] ?? ""}${braceRenameMatch[3] ?? ""}`
-    : trimmedPath;
-
-  if (normalizedPath.includes(" -> ")) {
-    const renamedParts = normalizedPath.split(" -> ");
-    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
-  } else if (normalizedPath.includes(" => ")) {
-    const renamedParts = normalizedPath.split(" => ");
-    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
-  }
-
-  return normalizedPath.trim().replace(/^"+|"+$/g, "").replace(/^\/+|\/+$/g, "");
-}
-
-function areGitChangeMapsEqual(
-  leftMap: Record<string, FileTreeGitChangeKind>,
-  rightMap: Record<string, FileTreeGitChangeKind>,
-): boolean {
-  const leftKeys = Object.keys(leftMap);
-  const rightKeys = Object.keys(rightMap);
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    if (leftMap[key] !== rightMap[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 type FileManagerViewProps = {
   openFileSearchRequestKey?: number;
@@ -180,9 +105,6 @@ export function FileManagerView({
     ? findExternalAppPreset(lastUsedExternalAppId)
     : null;
 
-  const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
-  const [fileSearchQuery, setFileSearchQuery] = useState("");
-  const [selectedSearchResultIndex, setSelectedSearchResultIndex] = useState(0);
   const [, setCreateEntryRequestId] = useState(0);
   const [createEntryRequest, setCreateEntryRequest] = useState<{
     kind: "file" | "folder";
@@ -202,11 +124,9 @@ export function FileManagerView({
   const [lastHandledDeleteSelectionRequestId, setLastHandledDeleteSelectionRequestId] = useState(0);
   const [lastHandledUndoRequestId, setLastHandledUndoRequestId] = useState(0);
   const [expandedItemsByWorkspaceId, setExpandedItemsByWorkspaceId] = useState<Record<string, string[]>>({});
-  const [gitChangesByPath, setGitChangesByPath] = useState<Record<string, FileTreeGitChangeKind>>({});
   const selectedTabId = tabStore((state) => state.selectedTabId);
   const tabs = tabStore((state) => state.tabs);
   const lastRevealedTabIdRef = useRef("");
-  const gitChangeLoadRequestIdRef = useRef(0);
 
   const expandedItems = selectedWorkspaceId ? (expandedItemsByWorkspaceId[selectedWorkspaceId] ?? []) : [];
 
@@ -242,35 +162,11 @@ export function FileManagerView({
     () => searchRepoFiles.filter((path) => !ignoredSearchRepoPathSet.has(path.replace(/\/+$/, ""))),
     [ignoredSearchRepoPathSet, searchRepoFiles],
   );
-  const trimmedFileSearchQuery = fileSearchQuery.trim();
-  const deferredFileSearchQuery = useDeferredValue(trimmedFileSearchQuery);
-  const fileSearchResults = useMemo(
-    () =>
-      deferredFileSearchQuery
-        ? searchFiles(searchableFiles, deferredFileSearchQuery).slice(0, MAX_FILE_SEARCH_RESULTS)
-        : [],
-    [deferredFileSearchQuery, searchableFiles],
-  );
-
-  useEffect(() => {
-    if (openFileSearchRequestKey <= lastHandledFileSearchRequestKey) {
-      return;
-    }
-
-    setFileSearchQuery("");
-    setSelectedSearchResultIndex(0);
-    setIsFileSearchOpen(true);
-    void loadAllRepoFiles();
-    onFileSearchRequestHandled?.(openFileSearchRequestKey);
-  }, [lastHandledFileSearchRequestKey, loadAllRepoFiles, onFileSearchRequestHandled, openFileSearchRequestKey]);
-
-  useEffect(() => {
-    if (selectedSearchResultIndex < fileSearchResults.length) {
-      return;
-    }
-
-    setSelectedSearchResultIndex(Math.max(0, fileSearchResults.length - 1));
-  }, [fileSearchResults.length, selectedSearchResultIndex]);
+  const gitChangesByPath = useFileTreeGitChanges({
+    listGitChanges,
+    selectedWorkspaceWorktreePath,
+    workspaceGitRefreshVersion,
+  });
 
   useEffect(() => {
     if (!fileTreeSelectionRequest?.path) {
@@ -321,55 +217,6 @@ export function FileManagerView({
     void onUndoLastEntryOperation();
   }, [canUndoLastEntryOperation, lastHandledUndoRequestId, onUndoLastEntryOperation, undoRequestId]);
 
-  useEffect(() => {
-    const requestId = gitChangeLoadRequestIdRef.current + 1;
-    gitChangeLoadRequestIdRef.current = requestId;
-
-    if (!selectedWorkspaceWorktreePath) {
-      setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
-      return;
-    }
-
-    void workspaceGitRefreshVersion;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const sections = await listGitChanges({
-          workspaceWorktreePath: selectedWorkspaceWorktreePath,
-        });
-
-        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        const nextMap: Record<string, FileTreeGitChangeKind> = {};
-        for (const file of [...sections.unstaged, ...sections.staged, ...sections.untracked]) {
-          const normalizedPath = normalizeGitChangePath(file.path);
-          if (!normalizedPath || normalizedPath.endsWith("/")) {
-            continue;
-          }
-
-          const nextKind = normalizeGitChangeKind(file.kind);
-          nextMap[normalizedPath] = mergeGitChangeKinds(nextMap[normalizedPath], nextKind);
-        }
-
-        setGitChangesByPath((currentMap) => (areGitChangeMapsEqual(currentMap, nextMap) ? currentMap : nextMap));
-      } catch (error) {
-        console.error("Failed to load file-tree git changes", error);
-        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [listGitChanges, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
-
   const openSearchResult = useCallback(
     async (path: string) => {
       if (path.endsWith("/")) {
@@ -388,53 +235,23 @@ export function FileManagerView({
     },
     [expandedItems, handleExpandedItemsChange, loadExpandedDirectory, openWorkspaceFile, setSelectedEntryPath],
   );
-
-  /** Opens the currently highlighted quick-search result if one exists. */
-  const openSelectedSearchResult = useCallback(async () => {
-    const selectedResult = fileSearchResults[selectedSearchResultIndex];
-    if (!selectedResult) {
-      return;
-    }
-
-    await openSearchResult(selectedResult.path);
-  }, [fileSearchResults, openSearchResult, selectedSearchResultIndex]);
-
-  /** Handles keyboard navigation and submit behavior in the quick-search input. */
-  const handleFileSearchInputKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (fileSearchResults.length === 0) {
-          return;
-        }
-
-        setSelectedSearchResultIndex((current) => Math.min(current + 1, fileSearchResults.length - 1));
-        return;
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        if (fileSearchResults.length === 0) {
-          return;
-        }
-
-        setSelectedSearchResultIndex((current) => Math.max(current - 1, 0));
-        return;
-      }
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        void openSelectedSearchResult();
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsFileSearchOpen(false);
-      }
-    },
-    [fileSearchResults.length, openSelectedSearchResult],
-  );
+  const {
+    isFileSearchOpen,
+    setIsFileSearchOpen,
+    fileSearchQuery,
+    setFileSearchQuery,
+    selectedSearchResultIndex,
+    setSelectedSearchResultIndex,
+    fileSearchResults,
+    handleFileSearchInputKeyDown,
+  } = useFileSearchController({
+    searchableFiles,
+    loadAllRepoFiles,
+    openFileSearchRequestKey,
+    lastHandledFileSearchRequestKey,
+    onFileSearchRequestHandled,
+    openSearchResult,
+  });
 
   const fileOperationModeLabel = fileOperationState ? t(`files.operations.modes.${fileOperationState.mode}`) : "";
 
