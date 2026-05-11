@@ -228,3 +228,57 @@ func (c *Client) RevokeToken(refreshToken string) (OKResponse, error) {
 	}, &response)
 	return response, err
 }
+
+type StartScheduledJobRunInput struct {
+	RunID     string
+	StartedAt string
+}
+
+type CompleteScheduledJobRunInput struct {
+	RunID        string
+	FinishedAt   string
+	Status       string
+	ResponseBody string
+	ErrorCode    string
+	ErrorMessage string
+	ErrorDetails map[string]any
+}
+
+func (c *Client) StartScheduledJobRun(nodeID string, input StartScheduledJobRunInput) (OKResponse, error) {
+	payload := map[string]any{
+		"runId": input.RunID,
+	}
+	if input.StartedAt != "" {
+		payload["startedAt"] = input.StartedAt
+	}
+
+	var response OKResponse
+	err := c.DoDecode("PUT", "/nodes/"+nodeID+"/scheduled-jobs/runs/start", payload, &response)
+	return response, err
+}
+
+func (c *Client) CompleteScheduledJobRun(nodeID string, input CompleteScheduledJobRunInput) (OKResponse, error) {
+	payload := map[string]any{
+		"runId":  input.RunID,
+		"status": input.Status,
+	}
+	if input.FinishedAt != "" {
+		payload["finishedAt"] = input.FinishedAt
+	}
+	if input.ResponseBody != "" {
+		payload["responseBody"] = input.ResponseBody
+	}
+	if input.ErrorCode != "" {
+		payload["errorCode"] = input.ErrorCode
+	}
+	if input.ErrorMessage != "" {
+		payload["errorMessage"] = input.ErrorMessage
+	}
+	if len(input.ErrorDetails) > 0 {
+		payload["errorDetails"] = input.ErrorDetails
+	}
+
+	var response OKResponse
+	err := c.DoDecode("PUT", "/nodes/"+nodeID+"/scheduled-jobs/runs/complete", payload, &response)
+	return response, err
+}

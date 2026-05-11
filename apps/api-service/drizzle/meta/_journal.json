@@ -15,6 +15,13 @@
       "when": 1778220575852,
       "tag": "0001_milky_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778366400000,
+      "tag": "0002_fair_stature",
+      "breakpoints": true
     }
   ]
 }

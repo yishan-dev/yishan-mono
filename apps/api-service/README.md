@@ -9,6 +9,7 @@ API service built with Hono + Bun, deployed to both Cloudflare Workers and a rem
 - Database: Postgres via Cloudflare Hyperdrive + node-postgres
 - ORM: Drizzle ORM
 - Auth: Google OAuth + GitHub OAuth
+- Queue: Redis Streams (Upstash or self-hosted)
 
 ## Environment Variables
 
@@ -30,6 +31,10 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `GOOGLE_CLIENT_SECRET`
 - `GITHUB_CLIENT_ID`
 - `GITHUB_CLIENT_SECRET`
+- `REDIS_STREAM_HTTP_URL` (optional generic Redis-stream HTTP endpoint for scheduler publish; useful for local testing)
+- `REDIS_STREAM_HTTP_TOKEN` (optional bearer token for `REDIS_STREAM_HTTP_URL`)
+- `UPSTASH_REDIS_REST_URL` (optional Upstash Redis REST endpoint; used when `REDIS_STREAM_HTTP_URL` is not set)
+- `UPSTASH_REDIS_REST_TOKEN` (optional Upstash Redis REST auth token)
 
 ## Scripts
 
@@ -61,6 +66,13 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `GET /orgs/:orgId/nodes`
 - `POST /orgs/:orgId/nodes`
 - `DELETE /orgs/:orgId/nodes/:nodeId`
+- `GET /orgs/:orgId/scheduled-jobs?projectId=<optional>`
+- `POST /orgs/:orgId/scheduled-jobs`
+- `PUT /orgs/:orgId/scheduled-jobs/:jobId`
+- `PUT /orgs/:orgId/scheduled-jobs/:jobId/pause`
+- `PUT /orgs/:orgId/scheduled-jobs/:jobId/resume`
+- `PUT /orgs/:orgId/scheduled-jobs/:jobId/disable`
+- `GET /orgs/:orgId/scheduled-jobs/:jobId/runs?limit=20`
 
 Notes:
 
@@ -76,6 +88,105 @@ Notes:
 - `GET /orgs/:orgId/nodes` returns both org remote nodes and local nodes owned by org members; listing visibility does not imply usage permission (`canUse` indicates direct usability).
 - `POST /orgs/:orgId/projects/:projectId/workspaces` creates workspace records via API first; node provisioning is handled as a backend orchestration concern.
 - Org-scoped resources reject access when the authenticated user is not a member of that org.
+
+## Scheduled Jobs
+
+Scheduled jobs let you define recurring agent tasks. Each job stores a prompt, optional model and command, and a cron schedule. The API service manages job definitions and run history; the CLI daemon on each node executes agent tasks.
+
+### Architecture
+
+```
+CF Worker cron (every 1 min)
+  -> evaluator: find due jobs, create "pending" runs, publish to Redis stream
+
+Redis Stream ("scheduled-job-runs")
+  <- Go daemon: XREADGROUP (blocks until messages arrive)
+
+Daemon receives message:
+  -> PUT /runs/start (status -> "running")
+  -> exec: opencode run --prompt ... [--model ...] [--command ...]
+  -> PUT /runs/complete (status -> "succeeded" or "failed")
+  -> XACK message
+
+If daemon is offline:
+  -> Evaluator still creates pending runs
+  -> After 5 min unclaimed, marked as "skipped_offline"
+```
+
+- **API service (CF Worker)**: stores job definitions, evaluates due jobs on a 1-minute cron, publishes to Redis stream, records run history
+- **Redis stream**: decouples evaluation from execution; daemon pulls messages via XREADGROUP
+- **CLI daemon**: consumes from Redis stream, executes agent tasks, reports results back to API
+- Each job is bound to a `nodeId` (the daemon that will execute it)
+
+### Run status lifecycle
+
+```
+pending -> running -> succeeded
+                   -> failed
+pending -> skipped_offline  (stale after 5 min, daemon was offline)
+```
+
+### Create a scheduled job
+
+`POST /orgs/:orgId/scheduled-jobs`
+
+```json
+{
+  "name": "Nightly Code Review",
+  "projectId": "<project-id>",
+  "nodeId": "<daemon-node-id>",
+  "agentKind": "claude",
+  "prompt": "Review all open PRs and leave comments",
+  "model": "claude-sonnet-4-20250514",
+  "command": "git diff main..HEAD",
+  "cronExpression": "0 2 * * *",
+  "timezone": "UTC"
+}
+```
+
+Fields:
+- `name` (required): human-readable label, max 120 chars
+- `projectId` (required): which project this job belongs to
+- `nodeId` (required): daemon node that will execute the job
+- `agentKind` (optional): agent CLI to execute (`opencode`, `codex`, `claude`, `gemini`, `pi`, `copilot`, `cursor`), defaults to `opencode`
+- `prompt` (required): agent instruction, max 4096 chars
+- `model` (optional): model identifier, max 120 chars
+- `command` (optional): CLI command for the agent, max 2048 chars
+- `cronExpression` (required): 5-field cron, max 120 chars
+- `timezone` (optional): IANA timezone, defaults to UTC
+
+### Daemon endpoints
+
+- `PUT /nodes/:nodeId/scheduled-jobs/runs/start` -- mark run as started
+- `PUT /nodes/:nodeId/scheduled-jobs/runs/complete` -- report run result (status, error info)
+
+### Pause/Resume/Disable semantics
+
+- `pause`: keep configuration but stop evaluating until resumed
+- `resume`: activate again and recompute `nextRunAt` from current time
+- `disable`: permanently stop evaluating without deleting the configuration
+
+### Run visibility and failures
+
+- `GET /orgs/:orgId/scheduled-jobs/:jobId/runs` returns latest runs (default `limit=20`, max `100`)
+- Each run includes `status`, `responseBody`, `errorCode`, `errorMessage`, and `errorDetails`
+- Job record also keeps latest run summary fields (`lastRunStatus`, `lastErrorCode`, `lastErrorMessage`)
+
+### Schedule format and limits
+
+- Format: **5-field cron** (`minute hour day-of-month month day-of-week`)
+- Supported tokens: `*`, comma lists, ranges (`1-5`), step values (`*/5`, `1-30/2`)
+- Day-of-week supports `0-6` (`0=Sunday`) and short names (`SUN`..`SAT`)
+- Timezone: IANA timezone name (e.g. `UTC`, `America/Los_Angeles`)
+- Evaluation: CF Worker cron runs every 1 minute, processes up to 500 due jobs per tick
+- Deduplication: scheduled runs are bucketed to the minute and protected by the unique `(jobId, scheduledFor)` index; duplicate evaluator ticks skip publish on insert conflict
+- Current hard limits:
+  - `name`: 120 chars
+  - `prompt`: 4096 chars
+  - `model`: 120 chars
+  - `command`: 2048 chars
+  - `cronExpression`: 120 chars
+  - run history query `limit`: 1-100
 
 ## Local Hyperdrive
 
@@ -94,6 +205,7 @@ bun run dev:worker
 - [Neon](https://neon.tech) project with a Postgres database
 - Cloudflare account with Workers plan
 - `wrangler` CLI authenticated (`wrangler login`)
+- Redis instance (Upstash or self-hosted) for scheduled job queue
 
 ### 1. Neon Database
 
@@ -141,6 +253,10 @@ wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
 wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
+wrangler secret put REDIS_STREAM_HTTP_URL
+wrangler secret put REDIS_STREAM_HTTP_TOKEN
+wrangler secret put UPSTASH_REDIS_REST_URL
+wrangler secret put UPSTASH_REDIS_REST_TOKEN
 ```
 
 Each command prompts for the value interactively.
@@ -192,9 +308,14 @@ Pushes to `main` that change files under `apps/api-service/` automatically trigg
 
 Required GitHub repository secret:
 
-- `CLOUDFLARE_API_TOKEN` — a Cloudflare API token with **Workers Scripts:Edit** permission. Create one at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
-- `NEON_DATABASE_URL` — Neon Postgres connection string used by the CI migration step (`bun run db:migrate`).
+- `CLOUDFLARE_API_TOKEN` -- a Cloudflare API token with **Workers Scripts:Edit** permission. Create one at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
+- `NEON_DATABASE_URL` -- Neon Postgres connection string used by the CI migration step (`bun run db:migrate`).
 
-### Cron Schedule
+### Cron Schedules
 
-The Worker runs a daily cleanup job at 03:00 UTC (`0 3 * * *`) to remove expired sessions and revoked refresh tokens. This is configured in `wrangler.toml` under `[triggers]`.
+The Worker runs two cron triggers configured in `wrangler.toml`:
+
+| Cron | Description |
+|---|---|
+| `* * * * *` | Evaluates due scheduled jobs every minute, creates pending runs, publishes to Redis stream |
+| `0 3 * * *` | Daily cleanup at 03:00 UTC -- removes expired sessions, revoked refresh tokens, and marks stale pending runs as `skipped_offline` |

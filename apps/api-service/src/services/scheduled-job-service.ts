@@ -1,0 +1,601 @@
+import { and, asc, desc, eq, lte } from "drizzle-orm";
+
+import type { AppDb } from "@/db/client";
+import { nodes, projects, scheduledJobRuns, scheduledJobs } from "@/db/schema";
+import {
+  NodeNotFoundError,
+  OrganizationMembershipRequiredError,
+  ProjectNotFoundError,
+  ScheduledJobInvalidCronError,
+  ScheduledJobInvalidTimezoneError,
+  ScheduledJobNotFoundError,
+  WorkspaceLocalNodePermissionRequiredError,
+  WorkspaceLocalNodeScopeInvalidError
+} from "@/errors";
+import { newId } from "@/lib/id";
+import { computeNextRunAt, ensureTimezoneSupported, parseCronExpression } from "@/scheduled/cron";
+import type { OrganizationService } from "@/services/organization-service";
+
+const DEFAULT_RUN_LIMIT = 20;
+const MAX_RESPONSE_BODY_SIZE = 4096;
+
+type ScheduledJobRecord = typeof scheduledJobs.$inferSelect;
+type ScheduledJobRunRecord = typeof scheduledJobRuns.$inferSelect;
+
+type JobRunStatus = "pending" | "running" | "succeeded" | "failed" | "skipped_offline";
+
+export type ScheduledJobView = {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  nodeId: string;
+  name: string;
+  agentKind: "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor";
+  prompt: string;
+  model: string | null;
+  command: string | null;
+  cronExpression: string;
+  timezone: string;
+  status: "active" | "paused" | "disabled";
+  nextRunAt: Date;
+  lastScheduledFor: Date | null;
+  lastRunAt: Date | null;
+  lastRunStatus: "succeeded" | "failed" | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  createdByUserId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ScheduledJobRunView = {
+  id: string;
+  jobId: string;
+  organizationId: string;
+  projectId: string;
+  nodeId: string;
+  scheduledFor: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  status: JobRunStatus;
+  responseBody: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  errorDetails: Record<string, unknown> | null;
+  createdAt: Date;
+};
+
+export type PendingRun = {
+  runId: string;
+  scheduledFor: Date;
+  job: ScheduledJobView;
+};
+
+type CreateScheduledJobInput = {
+  organizationId: string;
+  projectId: string;
+  actorUserId: string;
+  name: string;
+  nodeId: string;
+  agentKind?: "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor";
+  prompt: string;
+  model?: string;
+  command?: string;
+  cronExpression: string;
+  timezone?: string;
+};
+
+type UpdateScheduledJobInput = {
+  organizationId: string;
+  jobId: string;
+  actorUserId: string;
+  name?: string;
+  nodeId?: string;
+  agentKind?: "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor";
+  prompt?: string;
+  model?: string | null;
+  command?: string | null;
+  cronExpression?: string;
+  timezone?: string;
+};
+
+type JobIdentityInput = {
+  organizationId: string;
+  jobId: string;
+  actorUserId: string;
+};
+
+type ListRunsInput = JobIdentityInput & {
+  limit?: number;
+};
+
+function toScheduledJobView(row: ScheduledJobRecord): ScheduledJobView {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    projectId: row.projectId,
+    nodeId: row.nodeId,
+    name: row.name,
+    agentKind: row.agentKind,
+    prompt: row.prompt,
+    model: row.model,
+    command: row.command,
+    cronExpression: row.cronExpression,
+    timezone: row.timezone,
+    status: row.status,
+    nextRunAt: row.nextRunAt,
+    lastScheduledFor: row.lastScheduledFor,
+    lastRunAt: row.lastRunAt,
+    lastRunStatus: row.lastRunStatus,
+    lastErrorCode: row.lastErrorCode,
+    lastErrorMessage: row.lastErrorMessage,
+    createdByUserId: row.createdByUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function toRunView(row: ScheduledJobRunRecord): ScheduledJobRunView {
+  return {
+    id: row.id,
+    jobId: row.jobId,
+    organizationId: row.organizationId,
+    projectId: row.projectId,
+    nodeId: row.nodeId,
+    scheduledFor: row.scheduledFor,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+    status: row.status,
+    responseBody: row.responseBody,
+    errorCode: row.errorCode,
+    errorMessage: row.errorMessage,
+    errorDetails:
+      row.errorDetails && typeof row.errorDetails === "object" && !Array.isArray(row.errorDetails)
+        ? (row.errorDetails as Record<string, unknown>)
+        : null,
+    createdAt: row.createdAt
+  };
+}
+
+function limitResponseBody(raw: string): string {
+  if (raw.length <= MAX_RESPONSE_BODY_SIZE) {
+    return raw;
+  }
+  return `${raw.slice(0, MAX_RESPONSE_BODY_SIZE)}...`;
+}
+
+function bucketToMinute(date: Date): Date {
+  const rounded = new Date(date.getTime());
+  rounded.setUTCSeconds(0, 0);
+  return rounded;
+}
+
+function validateCronOrThrow(expression: string) {
+  try {
+    return parseCronExpression(expression);
+  } catch (error) {
+    throw new ScheduledJobInvalidCronError(
+      expression,
+      error instanceof Error ? error.message : "Unknown cron parse error"
+    );
+  }
+}
+
+function validateTimezoneOrThrow(timezone: string): string {
+  try {
+    return ensureTimezoneSupported(timezone);
+  } catch (error) {
+    throw new ScheduledJobInvalidTimezoneError(
+      timezone,
+      error instanceof Error ? error.message : "Unknown timezone validation error"
+    );
+  }
+}
+
+export class ScheduledJobService {
+  constructor(
+    private readonly db: AppDb,
+    private readonly organizationService: OrganizationService
+  ) {}
+
+  private async assertOrganizationMember(organizationId: string, userId: string): Promise<void> {
+    const role = await this.organizationService.getMembershipRole({ organizationId, userId });
+    if (!role) {
+      throw new OrganizationMembershipRequiredError();
+    }
+  }
+
+  private async assertProjectBelongsToOrganization(projectId: string, organizationId: string): Promise<void> {
+    const rows = await this.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.organizationId, organizationId)))
+      .limit(1);
+    if (rows.length === 0) {
+      throw new ProjectNotFoundError(projectId);
+    }
+  }
+
+  private async assertNodeOwnedByActor(nodeId: string, actorUserId: string): Promise<void> {
+    const rows = await this.db
+      .select({ id: nodes.id, ownerUserId: nodes.ownerUserId, scope: nodes.scope })
+      .from(nodes)
+      .where(eq(nodes.id, nodeId))
+      .limit(1);
+
+    const node = rows[0];
+    if (!node) {
+      throw new NodeNotFoundError(nodeId);
+    }
+    if (node.scope !== "private") {
+      throw new WorkspaceLocalNodeScopeInvalidError(nodeId);
+    }
+    if (node.ownerUserId !== actorUserId) {
+      throw new WorkspaceLocalNodePermissionRequiredError();
+    }
+  }
+
+  private async getJobOrThrow(jobId: string, organizationId: string): Promise<ScheduledJobRecord> {
+    const rows = await this.db
+      .select()
+      .from(scheduledJobs)
+      .where(
+        and(
+          eq(scheduledJobs.id, jobId),
+          eq(scheduledJobs.organizationId, organizationId)
+        )
+      )
+      .limit(1);
+
+    const job = rows[0];
+    if (!job) {
+      throw new ScheduledJobNotFoundError(jobId);
+    }
+    return job;
+  }
+
+  async createScheduledJob(input: CreateScheduledJobInput): Promise<ScheduledJobView> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    await this.assertProjectBelongsToOrganization(input.projectId, input.organizationId);
+    await this.assertNodeOwnedByActor(input.nodeId, input.actorUserId);
+
+    const cronExpression = input.cronExpression.trim();
+    const timezone = validateTimezoneOrThrow(input.timezone?.trim() || "UTC");
+    const parsed = validateCronOrThrow(cronExpression);
+    const nextRunAt = computeNextRunAt(parsed, timezone, new Date());
+
+    const rows = await this.db
+      .insert(scheduledJobs)
+      .values({
+        id: newId(),
+        organizationId: input.organizationId,
+        projectId: input.projectId,
+        nodeId: input.nodeId.trim(),
+        name: input.name.trim(),
+        agentKind: input.agentKind ?? "opencode",
+        prompt: input.prompt.trim(),
+        model: input.model?.trim() ?? null,
+        command: input.command?.trim() ?? null,
+        cronExpression,
+        timezone,
+        status: "active",
+        nextRunAt,
+        createdByUserId: input.actorUserId
+      })
+      .returning();
+
+    const created = rows[0];
+    if (!created) {
+      throw new Error("Failed to create scheduled job");
+    }
+    return toScheduledJobView(created);
+  }
+
+  async listScheduledJobs(input: {
+    organizationId: string;
+    projectId?: string;
+    actorUserId: string;
+  }): Promise<ScheduledJobView[]> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    if (input.projectId) {
+      await this.assertProjectBelongsToOrganization(input.projectId, input.organizationId);
+    }
+
+    const conditions = [eq(scheduledJobs.organizationId, input.organizationId)];
+    if (input.projectId) {
+      conditions.push(eq(scheduledJobs.projectId, input.projectId));
+    }
+
+    const rows = await this.db
+      .select()
+      .from(scheduledJobs)
+      .where(and(...conditions))
+      .orderBy(desc(scheduledJobs.createdAt));
+
+    return rows.map(toScheduledJobView);
+  }
+
+  async updateScheduledJob(input: UpdateScheduledJobInput): Promise<ScheduledJobView> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    const existing = await this.getJobOrThrow(input.jobId, input.organizationId);
+    const nodeId = input.nodeId?.trim() ?? existing.nodeId;
+    if (input.nodeId !== undefined) {
+      await this.assertNodeOwnedByActor(nodeId, input.actorUserId);
+    }
+
+    const nextCron = input.cronExpression?.trim() ?? existing.cronExpression;
+    const nextTimezone = validateTimezoneOrThrow((input.timezone ?? existing.timezone).trim());
+    const parsed = validateCronOrThrow(nextCron);
+    const shouldRecomputeNextRun =
+      input.cronExpression !== undefined || input.timezone !== undefined || existing.status === "active";
+    const nextRunAt = shouldRecomputeNextRun
+      ? computeNextRunAt(parsed, nextTimezone, new Date())
+      : existing.nextRunAt;
+
+    const rows = await this.db
+      .update(scheduledJobs)
+      .set({
+        name: input.name?.trim() ?? existing.name,
+        nodeId,
+        agentKind: input.agentKind ?? existing.agentKind,
+        prompt: input.prompt?.trim() ?? existing.prompt,
+        model: input.model !== undefined ? (input.model?.trim() ?? null) : existing.model,
+        command: input.command !== undefined ? (input.command?.trim() ?? null) : existing.command,
+        cronExpression: nextCron,
+        timezone: nextTimezone,
+        nextRunAt,
+        updatedAt: new Date()
+      })
+      .where(eq(scheduledJobs.id, existing.id))
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new ScheduledJobNotFoundError(input.jobId);
+    }
+    return toScheduledJobView(updated);
+  }
+
+  async pauseScheduledJob(input: JobIdentityInput): Promise<ScheduledJobView> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    await this.getJobOrThrow(input.jobId, input.organizationId);
+
+    const rows = await this.db
+      .update(scheduledJobs)
+      .set({ status: "paused", updatedAt: new Date() })
+      .where(
+        and(
+          eq(scheduledJobs.id, input.jobId),
+          eq(scheduledJobs.organizationId, input.organizationId)
+        )
+      )
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new ScheduledJobNotFoundError(input.jobId);
+    }
+    return toScheduledJobView(updated);
+  }
+
+  async resumeScheduledJob(input: JobIdentityInput): Promise<ScheduledJobView> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    const existing = await this.getJobOrThrow(input.jobId, input.organizationId);
+
+    const parsed = validateCronOrThrow(existing.cronExpression);
+    const timezone = validateTimezoneOrThrow(existing.timezone);
+    const nextRunAt = computeNextRunAt(parsed, timezone, new Date());
+
+    const rows = await this.db
+      .update(scheduledJobs)
+      .set({ status: "active", nextRunAt, updatedAt: new Date() })
+      .where(eq(scheduledJobs.id, existing.id))
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new ScheduledJobNotFoundError(input.jobId);
+    }
+    return toScheduledJobView(updated);
+  }
+
+  async disableScheduledJob(input: JobIdentityInput): Promise<ScheduledJobView> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    await this.getJobOrThrow(input.jobId, input.organizationId);
+
+    const rows = await this.db
+      .update(scheduledJobs)
+      .set({ status: "disabled", updatedAt: new Date() })
+      .where(
+        and(
+          eq(scheduledJobs.id, input.jobId),
+          eq(scheduledJobs.organizationId, input.organizationId)
+        )
+      )
+      .returning();
+
+    const updated = rows[0];
+    if (!updated) {
+      throw new ScheduledJobNotFoundError(input.jobId);
+    }
+    return toScheduledJobView(updated);
+  }
+
+  async listJobRuns(input: ListRunsInput): Promise<ScheduledJobRunView[]> {
+    await this.assertOrganizationMember(input.organizationId, input.actorUserId);
+    await this.getJobOrThrow(input.jobId, input.organizationId);
+
+    const limit = input.limit ?? DEFAULT_RUN_LIMIT;
+    const rows = await this.db
+      .select()
+      .from(scheduledJobRuns)
+      .where(
+        and(
+          eq(scheduledJobRuns.jobId, input.jobId),
+          eq(scheduledJobRuns.organizationId, input.organizationId)
+        )
+      )
+      .orderBy(desc(scheduledJobRuns.scheduledFor))
+      .limit(limit);
+
+    return rows.map(toRunView);
+  }
+
+  async evaluateDueJobs(input: {
+    limit: number;
+    now?: Date;
+  }): Promise<PendingRun[]> {
+    const now = input.now ?? new Date();
+
+    const dueJobs = await this.db
+      .select()
+      .from(scheduledJobs)
+      .where(
+        and(
+          eq(scheduledJobs.status, "active"),
+          lte(scheduledJobs.nextRunAt, now)
+        )
+      )
+      .orderBy(asc(scheduledJobs.nextRunAt))
+      .limit(input.limit);
+
+    const pending: PendingRun[] = [];
+
+    for (const dueJob of dueJobs) {
+      const parsed = validateCronOrThrow(dueJob.cronExpression);
+      const timezone = validateTimezoneOrThrow(dueJob.timezone);
+      const rawScheduledFor = dueJob.nextRunAt;
+      const scheduledFor = bucketToMinute(rawScheduledFor);
+      const nextRunAt = computeNextRunAt(parsed, timezone, rawScheduledFor);
+      const runId = newId();
+
+      // Optimistic lock: only advance if nextRunAt hasn't changed (another evaluator didn't claim it)
+      const updatedRows = await this.db
+        .update(scheduledJobs)
+        .set({ nextRunAt, lastScheduledFor: scheduledFor, updatedAt: now })
+        .where(
+          and(
+            eq(scheduledJobs.id, dueJob.id),
+            eq(scheduledJobs.status, "active"),
+            eq(scheduledJobs.nextRunAt, rawScheduledFor)
+          )
+        )
+        .returning();
+
+      const updated = updatedRows[0];
+      if (!updated) {
+        continue;
+      }
+
+      // Conflict guard: unique index on (job_id, scheduled_for) prevents duplicate runs
+      // If this insert conflicts, another evaluator tick already created the run — skip publishing
+      const insertedRows = await this.db
+        .insert(scheduledJobRuns)
+        .values({
+          id: runId,
+          jobId: updated.id,
+          organizationId: updated.organizationId,
+          projectId: updated.projectId,
+          nodeId: updated.nodeId,
+          scheduledFor,
+          status: "pending"
+        })
+        .onConflictDoNothing()
+        .returning({ id: scheduledJobRuns.id });
+
+      if (insertedRows.length === 0) {
+        continue;
+      }
+
+      pending.push({
+        runId,
+        scheduledFor,
+        job: toScheduledJobView(updated)
+      });
+    }
+
+    return pending;
+  }
+
+  async markStaleRunsOffline(input: {
+    staleThresholdMinutes: number;
+    now?: Date;
+  }): Promise<number> {
+    const now = input.now ?? new Date();
+    const threshold = new Date(now.getTime() - input.staleThresholdMinutes * 60_000);
+
+    const rows = await this.db
+      .update(scheduledJobRuns)
+      .set({ status: "skipped_offline", finishedAt: now })
+      .where(
+        and(
+          eq(scheduledJobRuns.status, "pending"),
+          lte(scheduledJobRuns.createdAt, threshold)
+        )
+      )
+      .returning({ id: scheduledJobRuns.id });
+
+    return rows.length;
+  }
+
+  async markRunStarted(input: {
+    runId: string;
+    nodeId: string;
+    actorUserId: string;
+    startedAt?: Date;
+  }): Promise<void> {
+    await this.assertNodeOwnedByActor(input.nodeId, input.actorUserId);
+    await this.db
+      .update(scheduledJobRuns)
+      .set({ status: "running", startedAt: input.startedAt ?? new Date() })
+      .where(and(eq(scheduledJobRuns.id, input.runId), eq(scheduledJobRuns.nodeId, input.nodeId)));
+  }
+
+  async completeRun(input: {
+    runId: string;
+    nodeId: string;
+    actorUserId: string;
+    status: "succeeded" | "failed";
+    finishedAt?: Date;
+    responseBody?: string;
+    errorCode?: string;
+    errorMessage?: string;
+    errorDetails?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.assertNodeOwnedByActor(input.nodeId, input.actorUserId);
+    const runRows = await this.db
+      .select()
+      .from(scheduledJobRuns)
+      .where(and(eq(scheduledJobRuns.id, input.runId), eq(scheduledJobRuns.nodeId, input.nodeId)))
+      .limit(1);
+
+    const run = runRows[0];
+    if (!run) {
+      return;
+    }
+
+    const finishedAt = input.finishedAt ?? new Date();
+    await this.db
+      .update(scheduledJobRuns)
+      .set({
+        status: input.status,
+        finishedAt,
+        responseBody: input.responseBody ? limitResponseBody(input.responseBody) : null,
+        errorCode: input.errorCode ?? null,
+        errorMessage: input.errorMessage ?? null,
+        errorDetails: input.errorDetails ?? null
+      })
+      .where(eq(scheduledJobRuns.id, run.id));
+
+    await this.db
+      .update(scheduledJobs)
+      .set({
+        lastRunAt: finishedAt,
+        lastRunStatus: input.status,
+        lastErrorCode: input.status === "failed" ? (input.errorCode ?? null) : null,
+        lastErrorMessage: input.status === "failed" ? (input.errorMessage ?? null) : null,
+        updatedAt: finishedAt
+      })
+      .where(eq(scheduledJobs.id, run.jobId));
+  }
+}

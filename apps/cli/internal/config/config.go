@@ -32,6 +32,7 @@ type Config struct {
 	LogFormat    string
 	ConfigPath   string
 	CurrentOrgID string
+	RedisURL     string
 	API          APIConfig
 	Daemon       DaemonConfig
 }
@@ -51,6 +52,7 @@ func Load(v *viper.Viper, explicitConfigPath string) (Config, error) {
 		LogFormat:    v.GetString("log_format"),
 		ConfigPath:   configPath,
 		CurrentOrgID: v.GetString("current_org_id"),
+		RedisURL:     v.GetString("redis_url"),
 		API: APIConfig{
 			BaseURL:               v.GetString("api_base_url"),
 			Token:                 v.GetString("api_token"),

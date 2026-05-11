@@ -31,6 +31,16 @@ func APIClient() *api.Client {
 	return api.NewRuntimeClient(cfg)
 }
 
+func RedisURL() string {
+	mu.RLock()
+	cfg := appCfg
+	mu.RUnlock()
+	if cfg == nil {
+		return ""
+	}
+	return cfg.RedisURL
+}
+
 func APIConfigured() bool {
 	mu.RLock()
 	cfg := appCfg

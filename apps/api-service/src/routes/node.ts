@@ -6,6 +6,10 @@ import {
   listNodesHandler,
   registerNodeHandler
 } from "@/handlers/node";
+import {
+  completeScheduledJobRunHandler,
+  startScheduledJobRunHandler
+} from "@/handlers/scheduled-job";
 import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
 import { validationErrorResponse } from "@/validation/error-response";
@@ -14,6 +18,11 @@ import {
   organizationNodeParamsSchema,
   registerNodeBodySchema
 } from "@/validation/node";
+import {
+  completeScheduledJobRunBodySchema,
+  nodeScheduledJobParamsSchema,
+  startScheduledJobRunBodySchema
+} from "@/validation/scheduled-job";
 
 export const nodeRouter = new Hono<AppEnv>();
 const orgNodesRouter = new Hono<AppEnv>();
@@ -38,4 +47,19 @@ nodeRouter.post(
   "/nodes/register",
   zValidator("json", registerNodeBodySchema, validationErrorResponse),
   (c) => registerNodeHandler(c, c.req.valid("json"))
+);
+
+
+nodeRouter.put(
+  "/nodes/:nodeId/scheduled-jobs/runs/start",
+  zValidator("param", nodeScheduledJobParamsSchema, validationErrorResponse),
+  zValidator("json", startScheduledJobRunBodySchema, validationErrorResponse),
+  (c) => startScheduledJobRunHandler(c, c.req.valid("param"), c.req.valid("json"))
+);
+
+nodeRouter.put(
+  "/nodes/:nodeId/scheduled-jobs/runs/complete",
+  zValidator("param", nodeScheduledJobParamsSchema, validationErrorResponse),
+  zValidator("json", completeScheduledJobRunBodySchema, validationErrorResponse),
+  (c) => completeScheduledJobRunHandler(c, c.req.valid("param"), c.req.valid("json"))
 );

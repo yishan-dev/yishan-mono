@@ -1,6 +1,7 @@
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
   boolean,
+  integer,
   jsonb,
   index,
   pgTable,
@@ -13,6 +14,9 @@ export type NodeScope = "private" | "shared";
 export type ProjectSourceType = "git" | "git-local" | "unknown";
 export type WorkspaceKind = "primary" | "worktree";
 export type WorkspaceStatus = "active" | "closed";
+export type ScheduledJobStatus = "active" | "paused" | "disabled";
+export type ScheduledAgentKind = "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor";
+export type ScheduledJobRunStatus = "pending" | "running" | "succeeded" | "failed" | "skipped_offline";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -213,6 +217,85 @@ export const workspaces = pgTable(
   ]
 );
 
+export const scheduledJobs = pgTable(
+  "scheduled_jobs",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    nodeId: text("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    agentKind: text("agent_kind").$type<ScheduledAgentKind>().notNull().default("opencode"),
+    prompt: text("prompt").notNull(),
+    model: text("model"),
+    command: text("command"),
+    cronExpression: text("cron_expression").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    status: text("status").$type<ScheduledJobStatus>().notNull().default("active"),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+    lastScheduledFor: timestamp("last_scheduled_for", { withTimezone: true }),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    lastRunStatus: text("last_run_status").$type<"succeeded" | "failed">(),
+    lastErrorCode: text("last_error_code"),
+    lastErrorMessage: text("last_error_message"),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    index("scheduled_jobs_organization_id_idx").on(table.organizationId),
+    index("scheduled_jobs_project_id_idx").on(table.projectId),
+    index("scheduled_jobs_node_id_idx").on(table.nodeId),
+    index("scheduled_jobs_status_idx").on(table.status),
+    index("scheduled_jobs_next_run_at_idx").on(table.nextRunAt),
+    index("scheduled_jobs_created_by_user_id_idx").on(table.createdByUserId)
+  ]
+);
+
+export const scheduledJobRuns = pgTable(
+  "scheduled_job_runs",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => scheduledJobs.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    nodeId: text("node_id")
+      .notNull()
+      .references(() => nodes.id, { onDelete: "cascade" }),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    status: text("status").$type<ScheduledJobRunStatus>().notNull().default("pending"),
+    responseBody: text("response_body"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    errorDetails: jsonb("error_details"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    uniqueIndex("scheduled_job_runs_job_id_scheduled_for_uq").on(table.jobId, table.scheduledFor),
+    index("scheduled_job_runs_job_id_idx").on(table.jobId),
+    index("scheduled_job_runs_project_id_idx").on(table.projectId),
+    index("scheduled_job_runs_node_id_idx").on(table.nodeId),
+    index("scheduled_job_runs_status_idx").on(table.status),
+    index("scheduled_job_runs_scheduled_for_idx").on(table.scheduledFor)
+  ]
+);
+
 export type User = InferSelectModel<typeof users>;
 export type NewUser = InferInsertModel<typeof users>;
 
@@ -239,3 +322,9 @@ export type NewProject = InferInsertModel<typeof projects>;
 
 export type Workspace = InferSelectModel<typeof workspaces>;
 export type NewWorkspace = InferInsertModel<typeof workspaces>;
+
+export type ScheduledJob = InferSelectModel<typeof scheduledJobs>;
+export type NewScheduledJob = InferInsertModel<typeof scheduledJobs>;
+
+export type ScheduledJobRun = InferSelectModel<typeof scheduledJobRuns>;
+export type NewScheduledJobRun = InferInsertModel<typeof scheduledJobRuns>;

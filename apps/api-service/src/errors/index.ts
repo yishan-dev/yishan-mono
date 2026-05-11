@@ -250,3 +250,30 @@ export class WorkspaceNotFoundError extends AppError {
     this.name = "WorkspaceNotFoundError";
   }
 }
+
+export class ScheduledJobNotFoundError extends AppError {
+  constructor(jobId: string) {
+    super("Scheduled job not found", StatusCodes.NOT_FOUND, "SCHEDULED_JOB_NOT_FOUND", { jobId });
+    this.name = "ScheduledJobNotFoundError";
+  }
+}
+
+export class ScheduledJobInvalidCronError extends AppError {
+  constructor(cronExpression: string, reason: string) {
+    super("Invalid cron expression", StatusCodes.BAD_REQUEST, "SCHEDULED_JOB_INVALID_CRON", {
+      cronExpression,
+      reason
+    });
+    this.name = "ScheduledJobInvalidCronError";
+  }
+}
+
+export class ScheduledJobInvalidTimezoneError extends AppError {
+  constructor(timezone: string, reason: string) {
+    super("Invalid timezone", StatusCodes.BAD_REQUEST, "SCHEDULED_JOB_INVALID_TIMEZONE", {
+      timezone,
+      reason
+    });
+    this.name = "ScheduledJobInvalidTimezoneError";
+  }
+}

@@ -9,7 +9,9 @@ import {
 } from "@/handlers/project";
 import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
+import { scheduledJobRouter } from "@/routes/project-scheduled-job";
 import { workspaceRouter } from "@/routes/project-workspace";
+
 import { validationErrorResponse } from "@/validation/error-response";
 import {
   createProjectBodySchema,
@@ -53,3 +55,4 @@ router.put(
 
 projectRouter.route("/orgs/:orgId/projects", router);
 projectRouter.route("/orgs/:orgId/projects/:projectId/workspaces", workspaceRouter);
+projectRouter.route("/orgs/:orgId/scheduled-jobs", scheduledJobRouter);
