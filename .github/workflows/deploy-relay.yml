@@ -64,10 +64,10 @@ jobs:
           username: ${{ secrets.RELAY_SSH_USER }}
           key: ${{ secrets.RELAY_SSH_KEY }}
           script: |
-            docker load -i /tmp/relay.tar.gz
-            docker stop relay || true
-            docker rm relay || true
-            docker run -d \
+            sudo docker load -i /tmp/relay.tar.gz
+            sudo docker stop relay || true
+            sudo docker rm relay || true
+            sudo docker run -d \
               --name relay \
               --restart unless-stopped \
               --env-file /opt/relay/.env \
