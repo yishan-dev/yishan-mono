@@ -29,7 +29,12 @@ export const registerNodeBodySchema = z.object({
   updateIfExists: z.boolean().optional(),
 });
 
+export const nodeRelayTokenParamsSchema = z.object({
+  nodeId: nonEmptyStringSchema,
+});
+
 export type NodeParamsInput = z.infer<typeof nodeParamsSchema>;
 export type RegisterNodeBodyInput = z.infer<typeof registerNodeBodySchema>;
 export type OrganizationNodeParamsInput = z.infer<typeof organizationNodeParamsSchema>;
 export type OrganizationNodeDeleteParamsInput = z.infer<typeof organizationNodeDeleteParamsSchema>;
+export type NodeRelayTokenParamsInput = z.infer<typeof nodeRelayTokenParamsSchema>;

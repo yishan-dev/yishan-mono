@@ -25,16 +25,23 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string)
 
 	delay := relayReconnectInitialDelay
 	for {
-		token := strings.TrimSpace(cliruntime.APIToken())
-		if token == "" {
-			log.Warn().Msg("relay client waiting for API token")
+		if !cliruntime.APIConfigured() {
+			log.Warn().Msg("relay client waiting for API credentials")
+			time.Sleep(delay)
+			delay = nextRelayDelay(delay)
+			continue
+		}
+
+		relayToken, err := mintRelayToken(nodeID)
+		if err != nil {
+			log.Warn().Err(err).Str("nodeId", nodeID).Msg("relay token mint failed")
 			time.Sleep(delay)
 			delay = nextRelayDelay(delay)
 			continue
 		}
 
 		headers := http.Header{}
-		headers.Set("Authorization", "Bearer "+token)
+		headers.Set("Authorization", "Bearer "+relayToken)
 		conn, _, err := websocket.DefaultDialer.Dial(endpoint, headers)
 		if err != nil {
 			log.Warn().Err(err).Str("relay_url", endpoint).Msg("relay websocket dial failed")
@@ -43,7 +50,7 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string)
 			continue
 		}
 
-		log.Info().Str("relay_url", endpoint).Str("node_id", nodeID).Msg("relay websocket connected")
+		log.Info().Str("relay_url", endpoint).Str("nodeId", nodeID).Msg("relay websocket connected")
 		delay = relayReconnectInitialDelay
 
 		runRelaySession(handler, conn)
@@ -107,6 +114,18 @@ func normalizeRelayWSURL(raw string) (string, error) {
 	}
 
 	return parsed.String(), nil
+}
+
+func mintRelayToken(nodeID string) (string, error) {
+	client := cliruntime.APIClient()
+	resp, err := client.RelayToken(nodeID)
+	if err != nil {
+		return "", fmt.Errorf("request relay token: %w", err)
+	}
+	if strings.TrimSpace(resp.Token) == "" {
+		return "", fmt.Errorf("empty relay token in response")
+	}
+	return resp.Token, nil
 }
 
 func nextRelayDelay(current time.Duration) time.Duration {
