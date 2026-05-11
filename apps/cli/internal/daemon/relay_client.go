@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +13,9 @@ import (
 	"github.com/rs/zerolog/log"
 	cliruntime "yishan/apps/cli/internal/runtime"
 )
+
+const relayMethodPing = "relay.ping"
+const relayMethodPong = "relay.pong"
 
 const relayReconnectInitialDelay = 2 * time.Second
 const relayReconnectMaxDelay = 30 * time.Second
@@ -77,6 +81,11 @@ func runRelaySession(handler *JSONRPCHandler, conn *websocket.Conn) {
 			continue
 		}
 
+		// Handle relay-level messages before dispatching to the daemon handler.
+		if handleRelayMessage(connState, payload) {
+			continue
+		}
+
 		resp := handler.handleRequest(context.Background(), connState, payload)
 		if resp == nil {
 			continue
@@ -114,6 +123,25 @@ func normalizeRelayWSURL(raw string) (string, error) {
 	}
 
 	return parsed.String(), nil
+}
+
+// handleRelayMessage handles relay-protocol messages (e.g. heartbeat ping).
+// Returns true if the message was consumed and should not be passed to the daemon handler.
+func handleRelayMessage(connState *wsConnState, payload []byte) bool {
+	var msg struct {
+		Method string `json:"method"`
+	}
+	if err := json.Unmarshal(payload, &msg); err != nil {
+		return false
+	}
+
+	switch msg.Method {
+	case relayMethodPing:
+		_ = connState.WriteJSON(notification{JSONRPC: "2.0", Method: relayMethodPong})
+		return true
+	default:
+		return false
+	}
 }
 
 func mintRelayToken(nodeID string) (string, error) {
