@@ -11,11 +11,15 @@ on:
 
 permissions:
   contents: read
+  packages: write
   deployments: write
 
 concurrency:
   group: deploy-relay
   cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yishan-io/relay
 
 jobs:
   build:
@@ -24,39 +28,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Build Docker image
-        working-directory: apps/relay
-        run: docker build -t relay:latest .
-
-      - name: Save Docker image as tarball
-        run: docker save relay:latest | gzip > /tmp/relay.tar.gz
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          name: relay-image
-          path: /tmp/relay.tar.gz
-          retention-days: 1
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        working-directory: apps/relay
+        run: |
+          docker build \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     environment: production - relay
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: relay-image
-
-      - name: Copy image to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.RELAY_SSH_HOST }}
-          username: ${{ secrets.RELAY_SSH_USER }}
-          key: ${{ secrets.RELAY_SSH_KEY }}
-          source: relay.tar.gz
-          target: /tmp/
-
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -65,7 +58,7 @@ jobs:
           key: ${{ secrets.RELAY_SSH_KEY }}
           script_stop: true
           script: |
-            docker load -i /tmp/relay.tar.gz
+            docker pull ${{ env.IMAGE }}:${{ github.sha }}
             if docker inspect relay >/dev/null 2>&1; then
               docker stop relay
               docker rm relay
@@ -75,5 +68,5 @@ jobs:
               --restart unless-stopped \
               --env-file /opt/relay/.env \
               -p 8788:8788 \
-              relay:latest
-            rm -f /tmp/relay.tar.gz
+              ${{ env.IMAGE }}:${{ github.sha }}
+            docker image prune -f
