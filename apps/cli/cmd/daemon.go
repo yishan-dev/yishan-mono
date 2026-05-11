@@ -64,12 +64,14 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 	}
 
 	return daemon.Run(daemon.RunConfig{
-		Host:        appConfig.Daemon.Host,
-		Port:        appConfig.Daemon.Port,
-		JWTSecret:   appConfig.Daemon.JWTSecret,
-		JWTIssuer:   appConfig.Daemon.JWTIssuer,
-		JWTAudience: appConfig.Daemon.JWTAudience,
-		JWTRequired: appConfig.Daemon.JWTRequired,
+		Host:         appConfig.Daemon.Host,
+		Port:         appConfig.Daemon.Port,
+		JWTSecret:    appConfig.Daemon.JWTSecret,
+		JWTIssuer:    appConfig.Daemon.JWTIssuer,
+		JWTAudience:  appConfig.Daemon.JWTAudience,
+		JWTRequired:  appConfig.Daemon.JWTRequired,
+		RelayEnabled: appConfig.Daemon.RelayEnabled,
+		RelayURL:     appConfig.Daemon.RelayURL,
 	}, statePath)
 }
 
@@ -99,12 +101,14 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 
 	if _, err := daemon.StartDetached(daemon.StartConfig{
 		Run: daemon.RunConfig{
-			Host:        appConfig.Daemon.Host,
-			Port:        appConfig.Daemon.Port,
-			JWTSecret:   appConfig.Daemon.JWTSecret,
-			JWTIssuer:   appConfig.Daemon.JWTIssuer,
-			JWTAudience: appConfig.Daemon.JWTAudience,
-			JWTRequired: appConfig.Daemon.JWTRequired,
+			Host:         appConfig.Daemon.Host,
+			Port:         appConfig.Daemon.Port,
+			JWTSecret:    appConfig.Daemon.JWTSecret,
+			JWTIssuer:    appConfig.Daemon.JWTIssuer,
+			JWTAudience:  appConfig.Daemon.JWTAudience,
+			JWTRequired:  appConfig.Daemon.JWTRequired,
+			RelayEnabled: appConfig.Daemon.RelayEnabled,
+			RelayURL:     appConfig.Daemon.RelayURL,
 		},
 		ConfigPath: appConfig.ConfigPath,
 		LogLevel:   appConfig.LogLevel,
@@ -149,12 +153,14 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 	state, err := daemon.Restart(
 		daemon.StartConfig{
 			Run: daemon.RunConfig{
-				Host:        appConfig.Daemon.Host,
-				Port:        appConfig.Daemon.Port,
-				JWTSecret:   appConfig.Daemon.JWTSecret,
-				JWTIssuer:   appConfig.Daemon.JWTIssuer,
-				JWTAudience: appConfig.Daemon.JWTAudience,
-				JWTRequired: appConfig.Daemon.JWTRequired,
+				Host:         appConfig.Daemon.Host,
+				Port:         appConfig.Daemon.Port,
+				JWTSecret:    appConfig.Daemon.JWTSecret,
+				JWTIssuer:    appConfig.Daemon.JWTIssuer,
+				JWTAudience:  appConfig.Daemon.JWTAudience,
+				JWTRequired:  appConfig.Daemon.JWTRequired,
+				RelayEnabled: appConfig.Daemon.RelayEnabled,
+				RelayURL:     appConfig.Daemon.RelayURL,
 			},
 			ConfigPath: appConfig.ConfigPath,
 			LogLevel:   appConfig.LogLevel,
@@ -237,6 +243,8 @@ func init() {
 	daemonCmd.PersistentFlags().String("jwt-issuer", "", "required JWT issuer")
 	daemonCmd.PersistentFlags().String("jwt-audience", "", "required JWT audience")
 	daemonCmd.PersistentFlags().Bool("jwt-required", true, "require JWT token for /ws access")
+	daemonCmd.PersistentFlags().Bool("relay-enabled", false, "connect daemon to relay over outbound websocket")
+	daemonCmd.PersistentFlags().String("relay-url", "https://relay.yishan.io", "relay websocket URL (wss://.../ws)")
 
 	cobra.CheckErr(viper.BindPFlag("daemon_host", daemonCmd.PersistentFlags().Lookup("host")))
 	cobra.CheckErr(viper.BindPFlag("daemon_port", daemonCmd.PersistentFlags().Lookup("port")))
@@ -244,4 +252,6 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("daemon_jwt_issuer", daemonCmd.PersistentFlags().Lookup("jwt-issuer")))
 	cobra.CheckErr(viper.BindPFlag("daemon_jwt_audience", daemonCmd.PersistentFlags().Lookup("jwt-audience")))
 	cobra.CheckErr(viper.BindPFlag("daemon_jwt_required", daemonCmd.PersistentFlags().Lookup("jwt-required")))
+	cobra.CheckErr(viper.BindPFlag("daemon_relay_enabled", daemonCmd.PersistentFlags().Lookup("relay-enabled")))
+	cobra.CheckErr(viper.BindPFlag("daemon_relay_url", daemonCmd.PersistentFlags().Lookup("relay-url")))
 }

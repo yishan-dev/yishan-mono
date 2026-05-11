@@ -39,6 +39,15 @@ func APIConfigured() bool {
 	return cfg != nil && cfg.API.BaseURL != "" && cfg.API.Token != ""
 }
 
+func APIToken() string {
+	mu.RLock()
+	defer mu.RUnlock()
+	if appCfg == nil {
+		return ""
+	}
+	return appCfg.API.Token
+}
+
 func PersistAuthTokens(update api.TokenUpdate) error {
 	mu.Lock()
 	defer mu.Unlock()

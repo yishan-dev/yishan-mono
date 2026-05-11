@@ -19,12 +19,14 @@ type APIConfig struct {
 }
 
 type DaemonConfig struct {
-	Host        string
-	Port        int
-	JWTSecret   string
-	JWTIssuer   string
-	JWTAudience string
-	JWTRequired bool
+	Host         string
+	Port         int
+	JWTSecret    string
+	JWTIssuer    string
+	JWTAudience  string
+	JWTRequired  bool
+	RelayEnabled bool
+	RelayURL     string
 }
 
 type Config struct {
@@ -59,12 +61,14 @@ func Load(v *viper.Viper, explicitConfigPath string) (Config, error) {
 			RefreshTokenExpiresAt: v.GetString("api_refresh_token_expires_at"),
 		},
 		Daemon: DaemonConfig{
-			Host:        v.GetString("daemon_host"),
-			Port:        v.GetInt("daemon_port"),
-			JWTSecret:   v.GetString("daemon_jwt_secret"),
-			JWTIssuer:   v.GetString("daemon_jwt_issuer"),
-			JWTAudience: v.GetString("daemon_jwt_audience"),
-			JWTRequired: v.GetBool("daemon_jwt_required"),
+			Host:         v.GetString("daemon_host"),
+			Port:         v.GetInt("daemon_port"),
+			JWTSecret:    v.GetString("daemon_jwt_secret"),
+			JWTIssuer:    v.GetString("daemon_jwt_issuer"),
+			JWTAudience:  v.GetString("daemon_jwt_audience"),
+			JWTRequired:  v.GetBool("daemon_jwt_required"),
+			RelayEnabled: v.GetBool("daemon_relay_enabled"),
+			RelayURL:     v.GetString("daemon_relay_url"),
 		},
 	}, nil
 }
