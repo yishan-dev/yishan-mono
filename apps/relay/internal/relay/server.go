@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -22,6 +23,14 @@ type Server struct {
 	apiToken      string
 	upgrader      websocket.Upgrader
 	startedAt     time.Time
+	clientMu      sync.RWMutex
+	clientsByNode map[string]map[*clientConn]struct{}
+}
+
+type clientConn struct {
+	nodeID string
+	conn   *websocket.Conn
+	write  sync.Mutex
 }
 
 // NewServer creates a new relay server.
@@ -32,11 +41,12 @@ func NewServer(sessions *SessionManager, authenticator *auth.Authenticator, queu
 		queue:         queue,
 		apiToken:      apiToken,
 		upgrader: websocket.Upgrader{
-			CheckOrigin:  func(_ *http.Request) bool { return true },
+			CheckOrigin:     func(_ *http.Request) bool { return true },
 			ReadBufferSize:  4096,
 			WriteBufferSize: 4096,
 		},
-		startedAt: time.Now(),
+		startedAt:     time.Now(),
+		clientsByNode: make(map[string]map[*clientConn]struct{}),
 	}
 
 	// Wire session events to the job queue for reconnect/disconnect handling.
@@ -85,6 +95,57 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	s.readLoop(session)
 }
 
+// HandleClientWebSocket upgrades HTTP to WebSocket for relay clients and bridges
+// terminal/jsonrpc traffic to a specific node session.
+func (s *Server) HandleClientWebSocket(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizeAPIRequest(w, r) {
+		return
+	}
+
+	nodeID := strings.TrimSpace(r.URL.Query().Get("nodeId"))
+	if nodeID == "" {
+		http.Error(w, "missing nodeId", http.StatusBadRequest)
+		return
+	}
+
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Error().Err(err).Msg("client websocket upgrade failed")
+		return
+	}
+
+	client := &clientConn{nodeID: nodeID, conn: conn}
+	s.addClient(client)
+	defer s.removeClient(client)
+
+	for {
+		msgType, payload, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure, websocket.CloseAbnormalClosure) {
+				log.Error().Err(err).Str("nodeId", nodeID).Msg("client websocket read failed")
+			}
+			return
+		}
+
+		node := s.sessions.Get(nodeID)
+		if node == nil || node.State != StateConnected {
+			_ = client.writeJSON(response{
+				JSONRPC: "2.0",
+				ID:      nil,
+				Error: &rpcError{
+					Code:    CodeNodeOffline,
+					Message: "node is offline",
+				},
+			})
+			continue
+		}
+
+		if err := node.SendMessage(msgType, payload); err != nil {
+			log.Error().Err(err).Str("nodeId", nodeID).Msg("failed to relay client payload to node")
+		}
+	}
+}
+
 // readLoop reads messages from the node's WebSocket until disconnection.
 func (s *Server) readLoop(session *NodeSession) {
 	nodeID := session.Identity.NodeID
@@ -99,43 +160,49 @@ func (s *Server) readLoop(session *NodeSession) {
 		}
 
 		if msgType != websocket.TextMessage {
-			continue // Only handle text (JSON-RPC) frames.
+			s.broadcastToNodeClients(nodeID, msgType, payload)
+			continue
 		}
 
-		go s.handleMessage(nodeID, payload)
+		handled := s.handleMessage(nodeID, payload)
+		if !handled {
+			s.broadcastToNodeClients(nodeID, msgType, payload)
+		}
 	}
 }
 
 // handleMessage parses and dispatches a JSON-RPC message from a node.
-func (s *Server) handleMessage(nodeID string, payload []byte) {
+func (s *Server) handleMessage(nodeID string, payload []byte) bool {
 	var req request
 	if err := json.Unmarshal(payload, &req); err != nil {
 		log.Warn().Err(err).Str("nodeId", nodeID).Msg("invalid json from node")
-		return
+		return false
 	}
 
 	switch req.Method {
 	case MethodPong:
 		// Heartbeat pong — no action needed, the read itself proves liveness.
 		log.Debug().Str("nodeId", nodeID).Msg("pong received")
+		return true
 
 	case MethodJobAck:
 		var params jobAckParams
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			log.Warn().Err(err).Str("nodeId", nodeID).Msg("invalid job.ack params")
-			return
+			return true
 		}
 		s.queue.HandleAck(nodeID, jobqueue.AckParams{
 			RunID:  params.RunID,
 			Status: params.Status,
 			Reason: params.Reason,
 		})
+		return true
 
 	case MethodJobResult:
 		var params jobResultParams
 		if err := json.Unmarshal(req.Params, &params); err != nil {
 			log.Warn().Err(err).Str("nodeId", nodeID).Msg("invalid job.result params")
-			return
+			return true
 		}
 		result := jobqueue.ResultParams{
 			RunID:      params.RunID,
@@ -153,9 +220,10 @@ func (s *Server) handleMessage(nodeID string, payload []byte) {
 			}
 		}
 		s.queue.HandleResult(nodeID, result)
+		return true
 
 	default:
-		log.Debug().Str("nodeId", nodeID).Str("method", req.Method).Msg("unhandled method from node")
+		return false
 	}
 }
 
@@ -227,8 +295,8 @@ func (s *Server) HandleDispatch(w http.ResponseWriter, r *http.Request) {
 		})
 	case result.Reason == "node_offline":
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error": "node offline",
-			"runId": result.RunID,
+			"error":  "node offline",
+			"runId":  result.RunID,
 			"status": "skipped_offline",
 		})
 	default:
@@ -312,6 +380,60 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		log.Error().Err(err).Msg("failed to write json response")
 	}
+}
+
+func (s *Server) addClient(client *clientConn) {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	set := s.clientsByNode[client.nodeID]
+	if set == nil {
+		set = make(map[*clientConn]struct{})
+		s.clientsByNode[client.nodeID] = set
+	}
+	set[client] = struct{}{}
+	log.Info().Str("nodeId", client.nodeID).Int("clients", len(set)).Msg("relay client connected")
+}
+
+func (s *Server) removeClient(client *clientConn) {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	set := s.clientsByNode[client.nodeID]
+	if set != nil {
+		delete(set, client)
+		if len(set) == 0 {
+			delete(s.clientsByNode, client.nodeID)
+		}
+	}
+	_ = client.conn.Close()
+}
+
+func (s *Server) broadcastToNodeClients(nodeID string, msgType int, payload []byte) {
+	s.clientMu.RLock()
+	set := s.clientsByNode[nodeID]
+	clients := make([]*clientConn, 0, len(set))
+	for c := range set {
+		clients = append(clients, c)
+	}
+	s.clientMu.RUnlock()
+
+	for _, c := range clients {
+		if err := c.writeMessage(msgType, payload); err != nil {
+			log.Debug().Err(err).Str("nodeId", nodeID).Msg("dropping relay client on write failure")
+			s.removeClient(c)
+		}
+	}
+}
+
+func (c *clientConn) writeMessage(msgType int, payload []byte) error {
+	c.write.Lock()
+	defer c.write.Unlock()
+	return c.conn.WriteMessage(msgType, payload)
+}
+
+func (c *clientConn) writeJSON(v any) error {
+	c.write.Lock()
+	defer c.write.Unlock()
+	return c.conn.WriteJSON(v)
 }
 
 // SendJobRun sends a job.run notification to a node via its relay session.

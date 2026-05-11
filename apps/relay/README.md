@@ -17,11 +17,15 @@
 
 - `GET /healthz` - liveness.
 - `GET /ws` - daemon relay socket (JWT bearer required).
+- `GET /client/ws?nodeId=<nodeId>` - client relay socket for terminal/jsonrpc passthrough (API bearer required).
 - `POST /api/v1/dispatch` - dispatch a run to `nodeId` (API bearer required).
 - `GET /api/v1/runs/{runId}` - run state lookup (API bearer required).
 - `GET /api/v1/metrics` - relay + queue metrics (API bearer required).
 
 ## Environment
+
+The relay automatically loads `apps/relay/.env` on startup if present.
+Values already exported in the shell take precedence over `.env` values.
 
 Required:
 
@@ -46,6 +50,20 @@ cd apps/relay
 JWT_SECRET=dev-secret RELAY_API_TOKEN=dev-token go run .
 ```
 
+Example `.env`:
+
+```dotenv
+JWT_SECRET=dev-secret
+RELAY_API_TOKEN=dev-token
+PORT=8788
+JWT_ISSUER=https://yishan.io
+JWT_AUDIENCE=api-service
+JOB_ACK_TIMEOUT=30s
+JOB_RESULT_TIMEOUT=5m
+JOB_MAX_RETRIES=3
+LOG_LEVEL=info
+```
+
 ## Dispatch example
 
 ```bash
@@ -64,6 +82,8 @@ curl -X POST http://localhost:8788/api/v1/dispatch \
 ## Troubleshooting
 
 - `401 unauthorized` on `/ws`: validate JWT signature, `iss`, `aud`, `exp`, and required `nodeId` claim.
+- `401 unauthorized` on `/client/ws`: verify `Authorization: Bearer <RELAY_API_TOKEN>`.
+- No terminal output on relay client: verify daemon node is connected and client is using the same `nodeId`.
 - `skipped_offline`: target node has no active relay session.
 - Frequent retries: inspect ack/result timeouts and daemon handling of `job.run`.
 - Duplicate dispatch conflict: same `(jobId, scheduledFor-minute)` already accepted.

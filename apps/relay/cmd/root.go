@@ -11,46 +11,41 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 
 	"yishan/apps/relay/internal/auth"
 	"yishan/apps/relay/internal/jobqueue"
 	"yishan/apps/relay/internal/relay"
 )
 
-// Config holds all relay server configuration.
-type Config struct {
-	Host string
-	Port int
-	APIToken string
-
-	JWTSecret   string
-	JWTIssuer   string
-	JWTAudience string
-
-	// Job queue timeouts.
-	JobAckTimeout    time.Duration
-	JobResultTimeout time.Duration
-	JobMaxRetries    int
-
-	LogLevel string
+var rootCmd = &cobra.Command{
+	Use:   "relay",
+	Short: "Yishan relay service",
 }
 
-func defaultConfig() Config {
-	return Config{
-		Host:             "0.0.0.0",
-		Port:             8788,
-		JWTIssuer:        "https://yishan.io",
-		JWTAudience:      "api-service",
-		JobAckTimeout:    30 * time.Second,
-		JobResultTimeout: 5 * time.Minute,
-		JobMaxRetries:    3,
-		LogLevel:         "info",
-	}
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "Start relay server",
+	RunE: func(_ *cobra.Command, _ []string) error {
+		return runRelay()
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.RunE = serveCmd.RunE
 }
 
 // Execute is the top-level entry point for the relay server.
 func Execute() error {
-	cfg := configFromEnv()
+	return rootCmd.Execute()
+}
+
+func runRelay() error {
+	cfg, err := configFromEnv()
+	if err != nil {
+		return err
+	}
 
 	level, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
@@ -84,6 +79,7 @@ func Execute() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", srv.HandleWebSocket)
+	mux.HandleFunc("/client/ws", srv.HandleClientWebSocket)
 	mux.HandleFunc("/healthz", handleHealthz)
 	mux.HandleFunc("/api/v1/dispatch", srv.HandleDispatch)
 	mux.HandleFunc("/api/v1/runs/", srv.HandleRunStatus)
@@ -117,49 +113,4 @@ func handleHealthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
-}
-
-func configFromEnv() Config {
-	cfg := defaultConfig()
-
-	if v := os.Getenv("HOST"); v != "" {
-		cfg.Host = v
-	}
-	if v := os.Getenv("PORT"); v != "" {
-		if _, err := fmt.Sscanf(v, "%d", &cfg.Port); err != nil {
-			log.Warn().Str("PORT", v).Msg("invalid PORT, using default")
-		}
-	}
-	if v := os.Getenv("JWT_SECRET"); v != "" {
-		cfg.JWTSecret = v
-	}
-	if v := os.Getenv("RELAY_API_TOKEN"); v != "" {
-		cfg.APIToken = v
-	}
-	if v := os.Getenv("JWT_ISSUER"); v != "" {
-		cfg.JWTIssuer = v
-	}
-	if v := os.Getenv("JWT_AUDIENCE"); v != "" {
-		cfg.JWTAudience = v
-	}
-	if v := os.Getenv("JOB_ACK_TIMEOUT"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			cfg.JobAckTimeout = d
-		}
-	}
-	if v := os.Getenv("JOB_RESULT_TIMEOUT"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			cfg.JobResultTimeout = d
-		}
-	}
-	if v := os.Getenv("JOB_MAX_RETRIES"); v != "" {
-		if _, err := fmt.Sscanf(v, "%d", &cfg.JobMaxRetries); err != nil {
-			log.Warn().Str("JOB_MAX_RETRIES", v).Msg("invalid JOB_MAX_RETRIES, using default")
-		}
-	}
-	if v := os.Getenv("LOG_LEVEL"); v != "" {
-		cfg.LogLevel = v
-	}
-
-	return cfg
 }

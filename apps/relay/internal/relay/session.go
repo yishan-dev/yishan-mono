@@ -57,6 +57,16 @@ func (s *NodeSession) SendNotification(method string, params any) error {
 	return s.SendJSON(notification{JSONRPC: "2.0", Method: method, Params: params})
 }
 
+// SendMessage sends a raw WebSocket message to the node. Thread-safe.
+func (s *NodeSession) SendMessage(msgType int, payload []byte) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.conn == nil {
+		return ErrNodeOffline
+	}
+	return s.conn.WriteMessage(msgType, payload)
+}
+
 // Close terminates the underlying WebSocket connection.
 func (s *NodeSession) Close(code int, reason string) {
 	s.writeMu.Lock()
