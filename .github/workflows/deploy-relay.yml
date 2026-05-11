@@ -63,10 +63,13 @@ jobs:
           host: ${{ secrets.RELAY_SSH_HOST }}
           username: ${{ secrets.RELAY_SSH_USER }}
           key: ${{ secrets.RELAY_SSH_KEY }}
+          script_stop: true
           script: |
             docker load -i /tmp/relay.tar.gz
-            docker stop relay || true
-            docker rm relay || true
+            if docker inspect relay >/dev/null 2>&1; then
+              docker stop relay
+              docker rm relay
+            fi
             docker run -d \
               --name relay \
               --restart unless-stopped \
