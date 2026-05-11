@@ -359,14 +359,21 @@ func (s *Server) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) authorizeAPIRequest(w http.ResponseWriter, r *http.Request) bool {
-	authorization := r.Header.Get("Authorization")
-	if authorization == "" {
-		http.Error(w, "missing authorization", http.StatusUnauthorized)
-		return false
+	token := ""
+
+	if authorization := r.Header.Get("Authorization"); authorization != "" {
+		token = strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
+		if token == authorization {
+			token = ""
+		}
 	}
 
-	token := strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
-	if token == "" || token == authorization || token != s.apiToken {
+	// Fallback: query param (needed for browser WebSocket which cannot set headers).
+	if token == "" {
+		token = strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+
+	if token == "" || token != s.apiToken {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return false
 	}
