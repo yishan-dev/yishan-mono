@@ -4,12 +4,14 @@ import { zValidator } from "@hono/zod-validator";
 import {
   deleteNodeHandler,
   listNodesHandler,
-  registerNodeHandler
+  registerNodeHandler,
+  relayTokenHandler
 } from "@/handlers/node";
 import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
 import { validationErrorResponse } from "@/validation/error-response";
 import {
+  nodeRelayTokenParamsSchema,
   organizationNodeDeleteParamsSchema,
   organizationNodeParamsSchema,
   registerNodeBodySchema
@@ -38,4 +40,10 @@ nodeRouter.post(
   "/nodes/register",
   zValidator("json", registerNodeBodySchema, validationErrorResponse),
   (c) => registerNodeHandler(c, c.req.valid("json"))
+);
+
+nodeRouter.post(
+  "/nodes/:nodeId/relay-token",
+  zValidator("param", nodeRelayTokenParamsSchema, validationErrorResponse),
+  (c) => relayTokenHandler(c, c.req.valid("param"))
 );

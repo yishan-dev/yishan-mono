@@ -29,12 +29,14 @@ var ErrNotRunning = errors.New("daemon is not running")
 const detachedEnvKey = "YISHAN_DAEMON_DETACHED"
 
 type RunConfig struct {
-	Host        string
-	Port        int
-	JWTSecret   string
-	JWTIssuer   string
-	JWTAudience string
-	JWTRequired bool
+	Host         string
+	Port         int
+	JWTSecret    string
+	JWTIssuer    string
+	JWTAudience  string
+	JWTRequired  bool
+	RelayEnabled bool
+	RelayURL     string
 }
 
 type StartConfig struct {
@@ -144,6 +146,10 @@ func Run(cfg RunConfig, statePath string) error {
 		}
 	}
 
+	if cfg.RelayEnabled && cfg.RelayURL != "" {
+		go runRelayClientLoop(handler, daemonID, cfg.RelayURL)
+	}
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(stop)
@@ -219,6 +225,7 @@ func StartDetached(cfg StartConfig) (int, error) {
 	args = append(args, "--host", cfg.Run.Host)
 	args = append(args, "--port", strconv.Itoa(cfg.Run.Port))
 	args = append(args, "--jwt-required="+strconv.FormatBool(cfg.Run.JWTRequired))
+	args = append(args, "--relay-enabled="+strconv.FormatBool(cfg.Run.RelayEnabled))
 	if cfg.Run.JWTSecret != "" {
 		args = append(args, "--jwt-secret", cfg.Run.JWTSecret)
 	}
@@ -227,6 +234,9 @@ func StartDetached(cfg StartConfig) (int, error) {
 	}
 	if cfg.Run.JWTAudience != "" {
 		args = append(args, "--jwt-audience", cfg.Run.JWTAudience)
+	}
+	if cfg.Run.RelayURL != "" {
+		args = append(args, "--relay-url", cfg.Run.RelayURL)
 	}
 	if cfg.ConfigPath != "" {
 		args = append(args, "--config", cfg.ConfigPath)
