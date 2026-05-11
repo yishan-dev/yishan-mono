@@ -47,7 +47,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: relay-image
-          path: /tmp/
 
       - name: Copy image to VM
         uses: appleboy/scp-action@v0.1.7
@@ -55,9 +54,8 @@ jobs:
           host: ${{ secrets.RELAY_SSH_HOST }}
           username: ${{ secrets.RELAY_SSH_USER }}
           key: ${{ secrets.RELAY_SSH_KEY }}
-          source: /tmp/relay.tar.gz
+          source: relay.tar.gz
           target: /tmp/
-          strip_components: 1
 
       - name: Deploy on VM
         uses: appleboy/ssh-action@v1.2.2
