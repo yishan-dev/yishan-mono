@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -55,8 +56,7 @@ func configFromEnv() (Config, error) {
 	v.SetDefault("LOG_LEVEL", cfg.LogLevel)
 
 	if err := v.ReadInConfig(); err != nil {
-		var configFileNotFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFound) {
+		if !errors.As(err, &viper.ConfigFileNotFoundError{}) && !os.IsNotExist(err) {
 			return cfg, fmt.Errorf("read .env: %w", err)
 		}
 	}
