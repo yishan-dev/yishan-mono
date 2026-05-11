@@ -1,0 +1,78 @@
+name: Deploy Relay
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/relay/**"
+      - ".github/workflows/deploy-relay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-relay
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build Docker image
+        working-directory: apps/relay
+        run: docker build -t relay:latest .
+
+      - name: Save Docker image as tarball
+        run: docker save relay:latest | gzip > /tmp/relay.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-image
+          path: /tmp/relay.tar.gz
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: relay-image
+          path: /tmp/
+
+      - name: Copy image to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.RELAY_SSH_HOST }}
+          username: ${{ secrets.RELAY_SSH_USER }}
+          key: ${{ secrets.RELAY_SSH_KEY }}
+          source: /tmp/relay.tar.gz
+          target: /tmp/
+          strip_components: 1
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.RELAY_SSH_HOST }}
+          username: ${{ secrets.RELAY_SSH_USER }}
+          key: ${{ secrets.RELAY_SSH_KEY }}
+          script: |
+            docker load -i /tmp/relay.tar.gz
+            docker stop relay || true
+            docker rm relay || true
+            docker run -d \
+              --name relay \
+              --restart unless-stopped \
+              --env-file /opt/relay/.env \
+              -p 8788:8788 \
+              relay:latest
+            rm -f /tmp/relay.tar.gz
