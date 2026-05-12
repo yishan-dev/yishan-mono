@@ -16,6 +16,21 @@ const mocked = vi.hoisted(() => ({
   listGitBranches: vi.fn(),
 }));
 
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        key: `virtual-${i}`,
+        start: i * 36,
+        size: 36,
+      })),
+    getTotalSize: () => count * 36,
+    scrollToIndex: () => {},
+    measureElement: () => {},
+  }),
+}));
+
 vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
     createWorkspace: mocked.createWorkspace,

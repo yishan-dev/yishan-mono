@@ -7,8 +7,8 @@ import {
   DialogContent,
   DialogTitle,
   InputAdornment,
-  Menu,
   MenuItem,
+  Popover,
   Stack,
   TextField,
   Typography,
@@ -592,24 +592,37 @@ export function CreateWorkspaceDialogView({
                   ),
                   endAdornment: (
                     <InputAdornment position="end" sx={{ ml: 0.5, color: "text.secondary" }}>
-                      <LuChevronDown size={16} />
+                      {isLoadingSourceBranches ? <CircularProgress size={14} /> : <LuChevronDown size={16} />}
                     </InputAdornment>
                   ),
                 }}
                 placeholder="Source branch"
                 disabled={isRenameMode || !selectedProjectId || sourceBranchOptions.length === 0}
               />
-              <Menu
+              <Popover
                 open={isSourceBranchMenuOpen}
                 anchorEl={sourceBranchMenuAnchorEl}
                 onClose={() => setSourceBranchMenuAnchorEl(null)}
-                PaperProps={{
-                  sx: {
-                    minWidth: 250,
-                    maxWidth: 350,
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                disableRestoreFocus
+                slotProps={{
+                  paper: {
+                    sx: {
+                      minWidth: 250,
+                      maxWidth: 350,
+                      mt: 0.5,
+                    },
                   },
                 }}
               >
+                {isLoadingSourceBranches ? (
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 3, px: 2, gap: 1 }}>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">Loading branches\u2026</Typography>
+                  </Box>
+                ) : (
+                <>
                 <BranchDropdown
                   groups={sourceBranchGroups}
                   selectedValue={sourceBranchSelectValue}
@@ -625,7 +638,9 @@ export function CreateWorkspaceDialogView({
                   emptyWorktreeLabel="No worktree branches"
                   emptyRemoteLabel="No remote branches"
                 />
-              </Menu>
+                </>
+                )}
+              </Popover>
             </Box>
           </Stack>
 
