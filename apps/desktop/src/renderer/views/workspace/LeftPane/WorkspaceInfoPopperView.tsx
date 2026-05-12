@@ -33,9 +33,7 @@ export function WorkspaceInfoPopperView({
   const unavailableLabel = t("workspace.info.unavailable");
   const displayBranch = currentBranch?.trim() || workspace?.branch?.trim() || unavailableLabel;
   const sourceBranch = workspace?.sourceBranch?.trim() || "";
-  const shouldShowSourceBranch = isPrimaryWorkspace
-    ? isMainBranch(displayBranch) && Boolean(sourceBranch)
-    : Boolean(sourceBranch);
+  const shouldShowSourceBranch = isPrimaryWorkspace ? isMainBranch(displayBranch) : Boolean(sourceBranch);
   const sourceBranchValue = sourceBranch || unavailableLabel;
   const showSourceBranch = shouldShowSourceBranch && sourceBranchValue !== displayBranch;
 
