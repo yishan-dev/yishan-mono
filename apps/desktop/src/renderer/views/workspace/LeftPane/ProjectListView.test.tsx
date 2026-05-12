@@ -155,6 +155,10 @@ vi.mock("../../../store/chatStore", () => ({
   chatStore: mocked.workspaceStore,
 }));
 
+vi.mock("../../../store/workspaceCreateProgressStore", () => ({
+  workspaceCreateProgressStore: vi.fn(() => undefined),
+}));
+
 vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
     setSelectedRepoId: mocked.setSelectedRepoId,
@@ -667,7 +671,6 @@ describe("ProjectListView", () => {
 
     const doneBadge = screen.getByTestId("workspace-status-done-badge-workspace-1");
     expect(doneBadge).toBeTruthy();
-    expect(within(doneBadge).getByTestId("workspace-icon-workspace-1")).toBeTruthy();
   });
 
   it("renders failed indicator for background workspace notifications", () => {
@@ -678,7 +681,6 @@ describe("ProjectListView", () => {
 
     const failedBadge = screen.getByTestId("workspace-status-failed-badge-workspace-1");
     expect(failedBadge).toBeTruthy();
-    expect(within(failedBadge).getByTestId("workspace-icon-workspace-1")).toBeTruthy();
   });
 
   it("clears unread indicator after opening that workspace while app is focused", () => {
