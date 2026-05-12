@@ -56,7 +56,7 @@ export function applyCreatedWorkspaceState(
     repoId: input.projectId,
     name: input.backendWorkspace.name || input.normalizedName,
     title: input.normalizedTitle,
-    sourceBranch: input.backendWorkspace.sourceBranch || input.normalizedBranch,
+    sourceBranch: input.backendWorkspace.sourceBranch || "",
     branch: input.backendWorkspace.branch || input.normalizedBranch,
     summaryId: nextWorkspaceId,
     worktreePath: input.backendWorkspace.worktreePath,
