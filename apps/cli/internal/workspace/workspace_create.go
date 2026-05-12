@@ -107,21 +107,24 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath}
 	steps := []createProgressStep{
 		{
-			ID:      "update",
-			Label:   "Fetch repository",
-			Timeout: 10 * time.Minute,
-			Run: func(stepCtx context.Context) (CreateProgressStatus, string, error) {
-				if err := m.gits.FetchRemotes(stepCtx, sourcePath); err != nil {
-					return CreateProgressFailed, err.Error(), err
-				}
-				return CreateProgressCompleted, "", nil
-			},
-		},
-		{
 			ID:      "worktree",
 			Label:   "Create local worktree",
-			Timeout: 2 * time.Minute,
+			Timeout: 10 * time.Minute,
 			Run: func(stepCtx context.Context) (CreateProgressStatus, string, error) {
+				err := m.gits.CreateWorktree(stepCtx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch))
+				if err == nil {
+					return CreateProgressCompleted, worktreePath, nil
+				}
+
+				if !isMissingRefError(err) {
+					return CreateProgressFailed, err.Error(), err
+				}
+
+				reportProgress("worktree", "Create local worktree", CreateProgressRunning, "Fetching missing refs...")
+				if fetchErr := m.gits.FetchRef(stepCtx, sourcePath, strings.TrimSpace(req.SourceBranch)); fetchErr != nil {
+					return CreateProgressFailed, fetchErr.Error(), fetchErr
+				}
+
 				if err := m.gits.CreateWorktree(stepCtx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch)); err != nil {
 					return CreateProgressFailed, err.Error(), err
 				}
@@ -230,4 +233,16 @@ func safeRelativePath(input string, field string) (string, error) {
 		return "", NewRPCError(-32602, field+" must not escape .yishan")
 	}
 	return cleaned, nil
+}
+
+func isMissingRefError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "not a valid object name") ||
+		strings.Contains(msg, "unknown revision") ||
+		strings.Contains(msg, "fatal: bad revision") ||
+		strings.Contains(msg, "Invalid object name") ||
+		strings.Contains(msg, "ambiguous argument")
 }

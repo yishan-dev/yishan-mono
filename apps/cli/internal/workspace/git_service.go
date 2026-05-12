@@ -516,16 +516,27 @@ func (s *GitService) RemoveBranch(ctx context.Context, root string, branch strin
 	return err
 }
 
-func (s *GitService) FetchRemotes(ctx context.Context, root string) error {
+func (s *GitService) FetchRef(ctx context.Context, root string, ref string) error {
 	remotesOut, err := gitCommand(ctx, root, "remote")
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(remotesOut) == "" {
+	remotes := splitNonEmptyLines(remotesOut)
+	if len(remotes) == 0 {
 		return nil
 	}
 
-	_, err = gitCommandCombined(ctx, root, "fetch", "--all", "--prune")
+	remote := "origin"
+	if !slices.Contains(remotes, "origin") {
+		remote = remotes[0]
+	}
+
+	args := []string{"fetch", remote, "--quiet", "--no-tags"}
+	if strings.TrimSpace(ref) != "" && ref != "HEAD" {
+		args = append(args, ref)
+	}
+
+	_, err = gitCommandCombined(ctx, root, args...)
 	return err
 }
 
