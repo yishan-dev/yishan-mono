@@ -105,6 +105,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
         oldContent: input.oldContent,
         newContent: input.newContent,
         source: input.diffSource,
+        isTemporary: Boolean(input.temporary),
       } as WorkspaceTabDataByKind[T["kind"]];
     }
 
@@ -119,6 +120,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       oldContent,
       newContent,
       source: input.diffSource,
+      isTemporary: Boolean(input.temporary),
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 

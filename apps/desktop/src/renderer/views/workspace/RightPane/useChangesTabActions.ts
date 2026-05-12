@@ -86,6 +86,7 @@ export function useChangesTabActions({
           oldContent: response.oldContent,
           newContent: response.newContent,
           diffSource: commitHash ? { kind: "commit", commitHash } : targetBranch ? { kind: "branch", targetBranch } : { kind: "workspace" },
+          temporary: true,
         });
       } catch (error) {
         console.error("Failed to load workspace commit file diff", error);
@@ -96,6 +97,7 @@ export function useChangesTabActions({
           changeKind: "modified",
           additions: 0,
           deletions: 0,
+          temporary: true,
         });
       }
     },
@@ -123,6 +125,7 @@ export function useChangesTabActions({
           oldContent: response.oldContent,
           newContent: response.newContent,
           diffSource: { kind: "workspace" },
+          temporary: true,
         });
       } catch (error) {
         console.error("Failed to load workspace workspace diff", error);
@@ -133,6 +136,7 @@ export function useChangesTabActions({
           changeKind: file.kind,
           additions: file.additions,
           deletions: file.deletions,
+          temporary: true,
         });
       }
     },

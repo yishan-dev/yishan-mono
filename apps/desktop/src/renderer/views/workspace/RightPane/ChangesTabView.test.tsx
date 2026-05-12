@@ -205,6 +205,7 @@ describe("ChangesTabView", () => {
         oldContent: "old",
         newContent: "new",
         diffSource: { kind: "commit", commitHash: "abc123456" },
+        temporary: true,
       });
     });
   });
@@ -265,6 +266,7 @@ describe("ChangesTabView", () => {
         oldContent: "old",
         newContent: "new",
         diffSource: { kind: "branch", targetBranch: "origin/main" },
+        temporary: true,
       });
     });
   });
@@ -348,6 +350,7 @@ describe("ChangesTabView", () => {
         oldContent: "old",
         newContent: "new",
         diffSource: { kind: "workspace" },
+        temporary: true,
       });
     });
   });

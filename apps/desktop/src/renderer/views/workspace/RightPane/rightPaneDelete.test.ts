@@ -37,6 +37,7 @@ describe("resolveTabIdsToCloseAfterDelete", () => {
         path: "src/nested/b.ts",
         oldContent: "",
         newContent: "",
+        isTemporary: false,
       },
     },
     {
