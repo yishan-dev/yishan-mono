@@ -1,10 +1,11 @@
-import { Box } from "@mui/material";
-import { SimpleTreeView } from "@mui/x-tree-view";
+import { Box, TextField } from "@mui/material";
+import { MdOutlineKeyboardArrowRight } from "react-icons/md";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isEditableTarget } from "../../shortcuts/editableTarget";
 import { handleFileTreeShortcutFromRegistry } from "../fileTreeActionRegistry";
-import { TreeNodeItem } from "./TreeNodeItem";
+import { getFileTreeIcon } from "../fileTreeIcons";
 import { extractSourcePathsFromDataTransferAsync, hasExternalFileDragIntent } from "./dataTransfer";
 import {
   collectAncestorDirectoryPaths,
@@ -18,29 +19,213 @@ import type {
   FileTreeContextMenuRequest,
   FileTreeGitChangeKind,
   FileTreeProps,
-  TreeNode,
+  VisibleRow,
 } from "./types";
 import { useVisibleFileTree } from "./useVisibleFileTree";
 
+const ROW_HEIGHT = 28;
+const INDENT_SIZE = 2;
+
 const EMPTY_IGNORED_PATHS: string[] = [];
-const EMPTY_LOADED_DIRECTORY_PATHS: string[] = [];
-const EMPTY_EXPANDABLE_DIRECTORY_PATHS: string[] = [];
 const EMPTY_GIT_CHANGES_BY_PATH: Record<string, FileTreeGitChangeKind> = {};
 
-/** Renders workspace files as one tree and exposes user intents to the owning view. */
+function getGitChangeIndicatorMeta(kind: FileTreeGitChangeKind): { textColor: string } {
+  if (kind === "added") {
+    return { textColor: "success.main" };
+  }
+
+  if (kind === "renamed") {
+    return { textColor: "info.main" };
+  }
+
+  return { textColor: "warning.main" };
+}
+
+function FlatTreeRow({
+  row,
+  isSelected,
+  isEditing,
+  editingName,
+  editingInputRef,
+  gitChangeKind,
+  isIgnored,
+  isExpanded,
+  onSelect,
+  onToggle,
+  onOpen,
+  onContextMenu,
+  onEditingNameChange,
+  onRenameKeyDown,
+  onRenameBlur,
+  onExternalDragOver,
+  onExternalDrop,
+  hasDescendantGitChange,
+}: {
+  row: VisibleRow;
+  isSelected: boolean;
+  isEditing: boolean;
+  editingName: string;
+  editingInputRef: React.RefObject<HTMLInputElement | null>;
+  gitChangeKind: FileTreeGitChangeKind | undefined;
+  hasDescendantGitChange: boolean;
+  isIgnored: boolean;
+  isExpanded: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+  onOpen: () => void;
+  onContextMenu: (event: MouseEvent<HTMLElement>) => void;
+  onEditingNameChange: (value: string) => void;
+  onRenameKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  onRenameBlur: () => void;
+  onExternalDragOver: (event: DragEvent<HTMLElement>) => void;
+  onExternalDrop: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
+}) {
+  if (isEditing) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          height: ROW_HEIGHT,
+          pl: row.depth * INDENT_SIZE + 4,
+          pr: 1,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+        }}
+      >
+        <Box sx={{ width: 16, flexShrink: 0 }} />
+        <Box
+          component="img"
+          src={getFileTreeIcon(editingName || row.path, row.isDirectory)}
+          alt=""
+          sx={{ width: 16, height: 16, flexShrink: 0, ml: 0.25 }}
+        />
+        <TextField
+          autoFocus
+          inputRef={editingInputRef}
+          value={editingName}
+          variant="standard"
+          size="small"
+          autoComplete="off"
+          spellCheck={false}
+          slotProps={{
+            htmlInput: {
+              autoCorrect: "off",
+              autoCapitalize: "none",
+              "data-gramm": "false",
+            },
+          }}
+          onChange={(event) => onEditingNameChange(event.target.value)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            onRenameKeyDown(event);
+          }}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onBlur={onRenameBlur}
+          sx={{
+            minWidth: 100,
+            ml: 0.75,
+            "& .MuiInputBase-input": {
+              py: 0,
+              typography: "body2",
+            },
+          }}
+        />
+      </Box>
+    );
+  }
+
+  const icon = getFileTreeIcon(row.path, row.isDirectory, isExpanded);
+  const indicatorMeta = gitChangeKind
+    ? getGitChangeIndicatorMeta(gitChangeKind)
+    : hasDescendantGitChange
+      ? { textColor: "warning.main" as const }
+      : null;
+
+  return (
+    <Box
+      data-path={row.path}
+      data-testid={`tree-row-${row.path}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+        if (row.isDirectory) {
+          onToggle();
+        }
+      }}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpen();
+      }}
+      onContextMenu={onContextMenu}
+      onDragOver={onExternalDragOver}
+      onDrop={(event) => onExternalDrop(event, row.path, row.isDirectory)}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        height: ROW_HEIGHT,
+        pl: row.depth * INDENT_SIZE + 4,
+        pr: 1,
+        borderRadius: 1,
+        cursor: "pointer",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        bgcolor: isSelected ? "action.selected" : "transparent",
+        "&:hover": {
+          bgcolor: isSelected ? "action.selected" : "action.hover",
+        },
+      }}
+    >
+      {row.isDirectory ? (
+        <Box
+          sx={{
+            width: 16,
+            height: ROW_HEIGHT,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+            color: "text.secondary",
+            "& svg": { display: "block" },
+          }}
+        >
+          <MdOutlineKeyboardArrowRight size={16} />
+        </Box>
+      ) : (
+        <Box sx={{ width: 16, flexShrink: 0 }} />
+      )}
+      <Box component="img" src={icon} alt="" sx={{ width: 16, height: 16, flexShrink: 0, ml: 0.25 }} />
+      <Box
+        component="span"
+        data-ignored={isIgnored ? "true" : "false"}
+        data-git-change-kind={gitChangeKind ?? "none"}
+        sx={{
+          ml: 0.75,
+          typography: "body2",
+          color: isIgnored ? "text.disabled" : indicatorMeta?.textColor ?? "text.primary",
+          fontWeight: indicatorMeta ? 500 : 400,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {row.name}
+      </Box>
+    </Box>
+  );
+}
+
 export function FileTree({
   files,
   gitChangesByPath,
   ignoredPaths = EMPTY_IGNORED_PATHS,
-  loadedDirectoryPaths = EMPTY_LOADED_DIRECTORY_PATHS,
-  expandableDirectoryPaths = EMPTY_EXPANDABLE_DIRECTORY_PATHS,
   expandedItems: expandedItemsOverride,
   selectionRequest,
   createEntryRequest,
   onSelectEntry,
   onOpenEntry,
   onExpandedItemsChange,
-  onLoadDirectory,
   onEnsurePathLoaded,
   onCreateEntry,
   onRenameEntry,
@@ -53,8 +238,17 @@ export function FileTree({
   canUndoLastEntryOperation,
   onDropExternalEntries,
   onItemContextMenu,
-}: FileTreeProps) {
-  const gitChangesByPathResolved = gitChangesByPath ?? EMPTY_GIT_CHANGES_BY_PATH;
+}: FileTreeProps) {  const gitChangesByPathResolved = gitChangesByPath ?? EMPTY_GIT_CHANGES_BY_PATH;
+  const ancestorOfGitChangePaths = useMemo(() => {
+    const set = new Set<string>();
+    for (const path of Object.keys(gitChangesByPathResolved)) {
+      const parts = path.split("/");
+      for (let i = 1; i < parts.length; i++) {
+        set.add(parts.slice(0, i).join("/"));
+      }
+    }
+    return set;
+  }, [gitChangesByPathResolved]);
   const [editingEntry, setEditingEntry] = useState<EditingEntry | null>(null);
   const [editingName, setEditingName] = useState("");
   const [selectedEntryPath, setSelectedEntryPath] = useState("");
@@ -62,16 +256,8 @@ export function FileTree({
     () => new Set(ignoredPaths.map((path) => path.replace(/\/+$/, "")).filter(Boolean)),
     [ignoredPaths],
   );
-  const loadedDirectoryPathSet = useMemo(
-    () => new Set(loadedDirectoryPaths.map((path) => path.replace(/\/+$/, ""))),
-    [loadedDirectoryPaths],
-  );
-  const expandableDirectoryPathSet = useMemo(
-    () => new Set(expandableDirectoryPaths.map((path) => path.replace(/\/+$/, "")).filter(Boolean)),
-    [expandableDirectoryPaths],
-  );
 
-  const { topLevelNodes, directoryPaths, expandedItems, setExpandedItems } = useVisibleFileTree({
+  const { visibleRows, directoryPaths, expandedItems, setExpandedItems } = useVisibleFileTree({
     files,
     ignoredPathSet,
     editingEntry,
@@ -79,19 +265,28 @@ export function FileTree({
     onExpandedItemsChange,
   });
 
-  const treeAreaRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const editingInputRef = useRef<HTMLInputElement | null>(null);
   const ignoreRenameBlurUntilRef = useRef(0);
   const didApplyInitialSelectionRef = useRef(false);
   const lastAppliedSelectionRequestIdRef = useRef<number | null>(null);
   const lastAppliedCreateRequestIdRef = useRef<number | null>(null);
-  const selectableEntryPaths = useMemo(
-    () => new Set(files.map((path) => path.replace(/\/$/, "")).filter(Boolean)),
-    [files],
-  );
   const expandedPathSet = useMemo(() => new Set(expandedItems), [expandedItems]);
+  const rowByPath = useMemo(() => {
+    const map = new Map<string, { row: VisibleRow; index: number }>();
+    for (let i = 0; i < visibleRows.length; i++) {
+      map.set(visibleRows[i]!.path, { row: visibleRows[i]!, index: i });
+    }
+    return map;
+  }, [visibleRows]);
 
-  /** Applies one external selection request and optionally focuses the tree for keyboard actions. */
+  const virtualizer = useVirtualizer({
+    count: visibleRows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 20,
+  });
+
   useEffect(() => {
     if (!selectionRequest) {
       return;
@@ -106,25 +301,24 @@ export function FileTree({
       return;
     }
 
-    void onEnsurePathLoaded?.(requestedPath);
-
     const ancestorDirectoryPaths = collectAncestorDirectoryPaths(requestedPath);
     if (ancestorDirectoryPaths.length > 0) {
       setExpandedItems((currentItems) => [...new Set([...currentItems, ...ancestorDirectoryPaths])]);
     }
 
-    if (!selectableEntryPaths.has(requestedPath)) {
+    void onEnsurePathLoaded?.(requestedPath);
+
+    if (!rowByPath.has(requestedPath)) {
       return;
     }
 
     setSelectedEntryPath(requestedPath);
     if (selectionRequest.focus) {
-      treeAreaRef.current?.focus();
+      scrollRef.current?.focus();
     }
     lastAppliedSelectionRequestIdRef.current = selectionRequest.requestId;
-  }, [onEnsurePathLoaded, selectableEntryPaths, selectionRequest, setExpandedItems]);
+  }, [onEnsurePathLoaded, rowByPath, selectionRequest, setExpandedItems]);
 
-  /** Applies one create-entry request from the owning view and starts inline create mode. */
   useEffect(() => {
     if (!createEntryRequest) {
       return;
@@ -244,55 +438,6 @@ export function FileTree({
     setEditingName(getEntryName(targetPath));
   };
 
-  const openContextMenu = (
-    event: MouseEvent<HTMLElement>,
-    input: { basePath: string; targetPath: string; targetIsDirectory: boolean },
-  ) => {
-    if (!onItemContextMenu) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    setSelectedEntryPath(input.targetPath);
-
-    const request: FileTreeContextMenuRequest = {
-      mouseX: event.clientX,
-      mouseY: event.clientY,
-      basePath: input.basePath,
-      targetPath: input.targetPath,
-      targetIsDirectory: input.targetIsDirectory,
-      startCreateFile: () => {
-        startCreate(input.basePath, false);
-      },
-      startCreateFolder: () => {
-        startCreate(input.basePath, true);
-      },
-      startRename: input.targetPath
-        ? () => {
-            startRename(input.targetPath, input.basePath);
-          }
-        : undefined,
-    };
-
-    onItemContextMenu(request);
-  };
-
-  const handleNodeContextMenu = (
-    event: MouseEvent<HTMLElement>,
-    input: { basePath: string; targetPath: string; targetIsDirectory: boolean },
-  ) => {
-    openContextMenu(event, input);
-  };
-
-  const handleEmptyAreaContextMenu = (event: MouseEvent<HTMLElement>) => {
-    openContextMenu(event, {
-      basePath: "",
-      targetPath: "",
-      targetIsDirectory: false,
-    });
-  };
-
   const handleExternalDragOver = (event: DragEvent<HTMLElement>) => {
     if (!onDropExternalEntries || !hasExternalFileDragIntent(event)) {
       return;
@@ -342,18 +487,95 @@ export function FileTree({
     );
   };
 
-  /** Handles file-tree keyboard shortcuts for copy/cut/paste/delete and local undo. */
   const handleTreeKeyDown = async (event: KeyboardEvent<HTMLElement>) => {
     if (editingEntry || isEditableTarget(event.target)) {
       return;
     }
 
-    if (event.key === "Enter" && selectedEntryPath && !directoryPaths.has(selectedEntryPath)) {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
-      await onOpenEntry?.({
-        path: selectedEntryPath,
-        isDirectory: false,
-      });
+      const current = rowByPath.get(selectedEntryPath);
+      if (!current) {
+        const firstRow = visibleRows[0];
+        if (firstRow) {
+          setSelectedEntryPath(firstRow.path);
+          onSelectEntry?.({ path: firstRow.path, isDirectory: firstRow.isDirectory });
+          virtualizer.scrollToIndex(0, { align: "auto" });
+        }
+        return;
+      }
+
+      const nextRow = visibleRows[current.index + 1];
+      if (nextRow) {
+        setSelectedEntryPath(nextRow.path);
+        onSelectEntry?.({ path: nextRow.path, isDirectory: nextRow.isDirectory });
+        virtualizer.scrollToIndex(current.index + 1, { align: "auto" });
+      }
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const current = rowByPath.get(selectedEntryPath);
+      if (!current || current.index === 0) {
+        return;
+      }
+
+      const prevRow = visibleRows[current.index - 1];
+      if (prevRow) {
+        setSelectedEntryPath(prevRow.path);
+        onSelectEntry?.({ path: prevRow.path, isDirectory: prevRow.isDirectory });
+        virtualizer.scrollToIndex(current.index - 1, { align: "auto" });
+      }
+      return;
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      const current = rowByPath.get(selectedEntryPath);
+      if (current?.row.isDirectory) {
+        if (!expandedPathSet.has(selectedEntryPath)) {
+          setExpandedItems((items) => [...new Set([...items, selectedEntryPath])]);
+        } else {
+          const firstChild = visibleRows[current.index + 1];
+          if (firstChild && firstChild.path.startsWith(selectedEntryPath + "/")) {
+            setSelectedEntryPath(firstChild.path);
+            onSelectEntry?.({ path: firstChild.path, isDirectory: firstChild.isDirectory });
+          }
+        }
+      }
+      return;
+    }
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      const current = rowByPath.get(selectedEntryPath);
+      if (current?.row.isDirectory && expandedPathSet.has(selectedEntryPath)) {
+        setExpandedItems((items) => items.filter((item) => item !== selectedEntryPath));
+      } else {
+        const pathParts = selectedEntryPath.split("/").filter(Boolean);
+        if (pathParts.length > 1) {
+          const parentPath = pathParts.slice(0, -1).join("/");
+          setSelectedEntryPath(parentPath);
+          onSelectEntry?.({ path: parentPath, isDirectory: true });
+        }
+      }
+      return;
+    }
+
+    if (event.key === "Enter" && selectedEntryPath) {
+      event.preventDefault();
+      const current = rowByPath.get(selectedEntryPath);
+      if (current?.row.isDirectory) {
+        setExpandedItems((items) => {
+          const isCurrentlyExpanded = items.includes(selectedEntryPath);
+          return isCurrentlyExpanded
+            ? items.filter((item) => item !== selectedEntryPath)
+            : [...items, selectedEntryPath];
+        });
+      } else {
+        await onOpenEntry?.({ path: selectedEntryPath, isDirectory: false });
+      }
       return;
     }
 
@@ -396,7 +618,6 @@ export function FileTree({
     cancelRename();
   };
 
-  /** Selects the first visible tree entry when focus enters without an existing selection. */
   const selectFirstTreeEntryOnFocus = () => {
     if (selectedEntryPath) {
       return;
@@ -406,24 +627,36 @@ export function FileTree({
       return;
     }
 
-    const firstVisibleEntryPath = topLevelNodes[0]?.path;
-    if (!firstVisibleEntryPath) {
+    const firstRow = visibleRows[0];
+    if (!firstRow) {
       return;
     }
 
-    setSelectedEntryPath(firstVisibleEntryPath);
-    onSelectEntry?.({
-      path: firstVisibleEntryPath,
-      isDirectory: directoryPaths.has(firstVisibleEntryPath),
-    });
+    setSelectedEntryPath(firstRow.path);
+    onSelectEntry?.({ path: firstRow.path, isDirectory: firstRow.isDirectory });
   };
 
   return (
     <Box
-      ref={treeAreaRef}
+      ref={scrollRef}
       data-testid="repo-file-tree-area"
       sx={{ flex: 1, minHeight: 0, px: 1.5, py: 1, overflowY: "auto", overflowX: "auto" }}
-      onContextMenu={handleEmptyAreaContextMenu}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        if (!onItemContextMenu) {
+          return;
+        }
+
+        onItemContextMenu({
+          mouseX: event.clientX,
+          mouseY: event.clientY,
+          basePath: "",
+          targetPath: "",
+          targetIsDirectory: false,
+          startCreateFile: () => startCreate("", false),
+          startCreateFolder: () => startCreate("", true),
+        });
+      }}
       onKeyDown={(event) => {
         void handleTreeKeyDown(event);
       }}
@@ -437,85 +670,94 @@ export function FileTree({
       onFocus={selectFirstTreeEntryOnFocus}
       tabIndex={0}
     >
-      <SimpleTreeView
-        expandedItems={expandedItems}
-        onExpandedItemsChange={(_, nextExpandedItems) => {
-          setExpandedItems(nextExpandedItems);
-
-          const addedExpandedItems = nextExpandedItems.filter((item) => !expandedItems.includes(item));
-          for (const directoryPath of addedExpandedItems) {
-            if (!directoryPaths.has(directoryPath)) {
-              continue;
-            }
-
-            void onLoadDirectory?.(directoryPath);
-          }
-        }}
-        selectedItems={selectedEntryPath}
-        onSelectedItemsChange={(_, selectedItems) => {
-          if (!selectedItems) {
-            setSelectedEntryPath("");
-            return;
+      <div style={{ height: virtualizer.getTotalSize(), width: "100%", position: "relative" }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const row = visibleRows[virtualItem.index];
+          if (!row) {
+            return null;
           }
 
-          if (typeof selectedItems === "string") {
-            setSelectedEntryPath(selectedItems);
-            onSelectEntry?.({
-              path: selectedItems,
-              isDirectory: directoryPaths.has(selectedItems),
-            });
-            return;
-          }
+          const isExpanded = expandedPathSet.has(row.path);
+          const isSelected = selectedEntryPath === row.path;
+          const isIgnored = ignoredPathSet.has(row.path);
+          const gitChangeKind = gitChangesByPathResolved[row.path];
+          const isEditing = editingEntry?.path === row.path;
+          const hasDescendantGitChange = row.isDirectory && ancestorOfGitChangePaths.has(row.path);
 
-          const nextSelectedEntryPath = selectedItems[0] ?? "";
-          setSelectedEntryPath(nextSelectedEntryPath);
-          if (!nextSelectedEntryPath) {
-            return;
-          }
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <FlatTreeRow
+                row={row}
+                isSelected={isSelected}
+                isEditing={isEditing}
+                editingName={editingName}
+                editingInputRef={editingInputRef}
+                gitChangeKind={gitChangeKind}
+                hasDescendantGitChange={hasDescendantGitChange}
+                isIgnored={isIgnored}
+                isExpanded={isExpanded}
+                onSelect={() => {
+                  setSelectedEntryPath(row.path);
+                  onSelectEntry?.({ path: row.path, isDirectory: row.isDirectory });
+                }}
+                onToggle={() => {
+                  setExpandedItems((items) => {
+                    const isCurrentlyExpanded = items.includes(row.path);
+                    return isCurrentlyExpanded ? items.filter((item) => item !== row.path) : [...items, row.path];
+                  });
+                }}
+                onOpen={() => {
+                  if (row.isDirectory) {
+                    setExpandedItems((items) => [...new Set([...items, row.path])]);
+                  } else {
+                    onOpenEntry?.({ path: row.path, isDirectory: false });
+                  }
+                }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!onItemContextMenu) {
+                    return;
+                  }
 
-          onSelectEntry?.({
-            path: nextSelectedEntryPath,
-            isDirectory: directoryPaths.has(nextSelectedEntryPath),
-          });
-        }}
-        sx={{
-          width: "max-content",
-          minWidth: "100%",
-          "& .MuiTreeItem-content": {
-            minHeight: 28,
-            borderRadius: 1,
-          },
-          "& .MuiTreeItem-label": {
-            typography: "body2",
-          },
-        }}
-      >
-        {topLevelNodes.map((node) => (
-          <TreeNodeItem
-            key={node.path}
-            node={node}
-            gitChangesByPath={gitChangesByPathResolved}
-            ignoredPathSet={ignoredPathSet}
-            loadedDirectoryPathSet={loadedDirectoryPathSet}
-            expandableDirectoryPathSet={expandableDirectoryPathSet}
-            editingPath={editingEntry?.path ?? ""}
-            editingName={editingName}
-            editingInputRef={editingInputRef}
-            onEditingNameChange={setEditingName}
-            onRenameKeyDown={handleRenameInputKeyDown}
-            onRenameBlur={handleRenameInputBlur}
-            onOpenEntry={(path, isDirectory) => {
-              onOpenEntry?.({ path, isDirectory });
-            }}
-            onContextMenu={handleNodeContextMenu}
-            onExternalDragOver={handleExternalDragOver}
-            onExternalDrop={(event, targetPath, targetIsDirectory) => {
-              void handleExternalDrop(event, targetPath, targetIsDirectory);
-            }}
-            expandedPathSet={expandedPathSet}
-          />
-        ))}
-      </SimpleTreeView>
+                  setSelectedEntryPath(row.path);
+                  const basePath = row.isDirectory ? row.path : row.path.split("/").slice(0, -1).join("/");
+                  onItemContextMenu({
+                    mouseX: event.clientX,
+                    mouseY: event.clientY,
+                    basePath,
+                    targetPath: row.path,
+                    targetIsDirectory: row.isDirectory,
+                    startCreateFile: () => startCreate(row.isDirectory ? row.path : basePath, false),
+                    startCreateFolder: () => startCreate(row.isDirectory ? row.path : basePath, true),
+                    startRename: onRenameEntry
+                      ? () => startRename(row.path, row.isDirectory ? row.path : basePath)
+                      : undefined,
+                  });
+                }}
+                onEditingNameChange={setEditingName}
+                onRenameKeyDown={handleRenameInputKeyDown}
+                onRenameBlur={handleRenameInputBlur}
+                onExternalDragOver={handleExternalDragOver}
+                onExternalDrop={(event, targetPath, targetIsDirectory) => {
+                  void handleExternalDrop(event, targetPath, targetIsDirectory);
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
     </Box>
   );
 }

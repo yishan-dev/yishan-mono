@@ -32,6 +32,21 @@ function asEntries(paths: string[]) {
   return paths.map((path) => ({ path, isIgnored: false }));
 }
 
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 28,
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        key: i,
+        start: i * 28,
+        size: 28,
+      })),
+    scrollToIndex: vi.fn(),
+    measureElement: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../commands/fileCommands", () => ({
   listFiles: (...args: unknown[]) => listFiles(...args),
   readFile: (...args: unknown[]) => readFile(...args),

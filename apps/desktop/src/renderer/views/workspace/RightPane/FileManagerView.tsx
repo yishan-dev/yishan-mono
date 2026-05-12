@@ -27,7 +27,7 @@ import { useFileSearchController } from "./useFileSearchController";
 import { useFileTreeContextMenuItems } from "./useFileTreeContextMenuItems";
 import { useFileTreeCreateEntryRequest } from "./useFileTreeCreateEntryRequest";
 import { useFileTreeGitChanges } from "./useFileTreeGitChanges";
-import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
+import { useFileTreeOperations } from "./useFileTreeOperations";
 
 type FileManagerViewProps = {
   openFileSearchRequestKey?: number;
@@ -82,6 +82,14 @@ export function FileManagerView({
     isOpen: hasOpenContextMenu,
   } = useContextMenuState<FileTreeContextMenuRequest>();
   const selectedEntryPath = workspaceFileTreeStore((state) => state.selectedEntryPath);
+  const selectedEntryIsDirectory = selectedEntryPath
+    ? ops.repoFiles.some((p) => p === selectedEntryPath + "/")
+    : false;
+  const createEntryBasePath = selectedEntryPath
+    ? selectedEntryIsDirectory
+      ? selectedEntryPath
+      : selectedEntryPath.split("/").slice(0, -1).join("/")
+    : "";
   const deleteSelectionRequestId = workspaceFileTreeStore((state) => state.deleteSelectionRequestId);
   const undoRequestId = workspaceFileTreeStore((state) => state.undoRequestId);
   const setSelectedEntryPath = workspaceFileTreeStore((state) => state.setSelectedEntryPath);
@@ -185,7 +193,6 @@ export function FileManagerView({
     async (path: string) => {
       if (path.endsWith("/")) {
         const directoryPath = path.replace(/\/+$/, "");
-        await ops.loadExpandedDirectory(directoryPath);
         if (!expandedItems.includes(directoryPath)) {
           handleExpandedItemsChange([...expandedItems, directoryPath]);
         }
@@ -286,10 +293,10 @@ export function FileManagerView({
         canCreateFolder={Boolean(ops.onCreateFolder)}
         canRefresh={Boolean(ops.onRefresh)}
         onCreateFile={() => {
-          requestCreateFile();
+          requestCreateFile(createEntryBasePath);
         }}
         onCreateFolder={() => {
-          requestCreateFolder();
+          requestCreateFolder(createEntryBasePath);
         }}
         onRefresh={() => {
           void ops.onRefresh?.();
@@ -299,13 +306,10 @@ export function FileManagerView({
         files={visibleTreeFiles}
         gitChangesByPath={gitChangesByPath}
         ignoredPaths={ops.ignoredRepoPaths}
-        loadedDirectoryPaths={ops.loadedDirectoryPaths}
-        expandableDirectoryPaths={CONTEXT_DIRECTORY_PATHS}
         expandedItems={expandedItems}
         selectionRequest={ops.fileTreeSelectionRequest}
         createEntryRequest={createEntryRequest}
         onExpandedItemsChange={handleExpandedItemsChange}
-        onLoadDirectory={ops.loadExpandedDirectory}
         onEnsurePathLoaded={ops.ensurePathLoaded}
         onSelectEntry={({ path, isDirectory }) => {
           setSelectedEntryPath(path);

@@ -211,10 +211,8 @@ function getFileTreeProps() {
     files: string[];
     gitChangesByPath?: Record<string, string>;
     expandedItems?: string[];
-    loadedDirectoryPaths?: string[];
     selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
     onExpandedItemsChange?: (items: string[]) => void;
-    onLoadDirectory?: (path: string) => Promise<void>;
     onSelectEntry?: (input: { path: string; isDirectory: boolean }) => void;
     onOpenEntry?: (input: { path: string; isDirectory: boolean }) => void;
     onCreateEntry?: (input: { path: string; isDirectory: boolean }) => Promise<void>;
@@ -280,7 +278,7 @@ describe("FileManagerView file search", () => {
     const { rerender } = render(<FileManagerView openFileSearchRequestKey={0} />);
 
     await waitFor(() => {
-      expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo", recursive: false });
+      expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo", recursive: true });
     });
 
     rerender(<FileManagerView openFileSearchRequestKey={1} />);
@@ -305,7 +303,7 @@ describe("FileManagerView file search", () => {
     const { rerender } = render(<FileManagerView openFileSearchRequestKey={0} />);
 
     await waitFor(() => {
-      expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo", recursive: false });
+      expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo", recursive: true });
     });
 
     rerender(<FileManagerView openFileSearchRequestKey={1} />);
@@ -661,7 +659,7 @@ describe("FileManagerView file search", () => {
   });
 });
 
-describe("FileManagerView lazy preload", () => {
+describe("FileManagerView file loading", () => {
   beforeEach(() => {
     mocks.subscribeWorkspaceGitChanged.mockImplementation(() => () => {});
     mocks.listGitChanges.mockResolvedValue({ unstaged: [], staged: [], untracked: [] });
@@ -678,117 +676,62 @@ describe("FileManagerView lazy preload", () => {
     vi.clearAllMocks();
   });
 
-  it("preloads top-level directories after the root tree loads", async () => {
-    mocks.listFiles
-      .mockResolvedValueOnce({ files: asEntries(["src/", "docs/", "README.md"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/index.ts"]) })
-      .mockResolvedValueOnce({ files: asEntries(["docs/guide.md"]) });
-
-    render(<FileManagerView />);
-
-    await waitFor(() => {
-      expect(mocks.listFiles.mock.calls).toEqual(
-        expect.arrayContaining([
-          [{ workspaceWorktreePath: "/tmp/repo", recursive: false }],
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src", recursive: false }],
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "docs", recursive: false }],
-        ]),
-      );
+  it("loads all files recursively in a single call", async () => {
+    mocks.listFiles.mockResolvedValue({
+      files: asEntries(["src/", "src/index.ts", "docs/", "docs/guide.md", "README.md"]),
     });
-  });
-
-  it("does not preload ignored directories automatically", async () => {
-    mocks.listFiles
-      .mockResolvedValueOnce({ files: asEntries(["node_modules/", "src/", "README.md"], ["node_modules/"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/index.ts"]) });
-
-    render(<FileManagerView />);
-
-    await waitFor(() => {
-      expect(mocks.listFiles.mock.calls).toEqual(
-        expect.arrayContaining([
-          [{ workspaceWorktreePath: "/tmp/repo", recursive: false }],
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src", recursive: false }],
-        ]),
-      );
-    });
-
-    expect(mocks.listFiles.mock.calls).not.toContainEqual([
-      { workspaceWorktreePath: "/tmp/repo", relativePath: "node_modules", recursive: false },
-    ]);
-  });
-
-  it("preloads one more level after expanding an already loaded branch", async () => {
-    mocks.listFiles
-      .mockResolvedValueOnce({ files: asEntries(["src/", "docs/"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/components/", "src/utils/", "src/index.ts"]) })
-      .mockResolvedValueOnce({ files: asEntries(["docs/guide.md"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/components/Button.tsx"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/utils/format.ts"]) });
-
-    render(<FileManagerView />);
-
-    await waitFor(() => {
-      expect(mocks.listFiles.mock.calls).toEqual(
-        expect.arrayContaining([
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src", recursive: false }],
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "docs", recursive: false }],
-        ]),
-      );
-    });
-
-    await getFileTreeProps().onLoadDirectory?.("src");
-
-    await waitFor(() => {
-      expect(mocks.listFiles.mock.calls).toEqual(
-        expect.arrayContaining([
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src/components", recursive: false }],
-          [{ workspaceWorktreePath: "/tmp/repo", relativePath: "src/utils", recursive: false }],
-        ]),
-      );
-    });
-  });
-
-  it("loads .my-context children when expanded", async () => {
-    mocks.listFiles
-      .mockResolvedValueOnce({ files: asEntries([".my-context/", "src/"]) })
-      .mockResolvedValueOnce({ files: asEntries(["src/index.ts"]) })
-      .mockResolvedValueOnce({ files: asEntries([".my-context/brief.md", ".my-context/notes/"]) })
-      .mockResolvedValueOnce({ files: asEntries([".my-context/notes/todo.md"]) });
 
     render(<FileManagerView />);
 
     await waitFor(() => {
       expect(mocks.listFiles).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        relativePath: "src",
-        recursive: false,
+        recursive: true,
       });
     });
 
-    expect(mocks.listFiles.mock.calls).not.toContainEqual([
-      { workspaceWorktreePath: "/tmp/repo", relativePath: ".my-context", recursive: false },
-    ]);
+    expect(mocks.listFiles).toHaveBeenCalledTimes(1);
+    expect(getFileTreeProps().files).toEqual(
+      expect.arrayContaining(["src/", "src/index.ts", "docs/", "docs/guide.md", "README.md"]),
+    );
+  });
 
-    await getFileTreeProps().onLoadDirectory?.(".my-context");
-
-    await waitFor(() => {
-      expect(getFileTreeProps().files).toEqual(
-        expect.arrayContaining([".my-context/", ".my-context/brief.md", ".my-context/notes/"]),
-      );
-      expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining(["", ".my-context"]));
+  it("includes ignored directories in the initial recursive load", async () => {
+    mocks.listFiles.mockResolvedValue({
+      files: asEntries(["node_modules/", "node_modules/pkg/index.js", "src/", "src/index.ts"], ["node_modules/"]),
     });
 
-    await getFileTreeProps().onLoadDirectory?.(".my-context/notes");
+    render(<FileManagerView />);
 
     await waitFor(() => {
       expect(mocks.listFiles).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        relativePath: ".my-context/notes",
-        recursive: false,
+        recursive: true,
       });
-      expect(getFileTreeProps().files).toEqual(expect.arrayContaining([".my-context/notes/todo.md"]));
     });
+
+    expect(getFileTreeProps().files).toEqual(
+      expect.arrayContaining(["node_modules/", "node_modules/pkg/index.js", "src/", "src/index.ts"]),
+    );
+  });
+
+  it("includes .my-context files in the initial recursive load", async () => {
+    mocks.listFiles.mockResolvedValue({
+      files: asEntries([".my-context/", ".my-context/brief.md", ".my-context/notes/", ".my-context/notes/todo.md", "src/", "src/index.ts"]),
+    });
+
+    render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect(mocks.listFiles).toHaveBeenCalledWith({
+        workspaceWorktreePath: "/tmp/repo",
+        recursive: true,
+      });
+    });
+
+    expect(getFileTreeProps().files).toEqual(
+      expect.arrayContaining([".my-context/", ".my-context/brief.md", ".my-context/notes/todo.md"]),
+    );
   });
 });
 
@@ -829,14 +772,14 @@ describe("FileManagerView external file tree refresh", () => {
       const { rerender } = render(<FileManagerView />);
 
       await waitFor(() => {
-        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-a", recursive: false });
+        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-a", recursive: true });
       });
 
       mocks.stateRef.current.selectedWorkspaceId = "workspace-2";
       rerender(<FileManagerView />);
 
       await waitFor(() => {
-        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-b", recursive: false });
+        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/repo-b", recursive: true });
       });
 
       secondLoad.resolve({ files: asEntries(["src/b.ts"]) });
@@ -868,35 +811,20 @@ describe("FileManagerView external file tree refresh", () => {
         { id: "workspace-2", worktreePath: "/tmp/shared-repo" },
       ];
       mocks.stateRef.current.selectedWorkspaceId = "workspace-1";
-      mocks.listFiles.mockImplementation(
-        async ({ workspaceWorktreePath, relativePath }: { workspaceWorktreePath: string; relativePath?: string }) => {
-          if (workspaceWorktreePath !== "/tmp/shared-repo") {
-            return { files: [] };
-          }
-
-          if (relativePath === "src") {
-            return { files: asEntries(["src/a.ts"]) };
-          }
-
-          if (relativePath === "app") {
-            return { files: asEntries(["app/main.ts"]) };
-          }
-
-          return { files: asEntries(["src/", "app/"]) };
-        },
-      );
+      mocks.listFiles.mockResolvedValue({
+        files: asEntries(["src/", "src/a.ts", "app/", "app/main.ts"]),
+      });
 
       const { rerender } = render(<FileManagerView />);
 
       await waitFor(() => {
-        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/shared-repo", recursive: false });
+        expect(mocks.listFiles).toHaveBeenCalledWith({ workspaceWorktreePath: "/tmp/shared-repo", recursive: true });
       });
 
       getFileTreeProps().onExpandedItemsChange?.(["src"]);
 
       await waitFor(() => {
         expect(getFileTreeProps().expandedItems).toEqual(["src"]);
-        expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining(["", "src"]));
       });
 
       mocks.stateRef.current.selectedWorkspaceId = "workspace-2";
@@ -904,7 +832,6 @@ describe("FileManagerView external file tree refresh", () => {
 
       await waitFor(() => {
         expect(getFileTreeProps().expandedItems).toEqual([]);
-        expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining([""]));
       });
 
       getFileTreeProps().onExpandedItemsChange?.(["app"]);
@@ -918,7 +845,6 @@ describe("FileManagerView external file tree refresh", () => {
 
       await waitFor(() => {
         expect(getFileTreeProps().expandedItems).toEqual(["src"]);
-        expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining(["", "src"]));
       });
 
       mocks.stateRef.current.selectedWorkspaceId = "workspace-2";
@@ -983,67 +909,26 @@ describe("FileManagerView external file tree refresh", () => {
     });
   });
 
-  it("drops invalid loaded directories from batch refresh results", async () => {
-    mocks.listFiles.mockImplementation(
-      async ({ relativePath }: { workspaceWorktreePath: string; relativePath?: string }) => {
-        if (relativePath === "src") {
-          return { files: asEntries(["src/a.ts"]) };
-        }
-
-        if (relativePath === "dist") {
-          return { files: asEntries(["dist/app.js"]) };
-        }
-
-        return { files: asEntries(["src/"]) };
-      },
-    );
-    mocks.listFilesBatch.mockImplementation(async (input: ListFilesBatchInput) => {
-      return {
-        results: input.requests.map((request) =>
-          request.relativePath === "dist"
-            ? {
-                request,
-                files: [],
-                error: "relativePath must point to a directory under rootPath",
-              }
-            : {
-                request,
-                files: asEntries(["src/a.ts"]),
-              },
-        ),
-      };
-    });
+  it("refreshes all files on refresh button click", async () => {
+    mocks.listFiles
+      .mockResolvedValueOnce({ files: asEntries(["src/a.ts"]) })
+      .mockResolvedValueOnce({ files: asEntries(["src/a.ts", "src/b.ts"]) });
 
     render(<FileManagerView />);
 
     await waitFor(() => {
-      expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining([""]));
-    });
-
-    await getFileTreeProps().onLoadDirectory?.("src");
-    await getFileTreeProps().onLoadDirectory?.("dist");
-
-    await waitFor(() => {
-      expect(getFileTreeProps().loadedDirectoryPaths).toEqual(expect.arrayContaining(["", "src", "dist"]));
+      expect(mocks.listFiles).toHaveBeenCalledTimes(1);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
     await waitFor(() => {
-      expect(getFileTreeProps().loadedDirectoryPaths).not.toContain("dist");
+      expect(mocks.listFiles).toHaveBeenCalledTimes(2);
+      expect(mocks.listFiles).toHaveBeenLastCalledWith({
+        workspaceWorktreePath: "/tmp/repo",
+        recursive: true,
+      });
     });
-
-    mocks.listFilesBatch.mockClear();
-
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-
-    await waitFor(() => {
-      expect(mocks.listFilesBatch).toHaveBeenCalled();
-    });
-    const requestedPaths = mocks.listFilesBatch.mock.calls.flatMap((call) =>
-      (call[0] as ListFilesBatchInput).requests.map((request) => request.relativePath ?? ""),
-    );
-    expect(requestedPaths).not.toContain("dist");
   });
 });
 

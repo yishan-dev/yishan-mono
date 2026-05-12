@@ -83,6 +83,9 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 	out := []FileEntry{}
 	if err := filepath.WalkDir(dir, func(fullPath string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
+			if os.IsNotExist(walkErr) {
+				return nil
+			}
 			return walkErr
 		}
 		if fullPath == dir {
@@ -97,6 +100,9 @@ func (s *FileService) walkFiles(root string, dir string) ([]FileEntry, error) {
 
 		info, isDir, err := fileInfoForDirectoryEntry(entry, fullPath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		relPath, err := filepath.Rel(root, fullPath)
@@ -333,12 +339,18 @@ func (s *FileService) listGitFiles(root string, path string) ([]FileEntry, bool,
 			}
 			entry, err := fileEntryForRelativePath(root, directoryPath)
 			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
 				return nil, true, err
 			}
 			entryByPath[directoryPath] = entry
 		}
 		entry, err := fileEntryForRelativePath(root, relPath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			return nil, true, err
 		}
 		entryByPath[relPath] = entry

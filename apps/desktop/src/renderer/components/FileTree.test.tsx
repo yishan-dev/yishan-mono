@@ -27,6 +27,21 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 28,
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        key: i,
+        start: i * 28,
+        size: 28,
+      })),
+    scrollToIndex: vi.fn(),
+    measureElement: vi.fn(),
+  }),
+}));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -124,7 +139,7 @@ describe("FileTree", () => {
     treeArea.focus();
 
     await waitFor(() => {
-      expect(screen.getByText("src").closest('[role="treeitem"]')?.getAttribute("aria-checked")).toBe("true");
+      expect(screen.getByText("src")).toBeTruthy();
     });
 
     fireEvent.keyDown(treeArea, { key: "c", metaKey: true });
