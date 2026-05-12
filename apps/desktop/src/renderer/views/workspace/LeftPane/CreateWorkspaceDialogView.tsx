@@ -7,8 +7,8 @@ import {
   DialogContent,
   DialogTitle,
   InputAdornment,
-  Menu,
   MenuItem,
+  Popover,
   Stack,
   TextField,
   Typography,
@@ -599,14 +599,20 @@ export function CreateWorkspaceDialogView({
                 placeholder="Source branch"
                 disabled={isRenameMode || !selectedProjectId || sourceBranchOptions.length === 0}
               />
-              <Menu
+              <Popover
                 open={isSourceBranchMenuOpen}
                 anchorEl={sourceBranchMenuAnchorEl}
                 onClose={() => setSourceBranchMenuAnchorEl(null)}
-                PaperProps={{
-                  sx: {
-                    minWidth: 250,
-                    maxWidth: 350,
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                disableRestoreFocus
+                slotProps={{
+                  paper: {
+                    sx: {
+                      minWidth: 250,
+                      maxWidth: 350,
+                      mt: 0.5,
+                    },
                   },
                 }}
               >
@@ -625,7 +631,7 @@ export function CreateWorkspaceDialogView({
                   emptyWorktreeLabel="No worktree branches"
                   emptyRemoteLabel="No remote branches"
                 />
-              </Menu>
+              </Popover>
             </Box>
           </Stack>
 
