@@ -9,7 +9,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 )
+
+const fetchTimeout = 15 * time.Second
+const branchCacheTTL = 30 * time.Second
 
 type GitStatusResponse struct {
 	Branch string   `json:"branch"`
@@ -76,10 +80,19 @@ type GitInspectResult struct {
 	CurrentBranch   string `json:"currentBranch,omitempty"`
 }
 
-type GitService struct{}
+type branchCacheEntry struct {
+	data GitBranchList
+	at   time.Time
+}
+
+type GitService struct {
+	branchCache map[string]branchCacheEntry
+}
 
 func NewGitService() *GitService {
-	return &GitService{}
+	return &GitService{
+		branchCache: make(map[string]branchCacheEntry),
+	}
 }
 
 func (s *GitService) Status(ctx context.Context, root string) (GitStatusResponse, error) {
@@ -370,7 +383,24 @@ func (s *GitService) ReadBranchComparisonDiff(ctx context.Context, root string, 
 }
 
 func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchList, error) {
-	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
+	if entry, ok := s.branchCache[root]; ok && time.Since(entry.at) < branchCacheTTL {
+		return entry.data, nil
+	}
+
+	fetchCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	s.FetchRef(fetchCtx, root, "")
+	cancel()
+
+	list, err := s.listBranchesFromGit(ctx, root)
+	if err != nil {
+		return GitBranchList{}, err
+	}
+
+	s.branchCache[root] = branchCacheEntry{data: list, at: time.Now()}
+	return list, nil
+}
+
+func (s *GitService) listBranchesFromGit(ctx context.Context, root string) (GitBranchList, error) {	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
 	if err != nil {
 		return GitBranchList{}, err
 	}

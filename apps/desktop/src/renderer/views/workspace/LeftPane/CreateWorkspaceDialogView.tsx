@@ -592,7 +592,7 @@ export function CreateWorkspaceDialogView({
                   ),
                   endAdornment: (
                     <InputAdornment position="end" sx={{ ml: 0.5, color: "text.secondary" }}>
-                      <LuChevronDown size={16} />
+                      {isLoadingSourceBranches ? <CircularProgress size={14} /> : <LuChevronDown size={16} />}
                     </InputAdornment>
                   ),
                 }}
@@ -616,6 +616,13 @@ export function CreateWorkspaceDialogView({
                   },
                 }}
               >
+                {isLoadingSourceBranches ? (
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 3, px: 2, gap: 1 }}>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">Loading branches\u2026</Typography>
+                  </Box>
+                ) : (
+                <>
                 <BranchDropdown
                   groups={sourceBranchGroups}
                   selectedValue={sourceBranchSelectValue}
@@ -631,6 +638,8 @@ export function CreateWorkspaceDialogView({
                   emptyWorktreeLabel="No worktree branches"
                   emptyRemoteLabel="No remote branches"
                 />
+                </>
+                )}
               </Popover>
             </Box>
           </Stack>
