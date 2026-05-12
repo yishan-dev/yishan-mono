@@ -10,18 +10,18 @@ export function useFileTreeCreateEntryRequest() {
   const [, setCreateEntryRequestId] = useState(0);
   const [createEntryRequest, setCreateEntryRequest] = useState<CreateEntryRequest | null>(null);
 
-  const requestCreateFile = useCallback(() => {
+  const requestCreateFile = useCallback((basePath?: string) => {
     setCreateEntryRequestId((current) => {
       const requestId = current + 1;
-      setCreateEntryRequest({ kind: "file", requestId });
+      setCreateEntryRequest({ kind: "file", basePath, requestId });
       return requestId;
     });
   }, []);
 
-  const requestCreateFolder = useCallback(() => {
+  const requestCreateFolder = useCallback((basePath?: string) => {
     setCreateEntryRequestId((current) => {
       const requestId = current + 1;
-      setCreateEntryRequest({ kind: "folder", requestId });
+      setCreateEntryRequest({ kind: "folder", basePath, requestId });
       return requestId;
     });
   }, []);

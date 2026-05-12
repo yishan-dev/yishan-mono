@@ -15,15 +15,12 @@ export type FileTreeProps = {
   files: string[];
   gitChangesByPath?: Record<string, FileTreeGitChangeKind>;
   ignoredPaths?: string[];
-  loadedDirectoryPaths?: string[];
-  expandableDirectoryPaths?: string[];
   expandedItems?: string[];
   selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
   createEntryRequest?: { kind: "file" | "folder"; basePath?: string; requestId: number } | null;
   onSelectEntry?: (input: { path: string; isDirectory: boolean }) => void;
   onOpenEntry?: (input: { path: string; isDirectory: boolean }) => void;
   onExpandedItemsChange?: (items: string[]) => void;
-  onLoadDirectory?: (path: string) => void | Promise<void>;
   onEnsurePathLoaded?: (path: string) => void | Promise<void>;
   onCreateEntry?: (input: { path: string; isDirectory: boolean }) => void | Promise<void>;
   onRenameEntry?: (path: string, nextName: string) => void | Promise<void>;
@@ -43,6 +40,14 @@ export type TreeNode = {
   path: string;
   isDirectory: boolean;
   children: Map<string, TreeNode>;
+};
+
+export type VisibleRow = {
+  path: string;
+  name: string;
+  depth: number;
+  isDirectory: boolean;
+  hasChildren: boolean;
 };
 
 export type EditingEntry = {
