@@ -219,51 +219,6 @@ func TestGitServiceListChangesRenameScenarios(t *testing.T) {
 	}
 }
 
-func TestGitServiceFetchRemotes(t *testing.T) {
-	remote := filepath.Join(t.TempDir(), "remote.git")
-	runGit(t, t.TempDir(), "init", "--bare", remote)
-
-	root := filepath.Join(t.TempDir(), "repo")
-	runGit(t, t.TempDir(), "clone", remote, root)
-	runGit(t, root, "config", "user.name", "Test User")
-	runGit(t, root, "config", "user.email", "test@example.com")
-
-	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("seed\n"), 0o644); err != nil {
-		t.Fatalf("write seed: %v", err)
-	}
-	runGit(t, root, "add", "seed.txt")
-	runGit(t, root, "commit", "-m", "seed")
-	runGit(t, root, "push", "origin", "HEAD:main")
-
-	other := filepath.Join(t.TempDir(), "other")
-	runGit(t, t.TempDir(), "clone", remote, other)
-	runGit(t, other, "checkout", "-B", "main", "origin/main")
-	runGit(t, other, "config", "user.name", "Test User")
-	runGit(t, other, "config", "user.email", "test@example.com")
-	if err := os.WriteFile(filepath.Join(other, "latest.txt"), []byte("latest\n"), 0o644); err != nil {
-		t.Fatalf("write latest: %v", err)
-	}
-	runGit(t, other, "add", "latest.txt")
-	runGit(t, other, "commit", "-m", "latest")
-	runGit(t, other, "push", "origin", "HEAD:main")
-
-	before := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
-	latest := strings.TrimSpace(runGit(t, other, "rev-parse", "HEAD"))
-	if before == latest {
-		t.Fatal("expected local remote-tracking branch to be stale before fetch")
-	}
-
-	svc := NewGitService()
-	if err := svc.FetchRemotes(context.Background(), root); err != nil {
-		t.Fatalf("fetch remotes: %v", err)
-	}
-
-	after := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
-	if after != latest {
-		t.Fatalf("expected origin/main %q after fetch, got %q", latest, after)
-	}
-}
-
 func TestGitServiceCreateAndRemoveWorktree(t *testing.T) {
 	root := t.TempDir()
 	initGitRepo(t, root)
@@ -318,5 +273,60 @@ func TestGitServiceCreateAndRemoveWorktree(t *testing.T) {
 	}
 	if branches := strings.TrimSpace(runGit(t, root, "branch", "--list", "feature/worktree")); branches != "" {
 		t.Fatalf("expected worktree branch removed, got %q", branches)
+	}
+}
+
+func TestGitServiceFetchRef(t *testing.T) {
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, t.TempDir(), "init", "--bare", remote)
+
+	root := filepath.Join(t.TempDir(), "repo")
+	runGit(t, t.TempDir(), "clone", remote, root)
+	runGit(t, root, "config", "user.name", "Test User")
+	runGit(t, root, "config", "user.email", "test@example.com")
+
+	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("seed\n"), 0o644); err != nil {
+		t.Fatalf("write seed: %v", err)
+	}
+	runGit(t, root, "add", "seed.txt")
+	runGit(t, root, "commit", "-m", "seed")
+	runGit(t, root, "push", "origin", "HEAD:main")
+
+	other := filepath.Join(t.TempDir(), "other")
+	runGit(t, t.TempDir(), "clone", remote, other)
+	runGit(t, other, "checkout", "-B", "main", "origin/main")
+	runGit(t, other, "config", "user.name", "Test User")
+	runGit(t, other, "config", "user.email", "test@example.com")
+	if err := os.WriteFile(filepath.Join(other, "latest.txt"), []byte("latest\n"), 0o644); err != nil {
+		t.Fatalf("write latest: %v", err)
+	}
+	runGit(t, other, "add", "latest.txt")
+	runGit(t, other, "commit", "-m", "latest")
+	runGit(t, other, "push", "origin", "HEAD:main")
+
+	before := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
+	latest := strings.TrimSpace(runGit(t, other, "rev-parse", "HEAD"))
+	if before == latest {
+		t.Fatal("expected local remote-tracking branch to be stale before fetch")
+	}
+
+	svc := NewGitService()
+	if err := svc.FetchRef(context.Background(), root, "main"); err != nil {
+		t.Fatalf("FetchRef: %v", err)
+	}
+
+	after := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
+	if after != latest {
+		t.Fatalf("expected origin/main %q after fetch, got %q", latest, after)
+	}
+}
+
+func TestGitServiceFetchRefNoRemote(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewGitService()
+
+	if err := svc.FetchRef(context.Background(), root, "main"); err != nil {
+		t.Fatalf("expected no error for repo without remotes, got: %v", err)
 	}
 }
