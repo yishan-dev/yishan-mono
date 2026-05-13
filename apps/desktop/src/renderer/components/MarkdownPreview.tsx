@@ -1,6 +1,6 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
@@ -9,7 +9,7 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { openExternalUrl } from "../commands/appCommands";
 import { readFileAsDataUrl } from "../commands/fileCommands";
-import { isIssueTrackerUrl } from "../helpers/issueLinks";
+import { tabStore } from "../store/tabStore";
 import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
 import { MermaidBlock } from "./MermaidBlock";
 
@@ -117,13 +117,9 @@ async function openMarkdownLink(url: string): Promise<void> {
   }
 
   enqueueWorkspaceErrorNotice({
-    title: "Failed to open external issue link",
-    message: "Could not open issue link in external app (" + result.reason + ").",
+    title: "Failed to open link",
+    message: "Could not open link in external app (" + result.reason + ").",
   });
-}
-
-function shouldOpenExternally(url: string): boolean {
-  return isIssueTrackerUrl(url);
 }
 
 /** Recursively extracts plain text from React node trees (strings, elements with children, arrays). */
@@ -478,9 +474,6 @@ function MarkdownImage({
 export function MarkdownPreview({ content, filePath, worktreePath }: MarkdownPreviewProps) {
   const theme = useTheme();
   const styles = useMarkdownStyles(theme);
-  const useExternalIssueLinks = true;
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
   const fileDir = useMemo(() => {
     if (!filePath) return "";
     const parts = filePath.split("/");
@@ -516,6 +509,36 @@ export function MarkdownPreview({ content, filePath, worktreePath }: MarkdownPre
           fileDir={fileDir}
         />
       ),
+      a: ({ href, children, ...props }: React.ComponentProps<"a">) => {
+        const handleClick = (e: React.MouseEvent) => {
+          if (!href) return;
+          e.preventDefault();
+
+          if (href.startsWith("#")) return;
+
+          if (isAbsoluteUrl(href)) {
+            void openMarkdownLink(href);
+            return;
+          }
+
+          if (worktreePath) {
+            const cleanPath = href.replace(/[?#].*$/, "");
+            const resolvedPath = resolveRelativePath(fileDir, cleanPath);
+            if (resolvedPath) {
+              tabStore.getState().openTab({
+                kind: "file",
+                path: resolvedPath,
+              });
+            }
+          }
+        };
+
+        return (
+          <a href={href} onClick={handleClick} {...props}>
+            {children}
+          </a>
+        );
+      },
     }),
     [worktreePath, fileDir],
   );
