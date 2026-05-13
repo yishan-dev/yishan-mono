@@ -228,6 +228,7 @@ describe("getShortcutDefinitions", () => {
       workspaceId: "workspace-1",
       kind: "browser",
       url: "https://example.com",
+      reuseExisting: false,
     });
   });
 

@@ -142,6 +142,7 @@ function executeShortcutTarget(context: ShortContext, event: KeyboardEvent, targ
       workspaceId,
       kind: "browser",
       url: "https://example.com",
+      reuseExisting: false,
     });
     event.preventDefault();
     return true;

@@ -245,6 +245,7 @@ export function MainPaneView() {
       cmd.openTab({
         workspaceId: selectedWorkspaceId,
         ...buildBrowserInput(),
+        reuseExisting: false,
       });
       return;
     }
