@@ -32,6 +32,7 @@ type TerminalViewProps = {
 
 /** Renders an xterm instance and binds it to a daemon-backed terminal session. */
 export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -95,7 +96,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
   );
 
   const searchState = useTerminalSearchState({
-    terminalHostRef,
+    terminalHostRef: containerRef,
     searchInputRef,
     xtermRef,
     searchAddonRef,
@@ -212,6 +213,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         });
       }, RESIZE_DEBOUNCE_MS);
     });
+    // Observe the terminal host element directly — this is the element xterm
+    // renders into and is the correct measurement target for FitAddon.
     resizeObserver.observe(host);
 
     return () => {
@@ -250,16 +253,16 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
 
   return (
     <Box
-      ref={terminalHostRef}
+      ref={containerRef}
       sx={{
         flex: 1,
         minHeight: 0,
         p: 1.5,
         bgcolor: "#2b3038",
         height: "100%",
-        "& .xterm-viewport": {
-          overflowY: "hidden",
-        },
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
       }}
     >
       {isSearchPanelOpen ? (
@@ -276,6 +279,17 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
           onClose={closeSearchPanel}
         />
        ) : null}
+      <Box
+        ref={terminalHostRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          "& .xterm-viewport": {
+            overflowY: "hidden",
+          },
+        }}
+      />
     </Box>
   );
 });
