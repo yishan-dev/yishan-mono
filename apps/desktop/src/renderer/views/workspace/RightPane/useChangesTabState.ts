@@ -72,17 +72,7 @@ function reconcileRenameLikePairs(input: RepoChangesBySection): RepoChangesBySec
         return deletedExtension !== "" && getFileExtension(candidate.path) === deletedExtension;
       });
 
-    const fallbackCandidate =
-      extensionCandidate ??
-      (() => {
-        const remainingAdded = addedUntracked.filter((candidate) => !consumedAddedPaths.has(candidate.path));
-        const remainingDeleted = deletedUnstaged.filter((candidate) => !consumedDeletedPaths.has(candidate.path));
-        if (remainingAdded.length === 1 && remainingDeleted.length === 1) {
-          return remainingAdded[0];
-        }
-
-        return null;
-      })();
+    const fallbackCandidate = extensionCandidate;
 
     if (!fallbackCandidate) {
       continue;
@@ -185,7 +175,7 @@ function dedupeRepoChangeFiles(files: ProjectGitChangesSection["files"]): Projec
 }
 
 function normalizeProjectGitChangeKind(kind: string): ProjectGitChangeKind {
-  if (kind === "added" || kind === "deleted" || kind === "modified" || kind === "renamed") {
+  if (kind === "added" || kind === "deleted" || kind === "modified" || kind === "renamed" || kind === "untracked") {
     return kind;
   }
 
@@ -213,13 +203,16 @@ function buildCommitChangesSection(commit: ProjectCommitComparisonCommit): Proje
   };
 }
 
-function buildAllCommitChangesSection(allChangedFiles: string[]): ProjectGitChangesSection {
+function buildAllCommitChangesSection(
+  allChangedFiles: string[],
+  uncommittedKindByPath: Map<string, ProjectGitChangeKind>,
+): ProjectGitChangesSection {
   return {
     id: "all-commit-files",
     label: "Changes in all",
     files: dedupeChangedPaths(allChangedFiles).map((path) => ({
       path,
-      kind: "modified" as const,
+      kind: uncommittedKindByPath.get(path) ?? ("modified" as const),
       additions: 0,
       deletions: 0,
     })),
@@ -400,18 +393,63 @@ export function useChangesTabState() {
     [repoCommitComparison.commits, selectedComparison],
   );
 
+  const mergedAllChangedFiles = useMemo(() => {
+    const allPaths = new Set<string>();
+    for (const path of repoCommitComparison.allChangedFiles) {
+      const normalized = normalizeWorkspaceRelativePath(path);
+      if (normalized) {
+        allPaths.add(normalized);
+      }
+    }
+    for (const section of [repoChangesBySection.staged, repoChangesBySection.unstaged, repoChangesBySection.untracked]) {
+      for (const file of section) {
+        const normalized = normalizeWorkspaceRelativePath(file.path);
+        if (normalized) {
+          allPaths.add(normalized);
+        }
+      }
+    }
+    return [...allPaths];
+  }, [repoCommitComparison.allChangedFiles, repoChangesBySection.staged, repoChangesBySection.unstaged, repoChangesBySection.untracked]);
+
+  const mergedComparison = useMemo<ProjectCommitComparisonData>(
+    () => ({ ...repoCommitComparison, allChangedFiles: mergedAllChangedFiles }),
+    [repoCommitComparison, mergedAllChangedFiles],
+  );
+
+  const uncommittedKindByPath = useMemo(() => {
+    const kindByPath = new Map<string, ProjectGitChangeKind>();
+    for (const section of [
+      { id: "staged", files: repoChangesBySection.staged },
+      { id: "unstaged", files: repoChangesBySection.unstaged },
+      { id: "untracked", files: repoChangesBySection.untracked },
+    ] as const) {
+      for (const file of section.files) {
+        const normalizedPath = normalizeWorkspaceRelativePath(file.path);
+        if (!normalizedPath) {
+          continue;
+        }
+        kindByPath.set(
+          normalizedPath,
+          section.id === "untracked" ? "untracked" : normalizeProjectGitChangeKind(file.kind),
+        );
+      }
+    }
+    return kindByPath;
+  }, [repoChangesBySection.staged, repoChangesBySection.unstaged, repoChangesBySection.untracked]);
+
   const visibleChanges = useMemo(() => {
     if (selectedComparison === "uncommitted") {
       return repoChanges;
     }
     if (selectedComparison === "all") {
-      return [buildAllCommitChangesSection(repoCommitComparison.allChangedFiles)];
+      return [buildAllCommitChangesSection(mergedAllChangedFiles, uncommittedKindByPath)];
     }
     if (selectedCommit) {
       return [buildCommitChangesSection(selectedCommit)];
     }
     return repoChanges;
-  }, [repoChanges, repoCommitComparison.allChangedFiles, selectedCommit, selectedComparison]);
+  }, [repoChanges, mergedAllChangedFiles, selectedCommit, selectedComparison, uncommittedKindByPath]);
 
   const isCommitChangesMode = selectedComparison !== "uncommitted";
 
@@ -422,7 +460,7 @@ export function useChangesTabState() {
     isRepoChangesLoading,
     isCommitComparisonLoading,
     selectedComparison,
-    repoCommitComparison,
+    repoCommitComparison: mergedComparison,
     visibleChanges,
     isCommitChangesMode,
     refreshChanges,

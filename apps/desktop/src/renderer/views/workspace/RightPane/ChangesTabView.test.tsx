@@ -369,4 +369,68 @@ describe("ChangesTabView", () => {
     expect(screen.queryByTestId("changes-file-unstaged-src/old-name.ts")).toBeNull();
     expect(screen.queryByTestId("changes-file-untracked-src/new-name.ts")).toBeNull();
   });
+
+  it("includes uncommitted files in the All changes count and list", async () => {
+    mocks.listGitChanges.mockResolvedValue({
+      unstaged: [{ path: "src/modified.ts", kind: "modified", additions: 3, deletions: 1 }],
+      staged: [],
+      untracked: [{ path: "src/new.ts", kind: "added", additions: 10, deletions: 0 }],
+    });
+    mocks.listGitCommitsToTarget.mockResolvedValue({
+      currentBranch: "main",
+      targetBranch: "main",
+      allChangedFiles: [],
+      commits: [],
+    });
+
+    render(<ChangesTabView />);
+
+    const scopeInput = await screen.findByRole("combobox", { name: "Change scope" });
+    fireEvent.change(scopeInput, { target: { value: "All changes" } });
+    fireEvent.mouseDown(scopeInput);
+    fireEvent.click(await screen.findByRole("option", { name: "All changes (2)" }));
+
+    expect(screen.getByText("Changes in all")).toBeTruthy();
+    expect(screen.getByText("modified.ts")).toBeTruthy();
+    expect(screen.getByText("new.ts")).toBeTruthy();
+    expect(screen.getByTestId("changes-file-indicator-all-commit-files-src/new.ts").textContent).toBe("?");
+  });
+
+  it("deduplicates files that appear in both committed and uncommitted changes", async () => {
+    mocks.listGitChanges.mockResolvedValue({
+      unstaged: [{ path: "src/shared.ts", kind: "modified", additions: 1, deletions: 0 }],
+      staged: [],
+      untracked: [],
+    });
+    mocks.listGitCommitsToTarget.mockResolvedValue({
+      currentBranch: "feature/work",
+      targetBranch: "main",
+      allChangedFiles: ["src/shared.ts", "src/other.ts"],
+      commits: [],
+    });
+
+    render(<ChangesTabView />);
+
+    const scopeInput = await screen.findByRole("combobox", { name: "Change scope" });
+    fireEvent.change(scopeInput, { target: { value: "All changes" } });
+    fireEvent.mouseDown(scopeInput);
+    fireEvent.click(await screen.findByRole("option", { name: "All changes (2)" }));
+
+    expect(screen.getAllByText("shared.ts").length).toBe(1);
+    expect(screen.getByText("other.ts")).toBeTruthy();
+  });
+
+  it("does not reconcile unrelated delete + add pairs as renamed", async () => {
+    mocks.listGitChanges.mockResolvedValue({
+      unstaged: [{ path: "sample.jsonl", kind: "deleted", additions: 0, deletions: 0 }],
+      staged: [],
+      untracked: [{ path: ".superset/config.json", kind: "added", additions: 0, deletions: 0 }],
+    });
+
+    render(<ChangesTabView />);
+
+    expect(await screen.findByTestId("changes-file-indicator-unstaged-sample.jsonl")).toBeTruthy();
+    expect(await screen.findByTestId("changes-file-indicator-untracked-.superset/config.json")).toBeTruthy();
+    expect(screen.queryByTestId("changes-file-indicator-unstaged-.superset/config.json")).toBeNull();
+  });
 });

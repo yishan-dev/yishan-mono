@@ -56,9 +56,10 @@ type GitCommitComparison struct {
 }
 
 type GitBranchDiffSummary struct {
-	FileCount int `json:"fileCount"`
-	Additions int `json:"additions"`
-	Deletions int `json:"deletions"`
+	FileCount int      `json:"fileCount"`
+	Additions int      `json:"additions"`
+	Deletions int      `json:"deletions"`
+	Files     []string `json:"files"`
 }
 
 type GitDiffContent struct {
@@ -187,7 +188,148 @@ func (s *GitService) ListChanges(ctx context.Context, root string) (GitChangesBy
 		}
 	}
 
+	sections = reconcileUnstagedDeleteUntrackedAddPairs(sections)
+
 	return sections, nil
+}
+
+func reconcileUnstagedDeleteUntrackedAddPairs(input GitChangesBySection) GitChangesBySection {
+	deletedUnstaged := make([]GitChange, 0)
+	addedUntracked := make([]GitChange, 0)
+	for _, file := range input.Unstaged {
+		if file.Kind == "deleted" {
+			deletedUnstaged = append(deletedUnstaged, file)
+		}
+	}
+	for _, file := range input.Untracked {
+		if file.Kind == "added" {
+			addedUntracked = append(addedUntracked, file)
+		}
+	}
+	if len(deletedUnstaged) == 0 || len(addedUntracked) == 0 {
+		return input
+	}
+
+	renamesByNewPath := map[string]GitChange{}
+	consumedDeletedPaths := map[string]bool{}
+	consumedAddedPaths := map[string]bool{}
+
+	for _, deletedFile := range deletedUnstaged {
+		deletedExt := fileExtension(deletedFile.Path)
+		deletedParent := parentPath(deletedFile.Path)
+
+		var sameDirectoryCandidate *GitChange
+		for i := range addedUntracked {
+			candidate := addedUntracked[i]
+			if consumedAddedPaths[candidate.Path] {
+				continue
+			}
+			if parentPath(candidate.Path) != deletedParent {
+				continue
+			}
+			if deletedExt == "" || fileExtension(candidate.Path) == deletedExt {
+				sameDirectoryCandidate = &candidate
+				break
+			}
+		}
+
+		fallbackCandidate := sameDirectoryCandidate
+		if fallbackCandidate == nil {
+			for i := range addedUntracked {
+				candidate := addedUntracked[i]
+				if consumedAddedPaths[candidate.Path] {
+					continue
+				}
+				if deletedExt != "" && fileExtension(candidate.Path) == deletedExt {
+					fallbackCandidate = &candidate
+					break
+				}
+			}
+		}
+
+		if fallbackCandidate == nil {
+			continue
+		}
+
+		consumedDeletedPaths[deletedFile.Path] = true
+		consumedAddedPaths[fallbackCandidate.Path] = true
+
+		existingRename, hasExisting := renamesByNewPath[fallbackCandidate.Path]
+		if hasExisting {
+			existingRename.Additions = maxInt(existingRename.Additions, fallbackCandidate.Additions)
+			existingRename.Deletions = maxInt(existingRename.Deletions, fallbackCandidate.Deletions)
+			renamesByNewPath[fallbackCandidate.Path] = existingRename
+			continue
+		}
+
+		renamesByNewPath[fallbackCandidate.Path] = GitChange{
+			Path:      fallbackCandidate.Path,
+			Kind:      "renamed",
+			Additions: maxInt(0, fallbackCandidate.Additions),
+			Deletions: maxInt(0, fallbackCandidate.Deletions),
+		}
+	}
+
+	if len(renamesByNewPath) == 0 {
+		return input
+	}
+
+	nextUnstaged := make([]GitChange, 0, len(input.Unstaged)+len(renamesByNewPath))
+	for _, file := range input.Unstaged {
+		if consumedDeletedPaths[file.Path] {
+			continue
+		}
+		nextUnstaged = append(nextUnstaged, file)
+	}
+	for _, renamed := range renamesByNewPath {
+		nextUnstaged = append(nextUnstaged, renamed)
+	}
+
+	nextUntracked := make([]GitChange, 0, len(input.Untracked))
+	for _, file := range input.Untracked {
+		if consumedAddedPaths[file.Path] {
+			continue
+		}
+		nextUntracked = append(nextUntracked, file)
+	}
+
+	input.Unstaged = nextUnstaged
+	input.Untracked = nextUntracked
+	return input
+}
+
+func parentPath(path string) string {
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+	slashIndex := strings.LastIndex(normalizedPath, "/")
+	if slashIndex <= 0 {
+		return ""
+	}
+	return normalizedPath[:slashIndex]
+}
+
+func fileExtension(path string) string {
+	fileName := path
+	if slashIndex := strings.LastIndex(strings.ReplaceAll(path, "\\", "/"), "/"); slashIndex >= 0 {
+		fileName = strings.ReplaceAll(path, "\\", "/")[slashIndex+1:]
+	}
+	dotIndex := strings.LastIndex(fileName, ".")
+	if dotIndex <= 0 || dotIndex == len(fileName)-1 {
+		return ""
+	}
+	return strings.ToLower(fileName[dotIndex+1:])
+}
+
+func maxInt(values ...int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	maxValue := values[0]
+	for _, value := range values[1:] {
+		if value > maxValue {
+			maxValue = value
+		}
+	}
+	return maxValue
 }
 
 func (s *GitService) TrackChanges(ctx context.Context, root string, paths []string) error {
@@ -288,7 +430,7 @@ func (s *GitService) ListCommitsToTarget(ctx context.Context, root string, targe
 	if err != nil {
 		return GitCommitComparison{}, err
 	}
-	allChanged, err := gitCommand(ctx, root, "diff", "--name-only", fmt.Sprintf("%s..HEAD", targetBranch))
+	allChanged, err := gitCommand(ctx, root, "diff", "--name-only", fmt.Sprintf("%s...HEAD", targetBranch))
 	if err != nil {
 		return GitCommitComparison{}, err
 	}
@@ -352,16 +494,17 @@ func (s *GitService) BranchDiffSummary(ctx context.Context, root string, targetB
 	}
 
 	stats := parseNumstat(numstat)
-	fileCount := 0
+	files := make([]string, 0, len(stats))
 	additions := 0
 	deletions := 0
-	for _, v := range stats {
-		fileCount++
+	for path, v := range stats {
+		files = append(files, path)
 		additions += v[0]
 		deletions += v[1]
 	}
+	sort.Strings(files)
 
-	return GitBranchDiffSummary{FileCount: fileCount, Additions: additions, Deletions: deletions}, nil
+	return GitBranchDiffSummary{FileCount: len(files), Additions: additions, Deletions: deletions, Files: files}, nil
 }
 
 func (s *GitService) ReadCommitDiff(ctx context.Context, root string, commitHash string, path string) (GitDiffContent, error) {

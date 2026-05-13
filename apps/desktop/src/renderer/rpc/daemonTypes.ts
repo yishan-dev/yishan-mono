@@ -362,6 +362,7 @@ export type GitBranchDiffSummaryResponse = {
   fileCount: number;
   additions: number;
   deletions: number;
+  files: string[];
 };
 
 export type GitDiffContentResponse = {
