@@ -1,5 +1,6 @@
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography } from "@mui/material";
 import { CenteredSpinner } from "../../components/CenteredSpinner";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonInfoResult } from "../../../main/ipc";
@@ -200,11 +201,9 @@ export function DaemonSettingsView() {
               <SettingsControlRow
                 title={t("settings.daemon.rows.status")}
                 control={
-                  <Chip
-                    size="small"
+                  <StatusIndicator
                     label={statusLabel}
-                    color={daemonInfo ? "success" : "default"}
-                    variant={daemonInfo ? "filled" : "outlined"}
+                    color={daemonInfo ? "success" : "disabled"}
                   />
                 }
               />
