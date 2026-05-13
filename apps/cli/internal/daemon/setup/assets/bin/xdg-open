@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# yishan wrapper for xdg-open(1) — routes URL targets to the in-app browser tab.
+
+set -u
+
+readonly WRAPPER_BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${WRAPPER_BIN_DIR}/../lib/common.sh"
+
+MANAGED_BIN_DIR="$(resolve_managed_bin_dir)"
+REAL_BIN="$(resolve_real_binary "xdg-open" "$WRAPPER_BIN_DIR" "$MANAGED_BIN_DIR" || true)"
+
+is_url() {
+  case "$1" in
+    http://*|https://*|ftp://*|ftps://*) return 0 ;;
+  esac
+  return 1
+}
+
+try_in_app_browser() {
+  local url="$1"
+  local ingress_url="${YISHAN_HOOK_INGRESS_URL:-}"
+  local workspace_id="${YISHAN_WORKSPACE_ID:-}"
+  local tab_id="${YISHAN_TAB_ID:-}"
+  local pane_id="${YISHAN_PANE_ID:-}"
+
+  if [ -z "$ingress_url" ] || [ -z "$workspace_id" ] || [ -z "$tab_id" ] || [ -z "$pane_id" ]; then
+    return 1
+  fi
+
+  escape_json() {
+    local raw="${1-}"
+    raw="${raw//\\/\\\\}"
+    raw="${raw//\"/\\\"}"
+    raw="${raw//$'\n'/\\n}"
+    raw="${raw//$'\r'/\\r}"
+    raw="${raw//$'\t'/\\t}"
+    printf '%s' "$raw"
+  }
+
+  local now_seconds
+  local ts_millis
+  now_seconds="$(date +%s 2>/dev/null || printf '0')"
+  ts_millis=$((now_seconds * 1000))
+
+  local request_body
+  request_body="$(printf '{"agent":"system","rawEventType":"OpenBrowserUrl","ts":%s,"workspaceId":"%s","tabId":"%s","paneId":"%s","payload":{"url":"%s"}}' \
+    "$ts_millis" \
+    "$(escape_json "$workspace_id")" \
+    "$(escape_json "$tab_id")" \
+    "$(escape_json "$pane_id")" \
+    "$(escape_json "$url")")"
+
+  local token="${YISHAN_OBSERVER_TOKEN:-}"
+  if [ -n "$token" ]; then
+    curl -sS -X POST "$ingress_url" \
+      --connect-timeout 1 \
+      --max-time 3 \
+      -H "content-type: application/json" \
+      -H "x-hook-version: v1" \
+      -H "authorization: Bearer ${token}" \
+      --data "$request_body" \
+      >/dev/null 2>&1
+  else
+    curl -sS -X POST "$ingress_url" \
+      --connect-timeout 1 \
+      --max-time 3 \
+      -H "content-type: application/json" \
+      -H "x-hook-version: v1" \
+      --data "$request_body" \
+      >/dev/null 2>&1
+  fi
+
+  return $?
+}
+
+if [ "$#" -gt 0 ] && is_url "$1"; then
+  if try_in_app_browser "$1"; then
+    exit 0
+  fi
+fi
+
+if [ -z "$REAL_BIN" ]; then
+  echo "yishan wrapper: real xdg-open not found in PATH" >&2
+  exit 127
+fi
+
+exec "$REAL_BIN" "$@"

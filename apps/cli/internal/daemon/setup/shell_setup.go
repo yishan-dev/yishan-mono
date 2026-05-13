@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 )
@@ -74,6 +75,7 @@ type shellTemplateInput struct {
 	PathEnsureFunction     string
 	QuotedZshWrapperDir    string
 	ZshPrecmdHook          string
+	BrowserOpenShim        string
 }
 
 func shellTemplateData(zshWrapperDir string, managedBinDir string) shellTemplateInput {
@@ -83,6 +85,7 @@ func shellTemplateData(zshWrapperDir string, managedBinDir string) shellTemplate
 		PathEnsureFunction:     buildPathEnsureFunction(managedBinDir),
 		QuotedZshWrapperDir:    quoteShellPath(zshWrapperDir),
 		ZshPrecmdHook:          buildZshPrecmdHook(),
+		BrowserOpenShim:        buildBrowserOpenShim(),
 	}
 }
 
@@ -134,6 +137,19 @@ func buildZshPrecmdHook() string {
 {
   precmd_functions=(${precmd_functions:#` + pathEnsureFunctionName + `} ` + pathEnsureFunctionName + `)
 } 2>/dev/null || true`
+}
+
+func buildBrowserOpenShim() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return `# Route /usr/bin/open URL calls through the yishan wrapper.
+/usr/bin/open() { command open "$@"; }`
+	case "linux":
+		return `# Route /usr/bin/xdg-open URL calls through the yishan wrapper.
+/usr/bin/xdg-open() { command xdg-open "$@"; }`
+	default:
+		return ""
+	}
 }
 
 func quoteShellPath(value string) string {

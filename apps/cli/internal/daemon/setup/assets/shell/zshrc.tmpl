@@ -4,5 +4,6 @@ export ZDOTDIR="$_yishan_home"
 [[ -f "$_yishan_home/.zshrc" ]] && source "$_yishan_home/.zshrc"
 {{.PathEnsureFunction}}
 {{.ZshPrecmdHook}}
+{{.BrowserOpenShim}}
 rehash 2>/dev/null || true
 export ZDOTDIR={{.QuotedZshWrapperDir}}
