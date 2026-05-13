@@ -122,10 +122,17 @@ export class DesktopApplication {
       }
 
       event.preventDefault();
-      this.hasProcessedBeforeQuit = true;
 
-      void this.runBeforeQuitCleanup().finally(() => {
-        app.quit();
+      void this.confirmQuit().then((shouldQuit) => {
+        if (!shouldQuit) {
+          this.isQuitting = false;
+          return;
+        }
+
+        this.hasProcessedBeforeQuit = true;
+        void this.runBeforeQuitCleanup().finally(() => {
+          app.quit();
+        });
       });
     });
 
@@ -406,6 +413,24 @@ export class DesktopApplication {
     } catch (error: unknown) {
       console.warn("Failed to stop daemon service during desktop shutdown", error);
     }
+  }
+
+  private async confirmQuit(): Promise<boolean> {
+    const messageBoxOptions: Electron.MessageBoxOptions = {
+      type: "question",
+      buttons: ["Cancel", "Quit"],
+      defaultId: 0,
+      cancelId: 0,
+      title: "Quit Yishan?",
+      message: "Are you sure you want to quit Yishan?",
+      noLink: true,
+    };
+
+    const result = this.mainWindow
+      ? await dialog.showMessageBox(this.mainWindow, messageBoxOptions)
+      : await dialog.showMessageBox(messageBoxOptions);
+
+    return result.response === 1;
   }
 
   /** Focuses the main window when menu actions should bring the app forward. */
