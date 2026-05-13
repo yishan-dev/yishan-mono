@@ -1,6 +1,6 @@
-import { Alert, Box, IconButton, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
+import { Alert, Box, Divider, IconButton, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuCookie, LuDatabaseZap, LuHistory, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuCamera, LuCookie, LuDatabaseZap, LuHistory, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
 import { useCommands } from "../../../hooks/useCommands";
 
 function normalizeUrl(rawValue: string): string {
@@ -124,6 +124,35 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const handleOpenDevTools = () => {
     closeToolsMenu();
     webviewRef.current?.openDevTools();
+  };
+
+  const handleForceReload = () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+    const candidate = webview as unknown as { reloadIgnoringCache?: () => void };
+    candidate.reloadIgnoringCache?.();
+  };
+
+  const handleTakeSnapshot = async () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+    try {
+      const image = await webview.capturePage();
+      const link = document.createElement("a");
+      link.download = `snapshot-${Date.now()}.png`;
+      link.href = image.toDataURL();
+      link.click();
+      notifySuccess("Snapshot saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to take snapshot: ${message}`);
+    }
   };
 
   const handleClearCache = async () => {
@@ -268,6 +297,15 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
             <LuWrench size={14} style={{ marginRight: 8 }} />
             Open Devtool
           </MenuItem>
+          <MenuItem onClick={handleForceReload}>
+            <LuRefreshCcw size={14} style={{ marginRight: 8 }} />
+            Force Reload
+          </MenuItem>
+          <MenuItem onClick={() => void handleTakeSnapshot()}>
+            <LuCamera size={14} style={{ marginRight: 8 }} />
+            Take Snapshot
+          </MenuItem>
+          <Divider />
           <MenuItem onClick={() => void handleClearCache()}>
             <LuTrash2 size={14} style={{ marginRight: 8 }} />
             Clear Cache
