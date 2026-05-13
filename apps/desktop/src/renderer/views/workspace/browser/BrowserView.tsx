@@ -37,6 +37,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const [pageTitle, setPageTitle] = useState("");
   const [historyGroups, setHistoryGroups] = useState<BrowserHistoryGroup[]>([]);
   const textFieldRef = useRef<HTMLDivElement>(null);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
 
   const filteredHistory = useMemo(() => {
     const allEntries = historyGroups.flatMap((g) => g.entries);
@@ -130,6 +131,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
 
   const handleUrlFocus = useCallback(() => {
     setUrlFocused(true);
+    setHighlightIndex(-1);
   }, []);
 
   const handleUrlBlur = useCallback(() => {
@@ -393,7 +395,25 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
           ref={textFieldRef}
           size="small"
           value={displayUrl}
-          onChange={(event) => setUrlInput(event.target.value)}
+          onChange={(event) => {
+            setUrlInput(event.target.value);
+            setHighlightIndex(-1);
+          }}
+          onKeyDown={(event) => {
+            if (!urlFocused || filteredHistory.length === 0) {
+              return;
+            }
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              setHighlightIndex((prev) => (prev < filteredHistory.length - 1 ? prev + 1 : 0));
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setHighlightIndex((prev) => (prev > 0 ? prev - 1 : filteredHistory.length - 1));
+            } else if (event.key === "Enter" && highlightIndex >= 0 && highlightIndex < filteredHistory.length) {
+              event.preventDefault();
+              navigateTo(filteredHistory[highlightIndex].url);
+            }
+          }}
           onFocus={handleUrlFocus}
           onBlur={handleUrlBlur}
           placeholder="Search or enter URL"
@@ -442,23 +462,28 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
                     </ListItemIcon>
                     {group.host}
                   </MenuItem>,
-                  ...entries.map((entry) => (
-                    <MenuItem
-                      key={entry.url}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        navigateTo(entry.url);
-                      }}
-                      sx={{ pl: 5, py: 0.5 }}
-                    >
-                      <ListItemText
-                        primary={entry.title}
-                        secondary={entry.url}
-                        primaryTypographyProps={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        secondaryTypographyProps={{ fontSize: 11, color: "text.disabled", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                      />
-                    </MenuItem>
-                  )),
+                  ...entries.map((entry, idx) => {
+                    const flatIdx = filteredHistory.indexOf(entry);
+                    return (
+                      <MenuItem
+                        key={entry.url}
+                        selected={flatIdx === highlightIndex}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          navigateTo(entry.url);
+                        }}
+                        onMouseEnter={() => setHighlightIndex(flatIdx)}
+                        sx={{ pl: 5, py: 0.5 }}
+                      >
+                        <ListItemText
+                          primary={entry.title}
+                          secondary={entry.url}
+                          primaryTypographyProps={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                          secondaryTypographyProps={{ fontSize: 11, color: "text.disabled", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        />
+                      </MenuItem>
+                    );
+                  }),
                 ];
               })}
             </MenuList>

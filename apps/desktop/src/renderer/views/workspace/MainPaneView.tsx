@@ -24,6 +24,22 @@ import { MainPaneTitleBarView } from "./MainPaneTitleBarView";
 import { BrowserView } from "./browser/BrowserView";
 import { TerminalView } from "./terminal/TerminalView";
 
+function FaviconIcon({ url, size }: { url?: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) {
+    return <LuGlobe size={size} />;
+  }
+  return (
+    <Box
+      component="img"
+      src={url}
+      alt=""
+      sx={{ width: size, height: size, flexShrink: 0, objectFit: "contain" }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 const paneHeaderSx = {
   minHeight: 38,
   px: 1.5,
@@ -321,18 +337,7 @@ export function MainPaneView() {
             }
 
             if (fullTab?.kind === "browser") {
-              if (fullTab.data.faviconUrl) {
-                return (
-                  <Box
-                    component="img"
-                    src={fullTab.data.faviconUrl}
-                    alt=""
-                    sx={{ width: 14, height: 14, flexShrink: 0 }}
-                  />
-                );
-              }
-
-              return <LuGlobe size={14} />;
+              return <FaviconIcon url={fullTab.data.faviconUrl} size={14} />;
             }
 
             if (fullTab?.kind === "file" || fullTab?.kind === "diff" || fullTab?.kind === "image") {
