@@ -17,6 +17,20 @@ import { useFileTreeClipboard } from "./useFileTreeClipboard";
 import { useFileTreeCrud } from "./useFileTreeCrud";
 import { useFileTreeUndo, type FileTreeUndoAction } from "./useFileTreeUndo";
 
+function mergeWorkspaceEntries(current: WorkspaceFileEntry[], incoming: WorkspaceFileEntry[]): WorkspaceFileEntry[] {
+  const mergedByPath = new Map<string, WorkspaceFileEntry>();
+
+  for (const entry of current) {
+    mergedByPath.set(entry.path, entry);
+  }
+
+  for (const entry of incoming) {
+    mergedByPath.set(entry.path, entry);
+  }
+
+  return [...mergedByPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
 type FileOperationState = {
   operationId: string;
   workspaceWorktreePath: string;
@@ -76,6 +90,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
   const selectedWorkspaceWorktreePathRef = useRef<string | undefined>(undefined);
   const treeCacheByWorkspaceIdRef = useRef(new Map<string, WorkspaceFileEntry[]>());
   const fileTreeSelectionRequestIdRef = useRef(0);
+  const loadedDirectoryPathsRef = useRef(new Set<string>());
 
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const selectedWorkspaceWorktreePath = workspaceStore(
@@ -123,7 +138,24 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
         workspaceWorktreePath: selectedWorkspaceWorktreePath,
         recursive: true,
       });
-      setRepoEntries(response.files);
+      setRepoEntries((currentEntries) => {
+        const preservedLoadedDescendants = currentEntries.filter((entry) => {
+          const normalizedEntryPath = normalizeRelativePath(entry.path);
+          if (!normalizedEntryPath) {
+            return false;
+          }
+
+          for (const loadedDirectoryPath of loadedDirectoryPathsRef.current) {
+            if (normalizedEntryPath.startsWith(`${loadedDirectoryPath}/`)) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        return mergeWorkspaceEntries(response.files, preservedLoadedDescendants);
+      });
       return mapWorkspaceEntryPaths(response.files);
     } catch (error) {
       console.error("Failed to load workspace files", error);
@@ -132,7 +164,32 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
     }
   }, [selectedWorkspaceWorktreePath]);
 
-  const ensurePathLoaded = useCallback(async (_path: string): Promise<void> => {}, []);
+  const ensurePathLoaded = useCallback(
+    async (path: string): Promise<void> => {
+      if (!selectedWorkspaceWorktreePath) {
+        return;
+      }
+
+      const normalizedPath = normalizeRelativePath(path);
+      if (!normalizedPath) {
+        return;
+      }
+
+      loadedDirectoryPathsRef.current.add(normalizedPath);
+
+      try {
+        const response = await listFiles({
+          workspaceWorktreePath: selectedWorkspaceWorktreePath,
+          relativePath: normalizedPath,
+          recursive: false,
+        });
+        setRepoEntries((currentEntries) => mergeWorkspaceEntries(currentEntries, response.files));
+      } catch (error) {
+        console.error("Failed to load workspace directory", { path: normalizedPath, error });
+      }
+    },
+    [selectedWorkspaceWorktreePath],
+  );
 
   useEffect(() => {
     void selectedWorkspaceWorktreePath;
@@ -143,6 +200,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
     setClipboardState(null);
     setUndoStack([]);
     setFileTreeSelectionRequest(null);
+    loadedDirectoryPathsRef.current = new Set<string>();
   }, [selectedWorkspaceId, selectedWorkspaceWorktreePath]);
 
   const beginFileOperation = useCallback(

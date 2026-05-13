@@ -712,6 +712,9 @@ export function FileTree({
                   onSelectEntry?.({ path: row.path, isDirectory: row.isDirectory });
                 }}
                 onToggle={() => {
+                  if (row.isDirectory) {
+                    void onEnsurePathLoaded?.(row.path);
+                  }
                   setExpandedItems((items) => {
                     const isCurrentlyExpanded = items.includes(row.path);
                     return isCurrentlyExpanded ? items.filter((item) => item !== row.path) : [...items, row.path];
@@ -719,6 +722,7 @@ export function FileTree({
                 }}
                 onOpen={() => {
                   if (row.isDirectory) {
+                    void onEnsurePathLoaded?.(row.path);
                     setExpandedItems((items) => [...new Set([...items, row.path])]);
                   } else {
                     onOpenEntry?.({ path: row.path, isDirectory: false });
