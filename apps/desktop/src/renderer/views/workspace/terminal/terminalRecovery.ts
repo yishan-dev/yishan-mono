@@ -24,6 +24,14 @@ const EMPTY_PERSISTED_TERMINAL_PAYLOAD: PersistedTerminalTabPayload = {
   tabs: [],
 };
 
+/** Clears persisted terminal recovery data from localStorage. */
+export function clearTerminalRecoveryStorage(storage: Storage | undefined = resolveBrowserStorage()): void {
+  if (!storage) {
+    return;
+  }
+  storage.removeItem(TERMINAL_RECOVERY_STORAGE_KEY);
+}
+
 /**
  * Coordinates terminal tab persistence and restore.
  */

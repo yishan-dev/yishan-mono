@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonInfoResult } from "../../../main/ipc";
 import { SettingsCard, SettingsControlRow, SettingsRows, SettingsSectionHeader, SettingsToggleRow } from "../../components/settings";
+import { closeTerminalSession } from "../../commands/terminalCommands";
 import { getDesktopHostBridge } from "../../rpc/rpcTransport";
+import { tabStore } from "../../store/tabStore";
+import { clearTerminalRecoveryStorage } from "../workspace/terminal/terminalRecovery";
 
 /** Renders one settings panel for inspecting the local daemon connection. */
 export function DaemonSettingsView() {
@@ -83,10 +86,43 @@ export function DaemonSettingsView() {
     setIsRestarting(true);
     setRestartError(null);
     setDaemonInfo(null);
-    // Invalidate any in-flight load so stale data cannot overwrite post-restart state.
     latestLoadIdRef.current += 1;
 
     try {
+      const terminalTabs = tabStore.getState().tabs.filter((tab) => tab.kind === "terminal");
+      if (terminalTabs.length > 0) {
+        const sessionIds = [
+          ...new Set(
+            terminalTabs
+              .map((tab) => (tab.kind === "terminal" ? tab.data.sessionId?.trim() : undefined))
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ];
+
+        const closeErrors: string[] = [];
+        for (const sessionId of sessionIds) {
+          try {
+            await closeTerminalSession({ sessionId });
+          } catch (error) {
+            closeErrors.push(sessionId);
+            console.warn("[DaemonSettingsView] Failed to close terminal session", sessionId, error);
+          }
+        }
+
+        tabStore.getState().closeAllTerminalTabs();
+        clearTerminalRecoveryStorage();
+
+        if (closeErrors.length > 0) {
+          if (!isMountedRef.current) {
+            return;
+          }
+          setRestartError(t("settings.daemon.restart.terminalCloseFailed"));
+          setHasLoadError(true);
+          setIsRestarting(false);
+          return;
+        }
+      }
+
       const result = await getDesktopHostBridge().restartDaemon();
       if (!isMountedRef.current) {
         return;

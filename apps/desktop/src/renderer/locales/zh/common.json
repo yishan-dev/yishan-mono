@@ -168,7 +168,8 @@
         "action": "重启",
         "inProgress": "重启中…",
         "success": "守护进程已成功重启。",
-        "failed": "重启守护进程失败。"
+        "failed": "重启守护进程失败。",
+        "terminalCloseFailed": "关闭终端会话失败，请手动关闭后重试。"
       },
       "quitOnExit": {
         "label": "退出应用前关闭守护进程",
