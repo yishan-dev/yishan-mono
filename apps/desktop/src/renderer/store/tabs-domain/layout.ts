@@ -1,3 +1,4 @@
+import type { WorkspaceTab } from "../types";
 import type { WorkspaceTabStateSlice } from "./types";
 
 function remapPathByRename(path: string, fromPath: string, toPath: string): string | null {
@@ -11,15 +12,27 @@ function remapPathByRename(path: string, fromPath: string, toPath: string): stri
   return `${toPath}/${path.slice(prefix.length)}`;
 }
 
+function isTemporaryTab(tab: WorkspaceTab): boolean {
+  return (
+    (tab.kind === "file" && tab.data.isTemporary) ||
+    (tab.kind === "image" && tab.data.isTemporary) ||
+    (tab.kind === "diff" && tab.data.isTemporary)
+  );
+}
+
+function clearTemporaryOnPin(tab: WorkspaceTab): WorkspaceTab {
+  if (isTemporaryTab(tab)) {
+    return { ...tab, pinned: true, data: { ...tab.data, isTemporary: false } };
+  }
+  return { ...tab, pinned: !tab.pinned };
+}
+
 /** Toggles pinned state for one tab id. */
 export function toggleTabPinnedState(state: WorkspaceTabStateSlice, tabId: string): Partial<WorkspaceTabStateSlice> {
   return {
     tabs: state.tabs.map((tab) =>
       tab.id === tabId
-        ? {
-            ...tab,
-            pinned: !tab.pinned,
-          }
+        ? clearTemporaryOnPin(tab)
         : tab,
     ),
   };

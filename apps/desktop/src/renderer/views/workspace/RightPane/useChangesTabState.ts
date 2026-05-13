@@ -241,20 +241,11 @@ export function useChangesTabState() {
     state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId),
   );
   const selectedWorkspaceWorktreePath = selectedWorkspace?.worktreePath;
-  const selectedWorkspaceBranch = selectedWorkspace?.branch?.trim();
-  const selectedWorkspaceSourceBranch = useMemo(() => {
-    const sourceBranch = selectedWorkspace?.sourceBranch?.trim();
-    if (!sourceBranch) {
-      return undefined;
-    }
-    if (sourceBranch.startsWith("origin/")) {
-      return sourceBranch;
-    }
-    if (sourceBranch.includes("/")) {
-      return sourceBranch;
-    }
-    return `origin/${sourceBranch}`;
-  }, [selectedWorkspace?.sourceBranch, selectedWorkspaceBranch]);
+  const selectedWorkspaceSourceBranch = workspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.selectedWorkspaceId);
+    const raw = ws?.sourceBranch?.trim() || (state.projects ?? []).find((p) => p.id === (ws?.projectId ?? ws?.repoId))?.defaultBranch?.trim() || "main";
+    return raw.includes("/") ? raw : `origin/${raw}`;
+  });
   const workspaceGitRefreshVersion = workspaceStore((state) => {
     if (!selectedWorkspaceWorktreePath) {
       return 0;

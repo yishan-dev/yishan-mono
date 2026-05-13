@@ -76,7 +76,7 @@ export type WorkspaceTabDataByKind = {
     agentKind?: DesktopAgentKind;
     isInitializing?: boolean;
   };
-  diff: { path: string; oldContent: string; newContent: string; source?: DiffTabSource };
+  diff: { path: string; oldContent: string; newContent: string; source?: DiffTabSource; isTemporary: boolean };
   file: {
     path: string;
     content: string;
@@ -141,6 +141,7 @@ export type OpenWorkspaceTabInput =
       oldContent?: string;
       newContent?: string;
       diffSource?: DiffTabSource;
+      temporary?: boolean;
     }
   | {
       workspaceId?: string;

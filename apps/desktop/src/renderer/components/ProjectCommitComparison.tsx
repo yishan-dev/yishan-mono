@@ -235,18 +235,18 @@ export const ProjectCommitComparison = memo(function ProjectCommitComparison({
     [comparisonScopeAriaLabel],
   );
 
-  if (!normalizedTargetBranch) {
-    return null;
-  }
-
   return (
     <Box sx={{ mt: 1, minWidth: 0 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0, overflow: "hidden" }}>
         <BranchBadge name={comparison.currentBranch} testId="commit-comparison-current-branch" />
-        <Box sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
-          <LuArrowRight size={13} color="currentColor" />
-        </Box>
-        <BranchBadge name={normalizedTargetBranch} testId="commit-comparison-target-branch" />
+        {normalizedTargetBranch ? (
+          <>
+            <Box sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+              <LuArrowRight size={13} color="currentColor" />
+            </Box>
+            <BranchBadge name={normalizedTargetBranch} testId="commit-comparison-target-branch" />
+          </>
+        ) : null}
       </Box>
 
       <Autocomplete

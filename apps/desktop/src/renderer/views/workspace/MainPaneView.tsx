@@ -142,7 +142,7 @@ export function MainPaneView() {
     pinned: tab.pinned,
     kind: tab.kind,
     isDirty: tab.kind === "file" ? tab.data.isDirty : false,
-    isTemporary: (tab.kind === "file" || tab.kind === "image") ? tab.data.isTemporary : false,
+    isTemporary: ["file", "image", "diff"].includes(tab.kind) ? (tab.data as { isTemporary: boolean }).isTemporary : false,
   }));
   const hasWorkspaceTabs = workspaceTabs.length > 0;
   const enabledAgentKinds = useMemo(
