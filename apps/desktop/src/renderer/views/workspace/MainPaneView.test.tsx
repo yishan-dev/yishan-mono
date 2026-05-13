@@ -40,6 +40,14 @@ vi.mock("../../store/tabStore", () => ({
   tabStore: mocked.workspaceStore,
 }));
 
+vi.mock("../../store/chatStore", () => ({
+  chatStore: (selector: (state: { workspaceUnreadToneByWorkspaceId: Record<string, "success" | "error"> }) => unknown) =>
+    selector({
+      workspaceUnreadToneByWorkspaceId:
+        (mocked.stateRef.current.workspaceUnreadToneByWorkspaceId as Record<string, "success" | "error"> | undefined) ?? {},
+    }),
+}));
+
 vi.mock("../../hooks/useCommands", () => ({
   useCommands: () => {
     const state = mocked.stateRef.current as Record<string, unknown>;
@@ -211,6 +219,7 @@ function buildStoreState(isInitializing: boolean) {
     refreshDiffTabContent: vi.fn(),
     updateFileTabContent: vi.fn(),
     markFileTabSaved: vi.fn(),
+    workspaceUnreadToneByWorkspaceId: {},
   };
 }
 
