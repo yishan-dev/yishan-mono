@@ -185,7 +185,9 @@
         "inProgress": "Restarting…",
         "success": "Daemon restarted successfully.",
         "failed": "Failed to restart daemon.",
-        "terminalCloseFailed": "Failed to close terminal sessions. Please close them manually and try again."
+        "terminalCloseFailed": "Failed to close terminal sessions. Please close them manually and try again.",
+        "confirmTitle": "Restart daemon?",
+        "confirmMessage": "All terminal sessions will be closed and their running processes terminated. This action cannot be undone."
       },
       "quitOnExit": {
         "label": "Quit daemon before app exits",

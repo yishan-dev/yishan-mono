@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Chip, CircularProgress, Snackbar, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography } from "@mui/material";
 import { CenteredSpinner } from "../../components/CenteredSpinner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,7 @@ export function DaemonSettingsView() {
   const [isRestarting, setIsRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
   const [restartSuccessOpen, setRestartSuccessOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [quitOnExit, setQuitOnExit] = useState(false);
   const [isLoadingQuitOnExit, setIsLoadingQuitOnExit] = useState(true);
   const [isSavingQuitOnExit, setIsSavingQuitOnExit] = useState(false);
@@ -255,7 +256,7 @@ export function DaemonSettingsView() {
                   variant="contained"
                   color="primary"
                   onClick={() => {
-                    void handleRestart();
+                    setIsConfirmOpen(true);
                   }}
                   disabled={isRestarting || isLoading}
                   startIcon={isRestarting ? <CircularProgress size={14} color="inherit" /> : null}
@@ -287,6 +288,37 @@ export function DaemonSettingsView() {
           {t("settings.daemon.restart.success")}
         </Alert>
       </Snackbar>
+
+      <Dialog
+        open={isConfirmOpen}
+        onClose={isRestarting ? undefined : () => setIsConfirmOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        disableEscapeKeyDown={isRestarting}
+      >
+        <DialogTitle>{t("settings.daemon.restart.confirmTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {t("settings.daemon.restart.confirmMessage")}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsConfirmOpen(false)} disabled={isRestarting}>
+            {t("common.actions.cancel")}
+          </Button>
+          <Button
+            color="warning"
+            onClick={() => {
+              setIsConfirmOpen(false);
+              void handleRestart();
+            }}
+            disabled={isRestarting}
+            startIcon={isRestarting ? <CircularProgress size={14} color="inherit" /> : undefined}
+          >
+            {t("settings.daemon.restart.action")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
