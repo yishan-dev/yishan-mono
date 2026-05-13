@@ -75,11 +75,34 @@ function createInAppNotificationHarness() {
   };
 }
 
+function createDaemonConnectionStatusHarness() {
+  let listener: ((status: "connected" | "connecting" | "disconnected") => void) | null = null;
+  const unsubscribe = vi.fn();
+  const subscribeDaemonConnectionStatus = vi.fn(
+    (nextListener: (status: "connected" | "connecting" | "disconnected") => void) => {
+      listener = nextListener;
+      return () => {
+        unsubscribe();
+        listener = null;
+      };
+    },
+  );
+
+  return {
+    subscribeDaemonConnectionStatus,
+    unsubscribe,
+    emit(status: "connected" | "connecting" | "disconnected") {
+      listener?.(status);
+    },
+  };
+}
+
 describe("createBackendEventStoreBindings", () => {
   it("subscribes once and forwards git changed events to store action", () => {
     const harness = createGitChangedHarness();
     const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
     const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
     const incrementFileTreeRefreshVersion = vi.fn();
     const incrementGitRefreshVersion = vi.fn();
     const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
@@ -89,6 +112,8 @@ describe("createBackendEventStoreBindings", () => {
 
     const startBindings = createBackendEventStoreBindings({
       subscribeGitChanged: harness.subscribeGitChanged,
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => ["/tmp/repo/.worktrees/task-1"],
       subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
       subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
       incrementFileTreeRefreshVersion,
@@ -109,6 +134,88 @@ describe("createBackendEventStoreBindings", () => {
     expect(harness.unsubscribe).toHaveBeenCalledTimes(1);
     expect(workspaceFilesHarness.unsubscribe).toHaveBeenCalledTimes(1);
     expect(inAppNotificationHarness.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(daemonConnectionHarness.unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("forces file tree and git refresh after daemon reconnect", () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => ["/tmp/repo/.worktrees/task-1"],
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+    });
+
+    const stopBindings = startBindings();
+    daemonConnectionHarness.emit("connected");
+    daemonConnectionHarness.emit("disconnected");
+    daemonConnectionHarness.emit("connecting");
+    daemonConnectionHarness.emit("connected");
+
+    expect(incrementFileTreeRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1", []);
+    expect(incrementGitRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1");
+
+    stopBindings();
+  });
+
+  it("logs clear diagnostics when reconnect recovery fails", () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => {
+        throw new Error("failed to enumerate workspaces");
+      },
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+    });
+
+    const stopBindings = startBindings();
+    daemonConnectionHarness.emit("connected");
+    daemonConnectionHarness.emit("disconnected");
+    daemonConnectionHarness.emit("connected");
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[backendEventStoreBindings] Failed to recover workspace views after daemon reconnect",
+      expect.any(Error),
+    );
+
+    stopBindings();
+    consoleErrorSpy.mockRestore();
   });
 
   it("forwards workspace file updates to file tree and git refresh actions", () => {
