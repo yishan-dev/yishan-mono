@@ -150,18 +150,21 @@ describe("SUPPORTED_KEY_BINDINGS", () => {
   it("documents chat and terminal tabs as mod+y and mod+t", () => {
     const chatBinding = SUPPORTED_KEY_BINDINGS.find((binding) => binding.id === "new-tab");
     const terminalBinding = SUPPORTED_KEY_BINDINGS.find((binding) => binding.id === "open-terminal");
+    const browserBinding = SUPPORTED_KEY_BINDINGS.find((binding) => binding.id === "open-browser");
 
     expect(chatBinding?.macKeys).toEqual(["⌘", "Y"]);
     expect(chatBinding?.windowsKeys).toEqual(["CTRL", "Y"]);
     expect(terminalBinding?.macKeys).toEqual(["⌘", "T"]);
     expect(terminalBinding?.windowsKeys).toEqual(["CTRL", "T"]);
+    expect(browserBinding?.macKeys).toEqual(["⌘", "⇧", "B"]);
+    expect(browserBinding?.windowsKeys).toEqual(["CTRL", "⇧", "B"]);
   });
 
   it("documents close-selected-workspace as mod+shift+w", () => {
     const closeWorkspaceBinding = SUPPORTED_KEY_BINDINGS.find((binding) => binding.id === "close-selected-workspace");
 
-    expect(closeWorkspaceBinding?.macKeys).toEqual(["⌘", "SHIFT", "W"]);
-    expect(closeWorkspaceBinding?.windowsKeys).toEqual(["CTRL", "SHIFT", "W"]);
+    expect(closeWorkspaceBinding?.macKeys).toEqual(["⌘", "⇧", "W"]);
+    expect(closeWorkspaceBinding?.windowsKeys).toEqual(["CTRL", "⇧", "W"]);
   });
 
   it("documents create-workspace as mod+n", () => {
@@ -204,6 +207,28 @@ describe("getShortcutDefinitions", () => {
     openFileSearch?.run(context, new KeyboardEvent("keydown", { key: "p", metaKey: true }));
 
     expect(openWorkspaceFileSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatches open browser tab from the central definition", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const openBrowser = runtimeDefinitions.find((definition) => definition.id === "open-browser");
+    expect(openBrowser).toBeTruthy();
+
+    const openTab = vi.fn();
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        openTab,
+      },
+    });
+
+    openBrowser?.run(context, new KeyboardEvent("keydown", { key: "B", metaKey: true, shiftKey: true }));
+
+    expect(openTab).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      kind: "browser",
+      url: "https://example.com",
+    });
   });
 
   it("opens selected file tab in latest external app from shortcut", () => {

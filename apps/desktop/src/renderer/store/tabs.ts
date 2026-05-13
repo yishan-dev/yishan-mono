@@ -146,6 +146,12 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 
+  if (input.kind === "browser") {
+    return {
+      url: input.url?.trim() || "https://example.com",
+    } as WorkspaceTabDataByKind[T["kind"]];
+  }
+
   return {
     title: input.title?.trim() || "Terminal",
     launchCommand: input.launchCommand?.trim() || undefined,

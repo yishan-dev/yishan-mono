@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { SupportedKeyBinding } from "../shortcuts/keybindings";
 import { getRendererPlatform } from "../helpers/platform";
 
+const LARGE_SYMBOL_KEYS = new Set(["⌘", "⇧", "⌃", "⌥", "↵"]);
+
 /**
  * Renders a horizontal sequence of keyboard keys with visual `<kbd>` styling.
  *
@@ -17,7 +19,7 @@ export function HotkeyDisplay({ keys }: { keys: readonly string[] }) {
       {keys.map((key, index) => (
         <Stack key={key} direction="row" spacing={0.5} alignItems="center">
           {index > 0 ? (
-            <Typography variant="caption" color="text.secondary" aria-hidden="true">
+            <Typography variant="body2" color="text.secondary" aria-hidden="true" sx={{ fontSize: 14 }}>
               +
             </Typography>
           ) : null}
@@ -26,6 +28,7 @@ export function HotkeyDisplay({ keys }: { keys: readonly string[] }) {
             sx={{
               px: 0.75,
               py: 0.3,
+              height: 22,
               borderRadius: 0.5,
               border: 1,
               borderColor: "divider",
@@ -33,9 +36,13 @@ export function HotkeyDisplay({ keys }: { keys: readonly string[] }) {
               typography: "caption",
               fontFamily: "monospace",
               lineHeight: 1.2,
+              display: "inline-flex",
+              alignItems: "center",
             }}
           >
-            {key}
+            <Box component="span" sx={LARGE_SYMBOL_KEYS.has(key) ? { fontSize: 14, fontWeight: 600 } : undefined}>
+              {key}
+            </Box>
           </Box>
         </Stack>
       ))}

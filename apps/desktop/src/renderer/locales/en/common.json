@@ -607,6 +607,7 @@
     "createMenu": {
       "label": "Create",
       "chat": "Chat",
+      "browser": "Browser",
       "opencode": "OpenCode",
       "codex": "Codex",
       "claude": "Claude",
@@ -638,6 +639,7 @@
     "hint": "Choose an action to get started.",
     "actions": {
       "openTerminal": "Open terminal",
+      "openBrowser": "Open browser tab",
       "openChat": "Open chat",
       "searchFiles": "Search files"
     }
@@ -668,6 +670,7 @@
       "closeTab": "Close selected tab",
       "closeWorkspace": "Close selected workspace",
       "openTerminal": "Open terminal tab",
+      "openBrowser": "Open browser tab",
       "activateRepoPane": "Activate repository pane",
       "activateFilesPane": "Activate files pane",
       "activateChangesPane": "Activate changes pane",

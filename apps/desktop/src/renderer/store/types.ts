@@ -99,6 +99,10 @@ export type WorkspaceTabDataByKind = {
     /** When true, auto-rename from terminal commands/paths is suppressed. */
     userRenamed?: boolean;
   };
+  browser: {
+    url: string;
+    faviconUrl?: string;
+  };
 };
 
 export type WorkspaceTabBase = {
@@ -128,6 +132,10 @@ export type WorkspaceTab =
   | (WorkspaceTabBase & {
       kind: "terminal";
       data: WorkspaceTabDataByKind["terminal"];
+    })
+  | (WorkspaceTabBase & {
+      kind: "browser";
+      data: WorkspaceTabDataByKind["browser"];
     });
 
 export type OpenWorkspaceTabInput =
@@ -166,6 +174,11 @@ export type OpenWorkspaceTabInput =
       launchCommand?: string;
       agentKind?: DesktopAgentKind;
       reuseExisting?: boolean;
+    }
+  | {
+      workspaceId?: string;
+      kind: "browser";
+      url?: string;
     };
 
 export type WorkspaceStoreState = {

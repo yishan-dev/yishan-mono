@@ -101,6 +101,23 @@ describe("tabs-domain open", () => {
     expect(created && created.kind === "terminal" ? created.data.paneId : undefined).toBe("pane-new-terminal");
   });
 
+  it("opens a browser tab and selects it", () => {
+    const state = createBaseState();
+    const patch = openTabState(
+      state,
+      {
+        kind: "browser",
+        url: "https://example.com",
+      },
+      "new-browser",
+    );
+
+    expect(patch).toBeTruthy();
+    expect(patch?.selectedTabId).toBe("new-browser");
+    const created = patch?.tabs?.find((tab) => tab.id === "new-browser");
+    expect(created?.kind).toBe("browser");
+  });
+
   it("creates a new terminal tab when reuseExisting is disabled", () => {
     const state = createBaseState();
     const patch = openTabState(

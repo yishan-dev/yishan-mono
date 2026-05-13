@@ -1,8 +1,8 @@
-import { Box, ButtonBase, IconButton, Menu, MenuItem, Typography } from "@mui/material";
+import { Box, ButtonBase, Divider, IconButton, Menu, MenuItem, Typography } from "@mui/material";
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
+import { LuGlobe, LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
 import {
   AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND,
   type DesktopAgentKind,
@@ -21,13 +21,13 @@ type WorkspaceTab = {
   isTemporary?: boolean;
 };
 
-export type TabBarCreateOption = "terminal" | DesktopAgentKind;
+export type TabBarCreateOption = "browser" | "terminal" | DesktopAgentKind;
 
 type AgentCreateOption = DesktopAgentKind;
 
 /** Returns true when one create-menu option targets an agent terminal preset. */
 function isAgentCreateOption(option: TabBarCreateOption): option is AgentCreateOption {
-  return option !== "terminal";
+  return option !== "terminal" && option !== "browser";
 }
 
 const dirtyDotSx = {
@@ -88,6 +88,13 @@ export function TabBar({
   const newTabLabel = t("tabs.new");
   const createMenuLabel = t("tabs.createMenu.label");
   const terminalTitle = t("terminal.title");
+  const browserCreateLabel = t("tabs.createMenu.browser");
+  const browserTitle =
+    browserCreateLabel !== "tabs.createMenu.browser"
+      ? browserCreateLabel
+      : t("browser.title") !== "browser.title"
+        ? t("browser.title")
+        : "Browser";
   const createLabelByAgentKind = SUPPORTED_DESKTOP_AGENT_KINDS.reduce<Record<DesktopAgentKind, string>>(
     (next, agentKind) => {
       next[agentKind] = t(AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND[agentKind]);
@@ -254,6 +261,12 @@ export function TabBar({
       icon: <LuSquareTerminal size={14} />,
       shortcutLabel: getShortcutDisplayLabelById("open-terminal", platform),
     },
+    {
+      option: "browser",
+      label: browserTitle,
+      icon: <LuGlobe size={14} />,
+      shortcutLabel: getShortcutDisplayLabelById("open-browser", platform),
+    },
     ...SUPPORTED_DESKTOP_AGENT_KINDS.map((agentKind) => {
       const label = createLabelByAgentKind[agentKind];
       return {
@@ -267,6 +280,7 @@ export function TabBar({
   const createOptions = allCreateOptions.filter(
     (item) => !isAgentCreateOption(item.option) || enabledAgentKindSet.has(item.option),
   );
+  const hasAgentCreateOptions = createOptions.some((item) => isAgentCreateOption(item.option));
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLDivElement>, tab: WorkspaceTab) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
@@ -670,26 +684,34 @@ export function TabBar({
         }}
       >
         {createOptions.map((item) => (
-          <MenuItem
-            key={item.option}
-            onClick={() => {
-              onCreateTab(item.option);
-              setCreateMenuAnchor(null);
-            }}
-            disabled={disabled}
-            sx={{ gap: 1 }}
-            aria-label={`${createMenuLabel}: ${item.label}`}
-          >
-            {item.icon}
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, width: "100%" }}>
-              <Box component="span">{item.label}</Box>
-              {item.shortcutLabel ? (
-                <Typography variant="caption" color="text.secondary" component="span" aria-hidden="true">
-                  {item.shortcutLabel}
-                </Typography>
-              ) : null}
-            </Box>
-          </MenuItem>
+          <Box key={item.option}>
+            <MenuItem
+              onClick={() => {
+                onCreateTab(item.option);
+                setCreateMenuAnchor(null);
+              }}
+              disabled={disabled}
+              sx={{ gap: 1 }}
+              aria-label={`${createMenuLabel}: ${item.label}`}
+            >
+              {item.icon}
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, width: "100%" }}>
+                <Box component="span">{item.label}</Box>
+                {item.shortcutLabel ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    component="span"
+                    aria-hidden="true"
+                    sx={{ fontSize: 13, lineHeight: 1 }}
+                  >
+                    {item.shortcutLabel}
+                  </Typography>
+                ) : null}
+              </Box>
+            </MenuItem>
+            {item.option === "browser" && hasAgentCreateOptions ? <Divider sx={{ my: 0.5 }} /> : null}
+          </Box>
         ))}
       </Menu>
       <Menu

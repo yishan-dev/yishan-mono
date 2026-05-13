@@ -591,6 +591,7 @@
     "createMenu": {
       "label": "创建",
       "chat": "聊天",
+      "browser": "浏览器",
       "opencode": "OpenCode",
       "codex": "Codex",
       "claude": "Claude",
@@ -622,6 +623,7 @@
     "hint": "选择一个操作以开始。",
     "actions": {
       "openTerminal": "打开终端",
+      "openBrowser": "打开浏览器标签",
       "openChat": "打开聊天",
       "searchFiles": "搜索文件"
     }
@@ -652,6 +654,7 @@
       "closeTab": "关闭当前标签",
       "closeWorkspace": "关闭当前工作区",
       "openTerminal": "打开终端标签",
+      "openBrowser": "打开浏览器标签",
       "activateRepoPane": "激活仓库面板",
       "activateFilesPane": "激活文件面板",
       "activateChangesPane": "激活变更面板",

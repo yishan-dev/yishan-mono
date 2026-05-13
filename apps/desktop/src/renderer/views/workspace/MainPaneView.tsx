@@ -2,7 +2,7 @@ import { Box, Typography, darken } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuSquareTerminal } from "react-icons/lu";
+import { LuGlobe, LuSquareTerminal } from "react-icons/lu";
 import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shared/contracts/externalApps";
 import { copyToClipboard } from "../../helpers/clipboard";
 import { FileEditor } from "../../components/FileEditor";
@@ -21,6 +21,7 @@ import { workspaceStore } from "../../store/workspaceStore";
 import { DARK_SURFACE_COLORS } from "../../theme";
 import { LaunchView } from "./LaunchView";
 import { MainPaneTitleBarView } from "./MainPaneTitleBarView";
+import { BrowserView } from "./browser/BrowserView";
 import { TerminalView } from "./terminal/TerminalView";
 
 const paneHeaderSx = {
@@ -93,6 +94,13 @@ function buildTerminalInput(title: string) {
     kind: "terminal" as const,
     title,
     reuseExisting: false,
+  };
+}
+
+function buildBrowserInput() {
+  return {
+    kind: "browser" as const,
+    url: "https://example.com",
   };
 }
 
@@ -217,6 +225,14 @@ export function MainPaneView() {
       return;
     }
 
+    if (option === "browser") {
+      cmd.openTab({
+        workspaceId: selectedWorkspaceId,
+        ...buildBrowserInput(),
+      });
+      return;
+    }
+
     if (!enabledAgentKindSet.has(option)) {
       return;
     }
@@ -302,6 +318,21 @@ export function MainPaneView() {
 
             if (fullTab?.kind === "terminal") {
               return <LuSquareTerminal size={14} />;
+            }
+
+            if (fullTab?.kind === "browser") {
+              if (fullTab.data.faviconUrl) {
+                return (
+                  <Box
+                    component="img"
+                    src={fullTab.data.faviconUrl}
+                    alt=""
+                    sx={{ width: 14, height: 14, flexShrink: 0 }}
+                  />
+                );
+              }
+
+              return <LuGlobe size={14} />;
             }
 
             if (fullTab?.kind === "file" || fullTab?.kind === "diff" || fullTab?.kind === "image") {
@@ -429,6 +460,14 @@ export function MainPaneView() {
                     Chat is currently disabled.
                   </Typography>
                 </Box>
+              </TabPanel>
+            );
+          }
+
+          if (tab.kind === "browser") {
+            return (
+              <TabPanel key={tab.id} active={isSelected}>
+                <BrowserView tabId={tab.id} initialUrl={tab.data.url} />
               </TabPanel>
             );
           }

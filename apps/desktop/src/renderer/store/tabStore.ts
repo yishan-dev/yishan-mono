@@ -49,6 +49,7 @@ export type TabStoreState = {
   closeAllTerminalTabs: () => void;
   /** Persists one backend terminal session id on one terminal tab. */
   setTerminalTabSessionId: (tabId: string, sessionId: string) => void;
+  setBrowserTabFaviconUrl: (tabId: string, faviconUrl: string | undefined) => void;
   toggleTabPinned: (tabId: string) => void;
   reorderTab: (draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
   renameTab: (tabId: string, title: string, options?: { userRenamed?: boolean }) => void;
@@ -232,6 +233,33 @@ export const tabStore = create<TabStoreState>()(
                   sessionId: normalizedSessionId,
                 },
               }
+            : tab,
+        ),
+      }));
+    },
+    setBrowserTabFaviconUrl: (tabId, faviconUrl) => {
+      const normalizedTabId = tabId.trim();
+      const normalizedFaviconUrl = faviconUrl?.trim();
+      if (!normalizedTabId) {
+        return;
+      }
+
+      set((state) => ({
+        tabs: state.tabs.map((tab: WorkspaceTab) =>
+          tab.id === normalizedTabId && tab.kind === "browser"
+            ? (() => {
+                const nextData = { ...tab.data };
+                if (normalizedFaviconUrl) {
+                  nextData.faviconUrl = normalizedFaviconUrl;
+                } else {
+                  delete nextData.faviconUrl;
+                }
+
+                return {
+                  ...tab,
+                  data: nextData,
+                };
+              })()
             : tab,
         ),
       }));

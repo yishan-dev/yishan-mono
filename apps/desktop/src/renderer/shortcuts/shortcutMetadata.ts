@@ -9,7 +9,7 @@ function toDisplayKeyToken(token: string): string {
     return "CTRL";
   }
   if (token === "shift") {
-    return "SHIFT";
+    return "⇧";
   }
   if (token === "alt") {
     return "ALT";
