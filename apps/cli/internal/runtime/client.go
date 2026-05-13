@@ -175,6 +175,29 @@ func ClearAuthState() {
 	}
 }
 
+func ReloadAuthConfig() error {
+	mu.Lock()
+	defer mu.Unlock()
+	if appCfg == nil || appCfg.ConfigPath == "" {
+		return fmt.Errorf("runtime config is not initialized")
+	}
+
+	v := viper.New()
+	v.SetConfigFile(appCfg.ConfigPath)
+	v.SetConfigType("yaml")
+	if err := v.ReadInConfig(); err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	appCfg.API.Token = v.GetString("api_token")
+	appCfg.API.RefreshToken = v.GetString("api_refresh_token")
+	appCfg.API.AccessTokenExpiresAt = v.GetString("api_access_token_expires_at")
+	appCfg.API.RefreshTokenExpiresAt = v.GetString("api_refresh_token_expires_at")
+	appCfg.API.BaseURL = v.GetString("api_base_url")
+
+	return nil
+}
+
 func parseExpiry(raw string) (time.Time, bool) {
 	if raw == "" {
 		return time.Time{}, false

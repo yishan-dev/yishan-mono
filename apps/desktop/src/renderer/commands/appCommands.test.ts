@@ -52,6 +52,7 @@ describe("appCommands", () => {
   it("delegates shell commands to app shell service", async () => {
     mocks.getDefaultWorktreeLocation.mockResolvedValueOnce({ worktreePath: "/tmp/worktrees" });
     mocks.checkAuthStatus.mockResolvedValueOnce({ authenticated: true, accessTokenExpiresAt: "2026-05-11T10:00:00Z" });
+    mocks.login.mockResolvedValueOnce({ authenticated: true, skipped: true });
 
     await openLocalFolderDialog("/tmp");
     await getDefaultWorktreeLocation();

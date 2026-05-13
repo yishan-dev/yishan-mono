@@ -99,6 +99,10 @@ export type LogoutOutput = {
   ok: boolean;
 };
 
+export type ReloadAuthConfigOutput = {
+  ok: boolean;
+};
+
 export type WorkspaceSyncContextLinkInput = {
   repoKey: string;
   enabled: boolean;

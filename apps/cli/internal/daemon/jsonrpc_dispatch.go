@@ -211,6 +211,11 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 	case MethodAppLogout:
 		cliruntime.ClearAuthState()
 		return map[string]bool{"ok": true}, nil
+	case MethodAppReloadAuthConfig:
+		if err := cliruntime.ReloadAuthConfig(); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"ok": true}, nil
 	case MethodFileRead:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {

@@ -77,5 +77,12 @@ export async function setDaemonQuitOnExit(value: boolean): Promise<void> {
 
 /** Runs one desktop login flow through main-process IPC. */
 export async function login() {
-  return await getDesktopHostBridge().login();
+  const result = await getDesktopHostBridge().login();
+  if (result.authenticated) {
+    try {
+      const daemonClient = await getDaemonClient();
+      await daemonClient.app.reloadAuthConfig();
+    } catch {}
+  }
+  return result;
 }

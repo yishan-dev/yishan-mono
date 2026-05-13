@@ -15,6 +15,7 @@ const (
 	MethodAppGetAccessToken          = "app.getAccessToken"
 	MethodAppCheckAuthStatus         = "app.checkAuthStatus"
 	MethodAppLogout                  = "app.logout"
+	MethodAppReloadAuthConfig       = "app.reloadAuthConfig"
 
 	MethodFileRead   = "file.read"
 	MethodFileList   = "file.list"

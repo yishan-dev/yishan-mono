@@ -49,6 +49,7 @@ export function AuthSessionExpiredSnackbar() {
         elevation={8}
         aria-live="assertive"
         role="alert"
+        className="electron-webkit-app-region-no-drag"
         sx={{
           display: "block",
           width: 360,

@@ -20,6 +20,7 @@ export type DaemonRpcClient = {
     getAccessToken: (input?: unknown) => Promise<Rpc.GetAccessTokenOutput>;
     checkAuthStatus: (input?: unknown) => Promise<Rpc.CheckAuthStatusOutput>;
     logout: (input?: unknown) => Promise<Rpc.LogoutOutput>;
+    reloadAuthConfig: (input?: unknown) => Promise<Rpc.ReloadAuthConfigOutput>;
   };
   workspace: {
     list: (input?: unknown) => Promise<unknown>;
