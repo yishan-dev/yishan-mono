@@ -1,6 +1,6 @@
-import { Alert, Box, IconButton, InputAdornment, TextField } from "@mui/material";
+import { Alert, Box, IconButton, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuBug, LuRefreshCcw } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuCookie, LuDatabaseZap, LuHistory, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
 import { useCommands } from "../../../hooks/useCommands";
 
 function normalizeUrl(rawValue: string): string {
@@ -30,6 +30,8 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [isWebviewReady, setIsWebviewReady] = useState(false);
+  const [toolsAnchor, setToolsAnchor] = useState<HTMLElement | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   useEffect(() => {
     setUrlInput(initialUrl);
@@ -111,6 +113,122 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
     setActiveUrl(nextUrl);
   };
 
+  const closeToolsMenu = () => {
+    setToolsAnchor(null);
+  };
+
+  const notifySuccess = (message: string) => {
+    setSnackbarMessage(message);
+  };
+
+  const handleOpenDevTools = () => {
+    closeToolsMenu();
+    webviewRef.current?.openDevTools();
+  };
+
+  const handleClearCache = async () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    try {
+      const candidate = webview as unknown as { clearCache?: () => void | Promise<void>; reload?: () => void };
+      if (typeof candidate.clearCache === "function") {
+        await candidate.clearCache();
+      }
+      candidate.reload?.();
+      setErrorMessage("");
+      notifySuccess("Clear Cache succeeded.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to clear browser cache: ${message}`);
+    }
+  };
+
+  const handleClearHistory = () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    try {
+      const candidate = webview as unknown as { clearHistory?: () => void };
+      if (typeof candidate.clearHistory === "function") {
+        candidate.clearHistory();
+      }
+      setCanGoBack(false);
+      setCanGoForward(false);
+      setErrorMessage("");
+      notifySuccess("Clear History succeeded.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to clear browser history: ${message}`);
+    }
+  };
+
+  const handleClearCookies = async () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    try {
+      const candidate = webview as unknown as {
+        clearStorageData?: (options?: { storages?: string[] }) => void | Promise<void>;
+        reload?: () => void;
+      };
+
+      if (typeof candidate.clearStorageData === "function") {
+        await candidate.clearStorageData({ storages: ["cookies"] });
+      }
+
+      candidate.reload?.();
+      setErrorMessage("");
+      notifySuccess("Clear Cookies succeeded.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to clear browser cookies: ${message}`);
+    }
+  };
+
+  const handleClearAllData = async () => {
+    closeToolsMenu();
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    try {
+      const candidate = webview as unknown as {
+        clearHistory?: () => void;
+        clearStorageData?: (options?: { storages?: string[] }) => void | Promise<void>;
+        clearCache?: () => void | Promise<void>;
+        reload?: () => void;
+      };
+
+      candidate.clearHistory?.();
+      if (typeof candidate.clearStorageData === "function") {
+        await candidate.clearStorageData();
+      }
+      if (typeof candidate.clearCache === "function") {
+        await candidate.clearCache();
+      }
+
+      setCanGoBack(false);
+      setCanGoForward(false);
+      candidate.reload?.();
+      setErrorMessage("");
+      notifySuccess("Clear All Data succeeded.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(`Failed to clear browser data: ${message}`);
+    }
+  };
+
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", p: 1.25, gap: 1 }}>
       <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", gap: 1 }}>
@@ -129,22 +247,57 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
           onChange={(event) => setUrlInput(event.target.value)}
           placeholder="https://example.com"
           fullWidth
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="Open browser tab DevTools"
-                  size="small"
-                  onClick={() => webviewRef.current?.openDevTools()}
-                >
-                  <LuBug size={14} />
-                </IconButton>
-              </InputAdornment>
-            ),
+          sx={{
+            "& .MuiInputBase-input": {
+              py: 0.75,
+              fontSize: 13,
+            },
           }}
         />
+        <IconButton aria-label="Browser tools" onClick={(event) => setToolsAnchor(event.currentTarget)}>
+          <LuWrench size={14} />
+        </IconButton>
+        <Menu
+          anchorEl={toolsAnchor}
+          open={Boolean(toolsAnchor)}
+          onClose={closeToolsMenu}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <MenuItem onClick={handleOpenDevTools}>
+            <LuWrench size={14} style={{ marginRight: 8 }} />
+            Open Devtool
+          </MenuItem>
+          <MenuItem onClick={() => void handleClearCache()}>
+            <LuTrash2 size={14} style={{ marginRight: 8 }} />
+            Clear Cache
+          </MenuItem>
+          <MenuItem onClick={() => void handleClearCookies()}>
+            <LuCookie size={14} style={{ marginRight: 8 }} />
+            Clear Cookies
+          </MenuItem>
+          <MenuItem onClick={handleClearHistory}>
+            <LuHistory size={14} style={{ marginRight: 8 }} />
+            Clear History
+          </MenuItem>
+          <MenuItem onClick={() => void handleClearAllData()}>
+            <LuDatabaseZap size={14} style={{ marginRight: 8 }} />
+            Clear All Data
+          </MenuItem>
+        </Menu>
       </Box>
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
+      <Snackbar
+        open={Boolean(snackbarMessage)}
+        autoHideDuration={1800}
+        onClose={() => setSnackbarMessage("")}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ mt: 10 }}
+      >
+        <Alert severity="success" onClose={() => setSnackbarMessage("")}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
       <Box sx={{ flex: 1, minHeight: 0, border: "1px solid", borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
         {resolvedUrl ? (
           <webview
