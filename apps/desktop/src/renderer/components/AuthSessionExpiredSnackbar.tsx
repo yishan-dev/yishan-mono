@@ -21,7 +21,9 @@ export function AuthSessionExpiredSnackbar() {
 
   useEffect(() => {
     const unsubscribe = onAuthExpired(() => {
-      setVisible(true);
+      if (authStore.getState().isAuthenticated) {
+        setVisible(true);
+      }
     });
 
     return unsubscribe;
