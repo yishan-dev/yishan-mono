@@ -157,9 +157,16 @@ func TestFileServiceRecursiveListUsesGitIgnore(t *testing.T) {
 	for _, entry := range entries {
 		paths = append(paths, entry.Path)
 	}
-	expected := []string{".gitignore", "cmd", "cmd/app", "cmd/app/main.go"}
+	expected := []string{
+		".gitignore",
+		"cmd",
+		"cmd/app",
+		"cmd/app/main.go",
+		"debug.log",
+		"node_modules/",
+	}
 	if strings.Join(paths, ",") != strings.Join(expected, ",") {
-		t.Fatalf("expected gitignore-pruned paths %v, got %v", expected, paths)
+		t.Fatalf("expected recursive git paths %v, got %v", expected, paths)
 	}
 }
 

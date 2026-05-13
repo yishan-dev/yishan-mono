@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 type FileEntry struct {
@@ -285,7 +287,8 @@ func markIgnoredEntries(root string, entries []FileEntry) []FileEntry {
 	}
 
 	for index := range entries {
-		entries[index].IsIgnored = ignoredPathSet[entries[index].Path]
+		normalizedPath := filepath.ToSlash(strings.TrimSuffix(entries[index].Path, "/"))
+		entries[index].IsIgnored = entries[index].IsIgnored || ignoredPathSet[normalizedPath]
 	}
 	return entries
 }
@@ -310,31 +313,93 @@ func gitIgnoredPathSet(root string, entries []FileEntry) (map[string]bool, bool)
 		if path == "" {
 			continue
 		}
-		ignoredPathSet[filepath.ToSlash(path)] = true
+		normalizedPath := filepath.ToSlash(strings.TrimSuffix(path, "/"))
+		if normalizedPath == "" {
+			continue
+		}
+		ignoredPathSet[normalizedPath] = true
 	}
 
 	return ignoredPathSet, true
 }
 
 func (s *FileService) listGitFiles(root string, path string) ([]FileEntry, bool, error) {
+	const gitListTimeout = 8 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), gitListTimeout)
+	defer cancel()
+
 	args := []string{"-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--"}
 	if strings.TrimSpace(path) != "" {
 		args = append(args, filepath.ToSlash(path))
 	}
-	cmd := exec.Command("git", args...)
-	output, err := cmd.Output()
-	if err != nil {
+	ignoredArgs := []string{
+		"-C",
+		root,
+		"ls-files",
+		"--others",
+		"--ignored",
+		"--exclude-standard",
+		"--directory",
+		"--no-empty-directory",
+		"-z",
+		"--",
+	}
+	if strings.TrimSpace(path) != "" {
+		ignoredArgs = append(ignoredArgs, filepath.ToSlash(path))
+	}
+
+	var (
+		normalOutput  []byte
+		normalErr     error
+		ignoredOutput []byte
+		ignoredErr    error
+	)
+
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	go func() {
+		defer waitGroup.Done()
+		normalOutput, normalErr = exec.CommandContext(ctx, "git", args...).Output()
+	}()
+	go func() {
+		defer waitGroup.Done()
+		ignoredOutput, ignoredErr = exec.CommandContext(ctx, "git", ignoredArgs...).Output()
+	}()
+	waitGroup.Wait()
+
+	if normalErr != nil {
 		return nil, false, nil
 	}
 
+	ignoredPathSet := map[string]bool{}
+	if ignoredErr == nil {
+		for _, rawPath := range strings.Split(string(ignoredOutput), "\x00") {
+			relPath := strings.TrimSpace(rawPath)
+			if relPath == "" {
+				continue
+			}
+			normalizedRelPath := filepath.ToSlash(strings.TrimSuffix(relPath, "/"))
+			if normalizedRelPath == "" {
+				continue
+			}
+			ignoredPathSet[normalizedRelPath] = true
+		}
+		normalOutput = append(normalOutput, ignoredOutput...)
+	}
+
 	entryByPath := map[string]FileEntry{}
-	for _, rawPath := range strings.Split(string(output), "\x00") {
+	for _, rawPath := range strings.Split(string(normalOutput), "\x00") {
 		relPath := strings.TrimSpace(rawPath)
 		if relPath == "" {
 			continue
 		}
+		normalizedRelPath := filepath.ToSlash(strings.TrimSuffix(relPath, "/"))
+		if normalizedRelPath == "" {
+			continue
+		}
 		for _, directoryPath := range parentDirectoryPaths(relPath) {
-			if _, exists := entryByPath[directoryPath]; exists {
+			normalizedDirectoryPath := filepath.ToSlash(strings.TrimSuffix(directoryPath, "/"))
+			if _, exists := entryByPath[normalizedDirectoryPath]; exists {
 				continue
 			}
 			entry, err := fileEntryForRelativePath(root, directoryPath)
@@ -344,7 +409,7 @@ func (s *FileService) listGitFiles(root string, path string) ([]FileEntry, bool,
 				}
 				return nil, true, err
 			}
-			entryByPath[directoryPath] = entry
+			entryByPath[normalizedDirectoryPath] = entry
 		}
 		entry, err := fileEntryForRelativePath(root, relPath)
 		if err != nil {
@@ -353,7 +418,10 @@ func (s *FileService) listGitFiles(root string, path string) ([]FileEntry, bool,
 			}
 			return nil, true, err
 		}
-		entryByPath[relPath] = entry
+		if ignoredPathSet[normalizedRelPath] {
+			entry.IsIgnored = true
+		}
+		entryByPath[normalizedRelPath] = entry
 	}
 
 	out := make([]FileEntry, 0, len(entryByPath))
