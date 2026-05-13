@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	codexManagedCommandMarker = "yishan-managed-hook=codex"
+	codexManagedCommandMarker       = "YISHAN_MANAGED_HOOK=codex"
+	codexLegacyManagedCommandMarker = "yishan-managed-hook=codex"
 )
 
 type codexHookCommand struct {
@@ -43,7 +44,11 @@ func ensureCodexHookSettings(notifyScriptPath string, homeDir string, goos strin
 		currentDefinitions, _ := hooksValue[event.name].([]any)
 		filteredDefinitions := make([]any, 0, len(currentDefinitions)+1)
 		for _, definition := range currentDefinitions {
-			cleaned, keep := removeManagedHookCommands(definition, codexManagedCommandMarker)
+			cleaned, keep := removeManagedHookCommands(definition, codexLegacyManagedCommandMarker)
+			if !keep {
+				continue
+			}
+			cleaned, keep = removeManagedHookCommands(cleaned, codexManagedCommandMarker)
 			if keep {
 				filteredDefinitions = append(filteredDefinitions, cleaned)
 			}

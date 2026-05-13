@@ -100,6 +100,12 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	if !strings.Contains(stopCommand, "bash "+quoteShellPath(notifyPath)+" --agent claude --event Stop") {
 		t.Fatalf("expected managed Claude hook to use quoted notify script path: %s", stopCommand)
 	}
+	if !strings.Contains(stopCommand, "YISHAN_MANAGED_HOOK=claude") {
+		t.Fatalf("expected managed Claude hook to use new marker, got: %s", stopCommand)
+	}
+	if strings.Contains(settingsText, "yishan-managed-hook=claude") {
+		t.Fatalf("expected legacy Claude hook marker to be replaced")
+	}
 
 	codexHooksRaw, err := os.ReadFile(codexHooksPath)
 	if err != nil {
@@ -124,6 +130,12 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	codexStopCommand := commandFromDefinition(t, codexStopDefinitions[1])
 	if !strings.Contains(codexStopCommand, "bash "+quoteShellPath(notifyPath)+" --agent codex --event Stop") {
 		t.Fatalf("expected managed Codex hook to use quoted notify script path: %s", codexStopCommand)
+	}
+	if !strings.Contains(codexStopCommand, "YISHAN_MANAGED_HOOK=codex") {
+		t.Fatalf("expected managed Codex hook to use new marker, got: %s", codexStopCommand)
+	}
+	if strings.Contains(codexHooksText, "yishan-managed-hook=codex") {
+		t.Fatalf("expected legacy Codex hook marker to be replaced")
 	}
 	if _, ok := codexHooks["SessionStart"]; !ok {
 		t.Fatalf("expected Codex SessionStart hook")
@@ -156,6 +168,12 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 		!strings.Contains(cursorHooksText, "beforeShellExecution") ||
 		!strings.Contains(cursorHooksText, "beforeMCPExecution") {
 		t.Fatalf("expected managed Cursor hook events to be present")
+	}
+	if !strings.Contains(cursorHooksText, "YISHAN_MANAGED_HOOK=cursor") {
+		t.Fatalf("expected managed Cursor hook to use new marker")
+	}
+	if strings.Contains(cursorHooksText, "yishan-managed-hook=cursor") {
+		t.Fatalf("expected legacy Cursor hook marker to be replaced")
 	}
 
 	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(filepath.Dir(notifyPath), cursorHookScriptFileName))
@@ -237,6 +255,13 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	beforeAgentCommand := commandFromDefinition(t, beforeAgentDefinitions[0])
 	if !strings.Contains(beforeAgentCommand, "bash "+quoteShellPath(notifyPath)+" --agent gemini --event Start") {
 		t.Fatalf("expected managed Gemini start command, got %s", beforeAgentCommand)
+	}
+	if !strings.Contains(beforeAgentCommand, "YISHAN_MANAGED_HOOK=gemini") {
+		t.Fatalf("expected managed Gemini hook to use new marker, got: %s", beforeAgentCommand)
+	}
+	geminiSettingsText := string(geminiSettingsRaw)
+	if strings.Contains(geminiSettingsText, "yishan-managed-hook=gemini") {
+		t.Fatalf("expected legacy Gemini hook marker to be replaced")
 	}
 	notificationDefinitions, ok := geminiHooks["Notification"].([]any)
 	if !ok || len(notificationDefinitions) != 1 {

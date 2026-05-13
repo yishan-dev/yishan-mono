@@ -13,8 +13,9 @@ import (
 var cursorHookScriptTemplate string
 
 const (
-	cursorManagedCommandMarker = "yishan-managed-hook=cursor"
-	cursorHookScriptFileName   = "cursor-hook.sh"
+	cursorManagedCommandMarker       = "YISHAN_MANAGED_HOOK=cursor"
+	cursorLegacyManagedCommandMarker = "yishan-managed-hook=cursor"
+	cursorHookScriptFileName         = "cursor-hook.sh"
 )
 
 type cursorHookInstaller struct{}
@@ -90,9 +91,10 @@ func ensureCursorHookSettings(cursorHookScriptPath string, homeDir string, goos 
 				continue
 			}
 			command, _ := entryMap["command"].(string)
-			if !strings.Contains(command, cursorManagedCommandMarker) {
-				filtered = append(filtered, entry)
+			if strings.Contains(command, cursorManagedCommandMarker) || strings.Contains(command, cursorLegacyManagedCommandMarker) {
+				continue
 			}
+			filtered = append(filtered, entry)
 		}
 		filtered = append(filtered, map[string]any{"command": managedCommand})
 		hooksValue[eventName] = filtered
