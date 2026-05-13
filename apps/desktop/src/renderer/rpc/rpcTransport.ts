@@ -72,8 +72,12 @@ async function openSocketWithRetry(): Promise<WebSocket> {
     try {
       invalidateDaemonDiscovery();
       const wsUrl = await getDaemonWsUrl();
+      const jwt = await getDesktopHostBridge().getDaemonJwt();
+      const url = new URL(wsUrl);
+      url.searchParams.set("token", jwt);
+      const authenticatedUrl = url.toString();
       return await new Promise<WebSocket>((resolvePromise, rejectPromise) => {
-        const socket = new WebSocket(wsUrl);
+        const socket = new WebSocket(authenticatedUrl);
         let settled = false;
 
         const resolveOnce = (value: WebSocket) => {

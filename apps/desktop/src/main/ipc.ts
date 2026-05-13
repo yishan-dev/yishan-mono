@@ -108,6 +108,7 @@ export type DesktopHostBridge = {
   restartDaemon: () => Promise<DaemonRestartResult>;
   getDaemonQuitOnExit: () => Promise<boolean>;
   setDaemonQuitOnExit: (value: boolean) => Promise<{ ok: true }>;
+  getDaemonJwt: () => Promise<string>;
 };
 
 export type DesktopRpcEventBridge = {
@@ -143,4 +144,5 @@ export const HOST_IPC_CHANNELS = {
   restartDaemon: "desktop:host/restart-daemon",
   getDaemonQuitOnExit: "desktop:host/get-daemon-quit-on-exit",
   setDaemonQuitOnExit: "desktop:host/set-daemon-quit-on-exit",
+  getDaemonJwt: "desktop:host/get-daemon-jwt",
 } as const;

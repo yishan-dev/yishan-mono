@@ -23,6 +23,7 @@ const bridge: DesktopBridge = {
     restartDaemon: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.restartDaemon),
     getDaemonQuitOnExit: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonQuitOnExit),
     setDaemonQuitOnExit: (value) => ipcRenderer.invoke(HOST_IPC_CHANNELS.setDaemonQuitOnExit, value),
+    getDaemonJwt: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonJwt),
   },
   events: {
     subscribe: (listener: (envelope: DesktopRpcEventEnvelope) => void) => {
