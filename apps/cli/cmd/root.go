@@ -56,6 +56,7 @@ func initConfig() {
 	viper.SetDefault("log_level", "info")
 	viper.SetDefault("log_format", logx.FormatPretty)
 	viper.SetDefault("output", "default")
+	viper.SetDefault("daemon_relay_enabled", true)
 	viper.SetDefault("daemon_relay_url", "https://relay.yishan.io")
 
 	if err := configureLogger(viper.GetString("log_level"), viper.GetString("log_format")); err != nil {

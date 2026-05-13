@@ -243,7 +243,7 @@ func init() {
 	daemonCmd.PersistentFlags().String("jwt-issuer", "", "required JWT issuer")
 	daemonCmd.PersistentFlags().String("jwt-audience", "", "required JWT audience")
 	daemonCmd.PersistentFlags().Bool("jwt-required", true, "require JWT token for /ws access")
-	daemonCmd.PersistentFlags().Bool("relay-enabled", false, "connect daemon to relay over outbound websocket")
+	daemonCmd.PersistentFlags().Bool("relay-enabled", true, "connect daemon to relay over outbound websocket")
 	daemonCmd.PersistentFlags().String("relay-url", "https://relay.yishan.io", "relay websocket URL (wss://.../ws)")
 
 	cobra.CheckErr(viper.BindPFlag("daemon_host", daemonCmd.PersistentFlags().Lookup("host")))
