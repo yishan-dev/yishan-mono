@@ -1,8 +1,9 @@
 import type { ExternalAppId } from "../../shared/contracts/externalApps";
 import {
+  computeUniqueGitChangeFileCount,
   countWorkspaceGitChanges,
   normalizeCreateWorkspaceInput,
-  summarizeWorkspaceGitChangeTotals,
+  summarizeReconciledWorkspaceGitChangeTotals,
 } from "../helpers/workspaceHelpers";
 import { getDaemonClient } from "../rpc/rpcTransport";
 import { layoutStore } from "../store/layoutStore";
@@ -470,7 +471,7 @@ export async function refreshWorkspaceGitChanges(workspaceId: string, workspaceW
     ]);
 
     const uncommittedCount = countWorkspaceGitChanges(sections);
-    const uncommittedTotals = summarizeWorkspaceGitChangeTotals(sections);
+    const uncommittedTotals = summarizeReconciledWorkspaceGitChangeTotals(sections);
 
     if (!branchSummary) {
       // No source branch configured — fall back to uncommitted-only count.
@@ -479,14 +480,7 @@ export async function refreshWorkspaceGitChanges(workspaceId: string, workspaceW
       return;
     }
 
-    // Combine: branch diff file count + uncommitted file count.
-    // The branch diff summary already counts unique files from merge-base to HEAD.
-    // Uncommitted files may partially overlap with branch-diff files, but a simple
-    // sum is the safest approximation without doing a full path intersection on the
-    // backend.  For the badge indicator the slight over-count when a committed file
-    // also has uncommitted edits is acceptable and still much more accurate than
-    // showing only uncommitted changes.
-    const combinedCount = branchSummary.fileCount + uncommittedCount;
+    const combinedCount = computeUniqueGitChangeFileCount(branchSummary.files ?? [], sections);
     const combinedTotals = {
       additions: branchSummary.additions + uncommittedTotals.additions,
       deletions: branchSummary.deletions + uncommittedTotals.deletions,
