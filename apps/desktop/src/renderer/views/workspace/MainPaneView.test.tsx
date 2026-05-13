@@ -41,10 +41,19 @@ vi.mock("../../store/tabStore", () => ({
 }));
 
 vi.mock("../../store/chatStore", () => ({
-  chatStore: (selector: (state: { workspaceUnreadToneByWorkspaceId: Record<string, "success" | "error"> }) => unknown) =>
+  chatStore: (
+    selector: (state: {
+      workspaceUnreadToneByWorkspaceId: Record<string, "success" | "error">;
+      workspaceAgentStatusByWorkspaceId: Record<string, "running" | "waiting_input" | "idle">;
+    }) => unknown,
+  ) =>
     selector({
       workspaceUnreadToneByWorkspaceId:
         (mocked.stateRef.current.workspaceUnreadToneByWorkspaceId as Record<string, "success" | "error"> | undefined) ?? {},
+      workspaceAgentStatusByWorkspaceId:
+        (mocked.stateRef.current.workspaceAgentStatusByWorkspaceId as
+          | Record<string, "running" | "waiting_input" | "idle">
+          | undefined) ?? {},
     }),
 }));
 
