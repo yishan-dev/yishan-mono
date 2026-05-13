@@ -1,6 +1,7 @@
-import { Alert, Box, Divider, IconButton, InputAdornment, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuCamera, LuCookie, LuDatabaseZap, LuHistory, LuLock, LuLockOpen, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
+import { Alert, Box, Divider, IconButton, InputAdornment, ListItemIcon, ListItemText, Menu, MenuItem, MenuList, Paper, Popper, Snackbar, TextField } from "@mui/material";
+import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuArrowLeft, LuArrowRight, LuCamera, LuCookie, LuDatabaseZap, LuGlobe, LuHistory, LuLock, LuLockOpen, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
+import type { BrowserHistoryGroup } from "../../../main/ipc";
 import { useCommands } from "../../../hooks/useCommands";
 
 function normalizeUrl(rawValue: string): string {
@@ -34,6 +35,75 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [urlFocused, setUrlFocused] = useState(false);
   const [pageTitle, setPageTitle] = useState("");
+  const [historyGroups, setHistoryGroups] = useState<BrowserHistoryGroup[]>([]);
+  const textFieldRef = useRef<HTMLDivElement>(null);
+
+  const filteredHistory = useMemo(() => {
+    const allEntries = historyGroups.flatMap((g) => g.entries);
+    if (!urlFocused || !urlInput.trim()) {
+      return allEntries.slice().reverse();
+    }
+    const lower = urlInput.toLowerCase();
+    return allEntries.filter((entry) => entry.url.toLowerCase().includes(lower) || entry.title.toLowerCase().includes(lower)).reverse();
+  }, [urlFocused, urlInput, historyGroups]);
+
+  const navigateTo = useCallback(
+    (url: string) => {
+      const normalized = normalizeUrl(url);
+      if (!normalized) {
+        return;
+      }
+      setUrlInput(normalized);
+      setErrorMessage("");
+      cmd.setBrowserTabFaviconUrl(tabId, undefined);
+      setPageTitle("");
+      setUrlFocused(false);
+      setActiveUrl(normalized);
+      (document.activeElement as HTMLElement)?.blur();
+    },
+    [cmd, tabId],
+  );
+
+  const addHistoryEntry = useCallback(
+    (url: string, title: string, faviconUrl?: string) => {
+      if (!url.trim()) {
+        return;
+      }
+      const entry = { url, title: title || url, faviconUrl, visitedAt: new Date().toISOString() };
+      void cmd.appendBrowserHistory({ entry });
+      setHistoryGroups((prev) => {
+        let host: string;
+        try {
+          host = new URL(url).host;
+        } catch {
+          host = url;
+        }
+        const next = prev.map((g) => ({ ...g, entries: [...g.entries] }));
+        let group = next.find((g) => g.host === host);
+        if (!group) {
+          group = { host, faviconUrl, entries: [] };
+          next.unshift(group);
+        }
+        if (faviconUrl) {
+          group.faviconUrl = faviconUrl;
+        }
+        const existing = group.entries.find((e) => e.url === url);
+        if (existing) {
+          existing.title = title || existing.title;
+          existing.faviconUrl = faviconUrl || existing.faviconUrl;
+          existing.visitedAt = entry.visitedAt;
+        } else {
+          group.entries.push(entry);
+        }
+        return next;
+      });
+    },
+    [cmd],
+  );
+
+  useEffect(() => {
+    void cmd.loadBrowserHistory().then(setHistoryGroups);
+  }, [cmd]);
 
   const displayUrl = useMemo(() => {
     if (urlFocused) {
@@ -63,11 +133,13 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   }, []);
 
   const handleUrlBlur = useCallback(() => {
-    setUrlFocused(false);
-    const normalized = normalizeUrl(urlInput);
-    if (normalized) {
-      setUrlInput(normalized);
-    }
+    setTimeout(() => {
+      setUrlFocused(false);
+      const normalized = normalizeUrl(urlInput);
+      if (normalized) {
+        setUrlInput(normalized);
+      }
+    }, 150);
   }, [urlInput]);
 
   useEffect(() => {
@@ -89,12 +161,17 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
         return;
       }
       setPageTitle(nextTitle);
+      addHistoryEntry(resolvedUrl, nextTitle);
       cmd.renameTab(tabId, nextTitle);
     };
 
     const handleFaviconUpdated = (event: Event) => {
       const favicons = (event as { favicons?: string[] }).favicons;
-      cmd.setBrowserTabFaviconUrl(tabId, favicons?.[0]);
+      const faviconUrl = favicons?.[0];
+      cmd.setBrowserTabFaviconUrl(tabId, faviconUrl);
+      if (faviconUrl) {
+        addHistoryEntry(resolvedUrl, pageTitle, faviconUrl);
+      }
     };
 
     const updateNavigationState = () => {
@@ -149,7 +226,10 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
     setErrorMessage("");
     cmd.setBrowserTabFaviconUrl(tabId, undefined);
     setPageTitle("");
+    setUrlFocused(false);
     setActiveUrl(nextUrl);
+    addHistoryEntry(nextUrl, "");
+    (document.activeElement as HTMLElement)?.blur();
   };
 
   const closeToolsMenu = () => {
@@ -310,6 +390,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
           <LuRefreshCcw size={14} />
         </IconButton>
         <TextField
+          ref={textFieldRef}
           size="small"
           value={displayUrl}
           onChange={(event) => setUrlInput(event.target.value)}
@@ -336,6 +417,53 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
             },
           }}
         />
+        <Popper open={urlFocused && historyGroups.length > 0} anchorEl={textFieldRef.current} placement="bottom-start" style={{ zIndex: 1300 }}>
+          <Paper sx={{ mt: 0.5, maxHeight: 320, overflowY: "auto", minWidth: textFieldRef.current?.offsetWidth ?? 300 }}>
+            <MenuList dense>
+              {historyGroups.map((group) => {
+                const entries = filteredHistory.filter((e) => {
+                  try {
+                    return new URL(e.url).host === group.host;
+                  } catch {
+                    return false;
+                  }
+                });
+                if (entries.length === 0) {
+                  return null;
+                }
+                return [
+                  <MenuItem key={`header-${group.host}`} disabled sx={{ opacity: 1, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, minHeight: 28 }}>
+                    <ListItemIcon sx={{ minWidth: 28 }}>
+                      {group.faviconUrl ? (
+                        <img src={group.faviconUrl} alt="" width={14} height={14} style={{ objectFit: "contain" }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                      ) : (
+                        <LuGlobe size={13} />
+                      )}
+                    </ListItemIcon>
+                    {group.host}
+                  </MenuItem>,
+                  ...entries.map((entry) => (
+                    <MenuItem
+                      key={entry.url}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        navigateTo(entry.url);
+                      }}
+                      sx={{ pl: 5, py: 0.5 }}
+                    >
+                      <ListItemText
+                        primary={entry.title}
+                        secondary={entry.url}
+                        primaryTypographyProps={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        secondaryTypographyProps={{ fontSize: 11, color: "text.disabled", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      />
+                    </MenuItem>
+                  )),
+                ];
+              })}
+            </MenuList>
+          </Paper>
+        </Popper>
         <IconButton aria-label="Browser tools" onClick={(event) => setToolsAnchor(event.currentTarget)}>
           <LuWrench size={14} />
         </IconButton>

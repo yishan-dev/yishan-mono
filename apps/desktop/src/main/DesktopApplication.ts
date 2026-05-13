@@ -3,6 +3,7 @@ import { extname, join, resolve } from "node:path";
 import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
+import { appendBrowserHistoryEntry, loadBrowserHistoryGroups } from "./browser/browserHistory";
 import { configureApplicationMenu } from "./app/menu";
 import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
@@ -338,6 +339,15 @@ export class DesktopApplication {
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.loadBrowserHistory, async () => {
+      return await loadBrowserHistoryGroups();
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.appendBrowserHistory, async (_event, input) => {
+      await appendBrowserHistoryEntry(input?.entry);
+      return { ok: true };
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.dispatchNotification, async (_event, input) => {

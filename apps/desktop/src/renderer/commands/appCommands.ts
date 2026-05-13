@@ -1,4 +1,4 @@
-import type { AuthStatusResult, DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
+import type { AppendBrowserHistoryInput, AuthStatusResult, BrowserHistoryGroup, DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
 import type { DesktopAgentKind } from "../helpers/agentSettings";
 import { getDaemonClient, getDesktopHostBridge } from "../rpc/rpcTransport";
 
@@ -85,4 +85,12 @@ export async function login() {
     } catch {}
   }
   return result;
+}
+
+export async function loadBrowserHistory(): Promise<BrowserHistoryGroup[]> {
+  return await getDesktopHostBridge().loadBrowserHistory();
+}
+
+export async function appendBrowserHistory(input: AppendBrowserHistoryInput): Promise<{ ok: true }> {
+  return await getDesktopHostBridge().appendBrowserHistory(input);
 }

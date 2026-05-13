@@ -88,6 +88,25 @@ export type ReadFileAsDataUrlResult =
   | { ok: true; dataUrl: string }
   | { ok: false; error: string };
 
+export type BrowserHistoryEntry = {
+  url: string;
+  title: string;
+  faviconUrl?: string;
+  visitedAt: string;
+};
+
+export type BrowserHistoryGroup = {
+  host: string;
+  faviconUrl?: string;
+  entries: BrowserHistoryEntry[];
+};
+
+export type LoadBrowserHistoryResult = BrowserHistoryGroup[];
+
+export type AppendBrowserHistoryInput = {
+  entry: BrowserHistoryEntry;
+};
+
 export type DesktopHostBridge = {
   openLocalFolderDialog: (input?: OpenLocalFolderDialogInput) => Promise<string | null>;
   toggleMainWindowMaximized: () => Promise<{ ok: true }>;
@@ -96,6 +115,8 @@ export type DesktopHostBridge = {
   openExternalUrl: (input: OpenExternalUrlInput) => Promise<OpenExternalUrlResult>;
   readExternalClipboardSourcePaths: () => Promise<ExternalClipboardReadOutcome>;
   readFileAsDataUrl: (input: ReadFileAsDataUrlInput) => Promise<ReadFileAsDataUrlResult>;
+  loadBrowserHistory: () => Promise<LoadBrowserHistoryResult>;
+  appendBrowserHistory: (input: AppendBrowserHistoryInput) => Promise<{ ok: true }>;
   dispatchNotification: (input: DispatchNotificationInput) => Promise<NotificationDispatchResult>;
   playNotificationSound: (input: PlayNotificationSoundInput) => Promise<NotificationSoundPreviewResult>;
   getPendingUpdate: () => Promise<DesktopUpdateEventPayload | null>;
@@ -132,6 +153,8 @@ export const HOST_IPC_CHANNELS = {
   openExternalUrl: "desktop:host/open-external-url",
   readExternalClipboardSourcePaths: "desktop:host/read-external-clipboard-source-paths",
   readFileAsDataUrl: "desktop:host/read-file-as-data-url",
+  loadBrowserHistory: "desktop:host/load-browser-history",
+  appendBrowserHistory: "desktop:host/append-browser-history",
   dispatchNotification: "desktop:host/dispatch-notification",
   playNotificationSound: "desktop:host/play-notification-sound",
   getPendingUpdate: "desktop:host/get-pending-update",
