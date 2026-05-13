@@ -25,7 +25,6 @@ export const authStore = create<AuthStoreState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
-        authStatusResolved: state.authStatusResolved,
       }),
     },
   ),

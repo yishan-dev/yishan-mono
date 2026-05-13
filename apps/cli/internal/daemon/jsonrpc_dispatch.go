@@ -188,6 +188,34 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
+	case MethodAppGetAccessToken:
+		accessToken, expiresAt, err := cliruntime.EnsureFreshAccessToken()
+		if err != nil {
+			return nil, err
+		}
+		result := map[string]string{"accessToken": accessToken}
+		if expiresAt != "" {
+			result["accessTokenExpiresAt"] = expiresAt
+		}
+		return result, nil
+	case MethodAppCheckAuthStatus:
+		authenticated, expiresAt, err := cliruntime.CheckAuthStatus()
+		if err != nil {
+			return map[string]any{"authenticated": false}, nil
+		}
+		result := map[string]any{"authenticated": authenticated}
+		if expiresAt != "" {
+			result["accessTokenExpiresAt"] = expiresAt
+		}
+		return result, nil
+	case MethodAppLogout:
+		cliruntime.ClearAuthState()
+		return map[string]bool{"ok": true}, nil
+	case MethodAppReloadAuthConfig:
+		if err := cliruntime.ReloadAuthConfig(); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"ok": true}, nil
 	case MethodFileRead:
 		var req fileReadParams
 		if err := decodeParams(params, &req); err != nil {

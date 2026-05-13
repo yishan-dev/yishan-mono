@@ -85,6 +85,24 @@ export type PersistAuthTokensInput = {
   refreshTokenExpiresAt?: string;
 };
 
+export type GetAccessTokenOutput = {
+  accessToken: string;
+  accessTokenExpiresAt?: string;
+};
+
+export type CheckAuthStatusOutput = {
+  authenticated: boolean;
+  accessTokenExpiresAt?: string;
+};
+
+export type LogoutOutput = {
+  ok: boolean;
+};
+
+export type ReloadAuthConfigOutput = {
+  ok: boolean;
+};
+
 export type WorkspaceSyncContextLinkInput = {
   repoKey: string;
   enabled: boolean;

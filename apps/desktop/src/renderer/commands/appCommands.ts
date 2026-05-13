@@ -1,4 +1,4 @@
-import type { DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
+import type { AuthStatusResult, DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
 import type { DesktopAgentKind } from "../helpers/agentSettings";
 import { getDaemonClient, getDesktopHostBridge } from "../rpc/rpcTransport";
 
@@ -42,8 +42,17 @@ export async function openExternalUrl(url: string) {
 }
 
 /** Reads current desktop authentication status from main-process IPC. */
-export async function getAuthStatus() {
-  return await getDesktopHostBridge().getAuthStatus();
+export async function getAuthStatus(): Promise<AuthStatusResult> {
+  try {
+    const client = await getDaemonClient();
+    const result = await client.app.checkAuthStatus();
+    return {
+      authenticated: result.authenticated,
+      expiresAt: result.accessTokenExpiresAt,
+    };
+  } catch {
+    return { authenticated: false };
+  }
 }
 
 /** Reads current daemon identity and version from desktop main-process IPC. */
@@ -68,5 +77,12 @@ export async function setDaemonQuitOnExit(value: boolean): Promise<void> {
 
 /** Runs one desktop login flow through main-process IPC. */
 export async function login() {
-  return await getDesktopHostBridge().login();
+  const result = await getDesktopHostBridge().login();
+  if (result.authenticated) {
+    try {
+      const daemonClient = await getDaemonClient();
+      await daemonClient.app.reloadAuthConfig();
+    } catch {}
+  }
+  return result;
 }

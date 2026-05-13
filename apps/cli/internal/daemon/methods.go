@@ -12,6 +12,10 @@ const (
 	MethodAgentListDetectionStatuses = "agent.listDetectionStatuses"
 	MethodFrontendEventsStream       = "events.frontendStream"
 	MethodAppPersistAuthTokens       = "app.persistAuthTokens"
+	MethodAppGetAccessToken          = "app.getAccessToken"
+	MethodAppCheckAuthStatus         = "app.checkAuthStatus"
+	MethodAppLogout                  = "app.logout"
+	MethodAppReloadAuthConfig       = "app.reloadAuthConfig"
 
 	MethodFileRead   = "file.read"
 	MethodFileList   = "file.list"

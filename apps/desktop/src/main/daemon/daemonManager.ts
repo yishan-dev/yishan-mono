@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { isDevMode } from "../runtime/environment";
 
-const DAEMON_START_ARGS = ["daemon", "start", "--jwt-required=false"];
+const DAEMON_START_ARGS = ["daemon", "start", "--jwt-required=true"];
 const DAEMON_STOP_ARGS = ["daemon", "stop"];
 const DAEMON_STATE_FILE_NAME = "daemon.state.json";
 const DAEMON_ID_FILE_NAME = "daemon.id";
@@ -356,7 +356,7 @@ export class DaemonManager {
 
     const invocation = resolveCliInvocation();
     let output = "";
-    const child = spawn(invocation.executablePath, [...invocation.prefixArgs, "daemon", "run", "--jwt-required=false"], {
+    const child = spawn(invocation.executablePath, [...invocation.prefixArgs, "daemon", "run", "--jwt-required=true"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env,
       cwd: invocation.cwd,

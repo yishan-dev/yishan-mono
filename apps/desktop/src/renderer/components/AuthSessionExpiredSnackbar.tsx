@@ -21,7 +21,9 @@ export function AuthSessionExpiredSnackbar() {
 
   useEffect(() => {
     const unsubscribe = onAuthExpired(() => {
-      setVisible(true);
+      if (authStore.getState().isAuthenticated) {
+        setVisible(true);
+      }
     });
 
     return unsubscribe;
@@ -49,6 +51,7 @@ export function AuthSessionExpiredSnackbar() {
         elevation={8}
         aria-live="assertive"
         role="alert"
+        className="electron-webkit-app-region-no-drag"
         sx={{
           display: "block",
           width: 360,

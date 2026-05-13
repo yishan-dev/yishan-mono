@@ -80,15 +80,6 @@ export type AuthLoginResult = {
   error?: string;
 };
 
-export type AuthTokensResult = {
-  authenticated: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  accessTokenExpiresAt?: string;
-  refreshTokenExpiresAt?: string;
-  error?: string;
-};
-
 export type ReadFileAsDataUrlInput = {
   absolutePath: string;
 };
@@ -113,11 +104,11 @@ export type DesktopHostBridge = {
   installUpdate: () => Promise<{ ok: true }>;
   getAuthStatus: () => Promise<AuthStatusResult>;
   login: () => Promise<AuthLoginResult>;
-  getAuthTokens: () => Promise<AuthTokensResult>;
   getDaemonInfo: () => Promise<DaemonInfoResult>;
   restartDaemon: () => Promise<DaemonRestartResult>;
   getDaemonQuitOnExit: () => Promise<boolean>;
   setDaemonQuitOnExit: (value: boolean) => Promise<{ ok: true }>;
+  getDaemonJwt: () => Promise<string>;
 };
 
 export type DesktopRpcEventBridge = {
@@ -149,9 +140,9 @@ export const HOST_IPC_CHANNELS = {
   installUpdate: "desktop:host/install-update",
   getAuthStatus: "desktop:host/get-auth-status",
   login: "desktop:host/login",
-  getAuthTokens: "desktop:host/get-auth-tokens",
   getDaemonInfo: "desktop:host/get-daemon-info",
   restartDaemon: "desktop:host/restart-daemon",
   getDaemonQuitOnExit: "desktop:host/get-daemon-quit-on-exit",
   setDaemonQuitOnExit: "desktop:host/set-daemon-quit-on-exit",
+  getDaemonJwt: "desktop:host/get-daemon-jwt",
 } as const;

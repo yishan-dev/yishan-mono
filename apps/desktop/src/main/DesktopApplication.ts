@@ -4,9 +4,10 @@ import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
 import { configureApplicationMenu } from "./app/menu";
-import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
+import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
 import { getDaemonQuitOnExit, setDaemonQuitOnExit } from "./daemon/daemonSettings";
+import { createDaemonJwt, ensureDaemonJwtSecret } from "./daemon/daemonSecret";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
 import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
 import { DESKTOP_RPC_IPC_CHANNELS, type DesktopUpdateEventPayload, HOST_IPC_CHANNELS } from "./ipc";
@@ -29,6 +30,7 @@ export class DesktopApplication {
   private pendingProtocolUrl: string | null = null;
   private pendingUpdateReady: DesktopUpdateEventPayload | null = null;
   private cachedDaemonQuitOnExit: boolean | null = null;
+  private daemonJwtSecret: string | null = null;
 
   /**
    * Starts the desktop app and exits on startup failure.
@@ -90,6 +92,7 @@ export class DesktopApplication {
       this.cachedDaemonQuitOnExit = false;
     }
 
+    this.daemonJwtSecret = await ensureDaemonJwtSecret();
     await this.daemonManager.ensureStarted();
     this.registerHostIpcHandlers();
     this.registerAuthIpcHandlers();
@@ -180,10 +183,6 @@ export class DesktopApplication {
       return await login();
     });
 
-    ipcMain.handle(HOST_IPC_CHANNELS.getAuthTokens, async () => {
-      return await getAuthTokens();
-    });
-
     ipcMain.handle(HOST_IPC_CHANNELS.getDaemonInfo, async () => {
       return await this.daemonManager.getInfo();
     });
@@ -222,6 +221,13 @@ export class DesktopApplication {
       await setDaemonQuitOnExit(value);
       this.cachedDaemonQuitOnExit = value;
       return { ok: true as const };
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.getDaemonJwt, async () => {
+      if (!this.daemonJwtSecret) {
+        this.daemonJwtSecret = await ensureDaemonJwtSecret();
+      }
+      return createDaemonJwt(this.daemonJwtSecret);
     });
   }
 

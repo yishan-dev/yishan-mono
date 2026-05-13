@@ -19,11 +19,11 @@ const bridge: DesktopBridge = {
     installUpdate: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.installUpdate),
     getAuthStatus: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthStatus),
     login: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.login),
-    getAuthTokens: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthTokens),
     getDaemonInfo: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonInfo),
     restartDaemon: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.restartDaemon),
     getDaemonQuitOnExit: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonQuitOnExit),
     setDaemonQuitOnExit: (value) => ipcRenderer.invoke(HOST_IPC_CHANNELS.setDaemonQuitOnExit, value),
+    getDaemonJwt: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonJwt),
   },
   events: {
     subscribe: (listener: (envelope: DesktopRpcEventEnvelope) => void) => {
