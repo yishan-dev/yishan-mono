@@ -1,4 +1,4 @@
-import { closeAllTabsState, closeOtherTabsState, closeTabState } from "./close";
+import { closeAllTabsState, closeAllTerminalTabsState, closeOtherTabsState, closeTabState } from "./close";
 import {
   markFileTabSavedState,
   refreshDiffTabContentState,
@@ -14,6 +14,7 @@ import { createSessionTabOptimisticState, failSessionTabInitState, resolveSessio
 
 export {
   closeAllTabsState,
+  closeAllTerminalTabsState,
   closeOtherTabsState,
   closeTabState,
   createSessionTabOptimisticState,

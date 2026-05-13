@@ -3,6 +3,7 @@ import { immer } from "zustand/middleware/immer";
 import { resolveSelectedTabIdForWorkspace } from "./tabs";
 import {
   closeAllTabsState,
+  closeAllTerminalTabsState,
   closeOtherTabsState,
   closeTabState,
   createSessionTabOptimisticState,
@@ -44,6 +45,8 @@ export type TabStoreState = {
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
   closeAllTabs: (tabId: string) => void;
+  /** Closes every terminal tab across all workspaces (used before daemon restart). */
+  closeAllTerminalTabs: () => void;
   /** Persists one backend terminal session id on one terminal tab. */
   setTerminalTabSessionId: (tabId: string, sessionId: string) => void;
   toggleTabPinned: (tabId: string) => void;
@@ -208,6 +211,9 @@ export const tabStore = create<TabStoreState>()(
     },
     closeAllTabs: (tabId) => {
       set((state) => closeAllTabsState(state, tabId) ?? state);
+    },
+    closeAllTerminalTabs: () => {
+      set((state) => closeAllTerminalTabsState(state) ?? state);
     },
     setTerminalTabSessionId: (tabId, sessionId) => {
       const normalizedTabId = tabId.trim();
