@@ -1,6 +1,6 @@
-import { Alert, Box, Divider, IconButton, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuCamera, LuCookie, LuDatabaseZap, LuHistory, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
+import { Alert, Box, Divider, IconButton, InputAdornment, Menu, MenuItem, Snackbar, TextField } from "@mui/material";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuArrowLeft, LuArrowRight, LuCamera, LuCookie, LuDatabaseZap, LuHistory, LuLock, LuLockOpen, LuRefreshCcw, LuTrash2, LuWrench } from "react-icons/lu";
 import { useCommands } from "../../../hooks/useCommands";
 
 function normalizeUrl(rawValue: string): string {
@@ -32,6 +32,43 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const [isWebviewReady, setIsWebviewReady] = useState(false);
   const [toolsAnchor, setToolsAnchor] = useState<HTMLElement | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [urlFocused, setUrlFocused] = useState(false);
+  const [pageTitle, setPageTitle] = useState("");
+
+  const displayUrl = useMemo(() => {
+    if (urlFocused) {
+      return urlInput;
+    }
+    if (!urlInput.trim()) {
+      return "";
+    }
+    const normalized = normalizeUrl(urlInput);
+    if (!pageTitle) {
+      return normalized;
+    }
+    try {
+      const url = new URL(normalized);
+      return `${pageTitle} — ${url.host}`;
+    } catch {
+      return normalized;
+    }
+  }, [urlFocused, urlInput, pageTitle]);
+
+  const normalizedUrl = urlInput.trim() ? normalizeUrl(urlInput) : "";
+  const isHttps = normalizedUrl.startsWith("https://");
+  const isHttp = normalizedUrl.startsWith("http://") && !isHttps;
+
+  const handleUrlFocus = useCallback(() => {
+    setUrlFocused(true);
+  }, []);
+
+  const handleUrlBlur = useCallback(() => {
+    setUrlFocused(false);
+    const normalized = normalizeUrl(urlInput);
+    if (normalized) {
+      setUrlInput(normalized);
+    }
+  }, [urlInput]);
 
   useEffect(() => {
     setUrlInput(initialUrl);
@@ -51,6 +88,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
       if (!nextTitle) {
         return;
       }
+      setPageTitle(nextTitle);
       cmd.renameTab(tabId, nextTitle);
     };
 
@@ -110,6 +148,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
 
     setErrorMessage("");
     cmd.setBrowserTabFaviconUrl(tabId, undefined);
+    setPageTitle("");
     setActiveUrl(nextUrl);
   };
 
@@ -272,14 +311,28 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
         </IconButton>
         <TextField
           size="small"
-          value={urlInput}
+          value={displayUrl}
           onChange={(event) => setUrlInput(event.target.value)}
-          placeholder="https://example.com"
+          onFocus={handleUrlFocus}
+          onBlur={handleUrlBlur}
+          placeholder="Search or enter URL"
           fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start" sx={{ mr: 0.5, ml: -0.25 }}>
+                {isHttps ? (
+                  <LuLock size={12} color="#4caf50" />
+                ) : isHttp ? (
+                  <LuLockOpen size={12} color="#ff9800" />
+                ) : null}
+              </InputAdornment>
+            ),
+          }}
           sx={{
             "& .MuiInputBase-input": {
               py: 0.75,
               fontSize: 13,
+              color: urlFocused ? "text.primary" : "text.secondary",
             },
           }}
         />
