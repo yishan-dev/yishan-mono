@@ -47,6 +47,9 @@ vi.mock("../shortcuts/shortcutDisplay", () => ({
     if (shortcutId === "open-terminal") {
       return "⌘+T";
     }
+    if (shortcutId === "open-browser") {
+      return "⌘+⇧+B";
+    }
 
     return null;
   },
@@ -260,6 +263,15 @@ describe("TabBar interactions", () => {
     await screen.findByRole("menuitem", { name: /Create: Terminal/ });
 
     expect(screen.getByText("⌘+T")).toBeTruthy();
+  });
+
+  it("shows shortcut for browser in create menu", async () => {
+    renderTabBar();
+
+    fireEvent.click(screen.getByRole("button", { name: "New tab" }));
+    await screen.findByRole("menuitem", { name: /Create: Browser/ });
+
+    expect(screen.getByText("⌘+⇧+B")).toBeTruthy();
   });
 
   it("hides disabled agents from create menu", async () => {

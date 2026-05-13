@@ -20,6 +20,7 @@ type ShortcutTarget =
   | { command: "tabs.create" }
   | { command: "tabs.closeSelected" }
   | { command: "tabs.openTerminal" }
+  | { command: "tabs.openBrowser" }
   | { command: "tabs.selectByIndex" }
   | { command: "workspace.activatePane"; payload: { pane: "repo" | "files" | "changes" } }
   | { command: "workspace.openCreateWorkspaceDialog" }
@@ -126,6 +127,21 @@ function executeShortcutTarget(context: ShortContext, event: KeyboardEvent, targ
       kind: "terminal",
       title: context.terminalTabTitle,
       reuseExisting: false,
+    });
+    event.preventDefault();
+    return true;
+  }
+
+  if (target.command === "tabs.openBrowser") {
+    const workspaceId = context.workspaceStoreState.selectedWorkspaceId;
+    if (!workspaceId) {
+      return false;
+    }
+
+    context.commands.openTab({
+      workspaceId,
+      kind: "browser",
+      url: "https://example.com",
     });
     event.preventDefault();
     return true;
@@ -291,6 +307,24 @@ const SHORTCUT_REGISTRY: readonly ShortcutRegistryItem[] = [
     scope: "workspace",
     keys: "ctrl+t,command+t",
     target: { command: "tabs.openTerminal" },
+    shouldRun: (context, event) => {
+      if (!context.isWorkspaceRoute || !context.workspaceStoreState.selectedWorkspaceId) {
+        return false;
+      }
+
+      if (isWithinTerminalSurface(event.target)) {
+        return true;
+      }
+
+      return !isEditableTarget(event.target);
+    },
+  },
+  {
+    id: "open-browser",
+    descriptionKey: "keybindings.actions.openBrowser",
+    scope: "workspace",
+    keys: "ctrl+shift+b,command+shift+b",
+    target: { command: "tabs.openBrowser" },
     shouldRun: (context, event) => {
       if (!context.isWorkspaceRoute || !context.workspaceStoreState.selectedWorkspaceId) {
         return false;

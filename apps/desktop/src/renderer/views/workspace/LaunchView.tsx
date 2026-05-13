@@ -4,6 +4,7 @@ import {
   LuCircle,
   LuCircleCheck,
   LuCircleX,
+  LuGlobe,
   LuLoaderCircle,
   LuSearch,
   LuSquareTerminal,
@@ -69,6 +70,18 @@ export function LaunchView() {
           kind: "terminal",
           title: t("terminal.title"),
           reuseExisting: false,
+        }),
+    },
+    {
+      id: "browser",
+      label: t("launch.actions.openBrowser"),
+      shortcutLabel: getShortcutDisplayLabelById("open-browser", platform),
+      icon: <LuGlobe size={16} />,
+      onClick: () =>
+        openTab({
+          workspaceId: selectedWorkspaceId,
+          kind: "browser",
+          url: "https://example.com",
         }),
     },
     {
@@ -201,7 +214,13 @@ export function LaunchView() {
               <Box component="span">{action.label}</Box>
             </Box>
             {action.shortcutLabel ? (
-              <Typography variant="caption" color="text.secondary" component="span" aria-hidden="true">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                component="span"
+                aria-hidden="true"
+                sx={{ fontSize: 13, lineHeight: 1 }}
+              >
                 {action.shortcutLabel}
               </Typography>
             ) : null}

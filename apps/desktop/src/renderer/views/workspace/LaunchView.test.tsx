@@ -16,6 +16,7 @@ vi.mock("react-i18next", () => ({
         "launch.title": "No tabs open",
         "launch.hint": "Select an action to get started.",
         "launch.actions.openTerminal": "Open terminal",
+        "launch.actions.openBrowser": "Open browser tab",
         "launch.actions.searchFiles": "Search files",
         "terminal.title": "Terminal",
       };
@@ -44,6 +45,9 @@ vi.mock("../../shortcuts/shortcutDisplay", () => ({
     if (id === "open-file-search") {
       return "⌘+P";
     }
+    if (id === "open-browser") {
+      return "⌘+⇧+B";
+    }
 
     return null;
   },
@@ -65,15 +69,17 @@ describe("LaunchView", () => {
 
     expect(screen.getByText("⌘+T")).toBeTruthy();
     expect(screen.getByText("⌘+P")).toBeTruthy();
+    expect(screen.getByText("⌘+⇧+B")).toBeTruthy();
   });
 
   it("runs launch actions when clicked", () => {
     render(<LaunchView />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open browser tab" }));
     fireEvent.click(screen.getByRole("button", { name: "Search files" }));
 
-    expect(mocks.openTab).toHaveBeenCalledTimes(1);
+    expect(mocks.openTab).toHaveBeenCalledTimes(2);
     expect(mocks.openWorkspaceFileSearch).toHaveBeenCalledTimes(1);
   });
 });
