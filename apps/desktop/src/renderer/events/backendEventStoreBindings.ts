@@ -8,6 +8,7 @@ import {
   getNotificationPreferences,
   playNotificationSound,
 } from "../commands/notificationCommands";
+import { subscribeDaemonConnectionStatus } from "../rpc/rpcTransport";
 import { type WorkspaceAgentStatus, type WorkspaceUnreadTone, chatStore } from "../store/chatStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceCreateProgressStore } from "../store/workspaceCreateProgressStore";
@@ -22,12 +23,14 @@ type WorkspaceCreateProgressPayload = RpcFrontendMessagePayload<"workspaceCreate
 type AgentSessionLifecycleStatus = "running" | "waiting_input";
 
 type BackendEventStoreBindingsDependencies = {
+  subscribeDaemonConnectionStatus?: (listener: (status: "connected" | "connecting" | "disconnected") => void) => () => void;
   subscribeGitChanged: (listener: (workspaceWorktreePath: string) => void) => () => void;
   subscribeWorkspaceFilesChanged: (
     listener: (workspaceWorktreePath: string, changedRelativePaths?: string[]) => void,
   ) => () => void;
   subscribeInAppNotification: (listener: (payload: NotificationEventPayload) => void) => () => void;
   subscribeWorkspaceCreateProgress?: (listener: (payload: WorkspaceCreateProgressPayload) => void) => () => void;
+  listWorkspaceWorktreePaths?: () => string[];
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
   setWorkspaceAgentStatusByWorkspaceId: (statusByWorkspaceId: Record<string, WorkspaceAgentStatus>) => void;
@@ -41,6 +44,7 @@ type BackendEventStoreBindingsDependencies = {
 };
 
 const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindingsDependencies = {
+  subscribeDaemonConnectionStatus,
   subscribeGitChanged: (listener) =>
     subscribeBackendEvent("git.changed", (event) => {
       if (event.source !== "gitChanged") {
@@ -69,6 +73,11 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
       listener(event.payload);
     });
   },
+  listWorkspaceWorktreePaths: () =>
+    workspaceStore
+      .getState()
+      .workspaces.map((workspace) => workspace.worktreePath.trim())
+      .filter((workspaceWorktreePath) => workspaceWorktreePath.length > 0),
   incrementFileTreeRefreshVersion: (workspaceWorktreePath, changedRelativePaths) => {
     workspaceStore.getState().incrementFileTreeRefreshVersion(workspaceWorktreePath, changedRelativePaths);
   },
@@ -312,6 +321,41 @@ export function createBackendEventStoreBindings(
     const unsubscribeGitChanged = dependencies.subscribeGitChanged((workspaceWorktreePath) => {
       dependencies.incrementGitRefreshVersion(workspaceWorktreePath);
     });
+    let hasObservedConnectedState = false;
+    let shouldRecoverWorkspaceViewsOnReconnect = false;
+    const unsubscribeDaemonConnectionStatus = (dependencies.subscribeDaemonConnectionStatus ?? subscribeDaemonConnectionStatus)(
+      (status) => {
+      if (status === "disconnected") {
+        shouldRecoverWorkspaceViewsOnReconnect = true;
+        return;
+      }
+
+      if (status !== "connected") {
+        return;
+      }
+
+      if (!hasObservedConnectedState) {
+        hasObservedConnectedState = true;
+        return;
+      }
+
+      if (!shouldRecoverWorkspaceViewsOnReconnect) {
+        return;
+      }
+
+      shouldRecoverWorkspaceViewsOnReconnect = false;
+
+      try {
+        const workspaceWorktreePaths = dependencies.listWorkspaceWorktreePaths?.() ?? [];
+        for (const workspaceWorktreePath of workspaceWorktreePaths) {
+          dependencies.incrementFileTreeRefreshVersion(workspaceWorktreePath, []);
+          dependencies.incrementGitRefreshVersion(workspaceWorktreePath);
+        }
+      } catch (error) {
+        console.error("[backendEventStoreBindings] Failed to recover workspace views after daemon reconnect", error);
+      }
+      },
+    );
     const unsubscribeWorkspaceFilesChanged = dependencies.subscribeWorkspaceFilesChanged(
       (workspaceWorktreePath, changedRelativePaths) => {
         dependencies.incrementFileTreeRefreshVersion(workspaceWorktreePath, changedRelativePaths);
@@ -376,6 +420,7 @@ export function createBackendEventStoreBindings(
 
     return () => {
       unsubscribeGitChanged();
+      unsubscribeDaemonConnectionStatus();
       unsubscribeWorkspaceFilesChanged();
       unsubscribeInAppNotification();
       unsubscribeWorkspaceCreateProgress();
