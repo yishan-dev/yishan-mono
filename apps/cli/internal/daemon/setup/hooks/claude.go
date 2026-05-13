@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 )
 
-const claudeManagedCommandMarker = "yishan-managed-hook=claude"
+const (
+	claudeManagedCommandMarker       = "YISHAN_MANAGED_HOOK=claude"
+	claudeLegacyManagedCommandMarker = "yishan-managed-hook=claude"
+)
 
 type claudeHookCommand struct {
 	Type    string `json:"type"`
@@ -41,7 +44,11 @@ func ensureClaudeHookSettings(notifyScriptPath string, homeDir string, goos stri
 		currentDefinitions, _ := hooksValue[event.name].([]any)
 		filteredDefinitions := make([]any, 0, len(currentDefinitions)+1)
 		for _, definition := range currentDefinitions {
-			cleaned, keep := removeManagedHookCommands(definition, claudeManagedCommandMarker)
+			cleaned, keep := removeManagedHookCommands(definition, claudeLegacyManagedCommandMarker)
+			if !keep {
+				continue
+			}
+			cleaned, keep = removeManagedHookCommands(cleaned, claudeManagedCommandMarker)
 			if keep {
 				filteredDefinitions = append(filteredDefinitions, cleaned)
 			}

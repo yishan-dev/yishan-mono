@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 )
 
-const geminiManagedCommandMarker = "yishan-managed-hook=gemini"
+const (
+	geminiManagedCommandMarker       = "YISHAN_MANAGED_HOOK=gemini"
+	geminiLegacyManagedCommandMarker = "yishan-managed-hook=gemini"
+)
 
 type geminiHookCommand struct {
 	Type    string `json:"type"`
@@ -40,7 +43,11 @@ func ensureGeminiHookSettings(notifyScriptPath string, homeDir string, goos stri
 		currentDefinitions, _ := hooksValue[event.name].([]any)
 		filteredDefinitions := make([]any, 0, len(currentDefinitions)+1)
 		for _, definition := range currentDefinitions {
-			cleaned, keep := removeManagedHookCommands(definition, geminiManagedCommandMarker)
+			cleaned, keep := removeManagedHookCommands(definition, geminiLegacyManagedCommandMarker)
+			if !keep {
+				continue
+			}
+			cleaned, keep = removeManagedHookCommands(cleaned, geminiManagedCommandMarker)
 			if keep {
 				filteredDefinitions = append(filteredDefinitions, cleaned)
 			}
