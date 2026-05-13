@@ -81,7 +81,7 @@ export function LaunchView() {
         openTab({
           workspaceId: selectedWorkspaceId,
           kind: "browser",
-          url: "https://example.com",
+          url: "",
         }),
     },
     {

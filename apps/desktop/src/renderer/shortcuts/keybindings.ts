@@ -141,7 +141,7 @@ function executeShortcutTarget(context: ShortContext, event: KeyboardEvent, targ
     context.commands.openTab({
       workspaceId,
       kind: "browser",
-      url: "https://example.com",
+      url: "",
       reuseExisting: false,
     });
     event.preventDefault();

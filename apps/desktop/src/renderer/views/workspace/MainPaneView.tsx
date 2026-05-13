@@ -116,7 +116,7 @@ function buildTerminalInput(title: string) {
 function buildBrowserInput() {
   return {
     kind: "browser" as const,
-    url: "https://example.com",
+    url: "",
   };
 }
 

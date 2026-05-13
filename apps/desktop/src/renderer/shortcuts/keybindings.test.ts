@@ -227,7 +227,7 @@ describe("getShortcutDefinitions", () => {
     expect(openTab).toHaveBeenCalledWith({
       workspaceId: "workspace-1",
       kind: "browser",
-      url: "https://example.com",
+      url: "",
       reuseExisting: false,
     });
   });
