@@ -1,7 +1,8 @@
 import { Box, Button, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuChevronRight, LuFolderGit2, LuMonitor, LuPanelLeft, LuPanelRight } from "react-icons/lu";
+import { HiCubeTransparent, HiOutlineCube } from "react-icons/hi2";
+import { LuChevronRight, LuPanelLeft, LuPanelRight } from "react-icons/lu";
 import { getMainWindowFullscreenState } from "../../commands/appCommands";
 import { PaneHeader } from "../../components/PaneHeader";
 import { renderProjectIcon } from "../../components/projectIcons";
@@ -32,10 +33,10 @@ function resolvePrimaryWorkspaceId(project: WorkspaceProjectRecord | undefined, 
 /** Renders the same workspace kind icon used by left-pane workspace rows. */
 function renderWorkspaceKindIcon(workspace: RepoWorkspaceItem | undefined, isPrimaryWorkspace: boolean, size: number) {
   if (workspace?.kind === "local" || isPrimaryWorkspace) {
-    return <LuMonitor size={size} />;
+    return <HiOutlineCube size={size} />;
   }
 
-  return <LuFolderGit2 size={size} />;
+  return <HiCubeTransparent size={size} />;
 }
 
 /** Renders the main pane title bar with repo/workspace selectors and pane toggle controls. */
