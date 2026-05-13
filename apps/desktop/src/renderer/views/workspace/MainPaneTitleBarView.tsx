@@ -10,6 +10,7 @@ import { getRendererPlatform } from "../../helpers/platform";
 import { useCommands } from "../../hooks/useCommands";
 import { useWorkspacePaneVisibilityContext } from "../../hooks/useWorkspacePaneVisibility";
 import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
+import { chatStore } from "../../store/chatStore";
 import type { RepoWorkspaceItem, WorkspaceProjectRecord } from "../../store/types";
 import { workspaceStore } from "../../store/workspaceStore";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
@@ -47,6 +48,8 @@ export function MainPaneTitleBarView() {
   const workspaces = workspaceStore((state) => state.workspaces);
   const selectedProjectId = workspaceStore((state) => state.selectedProjectId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
+  const workspaceAgentStatusByWorkspaceId = chatStore((state) => state.workspaceAgentStatusByWorkspaceId);
+  const workspaceUnreadToneByWorkspaceId = chatStore((state) => state.workspaceUnreadToneByWorkspaceId);
   const { setSelectedRepoId, setSelectedWorkspaceId } = useCommands();
   const selectedRepo = projects.find((project) => project.id === selectedProjectId);
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
@@ -82,7 +85,23 @@ export function MainPaneTitleBarView() {
   const filteredWorkspaceOptions = workspacesForSelectedRepo.filter((workspace) =>
     workspace.name.toLowerCase().includes(workspaceSearchValue.trim().toLowerCase()),
   );
+  const resolveWorkspaceIconColor = (workspaceId: string): "warning.main" | "error.main" | "success.main" | "text.secondary" => {
+    const runtimeStatus = workspaceAgentStatusByWorkspaceId[workspaceId] ?? "idle";
+    const unreadTone = workspaceUnreadToneByWorkspaceId[workspaceId];
+    if (runtimeStatus === "waiting_input") {
+      return "warning.main";
+    }
 
+    if (unreadTone === "error") {
+      return "error.main";
+    }
+
+    if (unreadTone === "success") {
+      return "success.main";
+    }
+
+    return "text.secondary";
+  };
   useEffect(() => {
     let isDisposed = false;
     /** Syncs one fullscreen snapshot from the host window state. */
@@ -166,7 +185,12 @@ export function MainPaneTitleBarView() {
             size="small"
             variant="outlined"
             aria-label={t("workspace.column")}
-            startIcon={renderWorkspaceKindIcon(selectedWorkspace, selectedWorkspace?.id === primaryWorkspaceId, 14)}
+            data-testid="main-pane-workspace-selector"
+            startIcon={
+              <Box component="span" sx={{ display: "inline-flex", color: "text.secondary" }}>
+                {renderWorkspaceKindIcon(selectedWorkspace, selectedWorkspace?.id === primaryWorkspaceId, 14)}
+              </Box>
+            }
             onClick={(event) => {
               setWorkspaceMenuAnchorEl(event.currentTarget);
               setWorkspaceSearchValue("");
@@ -287,7 +311,10 @@ export function MainPaneTitleBarView() {
               setWorkspaceSearchValue("");
             }}
           >
-            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", mr: 1 }}>
+            <Box
+              component="span"
+              sx={{ display: "inline-flex", alignItems: "center", mr: 1, color: resolveWorkspaceIconColor(workspace.id) }}
+            >
               {renderWorkspaceKindIcon(workspace, workspace.id === primaryWorkspaceId, 14)}
             </Box>
             <Typography variant="body2" noWrap>
