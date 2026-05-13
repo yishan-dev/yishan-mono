@@ -158,7 +158,7 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 		t.Fatalf("expected managed Cursor hook events to be present")
 	}
 
-	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(crossPlatformDir(notifyPath), cursorHookScriptFileName))
+	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(filepath.Dir(notifyPath), cursorHookScriptFileName))
 	if err != nil {
 		t.Fatalf("read cursor hook script: %v", err)
 	}
@@ -312,7 +312,7 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 		t.Fatalf("expected PowerShell Cursor command, got %q", string(cursorHooksRaw))
 	}
 
-	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(crossPlatformDir(notifyPath), cursorHookScriptFileName))
+	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(filepath.Dir(notifyPath), cursorHookScriptFileName))
 	if err != nil {
 		t.Fatalf("read cursor hook script: %v", err)
 	}
