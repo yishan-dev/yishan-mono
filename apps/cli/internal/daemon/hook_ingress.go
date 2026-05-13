@@ -169,7 +169,7 @@ func normalizeHookEventType(rawEventType string) string {
 	if normalized == "" || normalized == "unknown" {
 		return "unknown"
 	}
-	if strings.Contains(normalized, "start") || strings.Contains(normalized, "begin") {
+	if strings.Contains(normalized, "start") || strings.Contains(normalized, "begin") || strings.Contains(normalized, "submit") {
 		return "start"
 	}
 	if strings.Contains(normalized, "wait") || strings.Contains(normalized, "permission") || strings.Contains(normalized, "approval") {
