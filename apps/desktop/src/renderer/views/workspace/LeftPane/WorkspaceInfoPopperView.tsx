@@ -14,11 +14,6 @@ type WorkspaceInfoPopperViewProps = {
   onMouseLeave: () => void;
 };
 
-function isMainBranch(branch: string): boolean {
-  const normalizedBranch = branch.trim();
-  return normalizedBranch === "main" || normalizedBranch === "origin/main" || normalizedBranch === "refs/heads/main";
-}
-
 /** Renders hover popper with workspace name and branch metadata. */
 export function WorkspaceInfoPopperView({
   open,
@@ -33,7 +28,7 @@ export function WorkspaceInfoPopperView({
   const unavailableLabel = t("workspace.info.unavailable");
   const displayBranch = currentBranch?.trim() || workspace?.branch?.trim() || unavailableLabel;
   const sourceBranch = workspace?.sourceBranch?.trim() || "";
-  const shouldShowSourceBranch = isPrimaryWorkspace ? isMainBranch(displayBranch) : Boolean(sourceBranch);
+  const shouldShowSourceBranch = !isPrimaryWorkspace && Boolean(sourceBranch);
   const sourceBranchValue = sourceBranch || unavailableLabel;
   const showSourceBranch = shouldShowSourceBranch && sourceBranchValue !== displayBranch;
 
