@@ -2,7 +2,7 @@ import { Box, ButtonBase, IconButton, Menu, MenuItem, Typography } from "@mui/ma
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
+import { LuGlobe, LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
 import {
   AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND,
   type DesktopAgentKind,
@@ -21,13 +21,13 @@ type WorkspaceTab = {
   isTemporary?: boolean;
 };
 
-export type TabBarCreateOption = "terminal" | DesktopAgentKind;
+export type TabBarCreateOption = "browser" | "terminal" | DesktopAgentKind;
 
 type AgentCreateOption = DesktopAgentKind;
 
 /** Returns true when one create-menu option targets an agent terminal preset. */
 function isAgentCreateOption(option: TabBarCreateOption): option is AgentCreateOption {
-  return option !== "terminal";
+  return option !== "terminal" && option !== "browser";
 }
 
 const dirtyDotSx = {
@@ -88,6 +88,7 @@ export function TabBar({
   const newTabLabel = t("tabs.new");
   const createMenuLabel = t("tabs.createMenu.label");
   const terminalTitle = t("terminal.title");
+  const browserTitle = t("browser.title");
   const createLabelByAgentKind = SUPPORTED_DESKTOP_AGENT_KINDS.reduce<Record<DesktopAgentKind, string>>(
     (next, agentKind) => {
       next[agentKind] = t(AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND[agentKind]);
@@ -248,6 +249,12 @@ export function TabBar({
     icon: ReactNode;
     shortcutLabel: string | null;
   }> = [
+    {
+      option: "browser",
+      label: browserTitle,
+      icon: <LuGlobe size={14} />,
+      shortcutLabel: null,
+    },
     {
       option: "terminal",
       label: terminalTitle,

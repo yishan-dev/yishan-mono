@@ -72,6 +72,17 @@ function createTabFromOpenInput(input: OpenWorkspaceTabInput, workspaceId: strin
     };
   }
 
+  if (input.kind === "browser") {
+    return {
+      id: tabId,
+      workspaceId,
+      title: "Browser",
+      pinned: false,
+      kind: "browser",
+      data: buildTabDataByInput(input),
+    };
+  }
+
   return {
     id: tabId,
     workspaceId,
@@ -205,10 +216,32 @@ export function openTabState(
       };
     }
 
+    if (input.kind === "browser" && existingTab.kind === "browser") {
+      const nextUrl = input.url?.trim();
+      if (!nextUrl || nextUrl === existingTab.data.url) {
+        return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
+      }
+
+      return {
+        tabs: state.tabs.map((tab) =>
+          tab.id === existingTab.id && tab.kind === "browser"
+            ? {
+                ...tab,
+                data: {
+                  ...tab.data,
+                  url: nextUrl,
+                },
+              }
+            : tab,
+        ),
+        ...selectWorkspaceTab(state, targetWorkspaceId, existingTab.id),
+      };
+    }
+
     return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
   }
 
-  if (input.temporary && input.kind !== "terminal") {
+  if ((input.kind === "file" || input.kind === "image" || input.kind === "diff") && input.temporary) {
     const existing = findTemporaryTab(state.tabs, targetWorkspaceId);
     if (existing) {
       const replacement = createTabFromOpenInput(input, targetWorkspaceId, existing.id);

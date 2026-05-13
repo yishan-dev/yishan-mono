@@ -532,6 +532,7 @@ export class DesktopApplication {
         preload: join(__dirname, "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
+        webviewTag: true,
       },
     });
 

@@ -175,6 +175,11 @@ export function renameTab(tabId: string, title: string, options?: { userRenamed?
   readTabStoreState().renameTab(tabId, title, options);
 }
 
+/** Stores one browser tab favicon URL. */
+export function setBrowserTabFaviconUrl(tabId: string, faviconUrl: string | undefined) {
+  readTabStoreState().setBrowserTabFaviconUrl(tabId, faviconUrl);
+}
+
 /** Applies a file-tree rename mapping to related open tabs. */
 export function renameTabsForEntryRename(workspaceId: string, fromPath: string, toPath: string) {
   readTabStoreState().renameTabsForEntryRename(workspaceId, fromPath, toPath);

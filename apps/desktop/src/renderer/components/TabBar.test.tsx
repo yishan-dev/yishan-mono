@@ -15,6 +15,7 @@ vi.mock("react-i18next", () => ({
           "tabs.createMenu.label": "Create",
           "tabs.createMenu.chat": "Chat",
           "terminal.title": "Terminal",
+          "browser.title": "Browser",
           "tabs.createMenu.opencode": "OpenCode",
           "tabs.createMenu.codex": "Codex",
           "tabs.createMenu.claude": "Claude",
@@ -240,6 +241,16 @@ describe("TabBar interactions", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: /Create: Terminal/ }));
 
     expect(onCreateTab).toHaveBeenCalledWith("terminal");
+  });
+
+  it("creates a browser tab from plus button menu", async () => {
+    const onCreateTab = vi.fn();
+    renderTabBar({ onCreateTab });
+
+    fireEvent.click(screen.getByRole("button", { name: "New tab" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Create: Browser/ }));
+
+    expect(onCreateTab).toHaveBeenCalledWith("browser");
   });
 
   it("shows shortcut for terminal in create menu", async () => {
