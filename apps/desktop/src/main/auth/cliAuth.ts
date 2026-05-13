@@ -1,9 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { resolve } from "node:path";
-import type { AuthLoginResult, AuthStatusResult, AuthTokensResult } from "../ipc";
+import type { AuthLoginResult, AuthStatusResult } from "../ipc";
 import { isDevMode } from "../runtime/environment";
 
 const CLI_WHOAMI_ARGS = ["whoami"];
@@ -24,14 +22,6 @@ type CliInvocation = {
   cwd?: string;
 };
 
-type ParsedCredentialTokens = {
-  accessToken?: string;
-  refreshToken?: string;
-  accessTokenExpiresAt?: string;
-  refreshTokenExpiresAt?: string;
-};
-
-/** Resolves one desktop auth CLI executable path. */
 function resolveCliInvocation(): CliInvocation {
   const explicitCliPath = process.env.YISHAN_CLI_PATH?.trim();
   if (explicitCliPath) {
@@ -73,68 +63,6 @@ function resolveCliInvocation(): CliInvocation {
   };
 }
 
-/** Resolves active CLI profile name used for auth credential storage. */
-function resolveCliProfileName(): string {
-  if (isDevMode()) {
-    return "dev";
-  }
-
-  return process.env.YISHAN_PROFILE?.trim() || "default";
-}
-
-/** Resolves CLI credential file path for the active profile. */
-function resolveCredentialFilePath(): string {
-  return resolve(homedir(), ".yishan", "profiles", resolveCliProfileName(), "credential.yaml");
-}
-
-/** Parses one YAML-like key-value credential file into auth token fields. */
-function parseCredentialTokens(credentialText: string): ParsedCredentialTokens {
-  const tokens: ParsedCredentialTokens = {};
-  for (const rawLine of credentialText.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = line.indexOf(":");
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const key = line.slice(0, separatorIndex).trim();
-    const rawValue = line.slice(separatorIndex + 1).trim();
-    const value = rawValue.replace(/^['\"]|['\"]$/g, "");
-    if (key === "api_token") {
-      tokens.accessToken = value;
-      continue;
-    }
-    if (key === "api_refresh_token") {
-      tokens.refreshToken = value;
-      continue;
-    }
-    if (key === "api_access_token_expires_at") {
-      tokens.accessTokenExpiresAt = value;
-      continue;
-    }
-    if (key === "api_refresh_token_expires_at") {
-      tokens.refreshTokenExpiresAt = value;
-    }
-  }
-
-  return tokens;
-}
-
-/** Reads auth tokens from CLI credential file for current profile. */
-async function readAuthTokensFromCredentialFile(): Promise<ParsedCredentialTokens> {
-  try {
-    const credentialText = await readFile(resolveCredentialFilePath(), "utf8");
-    return parseCredentialTokens(credentialText);
-  } catch {
-    return {};
-  }
-}
-
-/** Executes one CLI command and captures exit status and output streams. */
 async function runCliCommand(args: string[]): Promise<CliCommandResult> {
   const invocation = resolveCliInvocation();
 
@@ -184,7 +112,6 @@ async function runCliCommand(args: string[]): Promise<CliCommandResult> {
   });
 }
 
-/** Parses one whoami JSON payload into one normalized renderer-facing status result. */
 function parseAuthStatusPayload(stdout: string): AuthStatusResult {
   const trimmed = stdout.trim();
   if (!trimmed) {
@@ -232,7 +159,6 @@ function parseAuthStatusPayload(stdout: string): AuthStatusResult {
   };
 }
 
-/** Runs one status-first login flow by skipping CLI login when user is already authenticated. */
 export async function login(options?: { run?: CliCommandRunner }): Promise<AuthLoginResult> {
   const run = options?.run ?? runCliCommand;
   const currentStatus = await getAuthStatus({ run });
@@ -265,7 +191,6 @@ export async function login(options?: { run?: CliCommandRunner }): Promise<AuthL
   return { authenticated: true, skipped: false };
 }
 
-/** Returns one normalized auth status from CLI-backed auth commands. */
 export async function getAuthStatus(options?: { run?: CliCommandRunner }): Promise<AuthStatusResult> {
   const run = options?.run ?? runCliCommand;
   const result = await run(CLI_WHOAMI_ARGS);
@@ -279,31 +204,4 @@ export async function getAuthStatus(options?: { run?: CliCommandRunner }): Promi
   }
 
   return parseAuthStatusPayload(result.stdout);
-}
-
-/** Returns auth tokens from CLI credential file after ensuring status/refresh is up to date. */
-export async function getAuthTokens(options?: { run?: CliCommandRunner }): Promise<AuthTokensResult> {
-  const status = await getAuthStatus(options);
-  if (!status.authenticated) {
-    return {
-      authenticated: false,
-      error: status.error,
-    };
-  }
-
-  const tokens = await readAuthTokensFromCredentialFile();
-  if (!tokens.accessToken || !tokens.refreshToken) {
-    return {
-      authenticated: false,
-      error: "Auth tokens are missing from CLI credential file",
-    };
-  }
-
-  return {
-    authenticated: true,
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    accessTokenExpiresAt: tokens.accessTokenExpiresAt,
-    refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
-  };
 }

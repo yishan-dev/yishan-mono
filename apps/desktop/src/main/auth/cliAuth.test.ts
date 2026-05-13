@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { getAuthStatus, login } from "./cliAuth";
 
+vi.mock("../runtime/environment", () => ({
+  isDevMode: () => false,
+}));
+
 describe("cliAuth", () => {
   it("returns authenticated status when CLI status reports signed-in state", async () => {
     const run = vi

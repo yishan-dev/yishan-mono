@@ -4,7 +4,7 @@ import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
 import { configureApplicationMenu } from "./app/menu";
-import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
+import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
 import { getDaemonQuitOnExit, setDaemonQuitOnExit } from "./daemon/daemonSettings";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
@@ -178,10 +178,6 @@ export class DesktopApplication {
 
     ipcMain.handle(HOST_IPC_CHANNELS.login, async () => {
       return await login();
-    });
-
-    ipcMain.handle(HOST_IPC_CHANNELS.getAuthTokens, async () => {
-      return await getAuthTokens();
     });
 
     ipcMain.handle(HOST_IPC_CHANNELS.getDaemonInfo, async () => {

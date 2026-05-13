@@ -17,6 +17,9 @@ export type DaemonRpcClient = {
     checkAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
     ensureAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
     persistAuthTokens: (input: Rpc.PersistAuthTokensInput) => Promise<{ ok: boolean }>;
+    getAccessToken: (input?: unknown) => Promise<Rpc.GetAccessTokenOutput>;
+    checkAuthStatus: (input?: unknown) => Promise<Rpc.CheckAuthStatusOutput>;
+    logout: (input?: unknown) => Promise<Rpc.LogoutOutput>;
   };
   workspace: {
     list: (input?: unknown) => Promise<unknown>;
