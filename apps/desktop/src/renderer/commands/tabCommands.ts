@@ -180,6 +180,11 @@ export function setBrowserTabFaviconUrl(tabId: string, faviconUrl: string | unde
   readTabStoreState().setBrowserTabFaviconUrl(tabId, faviconUrl);
 }
 
+/** Persists the current navigated URL on a browser tab. */
+export function setBrowserTabUrl(tabId: string, url: string) {
+  readTabStoreState().setBrowserTabUrl(tabId, url);
+}
+
 /** Applies a file-tree rename mapping to related open tabs. */
 export function renameTabsForEntryRename(workspaceId: string, fromPath: string, toPath: string) {
   readTabStoreState().renameTabsForEntryRename(workspaceId, fromPath, toPath);

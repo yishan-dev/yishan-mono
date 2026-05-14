@@ -55,14 +55,6 @@ export function useBrowserUrl(initialUrl: string) {
     setUrlFocused(false);
   }, []);
 
-  const syncInitialUrl = useCallback(
-    (url: string) => {
-      setUrlInput(url);
-      setActiveUrl(url);
-    },
-    [],
-  );
-
   return {
     urlInput,
     setUrlInput,
@@ -82,6 +74,5 @@ export function useBrowserUrl(initialUrl: string) {
     handleUrlFocus,
     handleUrlBlur,
     resetForNavigation,
-    syncInitialUrl,
   };
 }

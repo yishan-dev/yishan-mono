@@ -50,6 +50,8 @@ export type TabStoreState = {
   /** Persists one backend terminal session id on one terminal tab. */
   setTerminalTabSessionId: (tabId: string, sessionId: string) => void;
   setBrowserTabFaviconUrl: (tabId: string, faviconUrl: string | undefined) => void;
+  /** Persists the current navigated URL on a browser tab so it survives unmount/remount cycles. */
+  setBrowserTabUrl: (tabId: string, url: string) => void;
   toggleTabPinned: (tabId: string) => void;
   reorderTab: (draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
   renameTab: (tabId: string, title: string, options?: { userRenamed?: boolean }) => void;
@@ -263,6 +265,19 @@ export const tabStore = create<TabStoreState>()(
             : tab,
         ),
       }));
+    },
+    setBrowserTabUrl: (tabId, url) => {
+      const normalizedTabId = tabId.trim();
+      if (!normalizedTabId) {
+        return;
+      }
+
+      set((state) => {
+        const tab = state.tabs.find((t: WorkspaceTab) => t.id === normalizedTabId && t.kind === "browser");
+        if (tab && tab.kind === "browser") {
+          tab.data.url = url;
+        }
+      });
     },
     toggleTabPinned: (tabId) => {
       set((state) => toggleTabPinnedState(state, tabId));

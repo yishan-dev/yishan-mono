@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef } from "react";
+import { type FormEvent, useCallback, useMemo, useRef } from "react";
 import { LuWrench } from "react-icons/lu";
 import { useCommands } from "../../../hooks/useCommands";
 import { normalizeUrl } from "./normalizeUrl";
@@ -11,6 +11,7 @@ import { useBrowserHistory } from "./hooks/useBrowserHistory";
 import { useBrowserTools } from "./hooks/useBrowserTools";
 import { useBrowserUrl } from "./hooks/useBrowserUrl";
 import { useWebviewEvents } from "./hooks/useWebviewEvents";
+import { tabStore } from "../../../store/tabStore";
 
 type BrowserViewProps = {
   tabId: string;
@@ -27,7 +28,6 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
   const {
     urlInput,
     setUrlInput,
-    activeUrl,
     setActiveUrl,
     urlFocused,
     highlightIndex,
@@ -41,14 +41,9 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
     handleUrlFocus,
     handleUrlBlur,
     resetForNavigation,
-    syncInitialUrl,
   } = url;
 
   const filteredHistory = useMemo(() => filterHistory(urlInput, urlFocused), [filterHistory, urlInput, urlFocused]);
-
-  useEffect(() => {
-    syncInitialUrl(initialUrl);
-  }, [initialUrl, syncInitialUrl]);
 
   const navigateTo = useCallback(
     (rawUrl: string) => {
@@ -65,12 +60,20 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
     [cmd, tabId, setUrlInput, setActiveUrl, resetForNavigation],
   );
 
+  const handleNavigated = useCallback(
+    (url: string) => {
+      tabStore.getState().setBrowserTabUrl(tabId, url);
+    },
+    [tabId],
+  );
+
   const { webviewRef, setWebviewRef, canGoBack, canGoForward } = useWebviewEvents({
     tabId,
     resolvedUrl,
     pageTitle,
     addHistoryEntry,
     setPageTitle,
+    onNavigated: handleNavigated,
   });
 
   const tools = useBrowserTools(webviewRef);
@@ -83,6 +86,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
         cmd.setBrowserTabFaviconUrl(tabId, undefined);
         resetForNavigation();
         setActiveUrl("");
+        tabStore.getState().setBrowserTabUrl(tabId, "");
         (document.activeElement as HTMLElement)?.blur();
         return;
       }
