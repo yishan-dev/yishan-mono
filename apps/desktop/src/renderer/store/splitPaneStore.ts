@@ -17,147 +17,173 @@ import {
   type PaneLeaf,
   type SplitDirection,
   type SplitPaneNode,
+  type SplitPaneStateSlice,
 } from "./split-pane-domain";
 
 const ROOT_PANE_ID = "root-pane";
 
+function createEmptyLayout(): SplitPaneStateSlice {
+  return { root: createLeaf(ROOT_PANE_ID, [], ""), activePaneId: ROOT_PANE_ID };
+}
+
 export type SplitPaneStoreState = {
-  root: SplitPaneNode;
-  activePaneId: string;
+  /** Layouts keyed by workspace id. Each workspace keeps its own layout tree. */
+  layoutByWorkspaceId: Record<string, SplitPaneStateSlice>;
 
-  // Queries
-  getActivePane: () => PaneLeaf | null;
-  getPane: (paneId: string) => PaneLeaf | null;
-  getPaneForTab: (tabId: string) => PaneLeaf | null;
-  getAllPanes: () => PaneLeaf[];
+  // Queries (workspace-scoped)
+  getLayout: (workspaceId: string) => SplitPaneStateSlice;
+  getActivePane: (workspaceId: string) => PaneLeaf | null;
+  getPane: (workspaceId: string, paneId: string) => PaneLeaf | null;
+  getPaneForTab: (workspaceId: string, tabId: string) => PaneLeaf | null;
+  getAllPanes: (workspaceId: string) => PaneLeaf[];
 
-  // Mutations
-  setActivePane: (paneId: string) => void;
-  selectTab: (paneId: string, tabId: string) => void;
-  addTab: (tabId: string, paneId?: string) => void;
-  removeTab: (tabId: string) => void;
-  splitPane: (input: {
+  // Mutations (workspace-scoped)
+  setActivePane: (workspaceId: string, paneId: string) => void;
+  selectTab: (workspaceId: string, paneId: string, tabId: string) => void;
+  addTab: (workspaceId: string, tabId: string, paneId?: string) => void;
+  removeTab: (workspaceId: string, tabId: string) => void;
+  splitPane: (workspaceId: string, input: {
     tabId: string;
     targetPaneId: string;
     direction: SplitDirection;
     placement: "first" | "second";
   }) => void;
-  moveTab: (tabId: string, targetPaneId: string) => void;
-  reorderTab: (paneId: string, draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
-  updateSplitRatio: (branchId: string, ratio: number) => void;
-  /** Resets the layout to a single pane with the given tabs. */
-  resetLayout: (tabIds: string[], selectedTabId?: string) => void;
+  moveTab: (workspaceId: string, tabId: string, targetPaneId: string) => void;
+  reorderTab: (workspaceId: string, paneId: string, draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
+  updateSplitRatio: (workspaceId: string, branchId: string, ratio: number) => void;
 };
 
-/** Stores the recursive split-pane layout tree for the editor area. */
+/** Returns the layout for a workspace, creating one if it doesn't exist yet. */
+function ensureLayout(
+  layouts: Record<string, SplitPaneStateSlice>,
+  workspaceId: string,
+): SplitPaneStateSlice {
+  if (!layouts[workspaceId]) {
+    layouts[workspaceId] = createEmptyLayout();
+  }
+  return layouts[workspaceId];
+}
+
+/** Stores per-workspace split-pane layout trees for the editor area. */
 export const splitPaneStore = create<SplitPaneStoreState>()(
   immer((set, get) => ({
-    root: createLeaf(ROOT_PANE_ID, [], ""),
-    activePaneId: ROOT_PANE_ID,
+    layoutByWorkspaceId: {},
 
-    getActivePane: () => {
-      const state = get();
-      return findLeaf(state.root, state.activePaneId);
+    getLayout: (workspaceId) => {
+      return get().layoutByWorkspaceId[workspaceId] ?? createEmptyLayout();
     },
 
-    getPane: (paneId) => {
-      return findLeaf(get().root, paneId);
+    getActivePane: (workspaceId) => {
+      const layout = get().layoutByWorkspaceId[workspaceId];
+      if (!layout) return null;
+      return findLeaf(layout.root, layout.activePaneId);
     },
 
-    getPaneForTab: (tabId) => {
-      return findLeafByTabId(get().root, tabId);
+    getPane: (workspaceId, paneId) => {
+      const layout = get().layoutByWorkspaceId[workspaceId];
+      if (!layout) return null;
+      return findLeaf(layout.root, paneId);
     },
 
-    getAllPanes: () => {
-      return collectLeaves(get().root);
+    getPaneForTab: (workspaceId, tabId) => {
+      const layout = get().layoutByWorkspaceId[workspaceId];
+      if (!layout) return null;
+      return findLeafByTabId(layout.root, tabId);
     },
 
-    setActivePane: (paneId) => {
+    getAllPanes: (workspaceId) => {
+      const layout = get().layoutByWorkspaceId[workspaceId];
+      if (!layout) return [];
+      return collectLeaves(layout.root);
+    },
+
+    setActivePane: (workspaceId, paneId) => {
       set((state) => {
-        const next = setActivePaneState(state, paneId);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = setActivePaneState(layout, paneId);
         if (next) {
-          state.activePaneId = next.activePaneId;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    selectTab: (paneId, tabId) => {
+    selectTab: (workspaceId, paneId, tabId) => {
       set((state) => {
-        const next = selectTabInPane(state, paneId, tabId);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = selectTabInPane(layout, paneId, tabId);
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    addTab: (tabId, paneId) => {
+    addTab: (workspaceId, tabId, paneId) => {
       set((state) => {
-        const next = addTabToPane(state, tabId, paneId);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = addTabToPane(layout, tabId, paneId);
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    removeTab: (tabId) => {
+    removeTab: (workspaceId, tabId) => {
       set((state) => {
-        const next = removeTabFromPane(state, tabId);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = removeTabFromPane(layout, tabId);
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    splitPane: (input) => {
+    splitPane: (workspaceId, input) => {
       set((state) => {
-        const next = splitPaneWithTab(state, {
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = splitPaneWithTab(layout, {
           ...input,
           newPaneId: createPaneId(),
           newBranchId: createPaneId(),
         });
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    moveTab: (tabId, targetPaneId) => {
+    moveTab: (workspaceId, tabId, targetPaneId) => {
       set((state) => {
-        const next = moveTabToPane(state, { tabId, targetPaneId });
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = moveTabToPane(layout, { tabId, targetPaneId });
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    reorderTab: (paneId, draggedTabId, targetTabId, position) => {
+    reorderTab: (workspaceId, paneId, draggedTabId, targetTabId, position) => {
       set((state) => {
-        const next = reorderTabInPane(state, paneId, draggedTabId, targetTabId, position);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = reorderTabInPane(layout, paneId, draggedTabId, targetTabId, position);
         if (next) {
-          state.root = next.root;
-          state.activePaneId = next.activePaneId;
+          layout.root = next.root;
+          layout.activePaneId = next.activePaneId;
         }
       });
     },
 
-    updateSplitRatio: (branchId, ratio) => {
+    updateSplitRatio: (workspaceId, branchId, ratio) => {
       set((state) => {
-        const next = setSplitRatio(state, branchId, ratio);
+        const layout = ensureLayout(state.layoutByWorkspaceId, workspaceId);
+        const next = setSplitRatio(layout, branchId, ratio);
         if (next) {
-          state.root = next.root;
+          layout.root = next.root;
         }
-      });
-    },
-
-    resetLayout: (tabIds, selectedTabId) => {
-      set({
-        root: createLeaf(ROOT_PANE_ID, tabIds, selectedTabId ?? tabIds[0] ?? ""),
-        activePaneId: ROOT_PANE_ID,
       });
     },
   })),

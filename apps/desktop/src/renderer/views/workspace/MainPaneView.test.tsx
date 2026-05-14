@@ -184,15 +184,13 @@ vi.mock("../../components/SplitDropZone", () => ({
 }));
 
 vi.mock("../../store/splitPaneStore", () => {
-  // Dynamically builds the root pane from the current test state.
-  // The rootPane reads tabs from the mocked stateRef to stay in sync.
-  function buildRootPane() {
+  // Builds a root pane for a given workspace from the current test state.
+  function buildRootPaneForWorkspace(workspaceId: string) {
     const state = mocked.stateRef.current as Record<string, unknown>;
     const tabs = (state.tabs ?? []) as Array<{ id: string; workspaceId: string }>;
-    const selectedWorkspaceId = (state.selectedWorkspaceId ?? "") as string;
     const selectedTabId = (state.selectedTabId ?? "") as string;
     const workspaceTabIds = tabs
-      .filter((tab) => tab.workspaceId === selectedWorkspaceId)
+      .filter((tab) => tab.workspaceId === workspaceId)
       .map((tab) => tab.id);
     return {
       kind: "leaf" as const,
@@ -202,21 +200,32 @@ vi.mock("../../store/splitPaneStore", () => {
     };
   }
 
+  function buildLayoutByWorkspaceId() {
+    const state = mocked.stateRef.current as Record<string, unknown>;
+    const tabs = (state.tabs ?? []) as Array<{ id: string; workspaceId: string }>;
+    const workspaceIds = new Set(tabs.map((tab) => tab.workspaceId));
+    const result: Record<string, { root: any; activePaneId: string }> = {};
+    for (const wsId of workspaceIds) {
+      result[wsId] = { root: buildRootPaneForWorkspace(wsId), activePaneId: "root-pane" };
+    }
+    return result;
+  }
+
   return {
     splitPaneStore: Object.assign(
       (selector: (state: any) => any) => {
-        const rootPane = buildRootPane();
-        return selector({ root: rootPane, activePaneId: "root-pane" });
+        return selector({ layoutByWorkspaceId: buildLayoutByWorkspaceId() });
       },
       {
         getState: () => {
-          const rootPane = buildRootPane();
+          const selectedWorkspaceId = (mocked.stateRef.current as Record<string, unknown>).selectedWorkspaceId as string ?? "";
+          const rootPane = buildRootPaneForWorkspace(selectedWorkspaceId);
           return {
-            root: rootPane,
-            activePaneId: "root-pane",
+            layoutByWorkspaceId: buildLayoutByWorkspaceId(),
+            getLayout: (wsId: string) => ({ root: buildRootPaneForWorkspace(wsId), activePaneId: "root-pane" }),
             getActivePane: () => rootPane,
             getPane: () => rootPane,
-            getPaneForTab: (tabId: string) => (rootPane.tabIds.includes(tabId) ? rootPane : null),
+            getPaneForTab: (_wsId: string, tabId: string) => (rootPane.tabIds.includes(tabId) ? rootPane : null),
             getAllPanes: () => [rootPane],
             setActivePane: vi.fn(),
             selectTab: vi.fn(),
@@ -226,7 +235,6 @@ vi.mock("../../store/splitPaneStore", () => {
             moveTab: vi.fn(),
             reorderTab: vi.fn(),
             updateSplitRatio: vi.fn(),
-            resetLayout: vi.fn(),
           };
         },
         setState: vi.fn(),
@@ -530,12 +538,14 @@ describe("MainPaneView", () => {
 
     render(<MainPaneView />);
 
-    expect(screen.getByTestId("tab-bar").textContent).toContain("Terminal A");
-    expect(screen.getByTestId("tab-bar").textContent).not.toContain("Terminal B");
-    // Only the current workspace's terminal is rendered in the pane
-    expect(screen.getAllByTestId("terminal-view")).toHaveLength(1);
+    // Both workspaces are mounted (hide-not-unmount) but only workspace-1 is visible
+    const tabBars = screen.getAllByTestId("tab-bar");
+    const visibleTabBar = tabBars.find((el) => el.textContent?.includes("Terminal A"));
+    expect(visibleTabBar).toBeTruthy();
+    // Both terminal views stay mounted to preserve state
+    expect(screen.getAllByTestId("terminal-view")).toHaveLength(2);
     expect(document.querySelector('[data-tab-id="terminal-tab-1"]')).toBeTruthy();
-    expect(document.querySelector('[data-tab-id="terminal-tab-2"]')).toBeNull();
+    expect(document.querySelector('[data-tab-id="terminal-tab-2"]')).toBeTruthy();
   });
 
   it("requests content focus when selected tab changes outside the tab bar", () => {
@@ -670,9 +680,9 @@ describe("MainPaneView", () => {
 
     render(<MainPaneView />);
 
-    // Empty workspace shows the launch view; other workspaces' terminals are not rendered
+    // Empty workspace shows the launch view; workspace-1's terminal stays mounted (hidden)
     expect(screen.getByTestId("launch-view")).toBeTruthy();
-    expect(screen.queryAllByTestId("terminal-view")).toHaveLength(0);
+    expect(screen.queryAllByTestId("terminal-view")).toHaveLength(1);
   });
 
   it("opens an agent terminal tab when tab bar create option is selected", () => {
