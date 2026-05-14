@@ -30,6 +30,8 @@ export type SplitPaneGroupProps = {
   onCreateTab: (option: TabBarCreateOption) => void;
   onRenameTab: (tabId: string, title: string) => void;
   onSplitDrop: (tabId: string, targetPaneId: string, region: SplitDropRegion) => void;
+  onSplitRight?: (paneId: string) => void;
+  onSplitDown?: (paneId: string) => void;
   onFocusPane: (paneId: string) => void;
   /** Called when a tab drag starts - used to enable split drop targets. */
   onTabDragStart?: (tabId: string) => void;
@@ -82,6 +84,8 @@ export function SplitPaneGroup({
   onCreateTab,
   onRenameTab,
   onSplitDrop,
+  onSplitRight,
+  onSplitDown,
   onFocusPane,
   onTabDragStart,
   onTabDragEnd,
@@ -163,6 +167,8 @@ export function SplitPaneGroup({
           enabledAgentKinds={enabledAgentKinds}
           disabled={disabled}
           focused={isActive}
+          onSplitRight={onSplitRight ? () => onSplitRight(pane.id) : undefined}
+          onSplitDown={onSplitDown ? () => onSplitDown(pane.id) : undefined}
           onTabDragStart={(tabId) => {
             setDraggingTabId(tabId);
             onTabDragStart?.(tabId);

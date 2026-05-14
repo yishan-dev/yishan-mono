@@ -318,6 +318,31 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   const handleTabDragStart = useCallback(() => setIsDraggingSplit(true), []);
   const handleTabDragEnd = useCallback(() => setIsDraggingSplit(false), []);
 
+  /** Splits the selected tab out of a pane into a new sibling pane. */
+  const performSplit = useCallback(
+    (paneId: string, direction: "horizontal" | "vertical") => {
+      const pane = splitPaneStore.getState().getPane(workspaceId, paneId);
+      if (!pane?.selectedTabId || pane.tabIds.length <= 1) return;
+      splitPaneStore.getState().splitPane(workspaceId, {
+        tabId: pane.selectedTabId,
+        targetPaneId: paneId,
+        direction,
+        placement: "second",
+      });
+    },
+    [workspaceId],
+  );
+
+  const handleSplitRight = useCallback(
+    (paneId: string) => performSplit(paneId, "horizontal"),
+    [performSplit],
+  );
+
+  const handleSplitDown = useCallback(
+    (paneId: string) => performSplit(paneId, "vertical"),
+    [performSplit],
+  );
+
   const getTabIcon = useCallback(
     (tab: { id: string; kind?: string }) => {
       const fullTab = tabById.get(tab.id);
@@ -475,6 +500,8 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
           onCreateTab={handleCreateTab}
           onRenameTab={handleRenameTab}
           onSplitDrop={handleSplitDrop}
+          onSplitRight={handleSplitRight}
+          onSplitDown={handleSplitDown}
           onFocusPane={handleFocusPane}
           onTabDragStart={handleTabDragStart}
           onTabDragEnd={handleTabDragEnd}
@@ -488,8 +515,8 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
     [
       activePaneId, isDraggingSplit, tabById, handleSelectTab, handleCloseTab,
       cmd, handleReorderTab, handleCreateTab, handleRenameTab, handleSplitDrop,
-      handleFocusPane, handleTabDragStart, handleTabDragEnd, getTabIcon,
-      enabledAgentKinds, workspaceId, renderPaneContent,
+      handleSplitRight, handleSplitDown, handleFocusPane, handleTabDragStart,
+      handleTabDragEnd, getTabIcon, enabledAgentKinds, workspaceId, renderPaneContent,
     ],
   );
 

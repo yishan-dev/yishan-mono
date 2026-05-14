@@ -118,12 +118,13 @@ export function splitPaneWithTab(
     if (sourceLeaf.tabIds.length <= 1) {
       return null;
     }
+    const removedIndex = sourceLeaf.tabIds.indexOf(tabId);
     const remainingTabIds = sourceLeaf.tabIds.filter((id) => id !== tabId);
     const updatedSource: PaneLeaf = {
       ...sourceLeaf,
       tabIds: remainingTabIds,
       selectedTabId: sourceLeaf.selectedTabId === tabId
-        ? (remainingTabIds[0] ?? "")
+        ? (remainingTabIds[Math.min(removedIndex, remainingTabIds.length - 1)] ?? "")
         : sourceLeaf.selectedTabId,
     };
 

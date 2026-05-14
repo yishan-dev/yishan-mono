@@ -2,7 +2,7 @@ import { Box, ButtonBase, Divider, IconButton, Menu, MenuItem, Typography } from
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuGlobe, LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
+import { LuColumns2, LuGlobe, LuPin, LuPlus, LuRows2, LuSquareTerminal, LuX } from "react-icons/lu";
 import {
   AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND,
   type DesktopAgentKind,
@@ -66,6 +66,10 @@ type TabBarProps = {
   onTabDragEnd?: () => void;
   /** When false, the active tab left border shows grey instead of primary color. */
   focused?: boolean;
+  /** Called when the user clicks "Split Right". Only shown when provided. */
+  onSplitRight?: () => void;
+  /** Called when the user clicks "Split Down". Only shown when provided. */
+  onSplitDown?: () => void;
 };
 
 /**
@@ -91,6 +95,8 @@ export function TabBar({
   onTabDragStart,
   onTabDragEnd,
   focused = true,
+  onSplitRight,
+  onSplitDown,
 }: TabBarProps) {
   const { t } = useTranslation();
   const untitledLabel = t("tabs.untitled");
@@ -125,6 +131,7 @@ export function TabBar({
     tabId: string;
   } | null>(null);
   const [createMenuAnchor, setCreateMenuAnchor] = useState<HTMLElement | null>(null);
+  const [splitMenuAnchor, setSplitMenuAnchor] = useState<HTMLElement | null>(null);
   const [draggedTabId, setDraggedTabId] = useState("");
   const [dropTarget, setDropTarget] = useState<{
     tabId: string;
@@ -641,7 +648,7 @@ export function TabBar({
   };
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, height: "100%" }}>
+    <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, width: "100%", height: "100%" }}>
       <Box
         sx={{
           flex: 1,
@@ -673,16 +680,27 @@ export function TabBar({
         >
           {unpinnedTabs.map(renderTabItem)}
         </Box>
+        <IconButton
+          size="small"
+          aria-label={newTabLabel}
+          onClick={(event) => setCreateMenuAnchor(event.currentTarget)}
+          disabled={disabled}
+          sx={{ flexShrink: 0, alignSelf: "center" }}
+        >
+          <LuPlus size={16} />
+        </IconButton>
       </Box>
-      <IconButton
-        size="small"
-        aria-label={newTabLabel}
-        onClick={(event) => setCreateMenuAnchor(event.currentTarget)}
-        disabled={disabled}
-        sx={{ flexShrink: 0, alignSelf: "center" }}
-      >
-        <LuPlus size={16} />
-      </IconButton>
+      {(onSplitRight || onSplitDown) && (
+        <IconButton
+          size="small"
+          aria-label="Split pane"
+          onClick={(event) => setSplitMenuAnchor(event.currentTarget)}
+          disabled={disabled || !selectedTabId}
+          sx={{ flexShrink: 0, alignSelf: "center", color: "text.secondary" }}
+        >
+          <LuColumns2 size={16} />
+        </IconButton>
+      )}
       <Menu
         anchorEl={createMenuAnchor}
         open={Boolean(createMenuAnchor)}
@@ -725,6 +743,39 @@ export function TabBar({
             {item.option === "browser" && hasAgentCreateOptions ? <Divider sx={{ my: 0.5 }} /> : null}
           </Box>
         ))}
+      </Menu>
+      <Menu
+        anchorEl={splitMenuAnchor}
+        open={Boolean(splitMenuAnchor)}
+        onClose={() => setSplitMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 160 } } }}
+      >
+        {onSplitRight && (
+          <MenuItem
+            onClick={() => {
+              onSplitRight();
+              setSplitMenuAnchor(null);
+            }}
+            disabled={disabled || !selectedTabId}
+            sx={{ gap: 1 }}
+          >
+            <LuColumns2 size={14} />
+            <Box component="span">Split Right</Box>
+          </MenuItem>
+        )}
+        {onSplitDown && (
+          <MenuItem
+            onClick={() => {
+              onSplitDown();
+              setSplitMenuAnchor(null);
+            }}
+            disabled={disabled || !selectedTabId}
+            sx={{ gap: 1 }}
+          >
+            <LuRows2 size={14} />
+            <Box component="span">Split Down</Box>
+          </MenuItem>
+        )}
       </Menu>
       <Menu
         open={Boolean(contextMenu)}
