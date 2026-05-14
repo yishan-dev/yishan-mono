@@ -27,8 +27,8 @@ describe("AppBootstrapLoadingView", () => {
   it("renders loading content below the topbar", () => {
     render(<AppBootstrapLoadingView hasError={false} onRetry={() => {}} />);
 
+    expect(screen.getByText("app.bootstrap.badge")).toBeTruthy();
     expect(screen.getByText("app.bootstrap.title")).toBeTruthy();
-    expect(screen.getByText("app.bootstrap.description")).toBeTruthy();
   });
 
   it("renders retry button with no-drag class when hasError is true", () => {
