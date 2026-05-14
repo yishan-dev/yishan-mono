@@ -39,10 +39,20 @@ type DaemonManagerOptions = {
   fetch?: typeof fetch;
 };
 
+type DaemonRelayInfo = {
+  enabled: boolean;
+  url: string;
+  connected: boolean;
+  connectedAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+};
+
 type DaemonInfo = {
   version: string;
   daemonId: string;
   wsUrl: string;
+  relay?: DaemonRelayInfo;
 };
 
 type DaemonState = {
@@ -500,7 +510,7 @@ export class DaemonManager {
       throw new Error(`Failed to load daemon health: HTTP ${response.status}`);
     }
 
-    const body = (await response.json()) as { version?: unknown; daemonId?: unknown };
+    const body = (await response.json()) as { version?: unknown; daemonId?: unknown; relay?: unknown };
     const version = typeof body.version === "string" ? body.version.trim() : "";
     const daemonIdFromHealth = typeof body.daemonId === "string" ? body.daemonId.trim() : "";
     const daemonId = daemonIdFromHealth || (await readPersistedDaemonId());
@@ -508,6 +518,20 @@ export class DaemonManager {
       throw new Error("daemon health response is invalid");
     }
 
-    return { version, daemonId, wsUrl };
+    const result: DaemonInfo = { version, daemonId, wsUrl };
+
+    if (body.relay != null && typeof body.relay === "object") {
+      const r = body.relay as Record<string, unknown>;
+      result.relay = {
+        enabled: r.enabled === true,
+        url: typeof r.url === "string" ? r.url : "",
+        connected: r.connected === true,
+        connectedAt: typeof r.connectedAt === "string" ? r.connectedAt : undefined,
+        lastError: typeof r.lastError === "string" ? r.lastError : undefined,
+        lastErrorAt: typeof r.lastErrorAt === "string" ? r.lastErrorAt : undefined,
+      };
+    }
+
+    return result;
   }
 }
