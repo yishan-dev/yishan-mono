@@ -31,6 +31,24 @@ function mergeWorkspaceEntries(current: WorkspaceFileEntry[], incoming: Workspac
   return [...mergedByPath.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
+function isPathWithinOrEqual(path: string, candidateParentPath: string): boolean {
+  return path === candidateParentPath || path.startsWith(`${candidateParentPath}/`);
+}
+
+function buildNormalizedPathSet(entries: WorkspaceFileEntry[]): Set<string> {
+  const normalizedPaths = new Set<string>();
+  for (const entry of entries) {
+    const normalizedEntryPath = normalizeRelativePath(entry.path);
+    if (!normalizedEntryPath) {
+      continue;
+    }
+
+    normalizedPaths.add(normalizedEntryPath);
+  }
+
+  return normalizedPaths;
+}
+
 type FileOperationState = {
   operationId: string;
   workspaceWorktreePath: string;
@@ -91,6 +109,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
   const treeCacheByWorkspaceIdRef = useRef(new Map<string, WorkspaceFileEntry[]>());
   const fileTreeSelectionRequestIdRef = useRef(0);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
+  const changedRelativePathsForSelectedWorkspaceRef = useRef<string[]>([]);
 
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const selectedWorkspaceWorktreePath = workspaceStore(
@@ -120,6 +139,10 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
   }, [repoEntries]);
 
   useEffect(() => {
+    changedRelativePathsForSelectedWorkspaceRef.current = changedRelativePathsForSelectedWorkspace;
+  }, [changedRelativePathsForSelectedWorkspace]);
+
+  useEffect(() => {
     if (!selectedWorkspaceId) {
       return;
     }
@@ -139,16 +162,43 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
         recursive: true,
       });
       setRepoEntries((currentEntries) => {
+        const normalizedIncomingPathSet = buildNormalizedPathSet(response.files);
         const preservedLoadedDescendants = currentEntries.filter((entry) => {
           const normalizedEntryPath = normalizeRelativePath(entry.path);
           if (!normalizedEntryPath) {
             return false;
           }
 
-          for (const loadedDirectoryPath of loadedDirectoryPathsRef.current) {
-            if (normalizedEntryPath.startsWith(`${loadedDirectoryPath}/`)) {
-              return true;
+          for (const changedRelativePath of changedRelativePathsForSelectedWorkspaceRef.current) {
+            const normalizedChangedRelativePath = normalizeRelativePath(changedRelativePath);
+            if (!normalizedChangedRelativePath) {
+              continue;
             }
+
+            if (
+              isPathWithinOrEqual(normalizedEntryPath, normalizedChangedRelativePath) ||
+              isPathWithinOrEqual(normalizedChangedRelativePath, normalizedEntryPath)
+            ) {
+              return false;
+            }
+          }
+
+          for (const loadedDirectoryPath of loadedDirectoryPathsRef.current) {
+            if (!normalizedEntryPath.startsWith(`${loadedDirectoryPath}/`)) {
+              continue;
+            }
+
+            for (const incomingPath of normalizedIncomingPathSet) {
+              if (isPathWithinOrEqual(incomingPath, loadedDirectoryPath)) {
+                return false;
+              }
+            }
+
+            if (normalizedIncomingPathSet.has(loadedDirectoryPath)) {
+              return false;
+            }
+
+              return true;
           }
 
           return false;
