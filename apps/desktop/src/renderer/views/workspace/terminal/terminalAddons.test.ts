@@ -3,12 +3,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  openExternalUrl: vi.fn(),
+  openLink: vi.fn(),
   webLinksOpenHandler: null as ((event: MouseEvent, uri: string) => void) | null,
 }));
 
 vi.mock("../../../commands/appCommands", () => ({
-  openExternalUrl: (url: string) => mocks.openExternalUrl(url),
+  openLink: (options: { url: string; workspaceId?: string }) => mocks.openLink(options),
 }));
 
 vi.mock("@xterm/addon-web-links", () => ({
@@ -96,7 +96,7 @@ describe("loadTerminalAddons", () => {
       warn: vi.fn(),
     };
     const windowOpen = vi.spyOn(window, "open");
-    mocks.openExternalUrl.mockResolvedValueOnce({ opened: true });
+    mocks.openLink.mockResolvedValueOnce({ opened: true });
 
     loadTerminalAddons(terminal, logger);
 
@@ -105,7 +105,7 @@ describe("loadTerminalAddons", () => {
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledWith("https://yishan.io/docs");
+      expect(mocks.openLink).toHaveBeenCalledWith({ url: "https://yishan.io/docs" });
     });
     expect(logger.warn).not.toHaveBeenCalled();
     expect(windowOpen).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe("loadTerminalAddons", () => {
     const logger = {
       warn: vi.fn(),
     };
-    mocks.openExternalUrl.mockResolvedValueOnce({
+    mocks.openLink.mockResolvedValueOnce({
       opened: false,
       reason: "unsupported-protocol",
     });
