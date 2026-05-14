@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuCode, LuColumns2, LuEye } from "react-icons/lu";
 import { getLanguageId, isMarkdownFile } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
+import { useGitGutterDecorations } from "../hooks/useGitGutterDecorations";
 import { FileViewerToolbar } from "./FileViewerToolbar";
 import { MarkdownPreview } from "./MarkdownPreview";
 
@@ -39,6 +40,7 @@ export function FileEditor({
   const editorHostRef = useRef<HTMLDivElement | null>(null);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const [editorInstance, setEditorInstance] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
   const contentRef = useRef(content);
   const onContentChangeRef = useRef(onContentChange);
   const onSaveRef = useRef(onSave);
@@ -65,12 +67,15 @@ export function FileEditor({
     [theme.palette.mode],
   );
 
+  // Track the current editor content for git gutter decorations.
+  const [currentContent, setCurrentContent] = useState(content);
 
   const showEditor = viewMode === "editor" || viewMode === "split";
   const showPreview = viewMode === "preview" || viewMode === "split";
 
   useEffect(() => {
     contentRef.current = content;
+    setCurrentContent(content);
   }, [content]);
 
   useEffect(() => {
@@ -127,15 +132,19 @@ export function FileEditor({
 
     // Listen for content changes
     editor.onDidChangeModelContent(() => {
-      onContentChangeRef.current?.(editor.getValue());
+      const value = editor.getValue();
+      setCurrentContent(value);
+      onContentChangeRef.current?.(value);
     });
 
     editorRef.current = editor;
+    setEditorInstance(editor);
 
     return () => {
       editor.dispose();
       model.dispose();
       editorRef.current = null;
+      setEditorInstance(null);
     };
   }, [isDeleted, monacoTheme, path]);
 
@@ -186,6 +195,14 @@ export function FileEditor({
   const handleSetViewMode = useCallback((mode: MarkdownViewMode) => {
     setViewMode(mode);
   }, []);
+
+  // Apply git gutter decorations showing added/modified/deleted lines.
+  useGitGutterDecorations({
+    editor: editorInstance,
+    path,
+    worktreePath,
+    currentContent,
+  });
 
   const handleStartSplitDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!splitContainerRef.current) {

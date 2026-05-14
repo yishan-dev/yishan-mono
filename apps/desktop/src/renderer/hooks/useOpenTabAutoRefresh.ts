@@ -45,7 +45,13 @@ const REFRESH_DEBOUNCE_MS = 220;
 function isFileNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
-  return normalized.includes("no such file") || normalized.includes("not exist") || normalized.includes("enoent");
+  return (
+    normalized.includes("no such file") ||
+    normalized.includes("not exist") ||
+    normalized.includes("enoent") ||
+    normalized.includes("not a directory") ||
+    normalized.includes("notdir")
+  );
 }
 
 /** Keeps open file and diff tabs synced with on-disk changes using debounced polling refresh. */
