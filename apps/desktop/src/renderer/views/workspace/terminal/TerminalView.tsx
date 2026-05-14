@@ -21,6 +21,7 @@ import { useTerminalSessionLifecycle } from "./useTerminalSessionLifecycle";
 import { TerminalSearchPanel } from "./TerminalSearchPanel";
 import { createTerminalWriteQueue } from "./terminalWriteQueue";
 import type { TerminalWriteQueue } from "./terminalWriteQueue";
+import { useTerminalFileDrop } from "./useTerminalFileDrop";
 
 /** Resize debounce interval in milliseconds. */
 const RESIZE_DEBOUNCE_MS = 50;
@@ -109,6 +110,12 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     runTerminalSearch,
     closeSearchPanel,
   } = searchState;
+
+  useTerminalFileDrop({
+    containerRef,
+    xtermRef,
+    sessionIdRef,
+  });
 
   useEffect(() => {
     const host = terminalHostRef.current;

@@ -1,10 +1,22 @@
 import type { DragEvent } from "react";
 import { extractPathsFromClipboardText } from "../../../shared/fileClipboardPaths";
 
-/** Returns true when drag metadata indicates one or more filesystem entries are included. */
+/**
+ * Custom MIME type used to identify drags originating from the internal file tree.
+ * The payload is a JSON-encoded array of absolute file paths.
+ */
+export const FILETREE_DRAG_MIME = "application/x-filetree-paths";
+
+/** Returns true when drag metadata indicates one or more external filesystem entries are included.
+ *  Returns false for internal file-tree drags (identified by {@link FILETREE_DRAG_MIME}). */
 export function hasExternalFileDragIntent(event: DragEvent<HTMLElement>): boolean {
   const dataTransfer = event.dataTransfer;
   if (!dataTransfer) {
+    return false;
+  }
+
+  // Internal file-tree drags are not external file drops — reject early.
+  if (dataTransfer.types.includes(FILETREE_DRAG_MIME)) {
     return false;
   }
 
