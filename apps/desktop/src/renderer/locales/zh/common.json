@@ -70,6 +70,7 @@
       "appearance": "外观",
       "daemon": "守护进程",
       "keybindings": "键盘快捷键",
+      "links": "链接",
       "notifications": "通知",
       "terminal": "终端",
       "workspace": "工作区"
@@ -136,6 +137,15 @@
       "options": {
         "en": "English",
         "zh": "中文"
+      }
+    },
+    "links": {
+      "title": "链接打开方式",
+      "description": "选择应用内 HTTP 链接的打开位置。",
+      "targetLabel": "链接打开方式",
+      "options": {
+        "built-in": "内置浏览器",
+        "external": "系统默认浏览器"
       }
     },
     "daemon": {

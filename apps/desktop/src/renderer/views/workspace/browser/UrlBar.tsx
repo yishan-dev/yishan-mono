@@ -1,6 +1,8 @@
-import { Box, IconButton, InputAdornment, ListItemIcon, ListItemText, MenuList, MenuItem, Paper, Popper, TextField } from "@mui/material";
+import { Box, IconButton, InputAdornment, ListItemIcon, ListItemText, MenuList, MenuItem, Paper, Popper, TextField, Tooltip } from "@mui/material";
 import type { FormEvent } from "react";
 import { LuArrowLeft, LuArrowRight, LuGlobe, LuLock, LuLockOpen, LuRefreshCcw } from "react-icons/lu";
+import { RxExternalLink } from "react-icons/rx";
+import { openExternalUrl } from "../../../commands/appCommands";
 import type { BrowserHistoryGroup } from "../../../../main/ipc";
 
 type UrlBarProps = {
@@ -10,6 +12,7 @@ type UrlBarProps = {
   isHttp: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  resolvedUrl: string;
   historyGroups: BrowserHistoryGroup[];
   filteredHistory: Array<{ url: string; title: string; faviconUrl?: string; visitedAt: string }>;
   highlightIndex: number;
@@ -35,6 +38,7 @@ export function UrlBar({
   isHttp,
   canGoBack,
   canGoForward,
+  resolvedUrl,
   historyGroups,
   filteredHistory,
   highlightIndex,
@@ -147,6 +151,17 @@ export function UrlBar({
           </MenuList>
         </Paper>
       </Popper>
+      <Tooltip title="Open in system default browser" arrow>
+        <IconButton
+          aria-label="Open in system default browser"
+          disabled={!resolvedUrl}
+          onClick={() => {
+            void openExternalUrl(resolvedUrl);
+          }}
+        >
+          <RxExternalLink size={14} />
+        </IconButton>
+      </Tooltip>
       <IconButton aria-label="Browser tools" onClick={onToolsClick}>
         {children}
       </IconButton>
