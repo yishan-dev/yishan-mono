@@ -60,6 +60,12 @@ type TabBarProps = {
   getTabIcon?: (tab: WorkspaceTab) => ReactNode;
   enabledAgentKinds?: AgentCreateOption[];
   disabled?: boolean;
+  /** Called when a tab drag starts - useful for enabling split drop zones. */
+  onTabDragStart?: (tabId: string) => void;
+  /** Called when a tab drag ends. */
+  onTabDragEnd?: () => void;
+  /** When false, the active tab left border shows grey instead of primary color. */
+  focused?: boolean;
 };
 
 /**
@@ -82,6 +88,9 @@ export function TabBar({
   getTabIcon,
   enabledAgentKinds,
   disabled,
+  onTabDragStart,
+  onTabDragEnd,
+  focused = true,
 }: TabBarProps) {
   const { t } = useTranslation();
   const untitledLabel = t("tabs.untitled");
@@ -230,6 +239,7 @@ export function TabBar({
   const resetDragState = () => {
     setDraggedTabId("");
     setDropTarget(null);
+    onTabDragEnd?.();
   };
 
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>, tab: WorkspaceTab) => {
@@ -320,11 +330,11 @@ export function TabBar({
     mb: active ? "-1px" : 0,
     transition: "background-color 120ms ease",
     borderRight: "1px solid",
-    borderColor: "divider",
+    borderRightColor: "divider",
     ...(active
       ? {
           borderLeft: "1px solid",
-          borderLeftColor: "primary.main",
+          borderLeftColor: focused ? "primary.main" : "divider",
           "&::after": {
             content: '""',
             position: "absolute",
@@ -389,6 +399,8 @@ export function TabBar({
     setDraggedTabId(tab.id);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", tab.id);
+    event.dataTransfer.setData("application/x-tab-id", tab.id);
+    onTabDragStart?.(tab.id);
   };
 
   const handleTabDragOver = (event: DragEvent<HTMLDivElement>, tab: WorkspaceTab) => {
