@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Snackbar, Typography } from "@mui/material";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { LuRefreshCcw, LuTriangle } from "react-icons/lu";
 
 type WebviewPaneProps = {
@@ -23,6 +23,41 @@ export function WebviewPane({
 }: WebviewPaneProps) {
   const webviewElRef = useRef<Electron.WebviewTag | null>(null);
   const [hasError, setHasError] = useState(false);
+
+  // Keep mutable refs so the event listeners always see the latest values
+  // without needing to re-attach on every render.
+  const resolvedUrlRef = useRef(resolvedUrl);
+  resolvedUrlRef.current = resolvedUrl;
+  const onSetErrorMessageRef = useRef(onSetErrorMessage);
+  onSetErrorMessageRef.current = onSetErrorMessage;
+
+  useEffect(() => {
+    const webview = webviewElRef.current;
+    if (!webview) {
+      return;
+    }
+
+    const handleDidFailLoad = (event: Event) => {
+      const detail = event as { errorDescription?: string; validatedURL?: string };
+      const desc = detail.errorDescription?.trim() || "Navigation failed.";
+      const target = detail.validatedURL?.trim() || resolvedUrlRef.current;
+      onSetErrorMessageRef.current(`${desc}: ${target}`);
+      setHasError(true);
+    };
+
+    const handleDidStartLoading = () => {
+      onSetErrorMessageRef.current("");
+      setHasError(false);
+    };
+
+    webview.addEventListener("did-fail-load", handleDidFailLoad);
+    webview.addEventListener("did-start-loading", handleDidStartLoading);
+
+    return () => {
+      webview.removeEventListener("did-fail-load", handleDidFailLoad);
+      webview.removeEventListener("did-start-loading", handleDidStartLoading);
+    };
+  }, [resolvedUrl]);
 
   const handleReload = useCallback(() => {
     onSetErrorMessage("");
@@ -54,18 +89,7 @@ export function WebviewPane({
               }}
               src={resolvedUrl}
               style={{ width: "100%", height: "100%", display: hasError ? "none" : "inline-flex" }}
-              allowpopups
-              // @ts-expect-error — Electron webview custom JSX event props
-              onDidFailLoad={(event: { errorDescription?: string; validatedURL?: string; errorColumn?: number; errorLine?: number }) => {
-                const desc = event?.errorDescription?.trim() || "Navigation failed.";
-                const target = event?.validatedURL?.trim() || resolvedUrl;
-                onSetErrorMessage(`${desc}: ${target}`);
-                setHasError(true);
-              }}
-              onDidStartLoading={() => {
-                onSetErrorMessage("");
-                setHasError(false);
-              }}
+              allowpopups=""
             />
             {hasError ? (
               <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, p: 4, bgcolor: "background.paper" }}>

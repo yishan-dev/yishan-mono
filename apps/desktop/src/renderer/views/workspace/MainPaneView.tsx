@@ -153,7 +153,8 @@ export function MainPaneView() {
   const inUseByAgentKind = agentSettingsStore((state) => state.inUseByAgentKind);
   const workspaceTabs = tabs.filter((tab) => tab.workspaceId === selectedWorkspaceId);
   const terminalTabs = tabs.filter((tab) => tab.kind === "terminal");
-  const nonTerminalWorkspaceTabs = workspaceTabs.filter((tab) => tab.kind !== "terminal");
+  const browserTabs = tabs.filter((tab) => tab.kind === "browser");
+  const nonTerminalWorkspaceTabs = workspaceTabs.filter((tab) => tab.kind !== "terminal" && tab.kind !== "browser");
   const orderedWorkspaceTabs = [...workspaceTabs].sort((leftTab, rightTab) => {
     if (leftTab.pinned === rightTab.pinned) {
       return 0;
@@ -470,15 +471,25 @@ export function MainPaneView() {
             );
           }
 
-          if (tab.kind === "browser") {
-            return (
-              <TabPanel key={tab.id} active={isSelected}>
-                <BrowserView tabId={tab.id} initialUrl={tab.data.url} />
-              </TabPanel>
-            );
-          }
-
           return null;
+        })}
+        {browserTabs.map((tab) => {
+          const isSelectedWorkspaceTab = tab.workspaceId === selectedWorkspaceId;
+          const isSelected = isSelectedWorkspaceTab && tab.id === selectedTabId;
+
+          return (
+            <Box
+              key={tab.id}
+              sx={{
+                position: "absolute",
+                inset: 0,
+                display: isSelected ? "flex" : "none",
+                flexDirection: "column",
+              }}
+            >
+              <BrowserView tabId={tab.id} initialUrl={tab.data.url} />
+            </Box>
+          );
         })}
         {terminalTabs.map((tab) => {
           const isSelectedWorkspaceTab = tab.workspaceId === selectedWorkspaceId;

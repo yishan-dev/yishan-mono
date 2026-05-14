@@ -7,8 +7,9 @@ export function useWebviewEvents(args: {
   pageTitle: string;
   addHistoryEntry: (url: string, title: string, faviconUrl?: string) => void;
   setPageTitle: (title: string) => void;
+  onNavigated?: (url: string) => void;
 }) {
-  const { tabId, resolvedUrl, pageTitle, addHistoryEntry, setPageTitle } = args;
+  const { tabId, resolvedUrl, pageTitle, addHistoryEntry, setPageTitle, onNavigated } = args;
   const cmd = useCommands();
   const webviewRef = useRef<Electron.WebviewTag | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -56,16 +57,36 @@ export function useWebviewEvents(args: {
       setCanGoForward(webview.canGoForward());
     };
 
+    // Persist the webview's committed URL to the tab store only after
+    // navigation fully completes, avoiding mid-load store writes that
+    // could trigger a React re-render and abort the in-flight load.
+    const persistNavigatedUrl = () => {
+      try {
+        const currentUrl = webview.getURL?.();
+        if (currentUrl && onNavigated) {
+          onNavigated(currentUrl);
+        }
+      } catch {
+        // Webview may not be attached; ignore.
+      }
+    };
+
     const handleDomReady = () => {
       setIsWebviewReady(true);
       updateNavigationState();
+      persistNavigatedUrl();
+    };
+
+    const handleDidNavigate = () => {
+      updateNavigationState();
+      persistNavigatedUrl();
     };
 
     webview.addEventListener("page-title-updated", handlePageTitleUpdated);
     webview.addEventListener("page-favicon-updated", handleFaviconUpdated);
     webview.addEventListener("dom-ready", handleDomReady);
-    webview.addEventListener("did-navigate", updateNavigationState);
-    webview.addEventListener("did-navigate-in-page", updateNavigationState);
+    webview.addEventListener("did-navigate", handleDidNavigate);
+    webview.addEventListener("did-navigate-in-page", handleDidNavigate);
     webview.addEventListener("did-start-navigation", updateNavigationState);
     webview.addEventListener("did-stop-loading", updateNavigationState);
     updateNavigationState();
@@ -74,12 +95,12 @@ export function useWebviewEvents(args: {
       webview.removeEventListener("page-title-updated", handlePageTitleUpdated);
       webview.removeEventListener("page-favicon-updated", handleFaviconUpdated);
       webview.removeEventListener("dom-ready", handleDomReady);
-      webview.removeEventListener("did-navigate", updateNavigationState);
-      webview.removeEventListener("did-navigate-in-page", updateNavigationState);
+      webview.removeEventListener("did-navigate", handleDidNavigate);
+      webview.removeEventListener("did-navigate-in-page", handleDidNavigate);
       webview.removeEventListener("did-start-navigation", updateNavigationState);
       webview.removeEventListener("did-stop-loading", updateNavigationState);
     };
-  }, [cmd, isWebviewReady, tabId, resolvedUrl, addHistoryEntry, pageTitle, setPageTitle]);
+  }, [cmd, isWebviewReady, tabId, resolvedUrl, addHistoryEntry, pageTitle, setPageTitle, onNavigated]);
 
   const setWebviewRef = useCallback((element: Electron.WebviewTag | null) => {
     webviewRef.current = element;

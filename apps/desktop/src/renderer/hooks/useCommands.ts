@@ -76,6 +76,7 @@ import {
   renameTabsForEntryRename as renameTabsForEntryRenameCommand,
   renameTab as renameTabCommand,
   setBrowserTabFaviconUrl as setBrowserTabFaviconUrlCommand,
+  setBrowserTabUrl as setBrowserTabUrlCommand,
   reorderTab as reorderTabCommand,
   setSelectedTab as setSelectedTabCommand,
   toggleTabPinned as toggleTabPinnedCommand,
@@ -218,6 +219,7 @@ export type Commands = {
   reorderTab: typeof reorderTabCommand;
   renameTab: typeof renameTabCommand;
   setBrowserTabFaviconUrl: typeof setBrowserTabFaviconUrlCommand;
+  setBrowserTabUrl: typeof setBrowserTabUrlCommand;
   renameTabsForEntryRename: typeof renameTabsForEntryRenameCommand;
   updateFileTabContent: typeof updateFileTabContentCommand;
   markFileTabSaved: typeof markFileTabSavedCommand;
@@ -320,6 +322,7 @@ export function useCommands(): Commands {
       reorderTab: reorderTabCommand,
       renameTab: renameTabCommand,
       setBrowserTabFaviconUrl: setBrowserTabFaviconUrlCommand,
+      setBrowserTabUrl: setBrowserTabUrlCommand,
       renameTabsForEntryRename: renameTabsForEntryRenameCommand,
       updateFileTabContent: updateFileTabContentCommand,
       markFileTabSaved: markFileTabSavedCommand,
