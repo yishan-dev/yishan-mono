@@ -307,6 +307,7 @@ export function FileManagerView({
         gitChangesByPath={gitChangesByPath}
         ignoredPaths={ops.ignoredRepoPaths}
         expandedItems={expandedItems}
+        worktreePath={selectedWorkspaceWorktreePath || undefined}
         selectionRequest={ops.fileTreeSelectionRequest}
         createEntryRequest={createEntryRequest}
         onExpandedItemsChange={handleExpandedItemsChange}

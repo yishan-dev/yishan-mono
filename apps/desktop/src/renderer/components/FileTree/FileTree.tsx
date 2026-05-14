@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isEditableTarget } from "../../shortcuts/editableTarget";
 import { handleFileTreeShortcutFromRegistry } from "../fileTreeActionRegistry";
 import { getFileTreeIcon } from "../fileTreeIcons";
-import { extractSourcePathsFromDataTransferAsync, hasExternalFileDragIntent } from "./dataTransfer";
+import { FILETREE_DRAG_MIME, extractSourcePathsFromDataTransferAsync, hasExternalFileDragIntent } from "./dataTransfer";
 import {
   collectAncestorDirectoryPaths,
   getEntryName,
@@ -50,6 +50,8 @@ function FlatTreeRow({
   gitChangeKind,
   isIgnored,
   isExpanded,
+  isDraggable,
+  absolutePath,
   onSelect,
   onToggle,
   onOpen,
@@ -70,6 +72,10 @@ function FlatTreeRow({
   hasDescendantGitChange: boolean;
   isIgnored: boolean;
   isExpanded: boolean;
+  /** When true, the row is draggable and will emit file path data on drag start. */
+  isDraggable: boolean;
+  /** Absolute file path used as the drag payload. */
+  absolutePath: string;
   onSelect: () => void;
   onToggle: () => void;
   onOpen: () => void;
@@ -147,6 +153,16 @@ function FlatTreeRow({
     <Box
       data-path={row.path}
       data-testid={`tree-row-${row.path}`}
+      draggable={isDraggable}
+      onDragStart={
+        isDraggable
+          ? (event: DragEvent<HTMLElement>) => {
+              event.dataTransfer.effectAllowed = "copyMove";
+              event.dataTransfer.setData(FILETREE_DRAG_MIME, JSON.stringify([absolutePath]));
+              event.dataTransfer.setData("text/plain", absolutePath);
+            }
+          : undefined
+      }
       onClick={(event) => {
         event.stopPropagation();
         onSelect();
@@ -221,6 +237,7 @@ export function FileTree({
   gitChangesByPath,
   ignoredPaths = EMPTY_IGNORED_PATHS,
   expandedItems: expandedItemsOverride,
+  worktreePath,
   selectionRequest,
   createEntryRequest,
   onSelectEntry,
@@ -707,6 +724,8 @@ export function FileTree({
                 hasDescendantGitChange={hasDescendantGitChange}
                 isIgnored={isIgnored}
                 isExpanded={isExpanded}
+                isDraggable={Boolean(worktreePath)}
+                absolutePath={worktreePath ? `${worktreePath}/${row.path}` : row.path}
                 onSelect={() => {
                   setSelectedEntryPath(row.path);
                   onSelectEntry?.({ path: row.path, isDirectory: row.isDirectory });

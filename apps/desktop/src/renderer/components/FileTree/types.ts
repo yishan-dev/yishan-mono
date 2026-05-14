@@ -16,6 +16,9 @@ export type FileTreeProps = {
   gitChangesByPath?: Record<string, FileTreeGitChangeKind>;
   ignoredPaths?: string[];
   expandedItems?: string[];
+  /** Absolute path to the workspace root. When provided, rows become draggable
+   *  and the drag payload contains absolute paths (worktreePath + relative path). */
+  worktreePath?: string;
   selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
   createEntryRequest?: { kind: "file" | "folder"; basePath?: string; requestId: number } | null;
   onSelectEntry?: (input: { path: string; isDirectory: boolean }) => void;
