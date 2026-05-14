@@ -11,6 +11,8 @@ import { AuthSessionExpiredSnackbar } from "./components/AuthSessionExpiredSnack
 import { WorkspaceOverlay } from "./components/WorkspaceOverlay";
 import { startBackendEventPipeline, startBackendEventStoreBindings } from "./events";
 import { AppThemePreferenceProvider, useThemePreference } from "./hooks/useThemePreference";
+import { subscribeDesktopRpcEvent } from "./rpc/rpcTransport";
+import { openLink } from "./commands/appCommands";
 import { i18n } from "./i18n";
 import { rendererQueryClient } from "./queryClient";
 import { createAppTheme } from "./theme";
@@ -27,7 +29,23 @@ function AppRoot() {
     const stopPipeline = startBackendEventPipeline();
     const stopStoreBindings = startBackendEventStoreBindings();
 
+    // Listen for webview new-window requests forwarded from the main process
+    // (triggered by Cmd+Click, target="_blank", window.open in <webview> guests)
+    // and open the URL using the common openLink handler which respects the
+    // user's built-in vs external browser preference.
+    const unsubscribeWebviewOpenUrl = subscribeDesktopRpcEvent((event) => {
+      if (event.method !== "webviewOpenUrl") {
+        return;
+      }
+      const payload = event.payload as { url?: string } | undefined;
+      const url = payload?.url;
+      if (url) {
+        void openLink({ url });
+      }
+    });
+
     return () => {
+      unsubscribeWebviewOpenUrl();
       stopStoreBindings();
       stopPipeline();
     };

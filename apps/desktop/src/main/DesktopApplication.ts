@@ -575,6 +575,19 @@ export class DesktopApplication {
       });
     }
 
+    // Intercept popup/new-window requests from <webview> guests (e.g. Cmd+Click,
+    // target="_blank", window.open) and forward the URL to the renderer so it can
+    // open the destination in a new in-app browser tab instead of a popup window.
+    mainWindow.webContents.on("did-attach-webview", (_event, webviewContents) => {
+      webviewContents.setWindowOpenHandler((details) => {
+        mainWindow.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
+          method: "webviewOpenUrl",
+          payload: { url: details.url },
+        });
+        return { action: "deny" };
+      });
+    });
+
     mainWindow.on("closed", () => {
       if (this.mainWindow === mainWindow) {
         this.mainWindow = null;
