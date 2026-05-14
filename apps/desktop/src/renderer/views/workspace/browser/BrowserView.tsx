@@ -124,6 +124,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
         isHttp={isHttp}
         canGoBack={canGoBack}
         canGoForward={canGoForward}
+        resolvedUrl={resolvedUrl}
         historyGroups={historyGroups}
         filteredHistory={filteredHistory}
         highlightIndex={highlightIndex}
