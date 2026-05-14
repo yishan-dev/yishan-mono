@@ -89,7 +89,6 @@ export function WebviewPane({
               }}
               src={resolvedUrl}
               style={{ width: "100%", height: "100%", display: hasError ? "none" : "inline-flex" }}
-              allowpopups=""
             />
             {hasError ? (
               <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, p: 4, bgcolor: "background.paper" }}>
