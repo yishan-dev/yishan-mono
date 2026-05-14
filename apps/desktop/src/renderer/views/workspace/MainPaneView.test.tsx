@@ -132,6 +132,118 @@ vi.mock("../../components/TabBar", () => ({
   ),
 }));
 
+vi.mock("../../components/SplitPaneGroup", () => ({
+  SplitPaneGroup: ({
+    pane,
+    tabs,
+    renderContent,
+    onCreateTab,
+    enabledAgentKinds,
+  }: {
+    pane: { id: string; tabIds: string[]; selectedTabId: string };
+    tabs: Array<{ id: string; title: string }>;
+    renderContent: (pane: { id: string; tabIds: string[]; selectedTabId: string }) => React.ReactNode;
+    onCreateTab: (option: string) => void;
+    enabledAgentKinds?: string[];
+  }) => (
+    <div data-testid={`editor-pane-${pane.id}`}>
+      <div data-testid="tab-bar">{tabs.map((tab) => tab.title).join(",")}</div>
+      {enabledAgentKinds?.includes("codex") ? (
+        <button type="button" onClick={() => onCreateTab("codex")}>
+          create-codex
+        </button>
+      ) : null}
+      <button type="button" onClick={() => onCreateTab("terminal")}>
+        create-terminal
+      </button>
+      <div data-testid="pane-content">{renderContent(pane)}</div>
+    </div>
+  ),
+}));
+
+vi.mock("../../components/SplitPaneContainer", () => ({
+  SplitPaneContainer: ({
+    node,
+    renderPane,
+  }: {
+    node: { kind: string; id: string; tabIds?: string[]; selectedTabId?: string };
+    renderPane: (pane: { id: string; tabIds: string[]; selectedTabId: string }) => React.ReactNode;
+  }) => {
+    // For a leaf, render the pane directly
+    if (node.kind === "leaf") {
+      return <div data-testid="split-container">{renderPane(node as any)}</div>;
+    }
+    // For a branch, render both children
+    return <div data-testid="split-container">split-branch</div>;
+  },
+}));
+
+vi.mock("../../components/SplitDropZone", () => ({
+  SplitDropZone: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  resolveDropResult: () => null,
+}));
+
+vi.mock("../../store/splitPaneStore", () => {
+  // Builds a root pane for a given workspace from the current test state.
+  function buildRootPaneForWorkspace(workspaceId: string) {
+    const state = mocked.stateRef.current as Record<string, unknown>;
+    const tabs = (state.tabs ?? []) as Array<{ id: string; workspaceId: string }>;
+    const selectedTabId = (state.selectedTabId ?? "") as string;
+    const workspaceTabIds = tabs
+      .filter((tab) => tab.workspaceId === workspaceId)
+      .map((tab) => tab.id);
+    return {
+      kind: "leaf" as const,
+      id: "root-pane",
+      tabIds: workspaceTabIds,
+      selectedTabId: workspaceTabIds.includes(selectedTabId) ? selectedTabId : (workspaceTabIds[0] ?? ""),
+    };
+  }
+
+  function buildLayoutByWorkspaceId() {
+    const state = mocked.stateRef.current as Record<string, unknown>;
+    const tabs = (state.tabs ?? []) as Array<{ id: string; workspaceId: string }>;
+    const workspaceIds = new Set(tabs.map((tab) => tab.workspaceId));
+    const result: Record<string, { root: any; activePaneId: string }> = {};
+    for (const wsId of workspaceIds) {
+      result[wsId] = { root: buildRootPaneForWorkspace(wsId), activePaneId: "root-pane" };
+    }
+    return result;
+  }
+
+  return {
+    splitPaneStore: Object.assign(
+      (selector: (state: any) => any) => {
+        return selector({ layoutByWorkspaceId: buildLayoutByWorkspaceId() });
+      },
+      {
+        getState: () => {
+          const selectedWorkspaceId = (mocked.stateRef.current as Record<string, unknown>).selectedWorkspaceId as string ?? "";
+          const rootPane = buildRootPaneForWorkspace(selectedWorkspaceId);
+          return {
+            layoutByWorkspaceId: buildLayoutByWorkspaceId(),
+            getLayout: (wsId: string) => ({ root: buildRootPaneForWorkspace(wsId), activePaneId: "root-pane" }),
+            getActivePane: () => rootPane,
+            getPane: () => rootPane,
+            getPaneForTab: (_wsId: string, tabId: string) => (rootPane.tabIds.includes(tabId) ? rootPane : null),
+            getAllPanes: () => [rootPane],
+            setActivePane: vi.fn(),
+            selectTab: vi.fn(),
+            addTab: vi.fn(),
+            removeTab: vi.fn(),
+            splitPane: vi.fn(),
+            moveTab: vi.fn(),
+            reorderTab: vi.fn(),
+            updateSplitRatio: vi.fn(),
+          };
+        },
+        setState: vi.fn(),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+    ),
+  };
+});
+
 vi.mock("../../components/FileEditor", () => ({
   FileEditor: ({ isDeleted }: { isDeleted?: boolean }) => (
     <div data-testid="file-editor-view" data-is-deleted={isDeleted ? "true" : "false"} />
@@ -356,7 +468,7 @@ describe("MainPaneView", () => {
     expect(terminalView.getAttribute("data-tab-id")).toBe("terminal-tab-1");
   });
 
-  it("keeps terminal views mounted across workspace switches while tab strip stays scoped", () => {
+  it("scopes terminal views to the selected workspace pane", () => {
     mocked.stateRef.current = {
       workspaces: [
         {
@@ -426,8 +538,11 @@ describe("MainPaneView", () => {
 
     render(<MainPaneView />);
 
-    expect(screen.getByTestId("tab-bar").textContent).toContain("Terminal A");
-    expect(screen.getByTestId("tab-bar").textContent).not.toContain("Terminal B");
+    // Both workspaces are mounted (hide-not-unmount) but only workspace-1 is visible
+    const tabBars = screen.getAllByTestId("tab-bar");
+    const visibleTabBar = tabBars.find((el) => el.textContent?.includes("Terminal A"));
+    expect(visibleTabBar).toBeTruthy();
+    // Both terminal views stay mounted to preserve state
     expect(screen.getAllByTestId("terminal-view")).toHaveLength(2);
     expect(document.querySelector('[data-tab-id="terminal-tab-1"]')).toBeTruthy();
     expect(document.querySelector('[data-tab-id="terminal-tab-2"]')).toBeTruthy();
@@ -505,7 +620,7 @@ describe("MainPaneView", () => {
     expect(document.querySelector('[data-tab-id="terminal-tab-2"]')?.getAttribute("data-focus-request-key")).toBe("1");
   });
 
-  it("keeps existing terminal views mounted when selected workspace has no tabs", () => {
+  it("shows launch view when selected workspace has no tabs", () => {
     mocked.stateRef.current = {
       workspaces: [
         {
@@ -565,9 +680,9 @@ describe("MainPaneView", () => {
 
     render(<MainPaneView />);
 
+    // Empty workspace shows the launch view; workspace-1's terminal stays mounted (hidden)
     expect(screen.getByTestId("launch-view")).toBeTruthy();
-    expect(screen.getAllByTestId("terminal-view")).toHaveLength(1);
-    expect(document.querySelector('[data-tab-id="terminal-tab-1"]')).toBeTruthy();
+    expect(screen.queryAllByTestId("terminal-view")).toHaveLength(1);
   });
 
   it("opens an agent terminal tab when tab bar create option is selected", () => {
