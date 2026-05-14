@@ -37,12 +37,16 @@ type RunConfig struct {
 	JWTRequired  bool
 	RelayEnabled bool
 	RelayURL     string
+	// LogFilePath is the resolved path to the daemon log file.
+	// Set by the command layer; passed through to handlers for diagnostics.
+	LogFilePath string
 }
 
 type StartConfig struct {
 	Run        RunConfig
 	ConfigPath string
 	LogLevel   string
+	LogFile    string
 	Stdout     io.Writer
 	Stderr     io.Writer
 }
@@ -86,7 +90,7 @@ func Run(cfg RunConfig, statePath string) error {
 	currentPID := os.Getpid()
 
 	workspaceManager := workspace.NewManager()
-	handler := NewJSONRPCHandler(workspaceManager, daemonID)
+	handler := NewJSONRPCHandler(workspaceManager, daemonID, cfg.LogFilePath)
 	auth := NewJWTAuth(JWTAuthConfig{
 		Secret:   cfg.JWTSecret,
 		Issuer:   cfg.JWTIssuer,
@@ -246,6 +250,9 @@ func StartDetached(cfg StartConfig) (int, error) {
 	}
 	if cfg.LogLevel != "" {
 		args = append(args, "--log-level", cfg.LogLevel)
+	}
+	if cfg.LogFile != "" {
+		args = append(args, "--log-file", cfg.LogFile)
 	}
 
 	command := exec.Command(executable, args...)

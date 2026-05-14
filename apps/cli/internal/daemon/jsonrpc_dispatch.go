@@ -65,7 +65,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			if remoteSyncWarning != "" {
 				warnings := []any{}
 				if created.SetupHookResult != nil && created.SetupHookResult.Error != "" {
-					warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult))
+					warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult, h.logFilePath))
 				}
 				h.watchers.Watch(created.Path)
 				reportProgress(workspace.CreateProgressEvent{
@@ -94,7 +94,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		})
 		warnings := []any{}
 		if created.SetupHookResult != nil && created.SetupHookResult.Error != "" {
-			warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult))
+			warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult, h.logFilePath))
 		}
 		return map[string]any{
 			"id":                      created.ID,
@@ -142,7 +142,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		}
 		warnings := []any{}
 		if closeResult.PostHookResult != nil && closeResult.PostHookResult.Error != "" {
-			warnings = append(warnings, hookResultToWarning("post", req.PostHook, closeResult.PostHookResult))
+			warnings = append(warnings, hookResultToWarning("post", req.PostHook, closeResult.PostHookResult, h.logFilePath))
 		}
 		result := map[string]any{
 			"workspace":               map[string]string{"id": req.WorkspaceID, "status": "closed"},
@@ -485,7 +485,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 
 // hookResultToWarning converts a HookResult into the structured warning shape
 // that the desktop UI expects for lifecycle script warnings.
-func hookResultToWarning(scriptKind string, command string, hr *workspace.HookResult) map[string]any {
+func hookResultToWarning(scriptKind string, command string, hr *workspace.HookResult, logFilePath string) map[string]any {
 	var exitCode any
 	if hr.ExitCode >= 0 {
 		exitCode = hr.ExitCode
@@ -494,6 +494,11 @@ func hookResultToWarning(scriptKind string, command string, hr *workspace.HookRe
 	timedOut := false
 	if hr.Error != "" {
 		timedOut = strings.Contains(hr.Error, "timed out")
+	}
+
+	var logFileValue any
+	if logFilePath != "" {
+		logFileValue = logFilePath
 	}
 
 	return map[string]any{
@@ -505,6 +510,6 @@ func hookResultToWarning(scriptKind string, command string, hr *workspace.HookRe
 		"stderrExcerpt": hr.Stderr,
 		"exitCode":      exitCode,
 		"signal":        nil,
-		"logFilePath":   nil,
+		"logFilePath":   logFileValue,
 	}
 }

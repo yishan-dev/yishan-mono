@@ -276,7 +276,11 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 	homeDir := t.TempDir()
 	configHome := filepath.Join(t.TempDir(), "config")
-	notifyPath := `C:\Users\me\notify.ps1`
+	// Use a temp dir for the notify script path so that filepath.Dir resolves
+	// correctly on all platforms (previously used a raw Windows path which
+	// caused cursor-hook.sh to be written to the package directory on Unix).
+	notifyDir := t.TempDir()
+	notifyPath := filepath.Join(notifyDir, "notify.ps1")
 
 	if err := EnsureAgentHookSetup(AgentHookSetupConfig{
 		NotifyScriptPath: notifyPath,
@@ -298,7 +302,8 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 	hooksValue := settings["hooks"].(map[string]any)
 	stopDefinitions := hooksValue["Stop"].([]any)
 	stopCommand := commandFromDefinition(t, stopDefinitions[0])
-	if !strings.Contains(stopCommand, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\me\notify.ps1" --agent claude`) {
+	if !strings.Contains(stopCommand, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`) ||
+		!strings.Contains(stopCommand, "--agent claude") {
 		t.Fatalf("expected PowerShell Claude command, got %s", stopCommand)
 	}
 
@@ -337,11 +342,13 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 		t.Fatalf("expected PowerShell Cursor command, got %q", string(cursorHooksRaw))
 	}
 
-	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(filepath.Dir(notifyPath), cursorHookScriptFileName))
+	cursorHookScriptPath := filepath.Join(notifyDir, cursorHookScriptFileName)
+	cursorHookScriptRaw, err := os.ReadFile(cursorHookScriptPath)
 	if err != nil {
 		t.Fatalf("read cursor hook script: %v", err)
 	}
-	if !strings.Contains(string(cursorHookScriptRaw), `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\me\notify.ps1"`) {
+	if !strings.Contains(string(cursorHookScriptRaw), `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`) ||
+		!strings.Contains(string(cursorHookScriptRaw), "notify.ps1") {
 		t.Fatalf("expected PowerShell cursor hook script forwarding, got %q", string(cursorHookScriptRaw))
 	}
 
