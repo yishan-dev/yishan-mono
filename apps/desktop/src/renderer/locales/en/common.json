@@ -71,6 +71,7 @@
       "appearance": "Appearance",
       "daemon": "Daemon",
       "keybindings": "Keyboard Shortcuts",
+      "links": "Links",
       "notifications": "Notifications",
       "terminal": "Terminal",
       "workspace": "Workspace"
@@ -152,6 +153,15 @@
       "options": {
         "en": "English",
         "zh": "Chinese"
+      }
+    },
+    "links": {
+      "title": "Link opening behavior",
+      "description": "Choose where HTTP links open inside the app.",
+      "targetLabel": "Open links in",
+      "options": {
+        "built-in": "Built-in browser",
+        "external": "System default browser"
       }
     },
     "daemon": {

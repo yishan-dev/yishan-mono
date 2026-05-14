@@ -7,7 +7,7 @@ import rehypeMermaidLite from "rehype-mermaid-lite";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { openExternalUrl } from "../commands/appCommands";
+import { openLink } from "../commands/appCommands";
 import { readFileAsDataUrl } from "../commands/fileCommands";
 import { tabStore } from "../store/tabStore";
 import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
@@ -105,12 +105,7 @@ const sanitizeSchema = {
 };
 
 async function openMarkdownLink(url: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof openExternalUrl>> | null = null;
-  try {
-    result = await openExternalUrl(url);
-  } catch {
-    result = { opened: false, reason: "open-failed" };
-  }
+  const result = await openLink({ url });
 
   if (result.opened) {
     return;

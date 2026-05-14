@@ -25,6 +25,7 @@ import { AgentSettingsView } from "./settings/AgentSettingsView";
 import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
 import { KeybindingsSettingsView } from "./settings/KeybindingsSettingsView";
+import { LinkSettingsView } from "./settings/LinkSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
 import { LanguageSettingsView } from "./settings/LanguageSettingsView";
@@ -99,6 +100,7 @@ export function SettingsView() {
       selectedTabParam === "daemon" ||
       selectedTabParam === "keybindings" ||
       selectedTabParam === "language" ||
+      selectedTabParam === "links" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
@@ -163,6 +165,7 @@ export function SettingsView() {
         </Stack>
       ),
       daemon: <DaemonSettingsView />,
+      links: <LinkSettingsView />,
       terminal: <TerminalSettingsView />,
       keybindings: <KeybindingsSettingsView />,
       workspace: <GitWorkspaceSettingsView />,

@@ -6,8 +6,7 @@ import { WebFontsAddon } from "@xterm/addon-web-fonts";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import type { ITerminalAddon, Terminal } from "@xterm/xterm";
-import { openExternalUrl } from "../../../commands/appCommands";
-import { tabStore } from "../../../store/tabStore";
+import { openLink } from "../../../commands/appCommands";
 
 type Logger = Pick<Console, "warn">;
 
@@ -101,34 +100,10 @@ function loadAddonSafely(
   }
 }
 
-function isBrowserUrl(uri: string): boolean {
-  try {
-    const protocol = new URL(uri).protocol;
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function resolveActiveWorkspaceId(): string | undefined {
-  const state = tabStore.getState();
-  const selectedTab = state.tabs.find((tab) => tab.id === state.selectedTabId);
-  return selectedTab?.workspaceId || state.selectedWorkspaceId || undefined;
-}
-
-/** Opens one xterm web link in the in-app browser tab or falls back to the system browser. */
 async function openExternalLink(event: MouseEvent, uri: string, logger: Logger): Promise<void> {
   event.preventDefault();
   try {
-    if (isBrowserUrl(uri)) {
-      const workspaceId = resolveActiveWorkspaceId();
-      if (workspaceId) {
-        tabStore.getState().openTab({ kind: "browser", workspaceId, url: uri });
-        return;
-      }
-    }
-
-    const result = await openExternalUrl(uri);
+    const result = await openLink({ url: uri });
     if (!result.opened) {
       logger.warn(`Failed to open xterm external link (${result.reason})`, { uri });
     }
