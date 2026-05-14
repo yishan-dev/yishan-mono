@@ -294,6 +294,11 @@ export class DaemonClient {
           this.scheduleReconnect();
         });
 
+        // Clear stale workspace ID cache so that the next workspace-scoped
+        // operation re-registers workspaces with the new daemon instance (which
+        // also re-establishes filesystem watchers on the daemon side).
+        this.workspaceIdByWorktreePath.clear();
+
         void this.restoreDaemonSubscriptions();
 
         return socket;
