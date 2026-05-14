@@ -34,11 +34,12 @@ vi.mock("../helpers/monacoSetup", () => ({
   ensureEditorThemes: vi.fn(),
   monaco: {
     KeyMod: { CtrlCmd: 2048 },
-    KeyCode: { KeyS: 49 },
+    KeyCode: { KeyS: 49, Escape: 9 },
     Uri: {
       file: (path: string) => ({ scheme: "file", path }),
     },
     editor: {
+      MouseTargetType: { GUTTER_LINE_DECORATIONS: 4, CONTENT_VIEW_ZONE: 8 },
       create: (container: HTMLElement, options: Record<string, unknown>) => {
         mockEditorState.createCount += 1;
         mockEditorState.createOptions = options;
@@ -57,9 +58,14 @@ vi.mock("../helpers/monacoSetup", () => ({
             mockEditorState.contentChangeListener = listener;
             return { dispose: vi.fn() };
           },
+          onMouseDown: () => ({ dispose: vi.fn() }),
+          onKeyDown: () => ({ dispose: vi.fn() }),
+          changeViewZones: vi.fn(),
+          createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() })),
           dispose: () => {
             mockEditorState.disposeCount += 1;
           },
+          updateOptions: vi.fn(),
         };
       },
       createModel: (value: string, language?: string, uri?: unknown) => {
@@ -79,6 +85,11 @@ vi.mock("../helpers/monacoSetup", () => ({
       setTheme: vi.fn(),
     },
   },
+}));
+
+// Mock the git commands used by useGitGutterDecorations
+vi.mock("../commands/gitCommands", () => ({
+  readDiff: vi.fn(() => Promise.resolve({ oldContent: "", newContent: "" })),
 }));
 
 vi.mock("../helpers/editorLanguage", () => ({

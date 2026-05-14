@@ -235,7 +235,16 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
         });
         setRepoEntries((currentEntries) => mergeWorkspaceEntries(currentEntries, response.files));
       } catch (error) {
-        console.error("Failed to load workspace directory", { path: normalizedPath, error });
+        // Suppress benign filesystem errors (stale worktree, removed path, broken symlink)
+        const message = error instanceof Error ? error.message : String(error);
+        const isBenignFsError =
+          message.includes("not a directory") ||
+          message.includes("no such file") ||
+          message.includes("ENOENT") ||
+          message.includes("ENOTDIR");
+        if (!isBenignFsError) {
+          console.error("Failed to load workspace directory", { path: normalizedPath, error });
+        }
       }
     },
     [selectedWorkspaceWorktreePath],
