@@ -277,6 +277,70 @@ export function DaemonSettingsView() {
         </SettingsCard>
       </Box>
 
+      <Box sx={{ mt: 3 }}>
+        <SettingsSectionHeader
+          title={t("settings.daemon.relay.title")}
+          description={t("settings.daemon.relay.description")}
+        />
+        <SettingsCard>
+          {isLoading ? (
+            <CenteredSpinner />
+          ) : (
+            <SettingsRows>
+              <SettingsControlRow
+                title={t("settings.daemon.relay.rows.status")}
+                control={
+                  <StatusIndicator
+                    label={
+                      !daemonInfo?.relay?.enabled
+                        ? t("settings.daemon.relay.status.disabled")
+                        : daemonInfo.relay.connected
+                          ? t("settings.daemon.relay.status.connected")
+                          : t("settings.daemon.relay.status.disconnected")
+                    }
+                    color={
+                      !daemonInfo?.relay?.enabled
+                        ? "disabled"
+                        : daemonInfo.relay.connected
+                          ? "success"
+                          : "error"
+                    }
+                  />
+                }
+              />
+              <SettingsControlRow
+                title={t("settings.daemon.relay.rows.url")}
+                control={
+                  <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                    {daemonInfo?.relay?.url || t("settings.daemon.values.unknown")}
+                  </Typography>
+                }
+              />
+              {daemonInfo?.relay?.connectedAt ? (
+                <SettingsControlRow
+                  title={t("settings.daemon.relay.rows.connectedAt")}
+                  control={
+                    <Typography variant="body2">
+                      {new Date(daemonInfo.relay.connectedAt).toLocaleString()}
+                    </Typography>
+                  }
+                />
+              ) : null}
+              {daemonInfo?.relay?.lastError ? (
+                <SettingsControlRow
+                  title={t("settings.daemon.relay.rows.lastError")}
+                  control={
+                    <Typography variant="body2" color="error">
+                      {daemonInfo.relay.lastError}
+                    </Typography>
+                  }
+                />
+              ) : null}
+            </SettingsRows>
+          )}
+        </SettingsCard>
+      </Box>
+
       <Snackbar
         open={restartSuccessOpen}
         autoHideDuration={4000}

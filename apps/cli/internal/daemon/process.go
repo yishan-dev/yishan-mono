@@ -97,6 +97,8 @@ func Run(cfg RunConfig, statePath string) error {
 		return err
 	}
 
+	relayStatus := NewRelayStatus(cfg.RelayEnabled, cfg.RelayURL)
+
 	mux := http.NewServeMux()
 	mux.Handle("/ws", auth.Middleware(handler))
 	mux.HandleFunc(agentHookIngestPath, handler.ServeAgentHook)
@@ -107,6 +109,7 @@ func Run(cfg RunConfig, statePath string) error {
 			"status":   "running",
 			"version":  buildinfo.Version,
 			"daemonId": daemonID,
+			"relay":    relayStatus.Snapshot(),
 		})
 	})
 
@@ -147,7 +150,7 @@ func Run(cfg RunConfig, statePath string) error {
 	}
 
 	if cfg.RelayEnabled && cfg.RelayURL != "" {
-		go runRelayClientLoop(handler, daemonID, cfg.RelayURL)
+		go runRelayClientLoop(handler, daemonID, cfg.RelayURL, relayStatus)
 	}
 
 	stop := make(chan os.Signal, 1)

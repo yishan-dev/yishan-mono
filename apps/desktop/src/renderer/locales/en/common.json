@@ -209,6 +209,21 @@
       "quitOnExit": {
         "label": "Quit daemon before app exits",
         "description": "When enabled, the daemon is stopped before the desktop app exits. When disabled, the daemon continues running in the background."
+      },
+      "relay": {
+        "title": "Relay Connection",
+        "description": "Status of the outbound relay connection used for remote access.",
+        "rows": {
+          "status": "Connection",
+          "url": "Relay address",
+          "connectedAt": "Connected since",
+          "lastError": "Last error"
+        },
+        "status": {
+          "connected": "Connected",
+          "disconnected": "Disconnected",
+          "disabled": "Disabled"
+        }
       }
     },
     "terminal": {

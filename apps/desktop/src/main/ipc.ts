@@ -58,10 +58,20 @@ export type MainWindowFullscreenState = {
   isFullscreen: boolean;
 };
 
+export type DaemonRelayStatus = {
+  enabled: boolean;
+  url: string;
+  connected: boolean;
+  connectedAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+};
+
 export type DaemonInfoResult = {
   version: string;
   daemonId: string;
   wsUrl: string;
+  relay?: DaemonRelayStatus;
 };
 
 export type DaemonRestartResult =
