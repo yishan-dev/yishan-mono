@@ -3,6 +3,7 @@
  */
 export const ACTIONS = {
   NAVIGATE: "app.navigate",
+  CLOSE_TAB: "tab.close",
   FILE_DELETE: "file.delete",
   FILE_UNDO: "file.undo",
   WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP: "workspace.openSelectedInExternalApp",

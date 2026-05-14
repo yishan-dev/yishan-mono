@@ -74,6 +74,14 @@ function useWorkspaceAppActions(input: { cmd: WorkspaceViewCommands; navigate: R
         return;
       }
 
+      if (payload.action === ACTIONS.CLOSE_TAB) {
+        const selectedTabId = tabStore.getState().selectedTabId;
+        if (selectedTabId) {
+          cmd.closeTab(selectedTabId);
+        }
+        return;
+      }
+
       if (payload.action === ACTIONS.TOGGLE_LEFT_PANE) {
         cmd.toggleLeftPaneVisibility();
         return;

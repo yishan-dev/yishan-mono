@@ -126,7 +126,15 @@ export function buildApplicationMenuTemplate(input: ConfigureApplicationMenuInpu
     },
     {
       label: "File",
-      submenu: [{ role: "close", accelerator: "CmdOrCtrl+W" }],
+      submenu: [
+        {
+          label: "Close Tab",
+          accelerator: "CmdOrCtrl+W",
+          click: () => {
+            input.dispatchAction?.({ action: ACTIONS.CLOSE_TAB }, { focusApp: true });
+          },
+        },
+      ],
     },
     {
       label: "Edit",
@@ -179,7 +187,7 @@ export function buildApplicationMenuTemplate(input: ConfigureApplicationMenuInpu
     },
     {
       label: "Window",
-      submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" }, { role: "front" }],
+      submenu: [{ role: "minimize" }, { role: "zoom" }, { type: "separator" }, { role: "close" }, { type: "separator" }, { role: "front" }],
     },
     {
       label: "Help",
