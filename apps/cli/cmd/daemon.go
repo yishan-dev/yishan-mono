@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -63,6 +64,21 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	logFile := viper.GetString("daemon_log_file")
+	if logFile == "" {
+		logFile, err = daemon.ResolveLogFilePath(appConfig.ConfigPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := configureDaemonLogFile(logFile); err != nil {
+		return fmt.Errorf("configure daemon log file: %w", err)
+	}
+	defer closeDaemonLogFile()
+
+	log.Info().Str("log_file", logFile).Msg("daemon log file configured")
+
 	return daemon.Run(daemon.RunConfig{
 		Host:         appConfig.Daemon.Host,
 		Port:         appConfig.Daemon.Port,
@@ -72,6 +88,7 @@ func runDaemon(_ *cobra.Command, _ []string) error {
 		JWTRequired:  appConfig.Daemon.JWTRequired,
 		RelayEnabled: appConfig.Daemon.RelayEnabled,
 		RelayURL:     appConfig.Daemon.RelayURL,
+		LogFilePath:  logFile,
 	}, statePath)
 }
 
@@ -99,6 +116,14 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	logFile := viper.GetString("daemon_log_file")
+	if logFile == "" {
+		logFile, err = daemon.ResolveLogFilePath(appConfig.ConfigPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	if _, err := daemon.StartDetached(daemon.StartConfig{
 		Run: daemon.RunConfig{
 			Host:         appConfig.Daemon.Host,
@@ -112,6 +137,7 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 		},
 		ConfigPath: appConfig.ConfigPath,
 		LogLevel:   appConfig.LogLevel,
+		LogFile:    logFile,
 	}); err != nil {
 		return err
 	}
@@ -121,7 +147,7 @@ func startDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Msg("daemon started")
+	log.Info().Int("pid", state.PID).Str("address", net.JoinHostPort(state.Host, strconv.Itoa(state.Port))).Str("log_file", logFile).Msg("daemon started")
 	return nil
 }
 
@@ -150,6 +176,14 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	logFile := viper.GetString("daemon_log_file")
+	if logFile == "" {
+		logFile, err = daemon.ResolveLogFilePath(appConfig.ConfigPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	state, err := daemon.Restart(
 		daemon.StartConfig{
 			Run: daemon.RunConfig{
@@ -164,6 +198,7 @@ func restartDaemon(_ *cobra.Command, _ []string) error {
 			},
 			ConfigPath: appConfig.ConfigPath,
 			LogLevel:   appConfig.LogLevel,
+			LogFile:    logFile,
 		},
 		statePath,
 		10*time.Second,
@@ -184,15 +219,18 @@ func statusDaemon(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	logFile, _ := daemon.ResolveLogFilePath(appConfig.ConfigPath)
+
 	state, err := daemon.LoadState(statePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return output.PrintRenderData(output.RenderData{
 				Title:   "daemon",
-				Columns: []string{"running", "statePath"},
+				Columns: []string{"running", "statePath", "logFile"},
 				Rows: []map[string]any{{
 					"running":   false,
 					"statePath": statePath,
+					"logFile":   logFile,
 				}},
 			})
 		}
@@ -206,18 +244,19 @@ func statusDaemon(_ *cobra.Command, _ []string) error {
 
 		return output.PrintRenderData(output.RenderData{
 			Title:   "daemon",
-			Columns: []string{"running", "pid", "statePath"},
+			Columns: []string{"running", "pid", "statePath", "logFile"},
 			Rows: []map[string]any{{
 				"running":   false,
 				"pid":       state.PID,
 				"statePath": statePath,
+				"logFile":   logFile,
 			}},
 		})
 	}
 
 	return output.PrintRenderData(output.RenderData{
 		Title:   "daemon",
-		Columns: []string{"running", "pid", "address", "startedAt", "uptime", "statePath"},
+		Columns: []string{"running", "pid", "address", "startedAt", "uptime", "statePath", "logFile"},
 		Rows: []map[string]any{{
 			"running":   true,
 			"pid":       state.PID,
@@ -225,6 +264,7 @@ func statusDaemon(_ *cobra.Command, _ []string) error {
 			"startedAt": state.StartedAt.UTC().Format(time.RFC3339),
 			"uptime":    time.Since(state.StartedAt).Round(time.Second).String(),
 			"statePath": statePath,
+			"logFile":   logFile,
 		}},
 	})
 }
@@ -245,6 +285,7 @@ func init() {
 	daemonCmd.PersistentFlags().Bool("jwt-required", true, "require JWT token for /ws access")
 	daemonCmd.PersistentFlags().Bool("relay-enabled", true, "connect daemon to relay over outbound websocket")
 	daemonCmd.PersistentFlags().String("relay-url", "https://relay.yishan.io", "relay websocket URL (wss://.../ws)")
+	daemonCmd.PersistentFlags().String("log-file", "", "daemon log file path (default: ~/.yishan/profiles/<profile>/logs/daemon.log)")
 
 	cobra.CheckErr(viper.BindPFlag("daemon_host", daemonCmd.PersistentFlags().Lookup("host")))
 	cobra.CheckErr(viper.BindPFlag("daemon_port", daemonCmd.PersistentFlags().Lookup("port")))
@@ -254,4 +295,5 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("daemon_jwt_required", daemonCmd.PersistentFlags().Lookup("jwt-required")))
 	cobra.CheckErr(viper.BindPFlag("daemon_relay_enabled", daemonCmd.PersistentFlags().Lookup("relay-enabled")))
 	cobra.CheckErr(viper.BindPFlag("daemon_relay_url", daemonCmd.PersistentFlags().Lookup("relay-url")))
+	cobra.CheckErr(viper.BindPFlag("daemon_log_file", daemonCmd.PersistentFlags().Lookup("log-file")))
 }

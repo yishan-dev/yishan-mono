@@ -96,10 +96,43 @@ func initConfig() {
 	}
 }
 
+// activeLogFileWriter holds the current daemon log file writer so it can be
+// closed on shutdown and referenced for status/diagnostics.
+var activeLogFileWriter *logx.FileWriter
+
 func configureLogger(level string, format string) error {
-	return logx.Configure(logx.Config{
+	cfg := logx.Config{
 		Level:  level,
 		Format: format,
 		Out:    os.Stderr,
-	})
+	}
+	if activeLogFileWriter != nil {
+		cfg.FileOut = activeLogFileWriter
+	}
+	return logx.Configure(cfg)
+}
+
+// configureDaemonLogFile opens (or re-uses) a rotating log file writer at the
+// given path and reconfigures the global logger to also write to it.
+func configureDaemonLogFile(path string) error {
+	if activeLogFileWriter != nil {
+		// Already configured (e.g. logger was reconfigured after config load).
+		return nil
+	}
+
+	fw, err := logx.NewFileWriter(logx.FileWriterConfig{Path: path})
+	if err != nil {
+		return err
+	}
+	activeLogFileWriter = fw
+
+	return configureLogger(appConfig.LogLevel, appConfig.LogFormat)
+}
+
+// closeDaemonLogFile closes the active log file writer if one is open.
+func closeDaemonLogFile() {
+	if activeLogFileWriter != nil {
+		_ = activeLogFileWriter.Close()
+		activeLogFileWriter = nil
+	}
 }

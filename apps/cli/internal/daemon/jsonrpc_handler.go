@@ -18,23 +18,25 @@ const (
 )
 
 type JSONRPCHandler struct {
-	upgrader websocket.Upgrader
-	manager  *workspace.Manager
-	nodeID   string
-	events   *eventHub
-	watchers *workspaceWatchers
+	upgrader    websocket.Upgrader
+	manager     *workspace.Manager
+	nodeID      string
+	logFilePath string
+	events      *eventHub
+	watchers    *workspaceWatchers
 }
 
-func NewJSONRPCHandler(manager *workspace.Manager, nodeID string) *JSONRPCHandler {
+func NewJSONRPCHandler(manager *workspace.Manager, nodeID string, logFilePath string) *JSONRPCHandler {
 	events := newEventHub()
 	return &JSONRPCHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool { return true },
 		},
-		manager:  manager,
-		nodeID:   nodeID,
-		events:   events,
-		watchers: newWorkspaceWatchers(events),
+		manager:     manager,
+		nodeID:      nodeID,
+		logFilePath: logFilePath,
+		events:      events,
+		watchers:    newWorkspaceWatchers(events),
 	}
 }
 
