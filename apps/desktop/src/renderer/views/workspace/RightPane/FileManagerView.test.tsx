@@ -213,6 +213,7 @@ function getFileTreeProps() {
     expandedItems?: string[];
     selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
     onExpandedItemsChange?: (items: string[]) => void;
+    onEnsurePathLoaded?: (path: string) => Promise<void>;
     onSelectEntry?: (input: { path: string; isDirectory: boolean }) => void;
     onOpenEntry?: (input: { path: string; isDirectory: boolean }) => void;
     onCreateEntry?: (input: { path: string; isDirectory: boolean }) => Promise<void>;
@@ -694,6 +695,98 @@ describe("FileManagerView file loading", () => {
     expect(getFileTreeProps().files).toEqual(
       expect.arrayContaining(["src/", "src/index.ts", "docs/", "docs/guide.md", "README.md"]),
     );
+  });
+
+  it("reconciles externally renamed loaded descendants on file-change refresh", async () => {
+    mocks.listFiles.mockImplementation(async (input: {
+      workspaceWorktreePath: string;
+      relativePath?: string;
+      recursive?: boolean;
+    }) => {
+      if (input.recursive === false && input.relativePath === "src") {
+        return { files: asEntries(["src/old-name.ts"]) };
+      }
+
+      if (input.recursive) {
+        return { files: asEntries(["src/", "src/new-name.ts"]) };
+      }
+
+      return { files: asEntries([]) };
+    });
+
+    const { rerender } = render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual(["src/", "src/new-name.ts"]);
+    });
+
+    await getFileTreeProps().onEnsurePathLoaded?.("src");
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual([
+        "src/",
+        "src/new-name.ts",
+        "src/old-name.ts",
+      ]);
+    });
+
+    mocks.stateRef.current.fileTreeChangedRelativePathsByWorktreePath = {
+      "/tmp/repo": ["src/old-name.ts", "src/new-name.ts"],
+    };
+    mocks.stateRef.current.fileTreeRefreshVersion += 1;
+
+    rerender(<FileManagerView />);
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual(["src/", "src/new-name.ts"]);
+    });
+  });
+
+  it("removes stale old filename after external mv a.txt -> b.txt", async () => {
+    const directoryEntries = ["src/"];
+    let recursiveLeafName = "a.txt";
+    let loadedLeafName = "a.txt";
+
+    mocks.listFiles.mockImplementation(async (input: {
+      workspaceWorktreePath: string;
+      relativePath?: string;
+      recursive?: boolean;
+    }) => {
+      if (input.recursive === false && input.relativePath === "src") {
+        return { files: asEntries(["src/", `src/${loadedLeafName}`]) };
+      }
+
+      if (input.recursive) {
+        return { files: asEntries([...directoryEntries, `src/${recursiveLeafName}`]) };
+      }
+
+      return { files: asEntries([]) };
+    });
+
+    const { rerender } = render(<FileManagerView />);
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual(["src/", "src/a.txt"]);
+    });
+
+    await getFileTreeProps().onEnsurePathLoaded?.("src");
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual(["src/", "src/a.txt"]);
+    });
+
+    recursiveLeafName = "b.txt";
+    loadedLeafName = "a.txt";
+    mocks.stateRef.current.fileTreeChangedRelativePathsByWorktreePath = {
+      "/tmp/repo": ["src/a.txt", "src/b.txt"],
+    };
+    mocks.stateRef.current.fileTreeRefreshVersion += 1;
+
+    rerender(<FileManagerView />);
+
+    await waitFor(() => {
+      expect((mocks.repoFileTreePropsRef.current?.files as string[]) ?? []).toEqual(["src/", "src/b.txt"]);
+    });
   });
 
   it("includes ignored directories in the initial recursive load", async () => {
