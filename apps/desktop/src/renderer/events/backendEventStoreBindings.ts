@@ -30,12 +30,14 @@ type BackendEventStoreBindingsDependencies = {
   ) => () => void;
   subscribeInAppNotification: (listener: (payload: NotificationEventPayload) => void) => () => void;
   subscribeWorkspaceCreateProgress?: (listener: (payload: WorkspaceCreateProgressPayload) => void) => () => void;
+  subscribeOpenBrowserUrl?: (listener: (payload: { url: string; workspaceId: string }) => void) => () => void;
   listWorkspaceWorktreePaths?: () => string[];
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
   setWorkspaceAgentStatusByWorkspaceId: (statusByWorkspaceId: Record<string, WorkspaceAgentStatus>) => void;
   recordWorkspaceUnreadNotification: (workspaceId: string, tone: WorkspaceUnreadTone) => void;
   applyWorkspaceCreateProgressEvent?: (payload: WorkspaceCreateProgressPayload) => void;
+  openBrowserTab?: (payload: { url: string; workspaceId: string }) => void;
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
   getNotificationPreferences?: () => Promise<NotificationPreferences>;
@@ -73,6 +75,15 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
       listener(event.payload);
     });
   },
+  subscribeOpenBrowserUrl: (listener) => {
+    return subscribeBackendEvent("open.browser.url", (event) => {
+      if (event.source !== "openBrowserUrl") {
+        return;
+      }
+
+      listener(event.payload);
+    });
+  },
   listWorkspaceWorktreePaths: () =>
     workspaceStore
       .getState()
@@ -92,6 +103,9 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   },
   applyWorkspaceCreateProgressEvent: (payload) => {
     workspaceCreateProgressStore.getState().applyWorkspaceCreateProgressEvent(payload);
+  },
+  openBrowserTab: (payload) => {
+    tabStore.getState().openTab({ kind: "browser", workspaceId: payload.workspaceId, url: payload.url });
   },
   dispatchSystemNotification: async (input) => {
     await dispatchNotification(input);
@@ -417,6 +431,9 @@ export function createBackendEventStoreBindings(
     const unsubscribeWorkspaceCreateProgress = dependencies.subscribeWorkspaceCreateProgress?.((payload) => {
       dependencies.applyWorkspaceCreateProgressEvent?.(payload);
     }) ?? (() => {});
+    const unsubscribeOpenBrowserUrl = dependencies.subscribeOpenBrowserUrl?.((payload) => {
+      dependencies.openBrowserTab?.(payload);
+    }) ?? (() => {});
 
     return () => {
       unsubscribeGitChanged();
@@ -424,6 +441,7 @@ export function createBackendEventStoreBindings(
       unsubscribeWorkspaceFilesChanged();
       unsubscribeInAppNotification();
       unsubscribeWorkspaceCreateProgress();
+      unsubscribeOpenBrowserUrl();
       lifecycleBySessionKey.clear();
     };
   };

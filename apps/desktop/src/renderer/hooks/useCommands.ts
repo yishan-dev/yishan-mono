@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { listAgentDetectionStatuses as listAgentDetectionStatusesCommand } from "../commands/agentCommands";
 import {
+  appendBrowserHistory as appendBrowserHistoryCommand,
   checkAgentGlobalConfigExternalDirectoryPermission as checkAgentGlobalConfigExternalDirectoryPermissionCommand,
   ensureAgentGlobalConfigExternalDirectoryPermission as ensureAgentGlobalConfigExternalDirectoryPermissionCommand,
   getDefaultWorktreeLocation as getDefaultWorktreeLocationCommand,
+  loadBrowserHistory as loadBrowserHistoryCommand,
   openLocalFolderDialog as openLocalFolderDialogCommand,
   toggleMainWindowMaximized as toggleMainWindowMaximizedCommand,
 } from "../commands/appCommands";
@@ -136,6 +138,8 @@ export type Commands = {
   checkAgentGlobalConfigExternalDirectoryPermission: typeof checkAgentGlobalConfigExternalDirectoryPermissionCommand;
   ensureAgentGlobalConfigExternalDirectoryPermission: typeof ensureAgentGlobalConfigExternalDirectoryPermissionCommand;
   toggleMainWindowMaximized: typeof toggleMainWindowMaximizedCommand;
+  loadBrowserHistory: typeof loadBrowserHistoryCommand;
+  appendBrowserHistory: typeof appendBrowserHistoryCommand;
   ensureChatSession: typeof ensureChatSessionCommand;
   runChatPrompt: typeof runChatPromptCommand;
   closeAgentSession: typeof closeAgentSessionCommand;
@@ -247,6 +251,8 @@ export function useCommands(): Commands {
       checkAgentGlobalConfigExternalDirectoryPermission: checkAgentGlobalConfigExternalDirectoryPermissionCommand,
       ensureAgentGlobalConfigExternalDirectoryPermission: ensureAgentGlobalConfigExternalDirectoryPermissionCommand,
       toggleMainWindowMaximized: toggleMainWindowMaximizedCommand,
+      loadBrowserHistory: loadBrowserHistoryCommand,
+      appendBrowserHistory: appendBrowserHistoryCommand,
       ensureChatSession: ensureChatSessionCommand,
       runChatPrompt: runChatPromptCommand,
       closeAgentSession: closeAgentSessionCommand,

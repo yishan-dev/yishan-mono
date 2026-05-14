@@ -55,6 +55,12 @@ export type RpcSchema = {
         message?: string;
         createdAt: string;
       };
+      openBrowserUrl: {
+        url: string;
+        workspaceId: string;
+        tabId: string;
+        paneId: string;
+      };
     };
   };
 };

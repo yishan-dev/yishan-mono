@@ -54,6 +54,11 @@ func (h *JSONRPCHandler) ServeAgentHook(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	if isBrowserURLEvent(payload) {
+		h.handleBrowserURLEvent(w, payload)
+		return
+	}
+
 	event, ok := normalizeHookIngressPayload(payload)
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
@@ -164,7 +169,7 @@ func normalizeHookEventType(rawEventType string) string {
 	if normalized == "" || normalized == "unknown" {
 		return "unknown"
 	}
-	if strings.Contains(normalized, "start") || strings.Contains(normalized, "begin") {
+	if strings.Contains(normalized, "start") || strings.Contains(normalized, "begin") || strings.Contains(normalized, "submit") {
 		return "start"
 	}
 	if strings.Contains(normalized, "wait") || strings.Contains(normalized, "permission") || strings.Contains(normalized, "approval") {
@@ -196,4 +201,45 @@ func newHookEventID() string {
 		return "hook-" + time.Now().UTC().Format("20060102150405.000000000")
 	}
 	return "hook-" + hex.EncodeToString(bytes[:])
+}
+
+func isBrowserURLEvent(payload hookIngressEvent) bool {
+	raw := strings.ToLower(strings.TrimSpace(payload.RawEventType))
+	if raw != "openbrowserurl" {
+		return false
+	}
+	if payload.Payload == nil {
+		return false
+	}
+	urlVal, _ := payload.Payload["url"].(string)
+	return strings.TrimSpace(urlVal) != ""
+}
+
+func (h *JSONRPCHandler) handleBrowserURLEvent(w http.ResponseWriter, payload hookIngressEvent) {
+	workspaceID := strings.TrimSpace(payload.WorkspaceID)
+	tabID := strings.TrimSpace(payload.TabID)
+	paneID := strings.TrimSpace(payload.PaneID)
+	if workspaceID == "" || tabID == "" || paneID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	urlVal, _ := payload.Payload["url"].(string)
+	urlVal = strings.TrimSpace(urlVal)
+	if urlVal == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	h.events.Publish(frontendEvent{
+		Topic: "openBrowserUrl",
+		Payload: map[string]any{
+			"url":         urlVal,
+			"workspaceId": workspaceID,
+			"tabId":       tabID,
+			"paneId":      paneID,
+		},
+	})
+
+	w.WriteHeader(http.StatusOK)
 }
