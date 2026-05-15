@@ -45,6 +45,7 @@ JWT_ISSUER           = "https://api.yishan.io"
 JWT_AUDIENCE         = "api-service"
 COOKIE_DOMAIN        = "yishan.io"
 RELAY_URL            = "https://relay.yishan.io"
+QSTASH_URL           = "https://qstash-us-east-1.upstash.io"
 # Desktop dev (Electron renderer on Vite dev server) and production web origins.
 # Electron production builds load from file:// and bypass CORS enforcement,
 # so they do not need an explicit origin entry here.

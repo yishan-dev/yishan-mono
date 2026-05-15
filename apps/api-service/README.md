@@ -31,6 +31,7 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `GOOGLE_CLIENT_SECRET`
 - `GITHUB_CLIENT_ID`
 - `GITHUB_CLIENT_SECRET`
+- `QSTASH_URL` (Upstash QStash base URL, defaults to `https://qstash-us-east-1.upstash.io`)
 - `QSTASH_TOKEN` (Upstash QStash bearer token for dispatching scheduled job runs)
 - `RELAY_URL` (URL of the relay service, e.g. `https://relay.yishan.io`)
 - `RELAY_API_TOKEN` (bearer token for authenticating with the relay's dispatch endpoint)

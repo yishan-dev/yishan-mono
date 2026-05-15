@@ -11,11 +11,12 @@ export type DispatchMessage = {
 
 export type QStashEnv = {
   QSTASH_TOKEN?: string;
+  QSTASH_URL?: string;
   RELAY_URL?: string;
   RELAY_API_TOKEN?: string;
 };
 
-const QSTASH_PUBLISH_URL = "https://qstash.upstash.io/v2/publish/";
+const DEFAULT_QSTASH_URL = "https://qstash-us-east-1.upstash.io";
 const RELAY_DISPATCH_PATH = "/api/v1/dispatch";
 
 /**
@@ -42,11 +43,12 @@ export async function publishViaQStash(
     return 0;
   }
 
+  const qstashURL = env.QSTASH_URL || DEFAULT_QSTASH_URL;
   const destination = `${relayURL}${RELAY_DISPATCH_PATH}`;
   let published = 0;
 
   for (const msg of messages) {
-    const resp = await fetch(`${QSTASH_PUBLISH_URL}${destination}`, {
+    const resp = await fetch(`${qstashURL}/v2/publish/${destination}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
