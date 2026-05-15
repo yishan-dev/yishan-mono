@@ -514,6 +514,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
       isSelected: boolean,
       isInActivePane: boolean,
       rect: { left: number; top: number; width: number; height: number } | null,
+      paneId: string,
     ) => {
       const hasArea = Boolean(rect && rect.width > 1 && rect.height > 1);
       if (hasArea && rect) {
@@ -543,12 +544,20 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
           };
 
       return (
-        <Box key={tab.id} sx={style}>
+        <Box
+          key={tab.id}
+          sx={style}
+          onMouseDown={() => {
+            if (!isInActivePane) {
+              handleFocusPane(paneId);
+            }
+          }}
+        >
           {renderTabContent(tab, isSelected, isInActivePane)}
         </Box>
       );
     },
-    [isActive, isDraggingSplit, renderTabContent],
+    [isActive, isDraggingSplit, handleFocusPane, renderTabContent],
   );
 
   const renderPaneContent = useCallback(
@@ -561,7 +570,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   }, []);
 
   const tabPlacements = useMemo(() => {
-    const placements = new Map<string, { selected: boolean; activePane: boolean; rect: { left: number; top: number; width: number; height: number } | null }>();
+    const placements = new Map<string, { paneId: string; selected: boolean; activePane: boolean; rect: { left: number; top: number; width: number; height: number } | null }>();
     if (!splitRoot) {
       return placements;
     }
@@ -579,7 +588,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
         };
       }
       for (const tabId of pane.tabIds) {
-        placements.set(tabId, { selected: tabId === pane.selectedTabId, activePane: pane.id === activePaneId, rect });
+        placements.set(tabId, { paneId: pane.id, selected: tabId === pane.selectedTabId, activePane: pane.id === activePaneId, rect });
       }
     }
     return placements;
@@ -685,7 +694,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
         >
           {workspaceTabs.map((tab) => {
             const placement = tabPlacements.get(tab.id);
-            return renderTabSurface(tab, placement?.selected ?? false, placement?.activePane ?? false, placement?.rect ?? null);
+            return renderTabSurface(tab, placement?.selected ?? false, placement?.activePane ?? false, placement?.rect ?? null, placement?.paneId ?? "");
           })}
         </Box>,
         getOrCreateRuntimeRoot(),

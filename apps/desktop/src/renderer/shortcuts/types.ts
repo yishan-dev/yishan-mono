@@ -1,4 +1,5 @@
 import type { Commands } from "../hooks/useCommands";
+import type { SplitPaneStoreState } from "../store/splitPaneStore";
 import type { TabStoreState } from "../store/tabStore";
 import type { WorkspaceStoreState } from "../store/workspaceStore";
 
@@ -17,6 +18,7 @@ export type ShortContext = {
   isWorkspaceRoute: boolean;
   tabStoreState: TabStoreState;
   workspaceStoreState: WorkspaceStoreState;
+  splitPaneStoreState: SplitPaneStoreState;
   terminalTabTitle: string;
   commands: Commands;
   navigate: (path: string) => void;

@@ -225,12 +225,23 @@ function executeShortcutTarget(context: ShortContext, event: KeyboardEvent, targ
     return false;
   }
 
+  const activePane = context.splitPaneStoreState.getActivePane(workspaceId);
+  if (!activePane) {
+    return false;
+  }
+
+  const paneTabId = activePane.tabIds[parsedIndex];
+  if (!paneTabId) {
+    return false;
+  }
+
   const tabs = context.tabStoreState.getWorkspaceTabs(workspaceId);
-  const nextTab = tabs[parsedIndex];
+  const nextTab = tabs.find((t) => t.id === paneTabId);
   if (!nextTab) {
     return false;
   }
 
+  context.splitPaneStoreState.selectTab(workspaceId, activePane.id, nextTab.id);
   context.commands.setSelectedTabId(nextTab.id);
   event.preventDefault();
   return true;

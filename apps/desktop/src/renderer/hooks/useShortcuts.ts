@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getShortcutDefinitions } from "../shortcuts/keybindings";
 import { compileShortcutDefinitions, processShortcuts } from "../shortcuts/shortcutRunner";
+import { splitPaneStore } from "../store/splitPaneStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { useCommands } from "./useCommands";
@@ -16,6 +17,7 @@ export function useShortcuts(): void {
   const navigate = useNavigate();
   const tabStoreState = tabStore((state) => state);
   const workspaceStoreState = workspaceStore((state) => state);
+  const splitPaneStoreState = splitPaneStore((state) => state);
   const commands = useCommands();
 
   const isWorkspaceRoute = location.pathname === WORKSPACE_ROUTE;
@@ -26,11 +28,12 @@ export function useShortcuts(): void {
       isWorkspaceRoute,
       tabStoreState,
       workspaceStoreState,
+      splitPaneStoreState,
       terminalTabTitle: t("terminal.title"),
       commands,
       navigate,
     }),
-    [commands, isWorkspaceRoute, location.pathname, navigate, tabStoreState, t, workspaceStoreState],
+    [commands, isWorkspaceRoute, location.pathname, navigate, splitPaneStoreState, tabStoreState, t, workspaceStoreState],
   );
 
   const contextRef = useRef(context);
