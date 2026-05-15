@@ -8,7 +8,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { openLink } from "../commands/appCommands";
-import { readFileAsDataUrl } from "../commands/fileCommands";
+import { buildWorkspaceFileUrl } from "../commands/fileCommands";
 import { tabStore } from "../store/tabStore";
 import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
 import { MermaidBlock } from "./MermaidBlock";
@@ -19,7 +19,7 @@ type MarkdownPreviewProps = {
   worktreePath?: string;
 };
 
-const dataUrlCache = new Map<string, string>();
+const workspaceImageUrlCache = new Map<string, string>();
 
 function isAbsoluteUrl(src: string): boolean {
   return /^data:/i.test(src) || /^[a-z][a-z0-9+.-]*:/i.test(src);
@@ -399,22 +399,20 @@ function MarkdownImage({
       return;
     }
 
-    const absolutePath = `${worktreePath.replace(/\/+$/, "")}/${resolveRelativePath(fileDir, src)}`;
+    const cleanSrc = src.replace(/[?#].*$/, "");
+    const relativePath = resolveRelativePath(fileDir, cleanSrc);
+    const cacheKey = `${worktreePath}:${relativePath}`;
 
-    const cached = dataUrlCache.get(absolutePath);
+    const cached = workspaceImageUrlCache.get(cacheKey);
     if (cached) {
       setResolvedSrc(cached);
       return;
     }
 
     try {
-      const result = await readFileAsDataUrl({ absolutePath });
-      if (result.ok) {
-        dataUrlCache.set(absolutePath, result.dataUrl);
-        setResolvedSrc(result.dataUrl);
-      } else {
-        setError(true);
-      }
+      const protocolUrl = buildWorkspaceFileUrl({ workspaceWorktreePath: worktreePath, relativePath });
+      workspaceImageUrlCache.set(cacheKey, protocolUrl);
+      setResolvedSrc(protocolUrl);
     } catch {
       setError(true);
     }
