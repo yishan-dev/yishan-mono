@@ -6,7 +6,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isEditableTarget } from "../../shortcuts/editableTarget";
 import { handleFileTreeShortcutFromRegistry } from "../fileTreeActionRegistry";
 import { getFileTreeIcon } from "../fileTreeIcons";
-import { FILETREE_DRAG_MIME, extractSourcePathsFromDataTransferAsync, hasExternalFileDragIntent } from "./dataTransfer";
+import {
+  FILETREE_DRAG_MIME,
+  extractInternalDragRelativePaths,
+  extractSourcePathsFromDataTransferAsync,
+  hasExternalFileDragIntent,
+  hasInternalFileTreeDragIntent,
+} from "./dataTransfer";
 import {
   collectAncestorDirectoryPaths,
   getEntryName,
@@ -52,6 +58,7 @@ function FlatTreeRow({
   isExpanded,
   isDraggable,
   absolutePath,
+  isDropTarget,
   onSelect,
   onToggle,
   onOpen,
@@ -59,8 +66,10 @@ function FlatTreeRow({
   onEditingNameChange,
   onRenameKeyDown,
   onRenameBlur,
-  onExternalDragOver,
-  onExternalDrop,
+  onDragOver,
+  onDrop,
+  onDragEnter,
+  onDragLeave,
   hasDescendantGitChange,
 }: {
   row: VisibleRow;
@@ -76,6 +85,8 @@ function FlatTreeRow({
   isDraggable: boolean;
   /** Absolute file path used as the drag payload. */
   absolutePath: string;
+  /** True when this row is the active drop target during a drag operation. */
+  isDropTarget: boolean;
   onSelect: () => void;
   onToggle: () => void;
   onOpen: () => void;
@@ -83,8 +94,10 @@ function FlatTreeRow({
   onEditingNameChange: (value: string) => void;
   onRenameKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onRenameBlur: () => void;
-  onExternalDragOver: (event: DragEvent<HTMLElement>) => void;
-  onExternalDrop: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
+  onDragOver: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
+  onDragEnter: (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
 }) {
   if (isEditing) {
     return (
@@ -176,8 +189,10 @@ function FlatTreeRow({
         onOpen();
       }}
       onContextMenu={onContextMenu}
-      onDragOver={onExternalDragOver}
-      onDrop={(event) => onExternalDrop(event, row.path, row.isDirectory)}
+      onDragOver={onDragOver}
+      onDragEnter={(event) => onDragEnter(event, row.path, row.isDirectory)}
+      onDragLeave={onDragLeave}
+      onDrop={(event) => onDrop(event, row.path, row.isDirectory)}
       sx={{
         display: "flex",
         alignItems: "center",
@@ -188,9 +203,12 @@ function FlatTreeRow({
         cursor: "pointer",
         userSelect: "none",
         WebkitUserSelect: "none",
-        bgcolor: isSelected ? "action.selected" : "transparent",
+        bgcolor: isDropTarget ? "action.focus" : isSelected ? "action.selected" : "transparent",
+        outline: isDropTarget ? "1.5px dashed" : "none",
+        outlineColor: isDropTarget ? "primary.main" : undefined,
+        outlineOffset: isDropTarget ? "-1.5px" : undefined,
         "&:hover": {
-          bgcolor: isSelected ? "action.selected" : "action.hover",
+          bgcolor: isDropTarget ? "action.focus" : isSelected ? "action.selected" : "action.hover",
         },
       }}
     >
@@ -254,6 +272,7 @@ export function FileTree({
   onUndoLastEntryOperation,
   canUndoLastEntryOperation,
   onDropExternalEntries,
+  onMoveEntries,
   onItemContextMenu,
 }: FileTreeProps) {  const gitChangesByPathResolved = gitChangesByPath ?? EMPTY_GIT_CHANGES_BY_PATH;
   const ancestorOfGitChangePaths = useMemo(() => {
@@ -289,6 +308,7 @@ export function FileTree({
   const lastAppliedSelectionRequestIdRef = useRef<number | null>(null);
   const lastAppliedCreateRequestIdRef = useRef<number | null>(null);
   const expandedPathSet = useMemo(() => new Set(expandedItems), [expandedItems]);
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const rowByPath = useMemo(() => {
     const map = new Map<string, { row: VisibleRow; index: number }>();
     for (let i = 0; i < visibleRows.length; i++) {
@@ -456,6 +476,14 @@ export function FileTree({
   };
 
   const handleExternalDragOver = (event: DragEvent<HTMLElement>) => {
+    // Accept internal file-tree drags for move operations
+    if (onMoveEntries && hasInternalFileTreeDragIntent(event)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      return;
+    }
+
+    // Accept external file drops for import operations
     if (!onDropExternalEntries || !hasExternalFileDragIntent(event)) {
       return;
     }
@@ -464,7 +492,55 @@ export function FileTree({
     event.dataTransfer.dropEffect = "copy";
   };
 
+  const handleRowDragEnter = (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => {
+    const destinationPath = resolveDestinationDirectoryPath(targetPath, targetIsDirectory);
+
+    // For internal drags, highlight the target directory.
+    // Note: We cannot validate source paths here because getData() is restricted
+    // during dragenter; validation happens in the drop handler.
+    if (onMoveEntries && hasInternalFileTreeDragIntent(event)) {
+      setDropTargetPath(destinationPath);
+      return;
+    }
+
+    // For external drags, highlight the target
+    if (onDropExternalEntries && hasExternalFileDragIntent(event)) {
+      setDropTargetPath(destinationPath);
+    }
+  };
+
+  const handleRowDragLeave = (_event: DragEvent<HTMLElement>) => {
+    // The drop target will be updated by the next dragEnter, or cleared on drop/dragLeave of container
+  };
+
   const handleExternalDrop = async (event: DragEvent<HTMLElement>, targetPath: string, targetIsDirectory: boolean) => {
+    setDropTargetPath(null);
+
+    const destinationPath = resolveDestinationDirectoryPath(targetPath, targetIsDirectory);
+
+    // Handle internal file-tree move
+    if (onMoveEntries && hasInternalFileTreeDragIntent(event) && worktreePath) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const sourcePaths = extractInternalDragRelativePaths(event.dataTransfer, worktreePath);
+      if (sourcePaths.length === 0) {
+        return;
+      }
+
+      // Don't allow dropping onto itself or its own descendant
+      const isInvalidTarget = sourcePaths.some(
+        (srcPath) => srcPath === destinationPath || destinationPath.startsWith(`${srcPath}/`),
+      );
+      if (isInvalidTarget) {
+        return;
+      }
+
+      await onMoveEntries(sourcePaths, destinationPath);
+      return;
+    }
+
+    // Handle external file import
     if (!onDropExternalEntries) {
       return;
     }
@@ -473,7 +549,6 @@ export function FileTree({
     event.stopPropagation();
 
     const sourcePaths = await extractSourcePathsFromDataTransferAsync(event.dataTransfer);
-    const destinationPath = resolveDestinationDirectoryPath(targetPath, targetIsDirectory);
     if (sourcePaths.length === 0) {
       return;
     }
@@ -657,7 +732,20 @@ export function FileTree({
     <Box
       ref={scrollRef}
       data-testid="repo-file-tree-area"
-      sx={{ flex: 1, minHeight: 0, px: 1.5, py: 1, overflowY: "auto", overflowX: "auto" }}
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        px: 1.5,
+        py: 1,
+        overflowY: "auto",
+        overflowX: "auto",
+        ...(dropTargetPath === "" && {
+          outline: "1.5px dashed",
+          outlineColor: "primary.main",
+          outlineOffset: "-1.5px",
+          borderRadius: 1,
+        }),
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         if (!onItemContextMenu) {
@@ -678,6 +766,13 @@ export function FileTree({
         void handleTreeKeyDown(event);
       }}
       onDragOver={handleExternalDragOver}
+      onDragLeave={(event) => {
+        // Clear drop target when the drag leaves the tree container entirely
+        const relatedTarget = event.relatedTarget as Node | null;
+        if (!scrollRef.current?.contains(relatedTarget)) {
+          setDropTargetPath(null);
+        }
+      }}
       onDrop={(event) => {
         void handleExternalDrop(event, "", true);
       }}
@@ -726,6 +821,7 @@ export function FileTree({
                 isExpanded={isExpanded}
                 isDraggable={Boolean(worktreePath)}
                 absolutePath={worktreePath ? `${worktreePath}/${row.path}` : row.path}
+                isDropTarget={dropTargetPath != null && row.isDirectory && row.path === dropTargetPath}
                 onSelect={() => {
                   setSelectedEntryPath(row.path);
                   onSelectEntry?.({ path: row.path, isDirectory: row.isDirectory });
@@ -772,8 +868,10 @@ export function FileTree({
                 onEditingNameChange={setEditingName}
                 onRenameKeyDown={handleRenameInputKeyDown}
                 onRenameBlur={handleRenameInputBlur}
-                onExternalDragOver={handleExternalDragOver}
-                onExternalDrop={(event, targetPath, targetIsDirectory) => {
+                onDragOver={handleExternalDragOver}
+                onDragEnter={handleRowDragEnter}
+                onDragLeave={handleRowDragLeave}
+                onDrop={(event, targetPath, targetIsDirectory) => {
                   void handleExternalDrop(event, targetPath, targetIsDirectory);
                 }}
               />

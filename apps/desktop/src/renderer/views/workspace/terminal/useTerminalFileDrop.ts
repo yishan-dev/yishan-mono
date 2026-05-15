@@ -1,5 +1,5 @@
 import type { DragEvent, RefObject } from "react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import {
   FILETREE_DRAG_MIME,
@@ -15,6 +15,11 @@ type UseTerminalFileDropOptions = {
   xtermRef: RefObject<Terminal | null>;
   /** Ref to the active session id — drop is only handled when a session is active. */
   sessionIdRef: RefObject<string | null>;
+};
+
+type UseTerminalFileDropResult = {
+  /** True while a valid file drag is hovering over the terminal container. */
+  isFileDragOver: boolean;
 };
 
 /**
@@ -95,8 +100,9 @@ function extractDroppedPaths(dataTransfer: DataTransfer): string[] {
  *   clipboard paste and Shift+Enter already work in TerminalView.
  * - Multiple files are space-separated, each independently escaped.
  */
-export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: UseTerminalFileDropOptions): void {
-  const isDragOverRef = useRef(false);
+export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: UseTerminalFileDropOptions): UseTerminalFileDropResult {
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const dragEnterCountRef = useRef(0);
 
   const handleDragOver = useCallback((event: globalThis.DragEvent) => {
     if (!isAcceptableFileDrag(event)) {
@@ -108,7 +114,6 @@ export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: Us
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "copy";
     }
-    isDragOverRef.current = true;
   }, []);
 
   const handleDragEnter = useCallback((event: globalThis.DragEvent) => {
@@ -118,19 +123,29 @@ export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: Us
 
     event.preventDefault();
     event.stopPropagation();
+    dragEnterCountRef.current += 1;
+    if (dragEnterCountRef.current === 1) {
+      setIsFileDragOver(true);
+    }
   }, []);
 
   const handleDragLeave = useCallback((_event: globalThis.DragEvent) => {
-    isDragOverRef.current = false;
+    dragEnterCountRef.current = Math.max(0, dragEnterCountRef.current - 1);
+    if (dragEnterCountRef.current === 0) {
+      setIsFileDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback(
     (event: globalThis.DragEvent) => {
-      isDragOverRef.current = false;
+      dragEnterCountRef.current = 0;
+      setIsFileDragOver(false);
 
       const terminal = xtermRef.current;
       const sessionId = sessionIdRef.current;
-      if (!terminal || !sessionId || !event.dataTransfer) {
+      const dt = event.dataTransfer;
+
+      if (!terminal || !sessionId || !dt) {
         return;
       }
 
@@ -141,7 +156,7 @@ export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: Us
       event.preventDefault();
       event.stopPropagation();
 
-      const paths = extractDroppedPaths(event.dataTransfer);
+      const paths = extractDroppedPaths(dt);
       if (paths.length === 0) {
         return;
       }
@@ -171,4 +186,6 @@ export function useTerminalFileDrop({ containerRef, xtermRef, sessionIdRef }: Us
       container.removeEventListener("drop", handleDrop);
     };
   }, [containerRef, handleDragOver, handleDragEnter, handleDragLeave, handleDrop]);
+
+  return { isFileDragOver };
 }

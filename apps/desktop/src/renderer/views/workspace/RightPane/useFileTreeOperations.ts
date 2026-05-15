@@ -91,6 +91,8 @@ export type UseFileTreeOperationsResult = {
   onCutEntry: (path: string) => Promise<void>;
   onPasteEntries: (destinationPath: string) => Promise<void>;
   onDropExternalEntries: (sourcePaths: string[], destinationPath: string) => Promise<void>;
+  /** Moves entries within the workspace via drag-and-drop. */
+  onMoveEntries: (sourceRelativePaths: string[], destinationPath: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onUndoLastEntryOperation: () => Promise<void>;
 };
@@ -367,6 +369,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
     setInternalClipboardState,
     onPasteEntries,
     onDropExternalEntries,
+    onMoveEntries,
   } = useFileTreeClipboard({
     selectedWorkspaceWorktreePath,
     repoEntries,
@@ -417,6 +420,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
     },
     onPasteEntries,
     onDropExternalEntries,
+    onMoveEntries,
     onRefresh: async () => {
       await loadAllRepoFiles();
     },

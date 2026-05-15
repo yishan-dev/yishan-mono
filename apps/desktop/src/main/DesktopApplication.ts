@@ -1,5 +1,5 @@
-import { readFileSync, statSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
 import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
@@ -336,6 +336,62 @@ export class DesktopApplication {
         const buffer = readFileSync(absolutePath);
         const base64 = buffer.toString("base64");
         return { ok: true, dataUrl: `data:${mime};base64,${base64}` };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.copyFiles, async (_event, input) => {
+      try {
+        const sourcePaths: string[] = Array.isArray(input?.sourcePaths) ? input.sourcePaths : [];
+        const destinationDirectory = String(input?.destinationDirectory ?? "");
+        if (sourcePaths.length === 0) {
+          return { ok: false, error: "sourcePaths is required" };
+        }
+        if (!destinationDirectory) {
+          return { ok: false, error: "destinationDirectory is required" };
+        }
+
+        // Ensure destination directory exists
+        mkdirSync(destinationDirectory, { recursive: true });
+
+        const copiedPaths: string[] = [];
+        for (const sourcePath of sourcePaths) {
+          const name = basename(sourcePath);
+          const destPath = join(destinationDirectory, name);
+          const stat = statSync(sourcePath);
+          if (stat.isDirectory()) {
+            cpSync(sourcePath, destPath, { recursive: true });
+          } else {
+            copyFileSync(sourcePath, destPath);
+          }
+          copiedPaths.push(destPath);
+        }
+
+        return { ok: true, copiedPaths };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.writeFileBase64, async (_event, input) => {
+      try {
+        const absolutePath = String(input?.absolutePath ?? "");
+        const contentBase64 = String(input?.contentBase64 ?? "");
+        if (!absolutePath) {
+          return { ok: false, error: "absolutePath is required" };
+        }
+        if (!contentBase64) {
+          return { ok: false, error: "contentBase64 is required" };
+        }
+
+        // Ensure parent directory exists
+        const parentDir = join(absolutePath, "..");
+        mkdirSync(parentDir, { recursive: true });
+
+        const buffer = Buffer.from(contentBase64, "base64");
+        writeFileSync(absolutePath, buffer);
+        return { ok: true };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
