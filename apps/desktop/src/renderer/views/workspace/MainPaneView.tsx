@@ -134,6 +134,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   const [focusContentRequestKey, setFocusContentRequestKey] = useState(0);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const didTrackSelectedTabRef = useRef(false);
+  const didSyncPaneSelectionRef = useRef(false);
 
   // Read this workspace's layout from the store
   const layout = splitPaneStore((state) => state.layoutByWorkspaceId[workspaceId]);
@@ -172,6 +173,26 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
 
     previousTabIdsRef.current = currentTabIds;
   }, [workspaceId, workspaceTabs]);
+
+  // Sync tabStore.selectedTabId to splitPaneStore when a tab is selected programmatically
+  // (e.g. openTab reusing an existing temporary tab, or selecting an already-open file)
+  useEffect(() => {
+    if (!didSyncPaneSelectionRef.current) {
+      didSyncPaneSelectionRef.current = true;
+      return;
+    }
+    if (!selectedTabId || !isActive) return;
+
+    const tab = tabById.get(selectedTabId);
+    if (!tab || tab.workspaceId !== workspaceId) return;
+
+    const pane = splitPaneStore.getState().getPaneForTab(workspaceId, selectedTabId);
+    if (!pane) return;
+
+    if (pane.selectedTabId !== selectedTabId || activePaneId !== pane.id) {
+      splitPaneStore.getState().selectTab(workspaceId, pane.id, selectedTabId);
+    }
+  }, [selectedTabId, isActive, workspaceId, activePaneId, tabById]);
 
   // Auto-refresh open file/diff tabs
   const refreshableTabs = useMemo(
