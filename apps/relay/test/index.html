@@ -29,8 +29,8 @@
   </header>
 
   <div class="controls">
-    <input id="relay-url" type="text" placeholder="Relay URL" value="ws://127.0.0.1:8788" />
-    <input id="node-id" type="text" placeholder="Node ID" />
+    <input id="relay-url" type="text" placeholder="Relay URL" value="wss://relay.yishan.io" />
+    <input id="node-id" type="text" placeholder="Node ID" value="b15d27b8101a408f109656114c0279f2" />
     <input id="api-token" type="text" placeholder="Relay API Token" value="dev-token" />
     <button id="btn-connect" onclick="connectRelay()">Connect</button>
     <button id="btn-disconnect" class="secondary" onclick="disconnectRelay()" disabled>Disconnect</button>
@@ -56,6 +56,7 @@
     let term = null;
     let fitAddon = null;
     let sessionId = null;
+    let heartbeatInterval = null;
 
     const OPCODE_INPUT = 0x01;
     const OPCODE_OUTPUT = 0x02;
@@ -105,6 +106,14 @@
         document.getElementById('session-controls').style.display = 'flex';
         initTerminal();
         term.writeln('\x1b[32m[relay] Connected. Enter a workspace path and click "New Session".\x1b[0m');
+
+        // Send periodic pings to keep the connection alive through
+        // Cloudflare (100s idle timeout) and nginx (300s read timeout).
+        heartbeatInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            sendJsonRpc('ping', {}, nextId());
+          }
+        }, 30000);
       };
 
       ws.onmessage = (event) => {
@@ -116,6 +125,7 @@
       };
 
       ws.onclose = (event) => {
+        if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
         setStatus(false, `Disconnected (${event.code})`);
         document.getElementById('btn-connect').disabled = false;
         document.getElementById('btn-disconnect').disabled = true;
@@ -130,6 +140,7 @@
     }
 
     function disconnectRelay() {
+      if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
       if (ws) { ws.close(); ws = null; }
     }
 
