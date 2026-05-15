@@ -52,7 +52,7 @@ export function WebviewPane({
     syncWebviewUrl(tabId, resolvedUrl);
 
     attachWebviewPlaceholder(tabId, placeholder);
-    webview.style.visibility = hasError ? "hidden" : "visible";
+    webview.style.opacity = hasError ? "0" : "1";
     webview.style.pointerEvents = hasError ? "none" : "auto";
 
     webviewElRef.current = webview;

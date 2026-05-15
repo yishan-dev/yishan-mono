@@ -1,6 +1,6 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
@@ -469,6 +469,7 @@ function MarkdownImage({
 export function MarkdownPreview({ content, filePath, worktreePath }: MarkdownPreviewProps) {
   const theme = useTheme();
   const styles = useMarkdownStyles(theme);
+
   const fileDir = useMemo(() => {
     if (!filePath) return "";
     const parts = filePath.split("/");

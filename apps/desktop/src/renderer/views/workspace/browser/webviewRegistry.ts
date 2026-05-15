@@ -1,42 +1,8 @@
+import { createFixedRuntimeLayer } from "../runtime/fixedRuntimeLayer";
+
 const webviewsByTabId = new Map<string, Electron.WebviewTag>();
 const requestedUrlByTabId = new Map<string, string>();
-const placeholdersByTabId = new Map<string, HTMLElement>();
-const resizeObserversByTabId = new Map<string, ResizeObserver>();
-
-let rootHost: HTMLDivElement | null = null;
-
-function getRootHost(): HTMLDivElement {
-  if (rootHost) {
-    return rootHost;
-  }
-
-  const host = document.createElement("div");
-  host.setAttribute("data-testid", "webview-root-host");
-  host.style.position = "fixed";
-  host.style.left = "0";
-  host.style.top = "0";
-  host.style.width = "0";
-  host.style.height = "0";
-  host.style.pointerEvents = "none";
-  host.style.zIndex = "0";
-  document.body.appendChild(host);
-  rootHost = host;
-  return host;
-}
-
-function updateWebviewLayout(tabId: string): void {
-  const webview = webviewsByTabId.get(tabId);
-  const placeholder = placeholdersByTabId.get(tabId);
-  if (!webview || !placeholder) {
-    return;
-  }
-
-  const rect = placeholder.getBoundingClientRect();
-  webview.style.left = `${rect.left}px`;
-  webview.style.top = `${rect.top}px`;
-  webview.style.width = `${rect.width}px`;
-  webview.style.height = `${rect.height}px`;
-}
+const runtimeLayer = createFixedRuntimeLayer("webview-root-host");
 
 export function getOrCreateWebview(tabId: string, initialUrl: string): Electron.WebviewTag {
   const existing = webviewsByTabId.get(tabId);
@@ -61,7 +27,7 @@ export function getOrCreateWebview(tabId: string, initialUrl: string): Electron.
   if (initialUrl) {
     webview.setAttribute("src", initialUrl);
   }
-  getRootHost().appendChild(webview);
+  runtimeLayer.register(tabId, webview as unknown as HTMLElement);
   webviewsByTabId.set(tabId, webview);
   requestedUrlByTabId.set(tabId, initialUrl);
   return webview;
@@ -89,6 +55,8 @@ export function parkWebview(tabId: string): void {
     return;
   }
   webview.style.visibility = "hidden";
+  webview.style.left = "-10000px";
+  webview.style.top = "-10000px";
   webview.style.width = "0";
   webview.style.height = "0";
   webview.style.pointerEvents = "none";
@@ -99,49 +67,23 @@ export function attachWebviewPlaceholder(tabId: string, placeholder: HTMLElement
   if (!webview) {
     return;
   }
-  placeholdersByTabId.set(tabId, placeholder);
-  const existingObserver = resizeObserversByTabId.get(tabId);
-  existingObserver?.disconnect();
-
-  const observer = new ResizeObserver(() => {
-    updateWebviewLayout(tabId);
-  });
-  observer.observe(placeholder);
-  resizeObserversByTabId.set(tabId, observer);
-
-  updateWebviewLayout(tabId);
-  webview.style.visibility = "visible";
-  webview.style.pointerEvents = "auto";
+  runtimeLayer.attach(tabId, placeholder);
+  webview.style.left = "0";
+  webview.style.top = "0";
 }
 
 export function detachWebviewPlaceholder(tabId: string, placeholder: HTMLElement): void {
-  const current = placeholdersByTabId.get(tabId);
-  if (current !== placeholder) {
-    return;
-  }
-  placeholdersByTabId.delete(tabId);
-  const observer = resizeObserversByTabId.get(tabId);
-  observer?.disconnect();
-  resizeObserversByTabId.delete(tabId);
+  runtimeLayer.detach(tabId, placeholder);
   parkWebview(tabId);
 }
 
 export function removeWebviewsForClosedTabs(openTabIds: ReadonlySet<string>): void {
-  for (const [tabId, webview] of webviewsByTabId.entries()) {
+  for (const tabId of webviewsByTabId.keys()) {
     if (openTabIds.has(tabId)) {
       continue;
     }
     webviewsByTabId.delete(tabId);
     requestedUrlByTabId.delete(tabId);
-    placeholdersByTabId.delete(tabId);
-    const observer = resizeObserversByTabId.get(tabId);
-    observer?.disconnect();
-    resizeObserversByTabId.delete(tabId);
-    webview.remove();
-  }
-
-  if (webviewsByTabId.size === 0 && rootHost) {
-    rootHost.remove();
-    rootHost = null;
+    runtimeLayer.remove(tabId);
   }
 }

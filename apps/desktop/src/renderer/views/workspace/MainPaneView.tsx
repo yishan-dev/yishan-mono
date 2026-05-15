@@ -1,5 +1,6 @@
 import { Box, Typography } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { LuGlobe, LuSquareTerminal } from "react-icons/lu";
 import { SYSTEM_FILE_MANAGER_APP_ID, findExternalAppPreset } from "../../../shared/contracts/externalApps";
@@ -18,7 +19,7 @@ import { type DesktopAgentKind, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../help
 import { useCommands } from "../../hooks/useCommands";
 import { type RefreshableOpenTab, useOpenTabAutoRefresh } from "../../hooks/useOpenTabAutoRefresh";
 import { agentSettingsStore } from "../../store/agentSettingsStore";
-import type { PaneLeaf } from "../../store/split-pane-domain";
+import type { PaneLeaf, SplitPaneNode } from "../../store/split-pane-domain";
 import { splitPaneStore } from "../../store/splitPaneStore";
 import { tabStore } from "../../store/tabStore";
 import type { WorkspaceTab } from "../../store/types";
@@ -28,6 +29,7 @@ import { LaunchView } from "./LaunchView";
 import { MainPaneTitleBarView } from "./MainPaneTitleBarView";
 import { BrowserView } from "./browser/BrowserView";
 import { removeWebviewsForClosedTabs } from "./browser/webviewRegistry";
+import { getOrCreateRuntimeRoot } from "./runtime/runtimeRoot";
 import { TerminalView } from "./terminal/TerminalView";
 
 function FaviconIcon({ url, size }: { url?: string; size: number }) {
@@ -70,6 +72,16 @@ function buildTerminalInput(title: string) {
 
 function buildBrowserInput() {
   return { kind: "browser" as const, url: "" };
+}
+
+function collectPaneLeaves(node: SplitPaneNode | null | undefined): PaneLeaf[] {
+  if (!node) {
+    return [];
+  }
+  if (node.kind === "leaf") {
+    return [node];
+  }
+  return [...collectPaneLeaves(node.first), ...collectPaneLeaves(node.second)];
 }
 
 /** Converts a full WorkspaceTab to the lightweight descriptor used by TabBar/SplitPaneGroup. */
@@ -136,6 +148,9 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const didTrackSelectedTabRef = useRef(false);
   const didSyncPaneSelectionRef = useRef(false);
+  const [panePlaceholders, setPanePlaceholders] = useState<Record<string, HTMLDivElement | null>>({});
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const lastKnownRectByTabIdRef = useRef<Record<string, { left: number; top: number; width: number; height: number }>>({});
 
   // Read this workspace's layout from the store
   const layout = splitPaneStore((state) => state.layoutByWorkspaceId[workspaceId]);
@@ -385,7 +400,11 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
       if (tab.kind === "diff") {
         return (
           <TabPanel key={tab.id} active={isSelected}>
-            <FileDiffViewer filePath={tab.data.path} oldContent={tab.data.oldContent ?? ""} newContent={tab.data.newContent ?? ""} />
+            <FileDiffViewer
+              filePath={tab.data.path}
+              oldContent={tab.data.oldContent ?? ""}
+              newContent={tab.data.newContent ?? ""}
+            />
           </TabPanel>
         );
       }
@@ -482,18 +501,98 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
     [t, cmd, workspace, externalAppLabel, handleOpenExternalApp, focusContentRequestKey, copyToClipboard],
   );
 
-  const renderPaneContent = useCallback(
-    (pane: PaneLeaf) => (
-      <>
-        {pane.tabIds.map((tabId) => {
-          const tab = tabById.get(tabId);
-          if (!tab) return null;
-          return renderTabContent(tab, tabId === pane.selectedTabId);
-        })}
-      </>
-    ),
-    [tabById, renderTabContent],
+  const renderTabSurface = useCallback(
+    (tab: WorkspaceTab, isSelected: boolean, rect: { left: number; top: number; width: number; height: number } | null) => {
+      const hasArea = Boolean(rect && rect.width > 1 && rect.height > 1);
+      if (hasArea && rect) {
+        lastKnownRectByTabIdRef.current[tab.id] = rect;
+      }
+      const effectiveRect = rect ?? lastKnownRectByTabIdRef.current[tab.id] ?? null;
+      const shouldShow = isActive && isSelected && Boolean(effectiveRect && effectiveRect.width > 1 && effectiveRect.height > 1);
+      const style = effectiveRect
+        ? {
+            position: "fixed" as const,
+            left: effectiveRect.left,
+            top: effectiveRect.top,
+            width: effectiveRect.width,
+            height: effectiveRect.height,
+            display: shouldShow ? "flex" : "none",
+            flexDirection: "column" as const,
+            pointerEvents: shouldShow && !isDraggingSplit ? "auto" : "none",
+          }
+        : {
+            position: "absolute" as const,
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            display: "none",
+            pointerEvents: "none",
+          };
+
+      return (
+        <Box key={tab.id} sx={style}>
+          {renderTabContent(tab, isSelected)}
+        </Box>
+      );
+    },
+    [isActive, isDraggingSplit, renderTabContent],
   );
+
+  const renderPaneContent = useCallback(
+    (_pane: PaneLeaf, _placeholder: HTMLDivElement | null) => null,
+    [],
+  );
+
+  const handleContentPlaceholderChange = useCallback((paneId: string, placeholder: HTMLDivElement | null) => {
+    setPanePlaceholders((prev) => (prev[paneId] === placeholder ? prev : { ...prev, [paneId]: placeholder }));
+  }, []);
+
+  const tabPlacements = useMemo(() => {
+    const placements = new Map<string, { selected: boolean; rect: { left: number; top: number; width: number; height: number } | null }>();
+    if (!splitRoot) {
+      return placements;
+    }
+    const leaves = collectPaneLeaves(splitRoot);
+    for (const pane of leaves) {
+      const placeholder = panePlaceholders[pane.id];
+      let rect: { left: number; top: number; width: number; height: number } | null = null;
+      if (placeholder) {
+        const bounds = placeholder.getBoundingClientRect();
+        rect = {
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+        };
+      }
+      for (const tabId of pane.tabIds) {
+        placements.set(tabId, { selected: tabId === pane.selectedTabId, rect });
+      }
+    }
+    return placements;
+  }, [splitRoot, panePlaceholders, layoutVersion]);
+
+  useLayoutEffect(() => {
+    const observedElements = Object.values(panePlaceholders).filter(
+      (element): element is HTMLDivElement => element != null,
+    );
+    if (observedElements.length === 0 || typeof ResizeObserver !== "function") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      setLayoutVersion((version) => version + 1);
+    });
+
+    for (const element of observedElements) {
+      resizeObserver.observe(element);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [panePlaceholders]);
 
   const renderPane = useCallback(
     (pane: PaneLeaf) => {
@@ -530,6 +629,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
           getTabIcon={getTabIcon}
           enabledAgentKinds={enabledAgentKinds}
           disabled={!workspaceId}
+          onContentPlaceholderChange={handleContentPlaceholderChange}
           renderContent={renderPaneContent}
         />
       );
@@ -538,7 +638,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
       activePaneId, isDraggingSplit, tabById, handleSelectTab, handleCloseTab,
       cmd, handleReorderTab, handleCreateTab, handleRenameTab, handleSplitDrop,
       handleSplitRight, handleSplitDown, handleFocusPane, handleTabDragStart,
-      handleTabDragEnd, getTabIcon, enabledAgentKinds, workspaceId, renderPaneContent,
+      handleTabDragEnd, getTabIcon, enabledAgentKinds, workspaceId, handleContentPlaceholderChange, renderPaneContent,
     ],
   );
 
@@ -552,11 +652,33 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   if (!splitRoot) return null;
 
   return (
-    <SplitPaneContainer
-      node={splitRoot}
-      renderPane={renderPane}
-      onSplitRatioChange={handleSplitRatioChange}
-    />
+    <Box sx={{ position: "relative", height: "100%" }}>
+      <SplitPaneContainer
+        node={splitRoot}
+        renderPane={renderPane}
+        onSplitRatioChange={handleSplitRatioChange}
+      />
+      {createPortal(
+        <Box
+          sx={{
+            position: "fixed",
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            pointerEvents: "none",
+            opacity: isDraggingSplit ? 0.28 : 1,
+            transition: "opacity 120ms ease-out",
+          }}
+        >
+          {workspaceTabs.map((tab) => {
+            const placement = tabPlacements.get(tab.id);
+            return renderTabSurface(tab, placement?.selected ?? false, placement?.rect ?? null);
+          })}
+        </Box>,
+        getOrCreateRuntimeRoot(),
+      )}
+    </Box>
   );
 }
 

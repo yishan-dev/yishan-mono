@@ -156,7 +156,7 @@ vi.mock("../../components/SplitPaneGroup", () => ({
       <button type="button" onClick={() => onCreateTab("terminal")}>
         create-terminal
       </button>
-      <div data-testid="pane-content">{renderContent(pane)}</div>
+      <div data-testid="pane-content">{renderContent(pane, null)}</div>
     </div>
   ),
 }));
