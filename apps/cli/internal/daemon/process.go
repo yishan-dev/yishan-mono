@@ -145,15 +145,11 @@ func Run(cfg RunConfig, statePath string) error {
 	}
 
 	stop := make(chan os.Signal, 1)
-	schedulerStop := make(chan struct{})
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(stop)
 
-	go StartSchedulerLoop(daemonID, schedulerStop)
-
 	go func() {
 		<-stop
-		close(schedulerStop)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {

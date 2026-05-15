@@ -2,12 +2,11 @@ package daemon
 
 import (
 	"bytes"
-	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
 	"yishan/apps/cli/internal/api"
@@ -15,154 +14,67 @@ import (
 )
 
 const (
-	streamKey          = "scheduled-job-runs"
-	consumerGroup      = "daemon-consumers"
-	agentExecTimeout   = 5 * time.Minute
-	blockTimeout       = 30 * time.Second
-	reclaimInterval    = 60 * time.Second
-	reclaimMinIdle     = 2 * time.Minute
+	agentExecTimeout = 5 * time.Minute
 )
 
-func StartSchedulerLoop(daemonID string, stop <-chan struct{}) {
-	redisURL := cliruntime.RedisURL()
-	if redisURL == "" {
-		log.Debug().Msg("scheduler: REDIS_URL not configured, skipping scheduler loop")
+// jobRunParams matches the relay protocol's job.run notification params.
+type jobRunParams struct {
+	RunID          string         `json:"runId"`
+	JobID          string         `json:"jobId"`
+	ScheduledFor   string         `json:"scheduledFor"`
+	IdempotencyKey string         `json:"idempotencyKey"`
+	Payload        map[string]any `json:"payload"`
+}
+
+// handleJobRun processes a job.run notification received from the relay.
+// It sends job.ack / job.result back over the relay WS connection.
+func handleJobRun(connState *wsConnState, nodeID string, raw json.RawMessage) {
+	var params jobRunParams
+	if err := json.Unmarshal(raw, &params); err != nil {
+		log.Warn().Err(err).Msg("scheduler: invalid job.run params")
+		sendJobAck(connState, params.RunID, "rejected", "invalid params")
 		return
 	}
+
+	if params.RunID == "" || params.JobID == "" {
+		log.Warn().Msg("scheduler: skipping malformed job.run (missing runId or jobId)")
+		sendJobAck(connState, params.RunID, "rejected", "missing runId or jobId")
+		return
+	}
+
 	if !cliruntime.APIConfigured() {
-		log.Debug().Msg("scheduler: API not configured, skipping scheduler loop")
+		log.Warn().Msg("scheduler: API not configured, rejecting job.run")
+		sendJobAck(connState, params.RunID, "rejected", "API not configured")
 		return
 	}
 
-	opts, err := redis.ParseURL(redisURL)
-	if err != nil {
-		log.Error().Err(err).Msg("scheduler: invalid REDIS_URL")
-		return
-	}
+	// Accept the job
+	sendJobAck(connState, params.RunID, "accepted", "")
 
-	rdb := redis.NewClient(opts)
-	defer rdb.Close()
-
-	ctx := context.Background()
-
-	err = rdb.XGroupCreateMkStream(ctx, streamKey, consumerGroup, "0").Err()
-	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
-		log.Error().Err(err).Msg("scheduler: failed to create consumer group")
-		return
-	}
-
-	log.Info().Str("stream", streamKey).Str("group", consumerGroup).Msg("scheduler: started stream consumer")
-
-	reclaimTicker := time.NewTicker(reclaimInterval)
-	defer reclaimTicker.Stop()
-
-	for {
-		select {
-		case <-stop:
-			log.Info().Msg("scheduler: stopping stream consumer")
-			return
-		case <-reclaimTicker.C:
-			reclaimPending(ctx, rdb, daemonID)
-		default:
-			readAndProcess(ctx, rdb, daemonID, stop)
-		}
-	}
+	// Process asynchronously so the relay read loop is not blocked
+	go processRelayJob(connState, nodeID, params)
 }
 
-func readAndProcess(ctx context.Context, rdb *redis.Client, daemonID string, stop <-chan struct{}) {
-	streams, err := rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
-		Group:    consumerGroup,
-		Consumer: daemonID,
-		Streams:  []string{streamKey, ">"},
-		Count:    10,
-		Block:    blockTimeout,
-	}).Result()
-
-	if err != nil {
-		if err == redis.Nil {
-			return
-		}
-		select {
-		case <-stop:
-			return
-		default:
-		}
-		log.Error().Err(err).Msg("scheduler: XREADGROUP failed")
-		time.Sleep(5 * time.Second)
-		return
-	}
-
-	for _, stream := range streams {
-		for _, msg := range stream.Messages {
-			processMessage(ctx, rdb, daemonID, msg)
-		}
-	}
-}
-
-func reclaimPending(ctx context.Context, rdb *redis.Client, daemonID string) {
-	pending, err := rdb.XPendingExt(ctx, &redis.XPendingExtArgs{
-		Stream: streamKey,
-		Group:  consumerGroup,
-		Start:  "-",
-		End:    "+",
-		Count:  20,
-		Idle:   reclaimMinIdle,
-	}).Result()
-
-	if err != nil {
-		log.Error().Err(err).Msg("scheduler: failed to check pending messages")
-		return
-	}
-
-	for _, p := range pending {
-		claimed, err := rdb.XClaim(ctx, &redis.XClaimArgs{
-			Stream:   streamKey,
-			Group:    consumerGroup,
-			Consumer: daemonID,
-			MinIdle:  reclaimMinIdle,
-			Messages: []string{p.ID},
-		}).Result()
-		if err != nil {
-			log.Error().Err(err).Str("id", p.ID).Msg("scheduler: XCLAIM failed")
-			continue
-		}
-		for _, msg := range claimed {
-			processMessage(ctx, rdb, daemonID, msg)
-		}
-	}
-}
-
-func processMessage(ctx context.Context, rdb *redis.Client, daemonID string, msg redis.XMessage) {
-	runID, _ := msg.Values["runId"].(string)
-	nodeID, _ := msg.Values["nodeId"].(string)
-	agentKind, _ := msg.Values["agentKind"].(string)
-	prompt, _ := msg.Values["prompt"].(string)
-	model, _ := msg.Values["model"].(string)
-	command, _ := msg.Values["command"].(string)
-
-	if runID == "" || nodeID == "" || prompt == "" {
-		log.Warn().Str("msgId", msg.ID).Msg("scheduler: skipping malformed message")
-		rdb.XAck(ctx, streamKey, consumerGroup, msg.ID)
-		return
-	}
-
-	if nodeID != daemonID {
-		rdb.XAck(ctx, streamKey, consumerGroup, msg.ID)
-		return
-	}
-
+func processRelayJob(connState *wsConnState, nodeID string, params jobRunParams) {
+	startTime := time.Now()
 	client := cliruntime.APIClient()
 
-	_, err := client.StartScheduledJobRun(daemonID, api.StartScheduledJobRunInput{
-		RunID:     runID,
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
+	_, err := client.StartScheduledJobRun(nodeID, api.StartScheduledJobRunInput{
+		RunID:     params.RunID,
+		StartedAt: startTime.UTC().Format(time.RFC3339),
 	})
 	if err != nil {
-		log.Error().Err(err).Str("runId", runID).Msg("scheduler: failed to mark run started")
+		log.Error().Err(err).Str("runId", params.RunID).Msg("scheduler: failed to mark run started")
 	}
 
+	// Extract agent execution params from the payload
+	agentKind, _ := params.Payload["agentKind"].(string)
+	prompt, _ := params.Payload["prompt"].(string)
+	model, _ := params.Payload["model"].(string)
+	command, _ := params.Payload["command"].(string)
+
 	log.Info().
-		Str("runId", runID).
+		Str("runId", params.RunID).
 		Str("agentKind", agentKind).
 		Str("prompt", prompt).
 		Str("model", model).
@@ -170,34 +82,115 @@ func processMessage(ctx context.Context, rdb *redis.Client, daemonID string, msg
 		Msg("scheduler: executing agent")
 
 	output, execErr := runAgent(agentKind, prompt, model, command)
-	finishedAt := time.Now().UTC().Format(time.RFC3339)
+	finishedAt := time.Now()
+	durationMs := finishedAt.Sub(startTime).Milliseconds()
 
-	input := api.CompleteScheduledJobRunInput{
-		RunID:      runID,
-		FinishedAt: finishedAt,
+	// Report to API
+	apiInput := api.CompleteScheduledJobRunInput{
+		RunID:      params.RunID,
+		FinishedAt: finishedAt.UTC().Format(time.RFC3339),
 	}
 
 	if execErr != nil {
-		input.Status = "failed"
-		input.ErrorCode = "AGENT_EXEC_ERROR"
-		input.ErrorMessage = execErr.Error()
+		apiInput.Status = "failed"
+		apiInput.ErrorCode = "AGENT_EXEC_ERROR"
+		apiInput.ErrorMessage = execErr.Error()
 		if output != "" {
-			input.ResponseBody = output
+			apiInput.ResponseBody = output
 		}
 	} else {
-		input.Status = "succeeded"
+		apiInput.Status = "succeeded"
 		if output != "" {
-			input.ResponseBody = output
+			apiInput.ResponseBody = output
 		}
 	}
 
-	_, reportErr := client.CompleteScheduledJobRun(daemonID, input)
+	_, reportErr := client.CompleteScheduledJobRun(nodeID, apiInput)
 	if reportErr != nil {
-		log.Error().Err(reportErr).Str("runId", runID).Msg("scheduler: failed to report run result")
+		log.Error().Err(reportErr).Str("runId", params.RunID).Msg("scheduler: failed to report run result")
 	}
 
-	rdb.XAck(ctx, streamKey, consumerGroup, msg.ID)
+	// Send job.result back to relay
+	if execErr != nil {
+		sendJobResult(connState, params.RunID, "failed", durationMs, nil, &jobResultError{
+			Code:    "AGENT_EXEC_ERROR",
+			Message: execErr.Error(),
+		})
+	} else {
+		sendJobResult(connState, params.RunID, "completed", durationMs, nil, nil)
+	}
 }
+
+// ---------------------------------------------------------------------------
+// Relay protocol messages (job.ack and job.result)
+// ---------------------------------------------------------------------------
+
+type jobAckNotification struct {
+	JSONRPC string      `json:"jsonrpc"`
+	Method  string      `json:"method"`
+	Params  jobAckParams `json:"params"`
+}
+
+type jobAckParams struct {
+	RunID  string `json:"runId"`
+	Status string `json:"status"` // "accepted" | "rejected"
+	Reason string `json:"reason,omitempty"`
+}
+
+type jobResultNotification struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  jobResultParams `json:"params"`
+}
+
+type jobResultParams struct {
+	RunID      string          `json:"runId"`
+	Status     string          `json:"status"` // "completed" | "failed" | "cancelled"
+	Output     map[string]any  `json:"output,omitempty"`
+	Error      *jobResultError `json:"error,omitempty"`
+	DurationMs int64           `json:"durationMs,omitempty"`
+}
+
+type jobResultError struct {
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message"`
+}
+
+func sendJobAck(connState *wsConnState, runID, status, reason string) {
+	msg := jobAckNotification{
+		JSONRPC: "2.0",
+		Method:  "job.ack",
+		Params: jobAckParams{
+			RunID:  runID,
+			Status: status,
+			Reason: reason,
+		},
+	}
+	if err := connState.WriteJSON(msg); err != nil {
+		log.Error().Err(err).Str("runId", runID).Msg("scheduler: failed to send job.ack")
+	}
+}
+
+func sendJobResult(connState *wsConnState, runID, status string, durationMs int64, output map[string]any, jobErr *jobResultError) {
+	msg := jobResultNotification{
+		JSONRPC: "2.0",
+		Method:  "job.result",
+		Params: jobResultParams{
+			RunID:      runID,
+			Status:     status,
+			Output:     output,
+			Error:      jobErr,
+			DurationMs: durationMs,
+		},
+	}
+	if err := connState.WriteJSON(msg); err != nil {
+		log.Error().Err(err).Str("runId", runID).Msg("scheduler: failed to send job.result")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Agent execution
+// ---------------------------------------------------------------------------
 
 func resolveAgentCommand(agentKind string) string {
 	switch agentKind {

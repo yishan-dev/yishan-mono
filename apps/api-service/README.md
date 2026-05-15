@@ -9,7 +9,7 @@ API service built with Hono + Bun, deployed to both Cloudflare Workers and a rem
 - Database: Postgres via Cloudflare Hyperdrive + node-postgres
 - ORM: Drizzle ORM
 - Auth: Google OAuth + GitHub OAuth
-- Queue: Redis Streams (Upstash or self-hosted)
+- Queue: Upstash QStash → Relay service → Daemon (WebSocket push)
 
 ## Environment Variables
 
@@ -31,10 +31,9 @@ Copy `.env.example` to `.env` (Bun) and `.dev.vars` (Wrangler local dev):
 - `GOOGLE_CLIENT_SECRET`
 - `GITHUB_CLIENT_ID`
 - `GITHUB_CLIENT_SECRET`
-- `REDIS_STREAM_HTTP_URL` (optional generic Redis-stream HTTP endpoint for scheduler publish; useful for local testing)
-- `REDIS_STREAM_HTTP_TOKEN` (optional bearer token for `REDIS_STREAM_HTTP_URL`)
-- `UPSTASH_REDIS_REST_URL` (optional Upstash Redis REST endpoint; used when `REDIS_STREAM_HTTP_URL` is not set)
-- `UPSTASH_REDIS_REST_TOKEN` (optional Upstash Redis REST auth token)
+- `QSTASH_TOKEN` (Upstash QStash bearer token for dispatching scheduled job runs)
+- `RELAY_URL` (URL of the relay service, e.g. `https://relay.yishan.io`)
+- `RELAY_API_TOKEN` (bearer token for authenticating with the relay's dispatch endpoint)
 
 ## Scripts
 
@@ -97,25 +96,30 @@ Scheduled jobs let you define recurring agent tasks. Each job stores a prompt, o
 
 ```
 CF Worker cron (every 1 min)
-  -> evaluator: find due jobs, create "pending" runs, publish to Redis stream
+  -> evaluator: find due jobs, create "pending" runs, publish via QStash
 
-Redis Stream ("scheduled-job-runs")
-  <- Go daemon: XREADGROUP (blocks until messages arrive)
+QStash (at-least-once delivery with automatic retries)
+  -> POST {relayURL}/api/v1/dispatch
 
-Daemon receives message:
+Relay service (persistent WebSocket to daemon)
+  -> sends job.run notification to daemon over WS
+  -> daemon responds with job.ack then job.result
+
+Daemon receives job.run from relay:
   -> PUT /runs/start (status -> "running")
   -> exec: opencode run --prompt ... [--model ...] [--command ...]
   -> PUT /runs/complete (status -> "succeeded" or "failed")
-  -> XACK message
+  -> sends job.result back to relay
 
 If daemon is offline:
-  -> Evaluator still creates pending runs
-  -> After 5 min unclaimed, marked as "skipped_offline"
+  -> Relay marks run as skipped_offline
+  -> After 5 min unclaimed, evaluator marks stale runs as "skipped_offline"
 ```
 
-- **API service (CF Worker)**: stores job definitions, evaluates due jobs on a 1-minute cron, publishes to Redis stream, records run history
-- **Redis stream**: decouples evaluation from execution; daemon pulls messages via XREADGROUP
-- **CLI daemon**: consumes from Redis stream, executes agent tasks, reports results back to API
+- **API service (CF Worker)**: stores job definitions, evaluates due jobs on a 1-minute cron, dispatches via QStash to relay, records run history
+- **QStash**: guarantees at-least-once delivery to the relay service with automatic retries
+- **Relay service**: maintains persistent WS connections to daemon nodes; pushes `job.run` notifications, handles ack/result lifecycle
+- **CLI daemon**: connects outbound to relay via WebSocket, receives `job.run` notifications, executes agent tasks, reports results back to both relay and API
 - Each job is bound to a `nodeId` (the daemon that will execute it)
 
 ### Run status lifecycle
@@ -205,7 +209,8 @@ bun run dev:worker
 - [Neon](https://neon.tech) project with a Postgres database
 - Cloudflare account with Workers plan
 - `wrangler` CLI authenticated (`wrangler login`)
-- Redis instance (Upstash or self-hosted) for scheduled job queue
+- Upstash QStash account for scheduled job dispatch
+- Relay service deployed and accessible
 
 ### 1. Neon Database
 
@@ -253,10 +258,8 @@ wrangler secret put GOOGLE_CLIENT_ID
 wrangler secret put GOOGLE_CLIENT_SECRET
 wrangler secret put GITHUB_CLIENT_ID
 wrangler secret put GITHUB_CLIENT_SECRET
-wrangler secret put REDIS_STREAM_HTTP_URL
-wrangler secret put REDIS_STREAM_HTTP_TOKEN
-wrangler secret put UPSTASH_REDIS_REST_URL
-wrangler secret put UPSTASH_REDIS_REST_TOKEN
+wrangler secret put QSTASH_TOKEN
+wrangler secret put RELAY_API_TOKEN
 ```
 
 Each command prompts for the value interactively.
@@ -317,5 +320,5 @@ The Worker runs two cron triggers configured in `wrangler.toml`:
 
 | Cron | Description |
 |---|---|
-| `* * * * *` | Evaluates due scheduled jobs every minute, creates pending runs, publishes to Redis stream |
+| `* * * * *` | Evaluates due scheduled jobs every minute, creates pending runs, dispatches via QStash to relay |
 | `0 3 * * *` | Daily cleanup at 03:00 UTC -- removes expired sessions, revoked refresh tokens, and marks stale pending runs as `skipped_offline` |
