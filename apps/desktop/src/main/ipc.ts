@@ -98,6 +98,28 @@ export type ReadFileAsDataUrlResult =
   | { ok: true; dataUrl: string }
   | { ok: false; error: string };
 
+export type CopyFilesInput = {
+  /** Absolute source paths to copy from (external OS paths). */
+  sourcePaths: string[];
+  /** Absolute path of the destination directory to copy into. */
+  destinationDirectory: string;
+};
+
+export type CopyFilesResult =
+  | { ok: true; copiedPaths: string[] }
+  | { ok: false; error: string };
+
+export type WriteFileBase64Input = {
+  /** Absolute path of the file to write. */
+  absolutePath: string;
+  /** Base64-encoded file content. */
+  contentBase64: string;
+};
+
+export type WriteFileBase64Result =
+  | { ok: true }
+  | { ok: false; error: string };
+
 export type BrowserHistoryEntry = {
   url: string;
   title: string;
@@ -125,6 +147,8 @@ export type DesktopHostBridge = {
   openExternalUrl: (input: OpenExternalUrlInput) => Promise<OpenExternalUrlResult>;
   readExternalClipboardSourcePaths: () => Promise<ExternalClipboardReadOutcome>;
   readFileAsDataUrl: (input: ReadFileAsDataUrlInput) => Promise<ReadFileAsDataUrlResult>;
+  copyFiles: (input: CopyFilesInput) => Promise<CopyFilesResult>;
+  writeFileBase64: (input: WriteFileBase64Input) => Promise<WriteFileBase64Result>;
   loadBrowserHistory: () => Promise<LoadBrowserHistoryResult>;
   appendBrowserHistory: (input: AppendBrowserHistoryInput) => Promise<{ ok: true }>;
   dispatchNotification: (input: DispatchNotificationInput) => Promise<NotificationDispatchResult>;
@@ -163,6 +187,8 @@ export const HOST_IPC_CHANNELS = {
   openExternalUrl: "desktop:host/open-external-url",
   readExternalClipboardSourcePaths: "desktop:host/read-external-clipboard-source-paths",
   readFileAsDataUrl: "desktop:host/read-file-as-data-url",
+  copyFiles: "desktop:host/copy-files",
+  writeFileBase64: "desktop:host/write-file-base64",
   loadBrowserHistory: "desktop:host/load-browser-history",
   appendBrowserHistory: "desktop:host/append-browser-history",
   dispatchNotification: "desktop:host/dispatch-notification",

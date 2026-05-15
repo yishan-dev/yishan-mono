@@ -111,7 +111,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     closeSearchPanel,
   } = searchState;
 
-  useTerminalFileDrop({
+  const { isFileDragOver } = useTerminalFileDrop({
     containerRef,
     xtermRef,
     sessionIdRef,
@@ -270,8 +270,40 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        position: "relative",
       }}
     >
+      {isFileDragOver ? (
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: (theme) => `${theme.palette.primary.main}14`,
+            border: "2px dashed",
+            borderColor: "primary.main",
+            borderRadius: 1,
+            pointerEvents: "none",
+          }}
+        >
+          <Box
+            sx={{
+              typography: "body2",
+              color: "primary.main",
+              fontWeight: 500,
+              px: 2,
+              py: 0.75,
+              borderRadius: 1,
+              bgcolor: "rgba(0, 0, 0, 0.6)",
+            }}
+          >
+            Drop to insert file path
+          </Box>
+        </Box>
+      ) : null}
       {isSearchPanelOpen ? (
         <TerminalSearchPanel
           searchInputRef={searchInputRef}

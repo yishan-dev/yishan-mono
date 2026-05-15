@@ -35,6 +35,8 @@ export type FileTreeProps = {
   onUndoLastEntryOperation?: () => void | Promise<void>;
   canUndoLastEntryOperation?: boolean;
   onDropExternalEntries?: (sourcePaths: string[], destinationPath: string) => void | Promise<void>;
+  /** Called when entries are drag-and-dropped within the tree to move them to a new directory. */
+  onMoveEntries?: (sourceRelativePaths: string[], destinationPath: string) => void | Promise<void>;
   onItemContextMenu?: (request: FileTreeContextMenuRequest) => void;
 };
 

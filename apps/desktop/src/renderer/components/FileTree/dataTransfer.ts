@@ -7,6 +7,38 @@ import { extractPathsFromClipboardText } from "../../../shared/fileClipboardPath
  */
 export const FILETREE_DRAG_MIME = "application/x-filetree-paths";
 
+/** Returns true when drag metadata indicates an internal file-tree drag (identified by {@link FILETREE_DRAG_MIME}). */
+export function hasInternalFileTreeDragIntent(event: DragEvent<HTMLElement>): boolean {
+  return Boolean(event.dataTransfer?.types.includes(FILETREE_DRAG_MIME));
+}
+
+/**
+ * Extracts relative file paths from an internal file-tree drag payload.
+ * The payload contains absolute paths; this function strips the worktree prefix
+ * to return workspace-relative paths.
+ */
+export function extractInternalDragRelativePaths(dataTransfer: DataTransfer, worktreePath: string): string[] {
+  const raw = dataTransfer.getData(FILETREE_DRAG_MIME);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const prefix = worktreePath.endsWith("/") ? worktreePath : `${worktreePath}/`;
+    return parsed
+      .filter((item): item is string => typeof item === "string" && item.length > 0)
+      .map((absolutePath) => (absolutePath.startsWith(prefix) ? absolutePath.slice(prefix.length) : absolutePath))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /** Returns true when drag metadata indicates one or more external filesystem entries are included.
  *  Returns false for internal file-tree drags (identified by {@link FILETREE_DRAG_MIME}). */
 export function hasExternalFileDragIntent(event: DragEvent<HTMLElement>): boolean {
@@ -47,12 +79,28 @@ export function extractSourcePathsFromDataTransfer(dataTransfer: DataTransfer): 
     return dataTransfer.getData(type) || "";
   };
 
+  // Use Electron's webUtils.getPathForFile (exposed via preload) to resolve OS file paths.
+  // This is required because with contextIsolation enabled, File.path is not available.
+  const getFilePath = (file: File): string => {
+    if (window.desktop?.getPathForFile) {
+      try {
+        return window.desktop.getPathForFile(file)?.trim() ?? "";
+      } catch {
+        return "";
+      }
+    }
+
+    // Fallback for environments without the preload (e.g., tests)
+    return (file as File & { path?: string }).path?.trim() ?? "";
+  };
+
   const filePaths = Array.from(dataTransfer.files)
-    .map((file) => (file as File & { path?: string }).path?.trim() ?? "")
+    .map(getFilePath)
     .filter(Boolean);
   const itemPaths = Array.from(dataTransfer.items)
     .map((item) => item.getAsFile())
-    .map((file) => (file as (File & { path?: string }) | null)?.path?.trim() ?? "")
+    .filter((file): file is File => file != null)
+    .map(getFilePath)
     .filter(Boolean);
   const uriListPaths = extractPathsFromClipboardText(getData("text/uri-list"));
   const textPlainPaths = extractPathsFromClipboardText(getData("text/plain"));

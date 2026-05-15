@@ -3,9 +3,12 @@ import { useTranslation } from "react-i18next";
 import type { ExternalClipboardReadOutcome, WorkspaceFileEntry } from "../../../../shared/contracts/rpcRequestTypes";
 import { extractPathsFromClipboardText } from "../../../../shared/fileClipboardPaths";
 import {
+  copyFiles,
   importEntries,
   importFilePayloads,
   pasteEntries,
+  renameEntry,
+  writeFileBase64,
   readExternalClipboardSourcePaths as readExternalClipboardSourcePathsFromRpc,
 } from "../../../commands/fileCommands";
 import {
@@ -246,11 +249,18 @@ export function useFileTreeClipboard({
         const operationId = beginFileOperation("import");
 
         try {
-          await importEntries({
-            workspaceWorktreePath: selectedWorkspaceWorktreePath,
+          const destinationDirectory = destinationPath
+            ? `${selectedWorkspaceWorktreePath}/${destinationPath}`
+            : selectedWorkspaceWorktreePath;
+
+          const result = await copyFiles({
             sourcePaths: resolvedClipboardSource.sourcePaths,
-            destinationRelativePath: destinationPath,
+            destinationDirectory,
           });
+          if (!result.ok) {
+            throw new Error(result.error);
+          }
+
           completeFileOperation(operationId);
 
           await loadAllRepoFiles();
@@ -280,11 +290,21 @@ export function useFileTreeClipboard({
         const operationId = beginFileOperation("import");
 
         try {
-          await importFilePayloads({
-            workspaceWorktreePath: selectedWorkspaceWorktreePath,
-            filePayloads: resolvedClipboardSource.filePayloads,
-            destinationRelativePath: destinationPath,
-          });
+          // Write each base64-encoded payload using the host bridge
+          for (const filePayload of resolvedClipboardSource.filePayloads) {
+            const relPath = destinationPath
+              ? `${destinationPath}/${filePayload.relativePath}`
+              : filePayload.relativePath;
+            const absolutePath = `${selectedWorkspaceWorktreePath}/${relPath}`;
+            const result = await writeFileBase64({
+              absolutePath,
+              contentBase64: filePayload.contentBase64,
+            });
+            if (!result.ok) {
+              throw new Error(result.error);
+            }
+          }
+
           completeFileOperation(operationId);
 
           await loadAllRepoFiles();
@@ -313,12 +333,36 @@ export function useFileTreeClipboard({
       const operationId = beginFileOperation(resolvedClipboardSource.mode);
 
       try {
-        await pasteEntries({
-          workspaceWorktreePath: selectedWorkspaceWorktreePath,
-          sourceRelativePaths: resolvedClipboardSource.sourcePaths,
-          destinationRelativePath: destinationPath,
-          mode: resolvedClipboardSource.mode,
-        });
+        if (resolvedClipboardSource.mode === "move") {
+          // Move each source entry using the file.move RPC method
+          for (const sourcePath of resolvedClipboardSource.sourcePaths) {
+            const fileName = sourcePath.split("/").filter(Boolean).at(-1);
+            if (!fileName) {
+              continue;
+            }
+
+            const toRelativePath = destinationPath ? `${destinationPath}/${fileName}` : fileName;
+            await renameEntry({
+              workspaceWorktreePath: selectedWorkspaceWorktreePath,
+              fromRelativePath: sourcePath,
+              toRelativePath,
+            });
+          }
+        } else {
+          // Copy each source entry using the Electron host bridge
+          const absoluteSourcePaths = resolvedClipboardSource.sourcePaths.map(
+            (srcPath) => `${selectedWorkspaceWorktreePath}/${srcPath}`,
+          );
+          const destinationDirectory = destinationPath
+            ? `${selectedWorkspaceWorktreePath}/${destinationPath}`
+            : selectedWorkspaceWorktreePath;
+
+          const result = await copyFiles({ sourcePaths: absoluteSourcePaths, destinationDirectory });
+          if (!result.ok) {
+            throw new Error(result.error);
+          }
+        }
+
         completeFileOperation(operationId);
 
         await loadAllRepoFiles();
@@ -368,22 +412,35 @@ export function useFileTreeClipboard({
   const onDropExternalEntries = useCallback(
     async (sourcePaths: string[], destinationPath: string) => {
       if (!selectedWorkspaceWorktreePath) {
+        console.warn("[FileTree drop] No workspace worktree path available");
         return;
       }
 
+      console.info("[FileTree drop] External file drop:", { sourcePaths, destinationPath, selectedWorkspaceWorktreePath });
+
       const repoFilesBeforeDropImport = mapWorkspaceEntryPaths(repoEntries);
       if (!beginExternalImportLock()) {
+        console.warn("[FileTree drop] External import already in flight");
         return;
       }
 
       const operationId = beginFileOperation("import");
 
       try {
-        await importEntries({
-          workspaceWorktreePath: selectedWorkspaceWorktreePath,
-          sourcePaths,
-          destinationRelativePath: destinationPath,
-        });
+        // Compute absolute destination directory path
+        const destinationDirectory = destinationPath
+          ? `${selectedWorkspaceWorktreePath}/${destinationPath}`
+          : selectedWorkspaceWorktreePath;
+
+        console.info("[FileTree drop] Copying files:", { sourcePaths, destinationDirectory });
+
+        // Copy files using the Electron host bridge (Node.js fs)
+        const result = await copyFiles({ sourcePaths, destinationDirectory });
+        if (!result.ok) {
+          throw new Error(result.error);
+        }
+
+        console.info("[FileTree drop] Copy succeeded:", result);
         completeFileOperation(operationId);
 
         await loadAllRepoFiles();
@@ -411,9 +468,68 @@ export function useFileTreeClipboard({
     ],
   );
 
+  const onMoveEntries = useCallback(
+    async (sourceRelativePaths: string[], destinationPath: string) => {
+      if (!selectedWorkspaceWorktreePath) {
+        return;
+      }
+
+      const repoFilesBeforeMove = mapWorkspaceEntryPaths(repoEntries);
+      const moveUndoEntries = buildMoveUndoEntries(repoFilesBeforeMove, sourceRelativePaths, destinationPath);
+      const operationId = beginFileOperation("move");
+
+      try {
+        // Move each source entry using the file.move RPC method (renameEntry).
+        // Compute the destination as destinationDir/filename for each source.
+        for (const sourcePath of sourceRelativePaths) {
+          const fileName = sourcePath.split("/").filter(Boolean).at(-1);
+          if (!fileName) {
+            continue;
+          }
+
+          const toRelativePath = destinationPath ? `${destinationPath}/${fileName}` : fileName;
+          await renameEntry({
+            workspaceWorktreePath: selectedWorkspaceWorktreePath,
+            fromRelativePath: sourcePath,
+            toRelativePath,
+          });
+        }
+
+        completeFileOperation(operationId);
+
+        await loadAllRepoFiles();
+        const nextRepoFiles = await loadAllRepoFiles();
+        requestFileTreeSelection(
+          resolvePreferredImportedPath(repoFilesBeforeMove, nextRepoFiles, destinationPath, sourceRelativePaths),
+        );
+
+        if (moveUndoEntries.length > 0) {
+          pushUndoAction({
+            kind: "move",
+            entries: moveUndoEntries,
+          });
+        }
+      } catch (error) {
+        failFileOperation(operationId, error);
+        console.error("Failed to move workspace entries via drag-and-drop", error);
+      }
+    },
+    [
+      beginFileOperation,
+      completeFileOperation,
+      failFileOperation,
+      loadAllRepoFiles,
+      pushUndoAction,
+      repoEntries,
+      requestFileTreeSelection,
+      selectedWorkspaceWorktreePath,
+    ],
+  );
+
   return {
     setInternalClipboardState,
     onPasteEntries,
     onDropExternalEntries,
+    onMoveEntries,
   };
 }

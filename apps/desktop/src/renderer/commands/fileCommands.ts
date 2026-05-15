@@ -119,6 +119,22 @@ export async function readFileAsDataUrl(params: { absolutePath: string }) {
   return await getDesktopHostBridge().readFileAsDataUrl({ absolutePath: params.absolutePath });
 }
 
+/** Copies external files into a destination directory via the host bridge (Node.js fs). */
+export async function copyFiles(params: { sourcePaths: string[]; destinationDirectory: string }) {
+  return await getDesktopHostBridge().copyFiles({
+    sourcePaths: params.sourcePaths,
+    destinationDirectory: params.destinationDirectory,
+  });
+}
+
+/** Writes a base64-encoded file to an absolute path via the host bridge (Node.js fs). */
+export async function writeFileBase64(params: { absolutePath: string; contentBase64: string }) {
+  return await getDesktopHostBridge().writeFileBase64({
+    absolutePath: params.absolutePath,
+    contentBase64: params.contentBase64,
+  });
+}
+
 /** Copies or moves one or more workspace entries into a destination path. */
 export async function pasteEntries(params: {
   workspaceWorktreePath: string;

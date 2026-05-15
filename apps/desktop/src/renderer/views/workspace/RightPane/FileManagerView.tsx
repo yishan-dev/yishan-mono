@@ -342,6 +342,7 @@ export function FileManagerView({
         canPasteEntries={ops.canPasteEntries}
         onPasteEntries={ops.onPasteEntries}
         onDropExternalEntries={ops.onDropExternalEntries}
+        onMoveEntries={ops.onMoveEntries}
         canUndoLastEntryOperation={ops.canUndoLastEntryOperation}
         onUndoLastEntryOperation={ops.onUndoLastEntryOperation}
         onItemContextMenu={(request) => {
