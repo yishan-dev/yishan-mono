@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { startBackendEventPipeline, subscribeBackendEvent } from "../events/backendEventPipeline";
+import type { Commands } from "./useCommands";
 import type { DiffTabSource } from "../store/types";
 
 export type RefreshableOpenTab =
@@ -16,31 +18,43 @@ export type RefreshableOpenTab =
       source?: DiffTabSource;
     };
 
-type OpenTabAutoRefreshCommands = {
-  readFile: (input: { workspaceWorktreePath: string; relativePath: string }) => Promise<{ content: string }>;
-  readDiff: (input: { workspaceWorktreePath: string; relativePath: string }) => Promise<{ oldContent: string; newContent: string }>;
-  readCommitDiff: (input: {
-    workspaceWorktreePath: string;
-    commitHash: string;
-    relativePath: string;
-  }) => Promise<{ oldContent: string; newContent: string }>;
-  readBranchComparisonDiff: (input: {
-    workspaceWorktreePath: string;
-    targetBranch: string;
-    relativePath: string;
-  }) => Promise<{ oldContent: string; newContent: string }>;
-  refreshFileTabFromDisk: (input: { tabId: string; content: string; deleted: boolean }) => void;
-  refreshDiffTabContent: (input: { tabId: string; oldContent: string; newContent: string }) => void;
-};
+type OpenTabAutoRefreshCommands = Pick<
+  Commands,
+  | "readFile"
+  | "readDiff"
+  | "readCommitDiff"
+  | "readBranchComparisonDiff"
+  | "refreshFileTabFromDisk"
+  | "refreshDiffTabContent"
+>;
 
 type UseOpenTabAutoRefreshInput = {
   workspaceWorktreePath?: string;
   tabs: RefreshableOpenTab[];
-  commands: OpenTabAutoRefreshCommands;
+  cmd: OpenTabAutoRefreshCommands;
 };
 
-const POLL_INTERVAL_MS = 700;
 const REFRESH_DEBOUNCE_MS = 220;
+
+function normalizeRelativePath(path: string): string {
+  return path.replace(/^\.\/+/, "").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function isPathWithinOrEqual(path: string, candidate: string): boolean {
+  return path === candidate || path.startsWith(`${candidate}/`) || candidate.startsWith(`${path}/`);
+}
+
+function didPathChange(tabPath: string, changedRelativePaths?: string[]): boolean {
+  if (!changedRelativePaths || changedRelativePaths.length === 0) {
+    return true;
+  }
+
+  const normalizedTabPath = normalizeRelativePath(tabPath);
+  return changedRelativePaths.some((changedPath) => {
+    const normalizedChangedPath = normalizeRelativePath(changedPath);
+    return Boolean(normalizedChangedPath) && isPathWithinOrEqual(normalizedTabPath, normalizedChangedPath);
+  });
+}
 
 function isFileNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -54,14 +68,16 @@ function isFileNotFoundError(error: unknown): boolean {
   );
 }
 
-/** Keeps open file and diff tabs synced with on-disk changes using debounced polling refresh. */
+/** Keeps open file and diff tabs synced with on-disk changes using debounced backend file-watch events. */
 export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
-  const { workspaceWorktreePath, commands } = input;
+  const { workspaceWorktreePath } = input;
   const tabsRef = useRef(input.tabs);
+  const commandsRef = useRef(input.cmd);
   tabsRef.current = input.tabs;
+  commandsRef.current = input.cmd;
 
   useEffect(() => {
-    if (!workspaceWorktreePath || tabsRef.current.length === 0) {
+    if (!workspaceWorktreePath) {
       return;
     }
 
@@ -69,19 +85,36 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
     let inFlight = false;
     let queued = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingChangedRelativePaths: string[] | undefined;
+    let shouldRefreshAllDiffTabs = false;
+    const stopBackendEventPipeline = startBackendEventPipeline();
 
-    const runRefresh = async () => {
+    const runRefresh = async (changedRelativePaths?: string[], refreshAllDiffTabs = false) => {
       if (disposed || inFlight) {
         queued = true;
+        if (refreshAllDiffTabs) {
+          shouldRefreshAllDiffTabs = true;
+        }
+        if (!pendingChangedRelativePaths || !changedRelativePaths) {
+          pendingChangedRelativePaths = undefined;
+        } else {
+          pendingChangedRelativePaths = [...pendingChangedRelativePaths, ...changedRelativePaths];
+        }
         return;
       }
 
       inFlight = true;
       const tabs = tabsRef.current;
+      const commands = commandsRef.current;
 
       try {
         await Promise.all(
           tabs.map(async (tab) => {
+            const tabChanged = didPathChange(tab.path, changedRelativePaths);
+            if (!tabChanged && !(tab.kind === "diff" && refreshAllDiffTabs)) {
+              return;
+            }
+
             if (tab.kind === "file") {
               if (tab.isUnsupported) {
                 return;
@@ -148,32 +181,62 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
         inFlight = false;
         if (queued) {
           queued = false;
-          void runRefresh();
+          const nextChangedRelativePaths = pendingChangedRelativePaths;
+          const nextRefreshAllDiffTabs = shouldRefreshAllDiffTabs;
+          pendingChangedRelativePaths = undefined;
+          shouldRefreshAllDiffTabs = false;
+          void runRefresh(nextChangedRelativePaths, nextRefreshAllDiffTabs);
         }
       }
     };
 
-    const scheduleRefresh = () => {
+    const scheduleRefresh = (changedRelativePaths?: string[], refreshAllDiffTabs = false) => {
+      if (refreshAllDiffTabs) {
+        shouldRefreshAllDiffTabs = true;
+      }
+      if (!pendingChangedRelativePaths || !changedRelativePaths) {
+        pendingChangedRelativePaths = changedRelativePaths;
+      } else {
+        pendingChangedRelativePaths = [...pendingChangedRelativePaths, ...changedRelativePaths];
+      }
+
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
-        void runRefresh();
+        const nextChangedRelativePaths = pendingChangedRelativePaths;
+        const nextRefreshAllDiffTabs = shouldRefreshAllDiffTabs;
+        pendingChangedRelativePaths = undefined;
+        shouldRefreshAllDiffTabs = false;
+        void runRefresh(nextChangedRelativePaths, nextRefreshAllDiffTabs);
       }, REFRESH_DEBOUNCE_MS);
     };
 
-    scheduleRefresh();
-    const pollTimer = setInterval(() => {
-      scheduleRefresh();
-    }, POLL_INTERVAL_MS);
+    const unsubscribeWorkspaceFilesChanged = subscribeBackendEvent("workspace.files.changed", (event) => {
+      if (event.source !== "workspaceFilesChanged" || event.payload.workspaceWorktreePath !== workspaceWorktreePath) {
+        return;
+      }
+
+      scheduleRefresh(event.payload.changedRelativePaths);
+    });
+
+    const unsubscribeGitChanged = subscribeBackendEvent("git.changed", (event) => {
+      if (event.source !== "gitChanged" || event.payload.workspaceWorktreePath !== workspaceWorktreePath) {
+        return;
+      }
+
+      scheduleRefresh(undefined, true);
+    });
 
     return () => {
       disposed = true;
-      clearInterval(pollTimer);
+      stopBackendEventPipeline();
+      unsubscribeWorkspaceFilesChanged();
+      unsubscribeGitChanged();
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
     };
-  }, [commands, workspaceWorktreePath, input.tabs]);
+  }, [workspaceWorktreePath]);
 }

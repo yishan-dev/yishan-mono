@@ -233,14 +233,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   useOpenTabAutoRefresh({
     workspaceWorktreePath: workspace?.worktreePath,
     tabs: refreshableTabs,
-    commands: {
-      readFile: cmd.readFile,
-      readDiff: cmd.readDiff,
-      readCommitDiff: cmd.readCommitDiff,
-      readBranchComparisonDiff: cmd.readBranchComparisonDiff,
-      refreshFileTabFromDisk: cmd.refreshFileTabFromDisk,
-      refreshDiffTabContent: cmd.refreshDiffTabContent,
-    },
+    cmd,
   });
 
   // Focus content when the selected tab changes
