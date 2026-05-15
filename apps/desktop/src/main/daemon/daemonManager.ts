@@ -442,8 +442,19 @@ export class DaemonManager {
       });
     });
 
-    child.kill("SIGTERM");
-    await Promise.race([waitForExit, delay(DEV_DAEMON_STOP_TIMEOUT_MS)]);
+    const termSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGTERM";
+    child.kill(termSignal);
+    const exitedAfterTerminate = await Promise.race([
+      waitForExit.then(() => true),
+      delay(DEV_DAEMON_STOP_TIMEOUT_MS).then(() => false),
+    ]);
+
+    if (!exitedAfterTerminate) {
+      const killSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGKILL";
+      child.kill(killSignal);
+      await Promise.race([waitForExit, delay(CLI_COMMAND_FORCE_KILL_WAIT_MS)]);
+    }
+
     return true;
   }
 

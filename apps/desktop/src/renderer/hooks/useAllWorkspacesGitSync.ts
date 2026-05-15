@@ -94,6 +94,28 @@ export function useAllWorkspacesGitSync() {
     const workspaces = state.workspaces;
     const selectedWorkspaceId = state.selectedWorkspaceId;
     const lastSeen = lastSeenVersionByWorktreePath.current;
+    const activeWorkspaceIds = new Set(workspaces.map((workspace) => workspace.id));
+
+    for (const workspaceId of refreshStateByWorkspaceId.current.keys()) {
+      if (!activeWorkspaceIds.has(workspaceId)) {
+        const refreshState = refreshStateByWorkspaceId.current.get(workspaceId);
+        if (refreshState?.pendingTimer) {
+          clearTimeout(refreshState.pendingTimer);
+        }
+        refreshStateByWorkspaceId.current.delete(workspaceId);
+      }
+    }
+
+    const activeWorktreePaths = new Set(
+      workspaces
+        .map((workspace) => workspace.worktreePath?.trim())
+        .filter((workspaceWorktreePath): workspaceWorktreePath is string => Boolean(workspaceWorktreePath)),
+    );
+    for (const worktreePath of Object.keys(lastSeen)) {
+      if (!activeWorktreePaths.has(worktreePath)) {
+        delete lastSeen[worktreePath];
+      }
+    }
 
     for (const workspace of workspaces) {
       const worktreePath = workspace.worktreePath?.trim();
