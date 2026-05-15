@@ -51,6 +51,8 @@ const mocks = vi.hoisted(() => {
   const pasteEntries = vi.fn();
   const importEntries = vi.fn();
   const importFilePayloads = vi.fn();
+  const copyFiles = vi.fn();
+  const writeFileBase64 = vi.fn();
   const listGitChanges = vi.fn();
   const subscribeWorkspaceGitChanged = vi.fn<(listener: unknown) => () => void>(() => () => {});
   const openTab = vi.fn();
@@ -104,6 +106,8 @@ const mocks = vi.hoisted(() => {
     pasteEntries,
     importEntries,
     importFilePayloads,
+    copyFiles,
+    writeFileBase64,
     listGitChanges,
     subscribeWorkspaceGitChanged,
     openTab,
@@ -130,6 +134,8 @@ vi.mock("../../../commands/fileCommands", () => ({
   pasteEntries: (...args: unknown[]) => mocks.pasteEntries(...args),
   importEntries: (...args: unknown[]) => mocks.importEntries(...args),
   importFilePayloads: (...args: unknown[]) => mocks.importFilePayloads(...args),
+  copyFiles: (...args: unknown[]) => mocks.copyFiles(...args),
+  writeFileBase64: (...args: unknown[]) => mocks.writeFileBase64(...args),
 }));
 
 vi.mock("../../../commands/gitCommands", () => ({
@@ -1156,11 +1162,10 @@ describe("FileManagerView undo operations", () => {
     await getFileTreeProps().onUndoLastEntryOperation?.();
 
     await waitFor(() => {
-      expect(mocks.pasteEntries).toHaveBeenCalledWith({
+      expect(mocks.renameEntry).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        sourceRelativePaths: ["src/a.ts"],
-        destinationRelativePath: "docs",
-        mode: "move",
+        fromRelativePath: "src/a.ts",
+        toRelativePath: "docs/a.ts",
       });
       expect(mocks.renameEntry).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
@@ -1245,6 +1250,8 @@ describe("FileManagerView external clipboard paste", () => {
     });
     mocks.importEntries.mockResolvedValue({ ok: true });
     mocks.importFilePayloads.mockResolvedValue({ ok: true });
+    mocks.copyFiles.mockResolvedValue({ ok: true, copiedPaths: [] });
+    mocks.writeFileBase64.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -1278,10 +1285,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
         sourcePaths: [copiedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
@@ -1310,10 +1316,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
         sourcePaths: [copiedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
@@ -1344,9 +1349,8 @@ describe("FileManagerView external clipboard paste", () => {
     await waitFor(() => {
       expect(screen.getByTestId("file-operation-error")).toBeTruthy();
       expect(screen.getByText("files.operations.failed")).toBeTruthy();
-      expect(mocks.importEntries).not.toHaveBeenCalled();
-      expect(mocks.importFilePayloads).not.toHaveBeenCalled();
-      expect(mocks.pasteEntries).not.toHaveBeenCalled();
+      expect(mocks.copyFiles).not.toHaveBeenCalled();
+      expect(mocks.writeFileBase64).not.toHaveBeenCalled();
     });
   });
 
@@ -1380,10 +1384,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
         sourcePaths: [copiedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
       expect(mocks.pasteEntries).not.toHaveBeenCalled();
     });
@@ -1412,11 +1415,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.pasteEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
-        sourceRelativePaths: ["src/a.ts"],
-        destinationRelativePath: "",
-        mode: "copy",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
+        sourcePaths: ["/tmp/repo/src/a.ts"],
+        destinationDirectory: "/tmp/repo",
       });
       expect(mocks.importEntries).not.toHaveBeenCalled();
     });
@@ -1459,11 +1460,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.pasteEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
-        sourceRelativePaths: ["cover.png"],
-        destinationRelativePath: "",
-        mode: "copy",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
+        sourcePaths: ["/tmp/repo/cover.png"],
+        destinationDirectory: "/tmp/repo",
       });
     });
 
@@ -1502,11 +1501,10 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("docs");
 
     await waitFor(() => {
-      expect(mocks.pasteEntries).toHaveBeenCalledWith({
+      expect(mocks.renameEntry).toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
-        sourceRelativePaths: ["src/a.ts"],
-        destinationRelativePath: "docs",
-        mode: "move",
+        fromRelativePath: "src/a.ts",
+        toRelativePath: "docs/a.ts",
       });
       expect(mocks.importEntries).not.toHaveBeenCalled();
     });
@@ -1514,9 +1512,9 @@ describe("FileManagerView external clipboard paste", () => {
 
   it("requests file-tree selection on the newly pasted entry after internal copy paste", async () => {
     let hasPastedEntry = false;
-    mocks.pasteEntries.mockImplementation(async () => {
+    mocks.copyFiles.mockImplementation(async () => {
       hasPastedEntry = true;
-      return { ok: true };
+      return { ok: true, copiedPaths: [] };
     });
     mocks.listFiles.mockImplementation(async (params: { relativePath?: string; recursive?: boolean }) => {
       if (params.relativePath === "src") {
@@ -1575,10 +1573,9 @@ describe("FileManagerView external clipboard paste", () => {
     await getFileTreeProps().onPasteEntries?.("");
 
     await waitFor(() => {
-      expect(mocks.importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(mocks.copyFiles).toHaveBeenCalledWith({
         sourcePaths: [copiedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
@@ -1592,11 +1589,11 @@ describe("FileManagerView external clipboard paste", () => {
       strategy: "test-native",
     });
 
-    let resolveFirstImport: ((value: { ok: true }) => void) | undefined;
-    const firstImport = new Promise<{ ok: true }>((resolve) => {
+    let resolveFirstImport: ((value: { ok: true; copiedPaths: string[] }) => void) | undefined;
+    const firstImport = new Promise<{ ok: true; copiedPaths: string[] }>((resolve) => {
       resolveFirstImport = resolve;
     });
-    mocks.importEntries.mockImplementationOnce(() => firstImport).mockResolvedValue({ ok: true });
+    mocks.copyFiles.mockImplementationOnce(() => firstImport).mockResolvedValue({ ok: true, copiedPaths: [] });
 
     render(<FileManagerView />);
 
@@ -1613,9 +1610,9 @@ describe("FileManagerView external clipboard paste", () => {
     await Promise.resolve();
     await onPasteEntries("");
 
-    expect(mocks.importEntries).toHaveBeenCalledTimes(1);
+    expect(mocks.copyFiles).toHaveBeenCalledTimes(1);
 
-    resolveFirstImport?.({ ok: true });
+    resolveFirstImport?.({ ok: true, copiedPaths: [] });
     await firstCall;
   });
 });
