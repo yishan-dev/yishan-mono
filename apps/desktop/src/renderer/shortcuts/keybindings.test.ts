@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { ACTIONS } from "../../shared/contracts/actions";
+import type { SplitPaneStoreState } from "../store/splitPaneStore";
 import type { TabStoreState } from "../store/tabStore";
 import type { WorkspaceStoreState } from "../store/workspaceStore";
 import { SUPPORTED_KEY_BINDINGS, type ShortContext, getShortcutDefinitions } from "./keybindings";
@@ -71,6 +72,22 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
       setWorkspaceGitChangeTotals: vi.fn(),
       incrementGitRefreshVersion: vi.fn(),
     } as WorkspaceStoreState,
+    splitPaneStoreState: {
+      layoutByWorkspaceId: {},
+      getLayout: vi.fn(),
+      getActivePane: vi.fn(() => null),
+      getPane: vi.fn(() => null),
+      getPaneForTab: vi.fn(() => null),
+      getAllPanes: vi.fn(() => []),
+      setActivePane: vi.fn(),
+      selectTab: vi.fn(),
+      addTab: vi.fn(),
+      removeTab: vi.fn(),
+      splitPane: vi.fn(),
+      moveTab: vi.fn(),
+      reorderTab: vi.fn(),
+      updateSplitRatio: vi.fn(),
+    } as SplitPaneStoreState,
     terminalTabTitle: "terminal.title",
     commands: {
       setSelectedRepoId: vi.fn(),
@@ -628,6 +645,8 @@ describe("getShortcutDefinitions", () => {
     expect(selectByIndexDefinition).toBeTruthy();
 
     const setSelectedTabId = vi.fn();
+    const getActivePane = vi.fn(() => ({ kind: "leaf" as const, id: "active-pane-1", tabIds: ["tab-1", "tab-2"], selectedTabId: "tab-1" }));
+    const selectTab = vi.fn();
     const context = createShortcutContext({
       commands: {
         ...createShortcutContext().commands,
@@ -640,6 +659,11 @@ describe("getShortcutDefinitions", () => {
           { id: "tab-2", workspaceId: "workspace-1", title: "Tab 2", pinned: false, kind: "session", data: {} },
         ]),
       },
+      splitPaneStoreState: {
+        ...createShortcutContext().splitPaneStoreState,
+        getActivePane,
+        selectTab,
+      },
     });
 
     const input = document.createElement("input");
@@ -649,6 +673,8 @@ describe("getShortcutDefinitions", () => {
       preventDefault: vi.fn(),
     } as unknown as KeyboardEvent);
 
+    expect(getActivePane).toHaveBeenCalledWith("workspace-1");
+    expect(selectTab).toHaveBeenCalledWith("workspace-1", "active-pane-1", "tab-2");
     expect(setSelectedTabId).toHaveBeenCalledWith("tab-2");
   });
   it("ignores file-tree delete shortcut when editable target is focused", () => {
