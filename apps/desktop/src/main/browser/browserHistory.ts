@@ -7,6 +7,10 @@ import type { BrowserHistoryEntry, BrowserHistoryGroup } from "../ipc";
 
 const MAX_ENTRIES = 500;
 const PRUNE_THRESHOLD = 1000;
+const PRUNE_CHECK_APPEND_INTERVAL = 100;
+const PRUNE_CHECK_MIN_INTERVAL_MS = 2 * 60 * 1000;
+let appendCountSincePruneCheck = 0;
+let lastPruneCheckAtMs = 0;
 
 function resolveHistoryFilePath(): string {
   return join(app.getPath("userData"), isDevMode() ? "browser-history.dev.jsonl" : "browser-history.jsonl");
@@ -59,13 +63,8 @@ async function pruneIfNeeded(entries: BrowserHistoryEntry[]): Promise<void> {
   await writeFile(filePath, lines, "utf8");
 }
 
-export async function appendBrowserHistoryEntry(entry: BrowserHistoryEntry): Promise<void> {
-  const filePath = resolveHistoryFilePath();
-  const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await appendFile(filePath, JSON.stringify(entry) + "\n", "utf8");
+async function runPruneCheck(filePath: string): Promise<void> {
+  lastPruneCheckAtMs = Date.now();
   let raw: string;
   try {
     raw = await readFile(filePath, "utf8");
@@ -74,6 +73,30 @@ export async function appendBrowserHistoryEntry(entry: BrowserHistoryEntry): Pro
   }
   const entries = parseEntries(raw);
   await pruneIfNeeded(entries);
+}
+
+export async function appendBrowserHistoryEntry(entry: BrowserHistoryEntry): Promise<void> {
+  const filePath = resolveHistoryFilePath();
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await appendFile(filePath, JSON.stringify(entry) + "\n", "utf8");
+  appendCountSincePruneCheck += 1;
+  const shouldCheckByCount = appendCountSincePruneCheck >= PRUNE_CHECK_APPEND_INTERVAL;
+  const now = Date.now();
+  const shouldCheckByTime = now - lastPruneCheckAtMs >= PRUNE_CHECK_MIN_INTERVAL_MS;
+  if (!shouldCheckByCount && !shouldCheckByTime) {
+    return;
+  }
+
+  appendCountSincePruneCheck = 0;
+  await runPruneCheck(filePath);
+}
+
+export async function flushBrowserHistoryPruneCheck(): Promise<void> {
+  appendCountSincePruneCheck = 0;
+  await runPruneCheck(resolveHistoryFilePath());
 }
 
 export async function loadBrowserHistoryGroups(): Promise<BrowserHistoryGroup[]> {

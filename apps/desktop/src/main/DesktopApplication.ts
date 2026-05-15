@@ -11,7 +11,11 @@ import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
-import { appendBrowserHistoryEntry, loadBrowserHistoryGroups } from "./browser/browserHistory";
+import {
+  appendBrowserHistoryEntry,
+  flushBrowserHistoryPruneCheck,
+  loadBrowserHistoryGroups,
+} from "./browser/browserHistory";
 import { configureApplicationMenu } from "./app/menu";
 import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
@@ -489,6 +493,12 @@ export class DesktopApplication {
   }
 
   private async runBeforeQuitCleanup(): Promise<void> {
+    try {
+      await flushBrowserHistoryPruneCheck();
+    } catch (error: unknown) {
+      console.warn("Failed to prune browser history during desktop shutdown", error);
+    }
+
     const shouldStopDaemon = isDevMode() || (this.cachedDaemonQuitOnExit ?? false);
     if (!shouldStopDaemon) {
       return;
