@@ -27,6 +27,7 @@ import { DARK_SURFACE_COLORS } from "../../theme";
 import { LaunchView } from "./LaunchView";
 import { MainPaneTitleBarView } from "./MainPaneTitleBarView";
 import { BrowserView } from "./browser/BrowserView";
+import { removeWebviewsForClosedTabs } from "./browser/webviewRegistry";
 import { TerminalView } from "./terminal/TerminalView";
 
 function FaviconIcon({ url, size }: { url?: string; size: number }) {
@@ -565,6 +566,11 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
 export function MainPaneView() {
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
   const tabs = tabStore((state) => state.tabs);
+
+  useEffect(() => {
+    const browserTabIds = new Set(tabs.filter((tab) => tab.kind === "browser").map((tab) => tab.id));
+    removeWebviewsForClosedTabs(browserTabIds);
+  }, [tabs]);
 
   // Group tabs by workspace to know which workspaces have content
   const workspaceIdsWithTabs = useMemo(() => {

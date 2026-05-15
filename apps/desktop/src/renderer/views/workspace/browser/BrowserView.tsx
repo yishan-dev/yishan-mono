@@ -159,6 +159,7 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
         onClearAllData={tools.handleClearAllData}
       />
       <WebviewPane
+        tabId={tabId}
         resolvedUrl={resolvedUrl}
         errorMessage={tools.errorMessage}
         snackbarMessage={tools.snackbarMessage}
