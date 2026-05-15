@@ -41,7 +41,7 @@ export type TabStoreState = {
   >;
   resolveSessionTab: (tabId: string, sessionId: string) => void;
   failSessionTabInit: (tabId: string) => void;
-  openTab: (input: OpenWorkspaceTabInput) => void;
+  openTab: (input: OpenWorkspaceTabInput, options?: { activePaneTabIds?: string[] }) => void;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
   closeAllTabs: (tabId: string) => void;
@@ -203,8 +203,8 @@ export const tabStore = create<TabStoreState>()(
     failSessionTabInit: (tabId) => {
       set((state) => failSessionTabInitState(state, tabId));
     },
-    openTab: (input) => {
-      set((state) => openTabState(state, input, createClientTabId()) ?? state);
+    openTab: (input, options?) => {
+      set((state) => openTabState(state, input, createClientTabId(), options) ?? state);
     },
     closeTab: (tabId) => {
       set((state) => closeTabState(state, tabId) ?? state);

@@ -11,11 +11,22 @@ function isTemporaryTab(tab: WorkspaceTab): boolean {
   );
 }
 
-/** Returns the single reusable temporary tab in the target workspace, regardless of kind. */
-function findTemporaryTab(tabs: WorkspaceTab[], workspaceId: string): WorkspaceTab | null {
+/**
+ * Returns a reusable temporary tab in the target workspace.
+ * When restrictToTabIds is provided, only considers tabs in that set
+ * (i.e. only reuse a temp tab that belongs to the active pane).
+ */
+function findTemporaryTab(
+  tabs: WorkspaceTab[],
+  workspaceId: string,
+  restrictToTabIds?: string[],
+): WorkspaceTab | null {
+  const restrictSet = restrictToTabIds ? new Set(restrictToTabIds) : null;
   for (const tab of tabs) {
     if (tab.workspaceId === workspaceId && isTemporaryTab(tab)) {
-      return tab;
+      if (!restrictSet || restrictSet.has(tab.id)) {
+        return tab;
+      }
     }
   }
 
@@ -101,6 +112,7 @@ export function openTabState(
   state: WorkspaceTabStateSlice,
   input: OpenWorkspaceTabInput,
   nextTabId: string,
+  options?: { activePaneTabIds?: string[] },
 ): Partial<WorkspaceTabStateSlice> | null {
   const targetWorkspaceId = input.workspaceId ?? state.selectedWorkspaceId;
   if (!targetWorkspaceId) {
@@ -242,7 +254,7 @@ export function openTabState(
   }
 
   if ((input.kind === "file" || input.kind === "image" || input.kind === "diff") && input.temporary) {
-    const existing = findTemporaryTab(state.tabs, targetWorkspaceId);
+    const existing = findTemporaryTab(state.tabs, targetWorkspaceId, options?.activePaneTabIds);
     if (existing) {
       const replacement = createTabFromOpenInput(input, targetWorkspaceId, existing.id);
       return {
