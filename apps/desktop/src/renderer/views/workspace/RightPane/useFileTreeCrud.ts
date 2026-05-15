@@ -11,7 +11,7 @@ import {
 } from "../../../commands/fileCommands";
 import { isImageFile, isUnsupportedFileTab } from "../../../helpers/editorLanguage";
 import { SYSTEM_FILE_MANAGER_APP_ID, type ExternalAppId } from "../../../../shared/contracts/externalApps";
-import { getUtf8ByteLength, LARGE_FILE_OPEN_THRESHOLD_BYTES } from "./fileTreeHelpers";
+import { getUtf8ByteLength, LARGE_FILE_OPEN_THRESHOLD_BYTES, resolveWorkspaceAbsolutePath } from "./fileTreeHelpers";
 import { isDeletedPathDirectory, resolveTabIdsToCloseAfterDelete } from "./rightPaneDelete";
 import type { FileTreeUndoAction } from "./useFileTreeUndo";
 
