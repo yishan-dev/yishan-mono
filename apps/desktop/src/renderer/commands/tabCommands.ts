@@ -1,6 +1,7 @@
 import { collectSessionIdsToCloseAllTabs, collectSessionIdsToCloseOtherTabs } from "../helpers/tabHelpers";
 import { getDaemonClient } from "../rpc/rpcTransport";
 import { chatStore } from "../store/chatStore";
+import { splitPaneStore } from "../store/splitPaneStore";
 import type { TabStoreState } from "../store/tabStore";
 import { tabStore } from "../store/tabStore";
 import type { OpenWorkspaceTabInput } from "../store/types";
@@ -157,7 +158,9 @@ export function setSelectedTab(tabId: string) {
 
 /** Opens one tab from one normalized tab input payload. */
 export function openTab(input: OpenWorkspaceTabInput) {
-  readTabStoreState().openTab(input);
+  const workspaceId = input.workspaceId ?? readTabStoreState().selectedWorkspaceId;
+  const activePane = splitPaneStore.getState().getActivePane(workspaceId);
+  readTabStoreState().openTab(input, { activePaneTabIds: activePane?.tabIds });
 }
 
 /** Toggles pinned state for one tab id. */

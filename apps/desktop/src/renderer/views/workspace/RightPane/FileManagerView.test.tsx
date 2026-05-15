@@ -404,13 +404,16 @@ describe("FileManagerView file search", () => {
         workspaceWorktreePath: "/tmp/repo",
         relativePath: "src/readme.md",
       });
-      expect(mocks.openTab).toHaveBeenCalledWith({
-        workspaceId: "workspace-1",
-        kind: "file",
-        path: "src/readme.md",
-        content: "test-file-content",
-        temporary: false,
-      });
+      expect(mocks.openTab).toHaveBeenCalledWith(
+        {
+          workspaceId: "workspace-1",
+          kind: "file",
+          path: "src/readme.md",
+          content: "test-file-content",
+          temporary: false,
+        },
+        { activePaneTabIds: undefined },
+      );
       expect(getFileTreeProps().selectionRequest).toMatchObject({
         path: "src/readme.md",
         requestId: expect.any(Number),
@@ -432,13 +435,16 @@ describe("FileManagerView file search", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.openTab).toHaveBeenCalledWith({
-        workspaceId: "workspace-1",
-        kind: "file",
-        path: "src/readme.md",
-        content: "test-file-content",
-        temporary: true,
-      });
+      expect(mocks.openTab).toHaveBeenCalledWith(
+        {
+          workspaceId: "workspace-1",
+          kind: "file",
+          path: "src/readme.md",
+          content: "test-file-content",
+          temporary: true,
+        },
+        { activePaneTabIds: undefined },
+      );
     });
   });
 
@@ -455,13 +461,16 @@ describe("FileManagerView file search", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.openTab).toHaveBeenCalledWith({
-        workspaceId: "workspace-1",
-        kind: "file",
-        path: "src/readme.md",
-        content: "test-file-content",
-        temporary: false,
-      });
+      expect(mocks.openTab).toHaveBeenCalledWith(
+        {
+          workspaceId: "workspace-1",
+          kind: "file",
+          path: "src/readme.md",
+          content: "test-file-content",
+          temporary: false,
+        },
+        { activePaneTabIds: undefined },
+      );
     });
   });
 
@@ -478,15 +487,18 @@ describe("FileManagerView file search", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.openTab).toHaveBeenCalledWith({
-        workspaceId: "workspace-1",
-        kind: "file",
-        path: "data/main.sqlite",
-        content: "",
-        temporary: false,
-        isUnsupported: true,
-        unsupportedReason: "type",
-      });
+      expect(mocks.openTab).toHaveBeenCalledWith(
+        {
+          workspaceId: "workspace-1",
+          kind: "file",
+          path: "data/main.sqlite",
+          content: "",
+          temporary: false,
+          isUnsupported: true,
+          unsupportedReason: "type",
+        },
+        { activePaneTabIds: undefined },
+      );
       expect(mocks.readFile).not.toHaveBeenCalledWith({
         workspaceWorktreePath: "/tmp/repo",
         relativePath: "data/main.sqlite",
@@ -508,15 +520,18 @@ describe("FileManagerView file search", () => {
     });
 
     await waitFor(() => {
-      expect(mocks.openTab).toHaveBeenCalledWith({
-        workspaceId: "workspace-1",
-        kind: "file",
-        path: "logs/big.log",
-        content: "",
-        temporary: false,
-        isUnsupported: true,
-        unsupportedReason: "size",
-      });
+      expect(mocks.openTab).toHaveBeenCalledWith(
+        {
+          workspaceId: "workspace-1",
+          kind: "file",
+          path: "logs/big.log",
+          content: "",
+          temporary: false,
+          isUnsupported: true,
+          unsupportedReason: "size",
+        },
+        { activePaneTabIds: undefined },
+      );
     });
   });
 
