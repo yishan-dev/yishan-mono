@@ -1,5 +1,11 @@
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
-import { copyFile as copyFileAsync, cp as cpAsync, mkdir as mkdirAsync, stat as statAsync } from "node:fs/promises";
+import { statSync } from "node:fs";
+import {
+  copyFile as copyFileAsync,
+  cp as cpAsync,
+  mkdir as mkdirAsync,
+  stat as statAsync,
+  writeFile as writeFileAsync,
+} from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from "electron";
@@ -401,10 +407,10 @@ export class DesktopApplication {
 
         // Ensure parent directory exists
         const parentDir = join(absolutePath, "..");
-        mkdirSync(parentDir, { recursive: true });
+        await mkdirAsync(parentDir, { recursive: true });
 
         const buffer = Buffer.from(contentBase64, "base64");
-        writeFileSync(absolutePath, buffer);
+        await writeFileAsync(absolutePath, buffer);
         return { ok: true };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
