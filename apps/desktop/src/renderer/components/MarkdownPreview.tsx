@@ -1,6 +1,6 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
