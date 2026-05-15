@@ -18,6 +18,7 @@ vi.mock("../../rpc/rpcTransport", () => ({
   getDesktopHostBridge: () => ({
     getDaemonInfo: mocked.getDaemonInfo,
   }),
+  subscribeDesktopRpcEvent: vi.fn(() => vi.fn()),
 }));
 
 describe("DaemonSettingsView", () => {

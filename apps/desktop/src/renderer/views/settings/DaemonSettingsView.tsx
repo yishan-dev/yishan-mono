@@ -1,12 +1,29 @@
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography } from "@mui/material";
-import { CenteredSpinner } from "../../components/CenteredSpinner";
-import { StatusIndicator } from "../../components/StatusIndicator";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Snackbar,
+  Typography,
+} from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonInfoResult } from "../../../main/ipc";
-import { SettingsCard, SettingsControlRow, SettingsRows, SettingsSectionHeader, SettingsToggleRow } from "../../components/settings";
 import { closeTerminalSession } from "../../commands/terminalCommands";
-import { getDesktopHostBridge } from "../../rpc/rpcTransport";
+import { CenteredSpinner } from "../../components/CenteredSpinner";
+import { StatusIndicator } from "../../components/StatusIndicator";
+import {
+  SettingsCard,
+  SettingsControlRow,
+  SettingsRows,
+  SettingsSectionHeader,
+  SettingsToggleRow,
+} from "../../components/settings";
+import { getDesktopHostBridge, subscribeDesktopRpcEvent } from "../../rpc/rpcTransport";
 import { tabStore } from "../../store/tabStore";
 import { clearTerminalRecoveryStorage } from "../workspace/terminal/terminalRecovery";
 
@@ -84,6 +101,27 @@ export function DaemonSettingsView() {
     };
   }, [loadDaemonInfo, loadQuitOnExit]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeDesktopRpcEvent((event) => {
+      if (event.method !== "daemon.info.refreshed" || !event.payload || typeof event.payload !== "object") {
+        return;
+      }
+      const payload = event.payload as Record<string, unknown>;
+      if (typeof payload.daemonId !== "string" || typeof payload.version !== "string") {
+        return;
+      }
+      if (!isMountedRef.current) {
+        return;
+      }
+      setDaemonInfo(event.payload as DaemonInfoResult);
+      setHasLoadError(false);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const handleRestart = useCallback(async () => {
     setIsRestarting(true);
     setRestartError(null);
@@ -150,25 +188,22 @@ export function DaemonSettingsView() {
     }
   }, [t]);
 
-  const handleQuitOnExitChange = useCallback(
-    async (nextChecked: boolean) => {
-      setQuitOnExit(nextChecked);
-      setIsSavingQuitOnExit(true);
-      try {
-        await getDesktopHostBridge().setDaemonQuitOnExit(nextChecked);
-      } catch (error) {
-        console.error("[DaemonSettingsView] Failed to save quit-on-exit setting", error);
-        if (isMountedRef.current) {
-          setQuitOnExit(!nextChecked);
-        }
-      } finally {
-        if (isMountedRef.current) {
-          setIsSavingQuitOnExit(false);
-        }
+  const handleQuitOnExitChange = useCallback(async (nextChecked: boolean) => {
+    setQuitOnExit(nextChecked);
+    setIsSavingQuitOnExit(true);
+    try {
+      await getDesktopHostBridge().setDaemonQuitOnExit(nextChecked);
+    } catch (error) {
+      console.error("[DaemonSettingsView] Failed to save quit-on-exit setting", error);
+      if (isMountedRef.current) {
+        setQuitOnExit(!nextChecked);
       }
-    },
-    [],
-  );
+    } finally {
+      if (isMountedRef.current) {
+        setIsSavingQuitOnExit(false);
+      }
+    }
+  }, []);
 
   const statusLabel = daemonInfo ? t("settings.daemon.status.running") : t("settings.daemon.status.unavailable");
 
@@ -200,12 +235,7 @@ export function DaemonSettingsView() {
             <SettingsRows>
               <SettingsControlRow
                 title={t("settings.daemon.rows.status")}
-                control={
-                  <StatusIndicator
-                    label={statusLabel}
-                    color={daemonInfo ? "success" : "disabled"}
-                  />
-                }
+                control={<StatusIndicator label={statusLabel} color={daemonInfo ? "success" : "disabled"} />}
               />
               <SettingsControlRow
                 title={t("settings.daemon.rows.version")}
@@ -298,13 +328,7 @@ export function DaemonSettingsView() {
                           ? t("settings.daemon.relay.status.connected")
                           : t("settings.daemon.relay.status.disconnected")
                     }
-                    color={
-                      !daemonInfo?.relay?.enabled
-                        ? "disabled"
-                        : daemonInfo.relay.connected
-                          ? "success"
-                          : "error"
-                    }
+                    color={!daemonInfo?.relay?.enabled ? "disabled" : daemonInfo.relay.connected ? "success" : "error"}
                   />
                 }
               />
@@ -320,9 +344,7 @@ export function DaemonSettingsView() {
                 <SettingsControlRow
                   title={t("settings.daemon.relay.rows.connectedAt")}
                   control={
-                    <Typography variant="body2">
-                      {new Date(daemonInfo.relay.connectedAt).toLocaleString()}
-                    </Typography>
+                    <Typography variant="body2">{new Date(daemonInfo.relay.connectedAt).toLocaleString()}</Typography>
                   }
                 />
               ) : null}
