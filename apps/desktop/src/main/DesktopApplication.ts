@@ -1,4 +1,5 @@
-import { copyFileSync, cpSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFile as copyFileAsync, cp as cpAsync, mkdir as mkdirAsync, stat as statAsync } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from "electron";
@@ -366,17 +367,17 @@ export class DesktopApplication {
         }
 
         // Ensure destination directory exists
-        mkdirSync(destinationDirectory, { recursive: true });
+        await mkdirAsync(destinationDirectory, { recursive: true });
 
         const copiedPaths: string[] = [];
         for (const sourcePath of sourcePaths) {
           const name = basename(sourcePath);
           const destPath = join(destinationDirectory, name);
-          const stat = statSync(sourcePath);
+          const stat = await statAsync(sourcePath);
           if (stat.isDirectory()) {
-            cpSync(sourcePath, destPath, { recursive: true });
+            await cpAsync(sourcePath, destPath, { recursive: true });
           } else {
-            copyFileSync(sourcePath, destPath);
+            await copyFileAsync(sourcePath, destPath);
           }
           copiedPaths.push(destPath);
         }
