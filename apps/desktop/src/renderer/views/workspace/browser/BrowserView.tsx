@@ -62,9 +62,11 @@ export function BrowserView({ tabId, initialUrl }: BrowserViewProps) {
 
   const handleNavigated = useCallback(
     (url: string) => {
+      setUrlInput(url);
+      setPageTitle("");
       tabStore.getState().setBrowserTabUrl(tabId, url);
     },
-    [tabId],
+    [tabId, setUrlInput, setPageTitle],
   );
 
   const { webviewRef, setWebviewRef, canGoBack, canGoForward } = useWebviewEvents({

@@ -41,7 +41,8 @@ export function useWebviewEvents(args: {
         return;
       }
       setPageTitle(nextTitle);
-      addHistoryEntry(resolvedUrl, nextTitle);
+      const currentUrl = webview.getURL?.() || resolvedUrl;
+      addHistoryEntry(currentUrl, nextTitle);
       cmd.renameTab(tabId, nextTitle);
     };
 
@@ -50,7 +51,8 @@ export function useWebviewEvents(args: {
       const faviconUrl = favicons?.[0];
       cmd.setBrowserTabFaviconUrl(tabId, faviconUrl);
       if (faviconUrl) {
-        addHistoryEntry(resolvedUrl, pageTitleRef.current, faviconUrl);
+        const currentUrl = webview.getURL?.() || resolvedUrl;
+        addHistoryEntry(currentUrl, pageTitleRef.current, faviconUrl);
       }
     };
 
