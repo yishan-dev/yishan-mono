@@ -336,9 +336,12 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
         });
       }
 
+      cmd.setSelectedTabId(tabId);
+      setFocusContentRequestKey((key) => key + 1);
+
       setIsDraggingSplit(false);
     },
-    [workspaceId],
+    [workspaceId, cmd],
   );
 
   const handleFocusPane = useCallback(
@@ -360,14 +363,17 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
     (paneId: string, direction: "horizontal" | "vertical") => {
       const pane = splitPaneStore.getState().getPane(workspaceId, paneId);
       if (!pane?.selectedTabId || pane.tabIds.length <= 1) return;
+      const movedTabId = pane.selectedTabId;
       splitPaneStore.getState().splitPane(workspaceId, {
-        tabId: pane.selectedTabId,
+        tabId: movedTabId,
         targetPaneId: paneId,
         direction,
         placement: "second",
       });
+      cmd.setSelectedTabId(movedTabId);
+      setFocusContentRequestKey((key) => key + 1);
     },
-    [workspaceId],
+    [workspaceId, cmd],
   );
 
   const handleSplitRight = useCallback(
@@ -396,7 +402,8 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   );
 
   const renderTabContent = useCallback(
-    (tab: WorkspaceTab, isSelected: boolean) => {
+    (tab: WorkspaceTab, isSelected: boolean, isInActivePane: boolean) => {
+      const shouldFocusContent = isSelected && isInActivePane;
       if (tab.kind === "diff") {
         return (
           <TabPanel key={tab.id} active={isSelected}>
@@ -433,7 +440,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
               content={tab.data.content ?? ""}
               worktreePath={workspace?.worktreePath}
               isDeleted={Boolean(tab.data.isDeleted)}
-              focusRequestKey={isSelected ? focusContentRequestKey : 0}
+              focusRequestKey={shouldFocusContent ? focusContentRequestKey : 0}
               onContentChange={(nextContent) => cmd.updateFileTabContent(tab.id, nextContent)}
               onSave={async (nextContent) => {
                 const workspaceWorktreePath = workspace?.worktreePath;
@@ -491,7 +498,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
       if (tab.kind === "terminal") {
         return (
           <Box key={tab.id} sx={{ display: isSelected ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-            <TerminalView tabId={tab.id} focusRequestKey={isSelected ? focusContentRequestKey : 0} />
+            <TerminalView tabId={tab.id} focusRequestKey={shouldFocusContent ? focusContentRequestKey : 0} />
           </Box>
         );
       }
@@ -502,7 +509,12 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   );
 
   const renderTabSurface = useCallback(
-    (tab: WorkspaceTab, isSelected: boolean, rect: { left: number; top: number; width: number; height: number } | null) => {
+    (
+      tab: WorkspaceTab,
+      isSelected: boolean,
+      isInActivePane: boolean,
+      rect: { left: number; top: number; width: number; height: number } | null,
+    ) => {
       const hasArea = Boolean(rect && rect.width > 1 && rect.height > 1);
       if (hasArea && rect) {
         lastKnownRectByTabIdRef.current[tab.id] = rect;
@@ -532,7 +544,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
 
       return (
         <Box key={tab.id} sx={style}>
-          {renderTabContent(tab, isSelected)}
+          {renderTabContent(tab, isSelected, isInActivePane)}
         </Box>
       );
     },
@@ -549,7 +561,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
   }, []);
 
   const tabPlacements = useMemo(() => {
-    const placements = new Map<string, { selected: boolean; rect: { left: number; top: number; width: number; height: number } | null }>();
+    const placements = new Map<string, { selected: boolean; activePane: boolean; rect: { left: number; top: number; width: number; height: number } | null }>();
     if (!splitRoot) {
       return placements;
     }
@@ -567,11 +579,11 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
         };
       }
       for (const tabId of pane.tabIds) {
-        placements.set(tabId, { selected: tabId === pane.selectedTabId, rect });
+        placements.set(tabId, { selected: tabId === pane.selectedTabId, activePane: pane.id === activePaneId, rect });
       }
     }
     return placements;
-  }, [splitRoot, panePlaceholders, layoutVersion]);
+  }, [splitRoot, panePlaceholders, layoutVersion, activePaneId]);
 
   useLayoutEffect(() => {
     const observedElements = Object.values(panePlaceholders).filter(
@@ -673,7 +685,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
         >
           {workspaceTabs.map((tab) => {
             const placement = tabPlacements.get(tab.id);
-            return renderTabSurface(tab, placement?.selected ?? false, placement?.rect ?? null);
+            return renderTabSurface(tab, placement?.selected ?? false, placement?.activePane ?? false, placement?.rect ?? null);
           })}
         </Box>,
         getOrCreateRuntimeRoot(),
