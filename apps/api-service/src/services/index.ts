@@ -4,6 +4,7 @@ import { AuthService } from "@/services/auth-service";
 import { NodeService } from "@/services/node-service";
 import { OrganizationService } from "@/services/organization-service";
 import { ProjectService } from "@/services/project-service";
+import { ScheduledJobService } from "@/services/scheduled-job-service";
 import { UserService } from "@/services/user-service";
 import { NoopWorkspaceProvisioner } from "@/services/workspace-provisioner";
 import { WorkspaceService } from "@/services/workspace-service";
@@ -14,6 +15,7 @@ export type AppServices = {
   organization: OrganizationService;
   node: NodeService;
   project: ProjectService;
+  scheduledJob: ScheduledJobService;
   workspace: WorkspaceService;
 };
 
@@ -28,6 +30,7 @@ export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppS
     organization,
     node: new NodeService(deps.db, organization),
     project: new ProjectService(deps.db, organization),
+    scheduledJob: new ScheduledJobService(deps.db, organization),
     workspace: new WorkspaceService(deps.db, organization, workspaceProvisioner)
   };
 }

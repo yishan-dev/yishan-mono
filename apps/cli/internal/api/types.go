@@ -127,3 +127,28 @@ type RefreshTokenResponse struct {
 	AccessTokenExpiresAt  string `json:"accessTokenExpiresAt"`
 	RefreshTokenExpiresAt string `json:"refreshTokenExpiresAt"`
 }
+
+type ScheduledJob struct {
+	ID               string `json:"id"`
+	OrganizationID   string `json:"organizationId"`
+	ProjectID        string `json:"projectId"`
+	NodeID           string `json:"nodeId"`
+	Name             string `json:"name"`
+	AgentKind        string `json:"agentKind"`
+	Prompt           string `json:"prompt"`
+	Model            string `json:"model,omitempty"`
+	Command          string `json:"command,omitempty"`
+	CronExpression   string `json:"cronExpression"`
+	Timezone         string `json:"timezone"`
+	Status           string `json:"status"`
+	NextRunAt        string `json:"nextRunAt"`
+	LastScheduledFor string `json:"lastScheduledFor"`
+	LastRunAt        string `json:"lastRunAt"`
+	LastRunStatus    string `json:"lastRunStatus"`
+	LastErrorCode    string `json:"lastErrorCode"`
+	LastErrorMessage string `json:"lastErrorMessage"`
+	CreatedByUserID  string `json:"createdByUserId"`
+	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+

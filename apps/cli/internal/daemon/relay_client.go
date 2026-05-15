@@ -17,6 +17,7 @@ import (
 
 const relayMethodPing = "relay.ping"
 const relayMethodPong = "relay.pong"
+const relayMethodJobRun = "job.run"
 
 const relayReconnectInitialDelay = 2 * time.Second
 const relayReconnectMaxDelay = 30 * time.Second
@@ -132,12 +133,12 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string,
 		delay = relayReconnectInitialDelay
 		status.setConnected(time.Now().UTC())
 
-		runRelaySession(handler, conn)
+		runRelaySession(handler, nodeID, conn)
 		status.setDisconnected("session ended")
 	}
 }
 
-func runRelaySession(handler *JSONRPCHandler, conn *websocket.Conn) {
+func runRelaySession(handler *JSONRPCHandler, nodeID string, conn *websocket.Conn) {
 	connState := newWSConnState(conn)
 	defer connState.Close()
 
@@ -158,7 +159,7 @@ func runRelaySession(handler *JSONRPCHandler, conn *websocket.Conn) {
 		}
 
 		// Handle relay-level messages before dispatching to the daemon handler.
-		if handleRelayMessage(connState, payload) {
+		if handleRelayMessage(connState, nodeID, payload) {
 			continue
 		}
 
@@ -201,11 +202,12 @@ func normalizeRelayWSURL(raw string) (string, error) {
 	return parsed.String(), nil
 }
 
-// handleRelayMessage handles relay-protocol messages (e.g. heartbeat ping).
+// handleRelayMessage handles relay-protocol messages (heartbeat, job dispatch).
 // Returns true if the message was consumed and should not be passed to the daemon handler.
-func handleRelayMessage(connState *wsConnState, payload []byte) bool {
+func handleRelayMessage(connState *wsConnState, nodeID string, payload []byte) bool {
 	var msg struct {
-		Method string `json:"method"`
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params,omitempty"`
 	}
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return false
@@ -214,6 +216,9 @@ func handleRelayMessage(connState *wsConnState, payload []byte) bool {
 	switch msg.Method {
 	case relayMethodPing:
 		_ = connState.WriteJSON(notification{JSONRPC: "2.0", Method: relayMethodPong})
+		return true
+	case relayMethodJobRun:
+		handleJobRun(connState, nodeID, msg.Params)
 		return true
 	default:
 		return false

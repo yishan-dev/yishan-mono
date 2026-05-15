@@ -1,26 +1,13 @@
-import { createRequestDb, getDb } from "@/db/client";
+import type { AppDb } from "@/db/client";
 import { CleanupService } from "@/services/cleanup-service";
+import type { ScheduledDbEnv } from "@/scheduled/db";
 
-type ScheduledEnv = {
-  HYPERDRIVE?: { connectionString: string };
-  DATABASE_URL?: string;
+export type CleanupEnv = ScheduledDbEnv & {
   REVOKED_TOKEN_RETENTION_DAYS?: string;
 };
 
-export async function handleCleanup(env: ScheduledEnv): Promise<void> {
-  const databaseUrl = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-  if (!databaseUrl) {
-    console.error("[cleanup] No database connection available — skipping cleanup");
-    return;
-  }
-
-  const hasHyperdrive = Boolean(env.HYPERDRIVE);
-  let requestDb: Awaited<ReturnType<typeof createRequestDb>> | null = null;
-
+export async function handleCleanup(db: AppDb, env: CleanupEnv): Promise<void> {
   try {
-    requestDb = hasHyperdrive ? await createRequestDb(databaseUrl) : null;
-    const db = requestDb?.db ?? getDb(databaseUrl);
-
     const retentionDaysRaw = env.REVOKED_TOKEN_RETENTION_DAYS;
     const retentionDays =
       retentionDaysRaw && Number.isFinite(Number(retentionDaysRaw)) && Number(retentionDaysRaw) > 0
@@ -38,7 +25,5 @@ export async function handleCleanup(env: ScheduledEnv): Promise<void> {
   } catch (error) {
     console.error("[cleanup] Failed:", error);
     throw error;
-  } finally {
-    await requestDb?.close();
   }
 }
