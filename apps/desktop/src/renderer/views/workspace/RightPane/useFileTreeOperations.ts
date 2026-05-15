@@ -114,6 +114,7 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
   const changedRelativePathsForSelectedWorkspaceRef = useRef<string[]>([]);
 
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
+  const workspaces = workspaceStore((state) => state.workspaces);
   const selectedWorkspaceWorktreePath = workspaceStore(
     (state) => state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.worktreePath,
   );
@@ -151,6 +152,16 @@ export function useFileTreeOperations(): UseFileTreeOperationsResult {
 
     treeCacheByWorkspaceIdRef.current.set(selectedWorkspaceId, repoEntries);
   }, [repoEntries, selectedWorkspaceId]);
+
+  useEffect(() => {
+    const activeWorkspaceIds = new Set(workspaces.map((workspace) => workspace.id));
+    const cacheByWorkspaceId = treeCacheByWorkspaceIdRef.current;
+    for (const cachedWorkspaceId of cacheByWorkspaceId.keys()) {
+      if (!activeWorkspaceIds.has(cachedWorkspaceId)) {
+        cacheByWorkspaceId.delete(cachedWorkspaceId);
+      }
+    }
+  }, [workspaces]);
 
   const loadAllRepoFiles = useCallback(async (): Promise<string[]> => {
     if (!selectedWorkspaceWorktreePath) {

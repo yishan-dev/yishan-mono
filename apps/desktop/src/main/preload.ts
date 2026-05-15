@@ -10,7 +10,6 @@ const bridge: DesktopBridge = {
     openEntryInExternalApp: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.openEntryInExternalApp, input),
     openExternalUrl: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.openExternalUrl, input),
     readExternalClipboardSourcePaths: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.readExternalClipboardSourcePaths),
-    readFileAsDataUrl: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.readFileAsDataUrl, input),
     copyFiles: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.copyFiles, input),
     writeFileBase64: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.writeFileBase64, input),
     loadBrowserHistory: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.loadBrowserHistory),

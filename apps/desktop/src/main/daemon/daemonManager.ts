@@ -16,6 +16,8 @@ const DAEMON_PRECHECK_HEALTH_RETRY_COUNT = 1;
 const DAEMON_PRECHECK_HEALTH_RETRY_DELAY_MS = 20;
 const CLI_COMMAND_TIMEOUT_MS = 30_000;
 const DEV_DAEMON_STOP_TIMEOUT_MS = 5_000;
+const CLI_COMMAND_TERM_GRACE_MS = 1_000;
+const CLI_COMMAND_FORCE_KILL_WAIT_MS = 1_000;
 
 type CliCommandResult = {
   exitCode: number | null;
@@ -245,12 +247,13 @@ async function runCliCommand(args: string[]): Promise<CliCommandResult> {
     let stderr = "";
 
     const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      resolveOnce({
-        exitCode: null,
-        stdout,
-        stderr,
-        error: `CLI command timed out after ${CLI_COMMAND_TIMEOUT_MS}ms`,
+      void terminateChildProcess(child).finally(() => {
+        resolveOnce({
+          exitCode: null,
+          stdout,
+          stderr,
+          error: `CLI command timed out after ${CLI_COMMAND_TIMEOUT_MS}ms`,
+        });
       });
     }, CLI_COMMAND_TIMEOUT_MS);
 
@@ -304,6 +307,28 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolvePromise) => {
     setTimeout(resolvePromise, ms);
   });
+}
+
+async function terminateChildProcess(child: ChildProcess): Promise<void> {
+  const waitForExit = new Promise<void>((resolvePromise) => {
+    child.once("exit", () => {
+      resolvePromise();
+    });
+  });
+
+  const termSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGTERM";
+  child.kill(termSignal);
+
+  const exitedAfterTerminate = await Promise.race([
+    waitForExit.then(() => true),
+    delay(CLI_COMMAND_TERM_GRACE_MS).then(() => false),
+  ]);
+
+  if (!exitedAfterTerminate) {
+    const killSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGKILL";
+    child.kill(killSignal);
+    await Promise.race([waitForExit, delay(CLI_COMMAND_FORCE_KILL_WAIT_MS)]);
+  }
 }
 
 function formatDevDaemonExitFailure(exitCode: number | null, signal: NodeJS.Signals | null, output: string): string {
@@ -417,8 +442,19 @@ export class DaemonManager {
       });
     });
 
-    child.kill("SIGTERM");
-    await Promise.race([waitForExit, delay(DEV_DAEMON_STOP_TIMEOUT_MS)]);
+    const termSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGTERM";
+    child.kill(termSignal);
+    const exitedAfterTerminate = await Promise.race([
+      waitForExit.then(() => true),
+      delay(DEV_DAEMON_STOP_TIMEOUT_MS).then(() => false),
+    ]);
+
+    if (!exitedAfterTerminate) {
+      const killSignal: NodeJS.Signals | undefined = process.platform === "win32" ? undefined : "SIGKILL";
+      child.kill(killSignal);
+      await Promise.race([waitForExit, delay(CLI_COMMAND_FORCE_KILL_WAIT_MS)]);
+    }
+
     return true;
   }
 

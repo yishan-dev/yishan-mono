@@ -1,9 +1,21 @@
-import { copyFileSync, cpSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
-import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
+import { statSync } from "node:fs";
+import {
+  copyFile as copyFileAsync,
+  cp as cpAsync,
+  mkdir as mkdirAsync,
+  stat as statAsync,
+  writeFile as writeFileAsync,
+} from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { BrowserWindow, Menu, app, dialog, ipcMain, net, protocol } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
-import { appendBrowserHistoryEntry, loadBrowserHistoryGroups } from "./browser/browserHistory";
+import {
+  appendBrowserHistoryEntry,
+  flushBrowserHistoryPruneCheck,
+  loadBrowserHistoryGroups,
+} from "./browser/browserHistory";
 import { configureApplicationMenu } from "./app/menu";
 import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
@@ -19,6 +31,17 @@ import { checkForUpdatesManually, downloadUpdate, startAutoUpdates } from "./upd
 type DispatchActionOptions = {
   focusApp?: boolean;
 };
+
+const WORKSPACE_FILE_PROTOCOL = "yishan-file";
+const WORKSPACE_FILE_PROTOCOL_HOST = "workspace-image";
+
+function isPathWithinOrEqual(rootPath: string, candidatePath: string): boolean {
+  const normalizedRootPath = resolve(rootPath);
+  const normalizedCandidatePath = resolve(candidatePath);
+  return (
+    normalizedCandidatePath === normalizedRootPath || normalizedCandidatePath.startsWith(`${normalizedRootPath}/`)
+  );
+}
 
 /**
  * Owns Electron desktop lifecycle and main window bootstrap.
@@ -71,6 +94,7 @@ export class DesktopApplication {
    */
   private async start(): Promise<void> {
     await app.whenReady();
+    this.registerWorkspaceFileProtocol();
 
     const defaultAppEntry = process.argv[1];
     if (process.defaultApp && defaultAppEntry) {
@@ -161,6 +185,33 @@ export class DesktopApplication {
       this.pendingProtocolUrl = null;
       this.handleProtocolCallbackUrl(callbackUrl);
     }
+  }
+
+  private registerWorkspaceFileProtocol(): void {
+    protocol.handle(WORKSPACE_FILE_PROTOCOL, async (request) => {
+      try {
+        const parsedUrl = new URL(request.url);
+        if (parsedUrl.hostname !== WORKSPACE_FILE_PROTOCOL_HOST) {
+          return new Response("Not found", { status: 404 });
+        }
+
+        const workspaceWorktreePath = parsedUrl.searchParams.get("workspaceWorktreePath")?.trim() ?? "";
+        const relativePath = parsedUrl.searchParams.get("relativePath")?.trim() ?? "";
+        if (!workspaceWorktreePath || !relativePath) {
+          return new Response("Missing workspaceWorktreePath or relativePath", { status: 400 });
+        }
+
+        const resolvedWorktreePath = resolve(workspaceWorktreePath);
+        const resolvedFilePath = resolve(resolvedWorktreePath, relativePath);
+        if (!isPathWithinOrEqual(resolvedWorktreePath, resolvedFilePath)) {
+          return new Response("Path escapes workspace root", { status: 403 });
+        }
+
+        return await net.fetch(pathToFileURL(resolvedFilePath).toString());
+      } catch {
+        return new Response("Failed to read workspace file", { status: 500 });
+      }
+    });
   }
 
   private extractAuthCallbackUrlFromArgv(argv: string[]): string | null {
@@ -314,33 +365,6 @@ export class DesktopApplication {
       return await readExternalClipboardSourcePathsFromSystem();
     });
 
-    ipcMain.handle(HOST_IPC_CHANNELS.readFileAsDataUrl, async (_event, input) => {
-      try {
-        const absolutePath = String(input?.absolutePath ?? "");
-        if (!absolutePath) {
-          return { ok: false, error: "absolutePath is required" };
-        }
-        const ext = extname(absolutePath).toLowerCase().replace(".", "");
-        const mimeMap: Record<string, string> = {
-          png: "image/png",
-          jpg: "image/jpeg",
-          jpeg: "image/jpeg",
-          gif: "image/gif",
-          svg: "image/svg+xml",
-          webp: "image/webp",
-          bmp: "image/bmp",
-          ico: "image/x-icon",
-          avif: "image/avif",
-        };
-        const mime = mimeMap[ext] ?? "application/octet-stream";
-        const buffer = readFileSync(absolutePath);
-        const base64 = buffer.toString("base64");
-        return { ok: true, dataUrl: `data:${mime};base64,${base64}` };
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    });
-
     ipcMain.handle(HOST_IPC_CHANNELS.copyFiles, async (_event, input) => {
       try {
         const sourcePaths: string[] = Array.isArray(input?.sourcePaths) ? input.sourcePaths : [];
@@ -353,17 +377,17 @@ export class DesktopApplication {
         }
 
         // Ensure destination directory exists
-        mkdirSync(destinationDirectory, { recursive: true });
+        await mkdirAsync(destinationDirectory, { recursive: true });
 
         const copiedPaths: string[] = [];
         for (const sourcePath of sourcePaths) {
           const name = basename(sourcePath);
           const destPath = join(destinationDirectory, name);
-          const stat = statSync(sourcePath);
+          const stat = await statAsync(sourcePath);
           if (stat.isDirectory()) {
-            cpSync(sourcePath, destPath, { recursive: true });
+            await cpAsync(sourcePath, destPath, { recursive: true });
           } else {
-            copyFileSync(sourcePath, destPath);
+            await copyFileAsync(sourcePath, destPath);
           }
           copiedPaths.push(destPath);
         }
@@ -387,10 +411,10 @@ export class DesktopApplication {
 
         // Ensure parent directory exists
         const parentDir = join(absolutePath, "..");
-        mkdirSync(parentDir, { recursive: true });
+        await mkdirAsync(parentDir, { recursive: true });
 
         const buffer = Buffer.from(contentBase64, "base64");
-        writeFileSync(absolutePath, buffer);
+        await writeFileAsync(absolutePath, buffer);
         return { ok: true };
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -469,6 +493,12 @@ export class DesktopApplication {
   }
 
   private async runBeforeQuitCleanup(): Promise<void> {
+    try {
+      await flushBrowserHistoryPruneCheck();
+    } catch (error: unknown) {
+      console.warn("Failed to prune browser history during desktop shutdown", error);
+    }
+
     const shouldStopDaemon = isDevMode() || (this.cachedDaemonQuitOnExit ?? false);
     if (!shouldStopDaemon) {
       return;

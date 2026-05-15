@@ -2,6 +2,8 @@ import type { WorkspaceEntryAppId } from "../../shared/contracts/externalApps";
 import type { ExternalClipboardReadOutcome } from "../../shared/contracts/rpcRequestTypes";
 import { getDaemonClient, getDesktopHostBridge } from "../rpc/rpcTransport";
 
+const WORKSPACE_FILE_PROTOCOL_URL = "yishan-file://workspace-image";
+
 /** Lists workspace files under one optional directory path, recursively by default. */
 export async function listFiles(params: { workspaceWorktreePath: string; relativePath?: string; recursive?: boolean }) {
   const client = await getDaemonClient();
@@ -114,9 +116,13 @@ export async function readExternalClipboardSourcePaths() {
   return (await getDesktopHostBridge().readExternalClipboardSourcePaths()) as ExternalClipboardReadOutcome;
 }
 
-/** Reads one file as a base64-encoded data URL via the host bridge. */
-export async function readFileAsDataUrl(params: { absolutePath: string }) {
-  return await getDesktopHostBridge().readFileAsDataUrl({ absolutePath: params.absolutePath });
+/** Builds one workspace-scoped custom protocol URL for image/file previews. */
+export function buildWorkspaceFileUrl(params: { workspaceWorktreePath: string; relativePath: string }) {
+  const search = new URLSearchParams({
+    workspaceWorktreePath: params.workspaceWorktreePath,
+    relativePath: params.relativePath,
+  });
+  return `${WORKSPACE_FILE_PROTOCOL_URL}?${search.toString()}`;
 }
 
 /** Copies external files into a destination directory via the host bridge (Node.js fs). */

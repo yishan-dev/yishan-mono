@@ -6,7 +6,7 @@ import {
   deleteEntry,
   openEntryInExternalApp,
   readFile,
-  readFileAsDataUrl,
+  buildWorkspaceFileUrl,
   renameEntry,
 } from "../../../commands/fileCommands";
 import { isImageFile, isUnsupportedFileTab } from "../../../helpers/editorLanguage";
@@ -66,17 +66,11 @@ export function useFileTreeCrud({
         }
 
         if (isImageFile(path)) {
-          const absolutePath = resolveWorkspaceAbsolutePath(selectedWorkspaceWorktreePath, path);
-          const result = await readFileAsDataUrl({ absolutePath });
-          if (!result.ok) {
-            console.error("Failed to read image file as data URL", result.error);
-            return;
-          }
           openTab({
             workspaceId: selectedWorkspaceId,
             kind: "image",
             path,
-            dataUrl: result.dataUrl,
+            dataUrl: buildWorkspaceFileUrl({ workspaceWorktreePath: selectedWorkspaceWorktreePath, relativePath: path }),
             temporary: Boolean(options?.temporary),
           });
           requestFileTreeSelection(path, false);

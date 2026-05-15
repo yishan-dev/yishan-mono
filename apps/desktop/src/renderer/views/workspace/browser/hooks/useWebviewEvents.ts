@@ -12,11 +12,18 @@ export function useWebviewEvents(args: {
   const { tabId, resolvedUrl, pageTitle, addHistoryEntry, setPageTitle, onNavigated } = args;
   const cmd = useCommands();
   const webviewRef = useRef<Electron.WebviewTag | null>(null);
+  const isWebviewReadyRef = useRef(false);
+  const pageTitleRef = useRef(pageTitle);
+  const onNavigatedRef = useRef(onNavigated);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [isWebviewReady, setIsWebviewReady] = useState(false);
 
+  pageTitleRef.current = pageTitle;
+  onNavigatedRef.current = onNavigated;
+
   useEffect(() => {
+    isWebviewReadyRef.current = false;
     setIsWebviewReady(false);
     setCanGoBack(false);
     setCanGoForward(false);
@@ -43,12 +50,12 @@ export function useWebviewEvents(args: {
       const faviconUrl = favicons?.[0];
       cmd.setBrowserTabFaviconUrl(tabId, faviconUrl);
       if (faviconUrl) {
-        addHistoryEntry(resolvedUrl, pageTitle, faviconUrl);
+        addHistoryEntry(resolvedUrl, pageTitleRef.current, faviconUrl);
       }
     };
 
     const updateNavigationState = () => {
-      if (!isWebviewReady) {
+      if (!isWebviewReadyRef.current) {
         setCanGoBack(false);
         setCanGoForward(false);
         return;
@@ -63,8 +70,8 @@ export function useWebviewEvents(args: {
     const persistNavigatedUrl = () => {
       try {
         const currentUrl = webview.getURL?.();
-        if (currentUrl && onNavigated) {
-          onNavigated(currentUrl);
+        if (currentUrl && onNavigatedRef.current) {
+          onNavigatedRef.current(currentUrl);
         }
       } catch {
         // Webview may not be attached; ignore.
@@ -72,6 +79,7 @@ export function useWebviewEvents(args: {
     };
 
     const handleDomReady = () => {
+      isWebviewReadyRef.current = true;
       setIsWebviewReady(true);
       updateNavigationState();
       persistNavigatedUrl();
@@ -100,6 +108,7 @@ export function useWebviewEvents(args: {
     updateNavigationState();
 
     return () => {
+      isWebviewReadyRef.current = false;
       webview.removeEventListener("page-title-updated", handlePageTitleUpdated);
       webview.removeEventListener("page-favicon-updated", handleFaviconUpdated);
       webview.removeEventListener("dom-ready", handleDomReady);
@@ -108,7 +117,7 @@ export function useWebviewEvents(args: {
       webview.removeEventListener("did-start-loading", handleDidStartLoading);
       webview.removeEventListener("did-stop-loading", handleDidStopLoading);
     };
-  }, [cmd, isWebviewReady, tabId, resolvedUrl, addHistoryEntry, pageTitle, setPageTitle, onNavigated]);
+  }, [cmd, tabId, resolvedUrl, addHistoryEntry, setPageTitle]);
 
   const setWebviewRef = useCallback((element: Electron.WebviewTag | null) => {
     webviewRef.current = element;
