@@ -1,7 +1,7 @@
 import { Box, darken } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PaneLeaf } from "../store/split-pane-domain";
 import { type SplitDropRegion, SplitDropZone } from "./SplitDropZone";
 import { TabBar, type TabBarCreateOption } from "./TabBar";
@@ -40,8 +40,9 @@ export type SplitPaneGroupProps = {
   getTabIcon?: (tab: TabDescriptor) => ReactNode;
   enabledAgentKinds?: Array<import("../helpers/agentSettings").DesktopAgentKind>;
   disabled?: boolean;
+  onContentPlaceholderChange?: (paneId: string, placeholder: HTMLDivElement | null) => void;
   /** Renders tab content for the selected tab. */
-  renderContent: (pane: PaneLeaf) => ReactNode;
+  renderContent: (pane: PaneLeaf, placeholder: HTMLDivElement | null) => ReactNode;
 };
 
 const paneHeaderSx = {
@@ -92,9 +93,15 @@ export function SplitPaneGroup({
   getTabIcon,
   enabledAgentKinds,
   disabled,
+  onContentPlaceholderChange,
   renderContent,
 }: SplitPaneGroupProps) {
   const [draggingTabId, setDraggingTabId] = useState<string>("");
+  const [contentPlaceholder, setContentPlaceholder] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    onContentPlaceholderChange?.(pane.id, contentPlaceholder);
+  }, [onContentPlaceholderChange, pane.id, contentPlaceholder]);
 
   const handleSelectTab = useCallback(
     (tabId: string) => {
@@ -180,8 +187,8 @@ export function SplitPaneGroup({
         />
       </Box>
       <SplitDropZone paneId={pane.id} active={isDraggingSplit} onDrop={handleSplitDrop}>
-        <Box sx={{ flex: 1, position: "relative", overflow: "hidden", height: "100%" }}>
-          {renderContent(pane)}
+        <Box ref={setContentPlaceholder} sx={{ flex: 1, position: "relative", overflow: "hidden", height: "100%" }}>
+          {renderContent(pane, contentPlaceholder)}
         </Box>
       </SplitDropZone>
     </Box>

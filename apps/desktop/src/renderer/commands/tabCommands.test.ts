@@ -381,4 +381,5 @@ describe("tabCommands", () => {
     expect(updateFileTabContentState).toHaveBeenCalledWith("tab-1", "next");
     expect(markFileTabSavedState).toHaveBeenCalledWith("tab-1");
   });
+
 });

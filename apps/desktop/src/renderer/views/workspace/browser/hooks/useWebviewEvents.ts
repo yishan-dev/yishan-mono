@@ -82,13 +82,21 @@ export function useWebviewEvents(args: {
       persistNavigatedUrl();
     };
 
+    const handleDidStartLoading = () => {
+      updateNavigationState();
+    };
+
+    const handleDidStopLoading = () => {
+      updateNavigationState();
+    };
+
     webview.addEventListener("page-title-updated", handlePageTitleUpdated);
     webview.addEventListener("page-favicon-updated", handleFaviconUpdated);
     webview.addEventListener("dom-ready", handleDomReady);
     webview.addEventListener("did-navigate", handleDidNavigate);
     webview.addEventListener("did-navigate-in-page", handleDidNavigate);
-    webview.addEventListener("did-start-navigation", updateNavigationState);
-    webview.addEventListener("did-stop-loading", updateNavigationState);
+    webview.addEventListener("did-start-loading", handleDidStartLoading);
+    webview.addEventListener("did-stop-loading", handleDidStopLoading);
     updateNavigationState();
 
     return () => {
@@ -97,8 +105,8 @@ export function useWebviewEvents(args: {
       webview.removeEventListener("dom-ready", handleDomReady);
       webview.removeEventListener("did-navigate", handleDidNavigate);
       webview.removeEventListener("did-navigate-in-page", handleDidNavigate);
-      webview.removeEventListener("did-start-navigation", updateNavigationState);
-      webview.removeEventListener("did-stop-loading", updateNavigationState);
+      webview.removeEventListener("did-start-loading", handleDidStartLoading);
+      webview.removeEventListener("did-stop-loading", handleDidStopLoading);
     };
   }, [cmd, isWebviewReady, tabId, resolvedUrl, addHistoryEntry, pageTitle, setPageTitle, onNavigated]);
 
