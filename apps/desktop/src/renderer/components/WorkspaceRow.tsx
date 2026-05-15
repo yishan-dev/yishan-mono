@@ -1,47 +1,26 @@
-import { Box, IconButton, ListItem, ListItemButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
+import { type Theme, Box, IconButton, ListItem, ListItemButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { LuArchive, LuFolderGit2, LuMonitor } from "react-icons/lu";
+import { HiCubeTransparent, HiOutlineCube } from "react-icons/hi2";
+import { LuArchive, LuLoaderCircle } from "react-icons/lu";
 import type { RepoWorkspaceItem, WorkspaceGitChangeTotals } from "../store/types";
+import { workspaceCreateProgressStore } from "../store/workspaceCreateProgressStore";
 import { CliSpinner } from "./CliSpinner";
 import { GitChangeTotals } from "./GitChangeTotals";
-import { StatusBadge } from "./StatusBadge";
 
 export type WorkspaceRowIndicator = "running" | "waiting_input" | "done" | "failed" | "none";
 type WorkspaceBadgeIndicator = Extract<WorkspaceRowIndicator, "waiting_input" | "failed" | "done">;
 
-/** Narrows row indicators to the subset rendered as badge-wrapped icons. */
-function isWorkspaceBadgeIndicator(indicator: WorkspaceRowIndicator): indicator is WorkspaceBadgeIndicator {
-  return indicator === "waiting_input" || indicator === "failed" || indicator === "done";
-}
+const INDICATOR_PALETTE_KEY: Record<WorkspaceBadgeIndicator, "success" | "error" | "warning"> = {
+  done: "success",
+  failed: "error",
+  waiting_input: "warning",
+};
 
-/** Resolves the localized aria-label for one badge indicator. */
-function resolveWorkspaceBadgeAriaLabel(
-  indicator: WorkspaceBadgeIndicator,
-  labels: {
-    waitingInputIndicatorLabel: string;
-    doneIndicatorLabel: string;
-    failedIndicatorLabel: string;
-  },
-): string {
-  if (indicator === "waiting_input") {
-    return labels.waitingInputIndicatorLabel;
-  }
-
-  if (indicator === "done") {
-    return labels.doneIndicatorLabel;
-  }
-
-  return labels.failedIndicatorLabel;
-}
-
-/** Resolves one stable test id for badge indicators. */
-function resolveWorkspaceBadgeTestId(indicator: WorkspaceBadgeIndicator, workspaceId: string): string {
-  if (indicator === "waiting_input") {
-    return `workspace-status-waiting-input-badge-${workspaceId}`;
-  }
-
-  return `workspace-status-${indicator}-badge-${workspaceId}`;
-}
+const INDICATOR_TEST_ID_SLUG: Record<WorkspaceBadgeIndicator, string> = {
+  waiting_input: "waiting-input",
+  done: "done",
+  failed: "failed",
+};
 
 type WorkspaceRowProps = {
   repoId: string;
@@ -61,7 +40,6 @@ type WorkspaceRowProps = {
   onRequestDelete: (repoId: string, workspaceId: string) => void;
 };
 
-/** Renders one workspace row with rename, status indicator, and delete affordances. */
 export function WorkspaceRow({
   repoId,
   workspace,
@@ -81,12 +59,15 @@ export function WorkspaceRow({
 }: WorkspaceRowProps) {
   const theme = useTheme();
   const isLocalWorkspace = workspace.kind === "local";
-  const badgeIndicator = isWorkspaceBadgeIndicator(indicator) ? indicator : null;
   const additions = changeTotals?.additions ?? 0;
   const deletions = changeTotals?.deletions ?? 0;
   const shouldShowChangeTotals = additions > 0 || deletions > 0;
+  const workspaceCreateProgress = workspaceCreateProgressStore(
+    (state) => state.progressByWorkspaceId[workspace.id],
+  );
+  const isSetupRunning =
+    Boolean(workspaceCreateProgress && !workspaceCreateProgress.isComplete);
 
-  /** Renders the workspace icon, swapping to spinner on running and badge on terminal states. */
   const renderWorkspaceIcon = () => {
     if (indicator === "running") {
       return (
@@ -110,31 +91,58 @@ export function WorkspaceRow({
       );
     }
 
-    const icon = (
-      <Box component="span" data-testid={`workspace-icon-${workspace.id}`} sx={{ display: "inline-flex", mt: 0.375 }}>
-        {isLocalWorkspace ? (
-          <LuMonitor size={16} data-testid={`workspace-kind-local-${workspace.id}`} />
-        ) : (
-          <LuFolderGit2 size={16} />
-        )}
-      </Box>
-    );
-
-    if (!badgeIndicator) {
-      return icon;
+    if (isSetupRunning) {
+      return (
+        <Box
+          component="span"
+          data-testid={`workspace-setup-spinner-${workspace.id}`}
+          sx={{
+            display: "inline-flex",
+            mt: 0.375,
+            color: "text.secondary",
+            "@keyframes workspace-setup-spin": {
+              from: { transform: "rotate(0deg)" },
+              to: { transform: "rotate(360deg)" },
+            },
+            "& .setup-spin": {
+              animation: "workspace-setup-spin 1s linear infinite",
+            },
+          }}
+        >
+          <LuLoaderCircle size={16} className="setup-spin" />
+        </Box>
+      );
     }
 
+    const indicatorColor = indicator in INDICATOR_PALETTE_KEY
+      ? theme.palette[INDICATOR_PALETTE_KEY[indicator as WorkspaceBadgeIndicator]].main
+      : undefined;
+
+    const badgeTestId = indicator in INDICATOR_TEST_ID_SLUG
+      ? `workspace-status-${INDICATOR_TEST_ID_SLUG[indicator as WorkspaceBadgeIndicator]}-badge-${workspace.id}`
+      : null;
+
+    const indicatorLabelMap: Record<WorkspaceBadgeIndicator, string> = {
+      waiting_input: waitingInputIndicatorLabel,
+      done: doneIndicatorLabel,
+      failed: failedIndicatorLabel,
+    };
+    const indicatorLabel = indicator in indicatorLabelMap ? indicatorLabelMap[indicator as WorkspaceBadgeIndicator] : undefined;
+
     return (
-      <StatusBadge
-        indicator={badgeIndicator}
-        icon={icon}
-        ariaLabel={resolveWorkspaceBadgeAriaLabel(badgeIndicator, {
-          waitingInputIndicatorLabel,
-          doneIndicatorLabel,
-          failedIndicatorLabel,
-        })}
-        testId={resolveWorkspaceBadgeTestId(badgeIndicator, workspace.id)}
-      />
+      <Box
+        component="span"
+        data-testid={badgeTestId ?? `workspace-icon-${workspace.id}`}
+        role={indicatorColor ? "img" : undefined}
+        aria-label={indicatorLabel}
+        sx={{ display: "inline-flex", mt: 0.375, color: indicatorColor ?? "text.secondary" }}
+      >
+        {isLocalWorkspace ? (
+          <HiOutlineCube size={16} data-testid={`workspace-kind-local-${workspace.id}`} />
+        ) : (
+          <HiCubeTransparent size={16} />
+        )}
+      </Box>
     );
   };
 

@@ -1,39 +1,120 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import type { Theme } from "@mui/material/styles";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeMermaidLite from "rehype-mermaid-lite";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { openExternalUrl } from "../commands/appCommands";
-import { isIssueTrackerUrl } from "../helpers/issueLinks";
+import { openLink } from "../commands/appCommands";
+import { readFileAsDataUrl } from "../commands/fileCommands";
+import { tabStore } from "../store/tabStore";
 import { enqueueWorkspaceErrorNotice } from "../store/workspaceLifecycleNoticeStore";
 import { MermaidBlock } from "./MermaidBlock";
 
 type MarkdownPreviewProps = {
   content: string;
+  filePath?: string;
+  worktreePath?: string;
+};
+
+const dataUrlCache = new Map<string, string>();
+
+function isAbsoluteUrl(src: string): boolean {
+  return /^data:/i.test(src) || /^[a-z][a-z0-9+.-]*:/i.test(src);
+}
+
+function resolveRelativePath(baseDir: string, relativePath: string): string {
+  const parts = baseDir ? baseDir.split("/") : [];
+  const segments = relativePath.split("/");
+  for (const segment of segments) {
+    if (segment === "..") {
+      if (parts.length > 0) parts.pop();
+    } else if (segment !== "." && segment !== "") {
+      parts.push(segment);
+    }
+  }
+  return parts.join("/");
+}
+
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    "div",
+    "span",
+    "details",
+    "summary",
+    "abbr",
+    "kbd",
+    "mark",
+    "sub",
+    "sup",
+    "br",
+    "wbr",
+    "figure",
+    "figcaption",
+    "picture",
+    "source",
+    "dl",
+    "dt",
+    "dd",
+    "cite",
+    "dfn",
+    "var",
+    "samp",
+    "ruby",
+    "rt",
+    "rp",
+    "bdi",
+    "bdo",
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": [
+      ...(defaultSchema.attributes?.["*"] ?? []),
+      "className",
+      "style",
+      "title",
+      "role",
+      "aria-*",
+      "data-*",
+    ],
+    img: [
+      ...(defaultSchema.attributes?.img ?? []),
+      "width",
+      "height",
+    ],
+    td: [
+      ...(defaultSchema.attributes?.td ?? []),
+      "colspan",
+      "rowspan",
+    ],
+    th: [
+      ...(defaultSchema.attributes?.th ?? []),
+      "colspan",
+      "rowspan",
+    ],
+    input: [
+      ...(defaultSchema.attributes?.input ?? []),
+      "checked",
+      "disabled",
+    ],
+  },
 };
 
 async function openMarkdownLink(url: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof openExternalUrl>> | null = null;
-  try {
-    result = await openExternalUrl(url);
-  } catch {
-    result = { opened: false, reason: "open-failed" };
-  }
+  const result = await openLink({ url });
 
   if (result.opened) {
     return;
   }
 
   enqueueWorkspaceErrorNotice({
-    title: "Failed to open external issue link",
-    message: "Could not open issue link in external app (" + result.reason + ").",
+    title: "Failed to open link",
+    message: "Could not open link in external app (" + result.reason + ").",
   });
-}
-
-function shouldOpenExternally(url: string): boolean {
-  return isIssueTrackerUrl(url);
 }
 
 /** Recursively extracts plain text from React node trees (strings, elements with children, arrays). */
@@ -291,25 +372,121 @@ function useMarkdownStyles(theme: Theme) {
   );
 }
 
+function MarkdownImage({
+  src,
+  alt,
+  worktreePath,
+  fileDir,
+}: {
+  src?: string;
+  alt?: string;
+  worktreePath: string;
+  fileDir: string;
+}) {
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  const resolveImage = useCallback(async () => {
+    if (!src) return;
+
+    if (isAbsoluteUrl(src)) {
+      setResolvedSrc(src);
+      return;
+    }
+
+    if (!worktreePath) {
+      setResolvedSrc(src);
+      return;
+    }
+
+    const absolutePath = `${worktreePath.replace(/\/+$/, "")}/${resolveRelativePath(fileDir, src)}`;
+
+    const cached = dataUrlCache.get(absolutePath);
+    if (cached) {
+      setResolvedSrc(cached);
+      return;
+    }
+
+    try {
+      const result = await readFileAsDataUrl({ absolutePath });
+      if (result.ok) {
+        dataUrlCache.set(absolutePath, result.dataUrl);
+        setResolvedSrc(result.dataUrl);
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    }
+  }, [src, worktreePath, fileDir]);
+
+  useEffect(() => {
+    setError(false);
+    setResolvedSrc(null);
+    void resolveImage();
+  }, [resolveImage]);
+
+  if (error) {
+    return (
+      <Box
+        component="span"
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.5,
+          px: 1,
+          py: 0.25,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+          color: "text.secondary",
+          fontSize: "0.85em",
+        }}
+      >
+        {alt || "image"}
+      </Box>
+    );
+  }
+
+  if (!resolvedSrc) {
+    return (
+      <Box
+        component="span"
+        sx={{
+          display: "inline-block",
+          width: 48,
+          height: 48,
+          borderRadius: 1,
+          bgcolor: "action.hover",
+        }}
+      />
+    );
+  }
+
+  return <img src={resolvedSrc} alt={alt ?? ""} style={{ maxWidth: "100%", height: "auto", borderRadius: 4 }} />;
+}
+
 /** Renders a Markdown string as styled HTML using react-markdown with GFM and syntax highlighting support. */
-export function MarkdownPreview({ content }: MarkdownPreviewProps) {
+export function MarkdownPreview({ content, filePath, worktreePath }: MarkdownPreviewProps) {
   const theme = useTheme();
   const styles = useMarkdownStyles(theme);
-  const useExternalIssueLinks = true;
-  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const fileDir = useMemo(() => {
+    if (!filePath) return "";
+    const parts = filePath.split("/");
+    return parts.length > 1 ? parts.slice(0, -1).join("/") : "";
+  }, [filePath]);
 
   const remarkPlugins = useMemo(() => [remarkGfm], []);
   const rehypePlugins = useMemo(
     () => [
+      rehypeRaw,
+      [rehypeSanitize, sanitizeSchema],
       rehypeMermaidLite,
       rehypeHighlight,
     ],
     [],
   );
 
-  // Custom component override for <pre> blocks to intercept mermaid diagrams.
-  // rehype-mermaid transforms mermaid fenced blocks into:
-  // <pre class="mermaid">diagram source</pre>
   const components = useMemo(
     () => ({
       pre: ({ className, children, ...props }: React.ComponentProps<"pre">) => {
@@ -320,8 +497,46 @@ export function MarkdownPreview({ content }: MarkdownPreviewProps) {
 
         return <pre className={className} {...props}>{children}</pre>;
       },
+      img: ({ src, alt, ...props }: React.ComponentProps<"img">) => (
+        <MarkdownImage
+          src={src}
+          alt={alt}
+          worktreePath={worktreePath ?? ""}
+          fileDir={fileDir}
+        />
+      ),
+      a: ({ href, children, ...props }: React.ComponentProps<"a">) => {
+        const handleClick = (e: React.MouseEvent) => {
+          if (!href) return;
+          e.preventDefault();
+
+          if (href.startsWith("#")) return;
+
+          if (isAbsoluteUrl(href)) {
+            void openMarkdownLink(href);
+            return;
+          }
+
+          if (worktreePath) {
+            const cleanPath = href.replace(/[?#].*$/, "");
+            const resolvedPath = resolveRelativePath(fileDir, cleanPath);
+            if (resolvedPath) {
+              tabStore.getState().openTab({
+                kind: "file",
+                path: resolvedPath,
+              });
+            }
+          }
+        };
+
+        return (
+          <a href={href} onClick={handleClick} {...props}>
+            {children}
+          </a>
+        );
+      },
     }),
-    [],
+    [worktreePath, fileDir],
   );
 
   if (!content.trim()) {

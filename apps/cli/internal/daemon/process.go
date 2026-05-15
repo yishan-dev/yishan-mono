@@ -29,18 +29,24 @@ var ErrNotRunning = errors.New("daemon is not running")
 const detachedEnvKey = "YISHAN_DAEMON_DETACHED"
 
 type RunConfig struct {
-	Host        string
-	Port        int
-	JWTSecret   string
-	JWTIssuer   string
-	JWTAudience string
-	JWTRequired bool
+	Host         string
+	Port         int
+	JWTSecret    string
+	JWTIssuer    string
+	JWTAudience  string
+	JWTRequired  bool
+	RelayEnabled bool
+	RelayURL     string
+	// LogFilePath is the resolved path to the daemon log file.
+	// Set by the command layer; passed through to handlers for diagnostics.
+	LogFilePath string
 }
 
 type StartConfig struct {
 	Run        RunConfig
 	ConfigPath string
 	LogLevel   string
+	LogFile    string
 	Stdout     io.Writer
 	Stderr     io.Writer
 }
@@ -84,7 +90,7 @@ func Run(cfg RunConfig, statePath string) error {
 	currentPID := os.Getpid()
 
 	workspaceManager := workspace.NewManager()
-	handler := NewJSONRPCHandler(workspaceManager, daemonID)
+	handler := NewJSONRPCHandler(workspaceManager, daemonID, cfg.LogFilePath)
 	auth := NewJWTAuth(JWTAuthConfig{
 		Secret:   cfg.JWTSecret,
 		Issuer:   cfg.JWTIssuer,
@@ -94,6 +100,8 @@ func Run(cfg RunConfig, statePath string) error {
 	if err := auth.ValidateConfig(); err != nil {
 		return err
 	}
+
+	relayStatus := NewRelayStatus(cfg.RelayEnabled, cfg.RelayURL)
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", auth.Middleware(handler))
@@ -105,6 +113,7 @@ func Run(cfg RunConfig, statePath string) error {
 			"status":   "running",
 			"version":  buildinfo.Version,
 			"daemonId": daemonID,
+			"relay":    relayStatus.Snapshot(),
 		})
 	})
 
@@ -142,6 +151,10 @@ func Run(cfg RunConfig, statePath string) error {
 				return fmt.Errorf("register daemon node: %w", err)
 			}
 		}
+	}
+
+	if cfg.RelayEnabled && cfg.RelayURL != "" {
+		go runRelayClientLoop(handler, daemonID, cfg.RelayURL, relayStatus)
 	}
 
 	stop := make(chan os.Signal, 1)
@@ -219,6 +232,7 @@ func StartDetached(cfg StartConfig) (int, error) {
 	args = append(args, "--host", cfg.Run.Host)
 	args = append(args, "--port", strconv.Itoa(cfg.Run.Port))
 	args = append(args, "--jwt-required="+strconv.FormatBool(cfg.Run.JWTRequired))
+	args = append(args, "--relay-enabled="+strconv.FormatBool(cfg.Run.RelayEnabled))
 	if cfg.Run.JWTSecret != "" {
 		args = append(args, "--jwt-secret", cfg.Run.JWTSecret)
 	}
@@ -228,11 +242,17 @@ func StartDetached(cfg StartConfig) (int, error) {
 	if cfg.Run.JWTAudience != "" {
 		args = append(args, "--jwt-audience", cfg.Run.JWTAudience)
 	}
+	if cfg.Run.RelayURL != "" {
+		args = append(args, "--relay-url", cfg.Run.RelayURL)
+	}
 	if cfg.ConfigPath != "" {
 		args = append(args, "--config", cfg.ConfigPath)
 	}
 	if cfg.LogLevel != "" {
 		args = append(args, "--log-level", cfg.LogLevel)
+	}
+	if cfg.LogFile != "" {
+		args = append(args, "--log-file", cfg.LogFile)
 	}
 
 	command := exec.Command(executable, args...)

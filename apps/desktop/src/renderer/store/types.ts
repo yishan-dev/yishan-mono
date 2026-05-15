@@ -76,7 +76,7 @@ export type WorkspaceTabDataByKind = {
     agentKind?: DesktopAgentKind;
     isInitializing?: boolean;
   };
-  diff: { path: string; oldContent: string; newContent: string; source?: DiffTabSource };
+  diff: { path: string; oldContent: string; newContent: string; source?: DiffTabSource; isTemporary: boolean };
   file: {
     path: string;
     content: string;
@@ -98,6 +98,10 @@ export type WorkspaceTabDataByKind = {
     agentKind?: DesktopAgentKind;
     /** When true, auto-rename from terminal commands/paths is suppressed. */
     userRenamed?: boolean;
+  };
+  browser: {
+    url: string;
+    faviconUrl?: string;
   };
 };
 
@@ -128,6 +132,10 @@ export type WorkspaceTab =
   | (WorkspaceTabBase & {
       kind: "terminal";
       data: WorkspaceTabDataByKind["terminal"];
+    })
+  | (WorkspaceTabBase & {
+      kind: "browser";
+      data: WorkspaceTabDataByKind["browser"];
     });
 
 export type OpenWorkspaceTabInput =
@@ -141,6 +149,7 @@ export type OpenWorkspaceTabInput =
       oldContent?: string;
       newContent?: string;
       diffSource?: DiffTabSource;
+      temporary?: boolean;
     }
   | {
       workspaceId?: string;
@@ -165,6 +174,11 @@ export type OpenWorkspaceTabInput =
       launchCommand?: string;
       agentKind?: DesktopAgentKind;
       reuseExisting?: boolean;
+    }
+  | {
+      workspaceId?: string;
+      kind: "browser";
+      url?: string;
     };
 
 export type WorkspaceStoreState = {

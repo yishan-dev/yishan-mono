@@ -16,7 +16,7 @@ import type { BiCog } from "react-icons/bi";
 import { RxExit } from "react-icons/rx";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { SearchInput } from "../components/SearchInput";
-import { SettingsErrorBoundary, SettingsSectionHeader } from "../components/settings";
+import { SettingsErrorBoundary, SettingsPageLayout, SettingsSectionHeader } from "../components/settings";
 import { ThemePreferencePicker } from "../components/settings/ThemePreferencePicker";
 import { getRendererPlatform } from "../helpers/platform";
 import { useThemePreference } from "../hooks/useThemePreference";
@@ -25,6 +25,7 @@ import { AgentSettingsView } from "./settings/AgentSettingsView";
 import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
 import { KeybindingsSettingsView } from "./settings/KeybindingsSettingsView";
+import { LinkSettingsView } from "./settings/LinkSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
 import { LanguageSettingsView } from "./settings/LanguageSettingsView";
@@ -99,6 +100,7 @@ export function SettingsView() {
       selectedTabParam === "daemon" ||
       selectedTabParam === "keybindings" ||
       selectedTabParam === "language" ||
+      selectedTabParam === "links" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
@@ -139,46 +141,61 @@ export function SettingsView() {
       .sort((left, right) => left.rank - right.rank);
   }, [normalizedSearchQuery, t]);
 
+  const selectedTabContentByTab = useMemo<Record<SettingsTab, ReactNode>>(
+    () => ({
+      notifications: <NotificationSettingsView focusItemId={focusedNotificationItemId} />,
+      account: <AccountSettingsView />,
+      agents: (
+        <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
+          <AgentSettingsView />
+        </SettingsErrorBoundary>
+      ),
+      appearance: (
+        <Stack spacing={2}>
+          <ThemePreferencePicker
+            preference={themePreference}
+            onChange={setThemePreference}
+            title={t("settings.appearance.theme.title")}
+            description={t("settings.appearance.theme.description")}
+            lightLabel={t("settings.appearance.theme.options.light")}
+            darkLabel={t("settings.appearance.theme.options.dark")}
+            systemLabel={t("settings.appearance.theme.options.system")}
+          />
+          <LanguageSettingsView />
+        </Stack>
+      ),
+      daemon: <DaemonSettingsView />,
+      links: <LinkSettingsView />,
+      terminal: <TerminalSettingsView />,
+      keybindings: <KeybindingsSettingsView />,
+      workspace: <GitWorkspaceSettingsView />,
+    }),
+    [focusedNotificationItemId, setThemePreference, t, themePreference],
+  );
+
   return (
-    <Box
-      sx={{
-        height: "100%",
-        display: "flex",
-        minHeight: 0,
-        bgcolor: "background.default",
-      }}
-    >
-      <Box
-        sx={{
-          width: 240,
-          minWidth: 240,
-          borderRight: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-          px: 1.25,
-          py: 1.5,
-          overflowY: "auto",
-        }}
-      >
-        <Box className="electron-webkit-app-region-drag" sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}>
-          {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
-          <Box sx={{ flex: 1 }} />
-          <Tooltip title={t("settings.back")} arrow>
-            <IconButton
-              className="electron-webkit-app-region-no-drag"
-              size="small"
-              onClick={() => navigate("/")}
-              data-testid="settings-back-button"
-              aria-label={t("settings.back")}
-              sx={{ transform: "rotate(180deg)" }}
-            >
-              <RxExit size={16} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        <Typography variant="body2" sx={{ px: 1, mb: 1.25, fontWeight: 700 }}>
-          {t("settings.title")}
-        </Typography>
+    <SettingsPageLayout
+      sidebar={
+        <>
+          <Box className="electron-webkit-app-region-drag" sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}>
+            {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
+            <Box sx={{ flex: 1 }} />
+            <Tooltip title={t("settings.back")} arrow>
+              <IconButton
+                className="electron-webkit-app-region-no-drag"
+                size="small"
+                onClick={() => navigate("/")}
+                data-testid="settings-back-button"
+                aria-label={t("settings.back")}
+                sx={{ transform: "rotate(180deg)" }}
+              >
+                <RxExit size={16} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Typography variant="body2" sx={{ px: 1, mb: 1.25, fontWeight: 700 }}>
+            {t("settings.title")}
+          </Typography>
 
         <SearchInput
           placeholder={t("settings.searchPlaceholder")}
@@ -266,53 +283,14 @@ export function SettingsView() {
             ))}
           </Stack>
         )}
-      </Box>
-
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          px: 2.5,
-          pb: 2.5,
-          pt: shouldReserveMacWindowControlsInset ? 4.5 : 2.5,
-          overflowY: "auto",
-        }}
-      >
-        {selectedTab === "notifications" ? (
-          <NotificationSettingsView focusItemId={focusedNotificationItemId} />
-        ) : selectedTab === "account" ? (
-          <AccountSettingsView />
-        ) : selectedTab === "agents" ? (
-          <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
-            <AgentSettingsView />
-          </SettingsErrorBoundary>
-        ) : selectedTab === "appearance" ? (
-          <Stack spacing={2}>
-            <ThemePreferencePicker
-              preference={themePreference}
-              onChange={setThemePreference}
-              title={t("settings.appearance.theme.title")}
-              description={t("settings.appearance.theme.description")}
-              lightLabel={t("settings.appearance.theme.options.light")}
-              darkLabel={t("settings.appearance.theme.options.dark")}
-              systemLabel={t("settings.appearance.theme.options.system")}
-            />
-            <LanguageSettingsView />
-          </Stack>
-        ) : selectedTab === "daemon" ? (
-          <DaemonSettingsView />
-        ) : selectedTab === "terminal" ? (
-          <TerminalSettingsView />
-        ) : selectedTab === "keybindings" ? (
-          <KeybindingsSettingsView />
-        ) : selectedTab === "workspace" ? (
-          <GitWorkspaceSettingsView />
-        ) : (
-          <Box>
-            <SettingsSectionHeader title={t("settings.title")} description={t("settings.comingSoon")} />
-          </Box>
-        )}
-      </Box>
-    </Box>
+        </>
+      }
+    >
+      {selectedTabContentByTab[selectedTab] ?? (
+        <Box>
+          <SettingsSectionHeader title={t("settings.title")} description={t("settings.comingSoon")} />
+        </Box>
+      )}
+    </SettingsPageLayout>
   );
 }

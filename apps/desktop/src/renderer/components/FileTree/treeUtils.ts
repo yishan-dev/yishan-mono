@@ -1,4 +1,5 @@
 import type { TreeNode } from "./types";
+import type { VisibleRow } from "./types";
 
 /** Sorts file-tree nodes so folders appear before files and names stay stable. */
 export function sortNodes(a: TreeNode, b: TreeNode): number {
@@ -10,6 +11,63 @@ export function sortNodes(a: TreeNode, b: TreeNode): number {
   }
 
   return a.name.localeCompare(b.name);
+}
+
+/** Computes visible rows from a flat file path list + expanded directories, without building a tree. */
+export function computeVisibleRows(
+  files: string[],
+  expandedPathSet: Set<string>,
+): VisibleRow[] {
+  type Node = { name: string; path: string; isDirectory: boolean; children: Node[] };
+  const root: Node = { name: "", path: "", isDirectory: true, children: [] };
+
+  for (const entryPath of files) {
+    const isDir = entryPath.endsWith("/");
+    const normalizedPath = entryPath.replace(/\/$/, "");
+    const parts = normalizedPath.split("/").filter(Boolean);
+    if (parts.length === 0) continue;
+
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]!;
+      const childPath = parts.slice(0, i + 1).join("/");
+      let child = current.children.find((c) => c.name === part);
+      if (!child) {
+        child = { name: part, path: childPath, isDirectory: isDir && i === parts.length - 1, children: [] };
+        current.children.push(child);
+      } else if (isDir && i === parts.length - 1) {
+        child.isDirectory = true;
+      }
+      current = child;
+    }
+  }
+
+  const rows: VisibleRow[] = [];
+
+  function walk(nodes: Node[], depth: number) {
+    nodes.sort((a, b) => {
+      const aDir = a.isDirectory || a.children.length > 0;
+      const bDir = b.isDirectory || b.children.length > 0;
+      if (aDir !== bDir) return aDir ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    for (const node of nodes) {
+      const isDir = node.isDirectory || node.children.length > 0;
+      rows.push({
+        path: node.path,
+        name: node.name,
+        depth,
+        isDirectory: isDir,
+        hasChildren: node.children.length > 0,
+      });
+      if (isDir && expandedPathSet.has(node.path)) {
+        walk(node.children, depth + 1);
+      }
+    }
+  }
+
+  walk(root.children, 0);
+  return rows;
 }
 
 /** Builds one nested tree structure from workspace-relative file and directory paths. */

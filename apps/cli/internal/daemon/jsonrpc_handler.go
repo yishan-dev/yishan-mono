@@ -18,23 +18,25 @@ const (
 )
 
 type JSONRPCHandler struct {
-	upgrader websocket.Upgrader
-	manager  *workspace.Manager
-	nodeID   string
-	events   *eventHub
-	watchers *workspaceWatchers
+	upgrader    websocket.Upgrader
+	manager     *workspace.Manager
+	nodeID      string
+	logFilePath string
+	events      *eventHub
+	watchers    *workspaceWatchers
 }
 
-func NewJSONRPCHandler(manager *workspace.Manager, nodeID string) *JSONRPCHandler {
+func NewJSONRPCHandler(manager *workspace.Manager, nodeID string, logFilePath string) *JSONRPCHandler {
 	events := newEventHub()
 	return &JSONRPCHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool { return true },
 		},
-		manager:  manager,
-		nodeID:   nodeID,
-		events:   events,
-		watchers: newWorkspaceWatchers(events),
+		manager:     manager,
+		nodeID:      nodeID,
+		logFilePath: logFilePath,
+		events:      events,
+		watchers:    newWorkspaceWatchers(events),
 	}
 }
 
@@ -64,9 +66,13 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// Dispatch JSON-RPC requests asynchronously so that slow handlers
 		// never block the read loop (and therefore never starve terminal input).
-		reqCtx := r.Context()
-		go func(ctx context.Context, data []byte) {
-			resp := h.handleRequest(ctx, connState, data)
+		//
+		// Use context.Background() rather than r.Context(). After the WebSocket
+		// upgrade the HTTP request context is no longer meaningful — it's tied to
+		// the upgrade request, not the WS lifetime. Each handler method manages
+		// its own timeout budget internally.
+		go func(data []byte) {
+			resp := h.handleRequest(context.Background(), connState, data)
 			if resp == nil {
 				return
 			}
@@ -74,7 +80,7 @@ func (h *JSONRPCHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if err := connState.WriteJSON(resp); err != nil {
 				log.Error().Err(err).Msg("websocket write failed")
 			}
-		}(reqCtx, payload)
+		}(payload)
 	}
 }
 

@@ -18,6 +18,8 @@ const readExternalClipboardSourcePaths = vi.fn();
 const pasteEntries = vi.fn();
 const importEntries = vi.fn();
 const importFilePayloads = vi.fn();
+const copyFiles = vi.fn();
+const writeFileBase64 = vi.fn();
 const readWorkspaceDiff = vi.fn();
 
 const openTab = vi.fn();
@@ -32,6 +34,21 @@ function asEntries(paths: string[]) {
   return paths.map((path) => ({ path, isIgnored: false }));
 }
 
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getTotalSize: () => count * 28,
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        key: i,
+        start: i * 28,
+        size: 28,
+      })),
+    scrollToIndex: vi.fn(),
+    measureElement: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../commands/fileCommands", () => ({
   listFiles: (...args: unknown[]) => listFiles(...args),
   readFile: (...args: unknown[]) => readFile(...args),
@@ -45,6 +62,8 @@ vi.mock("../../../commands/fileCommands", () => ({
   pasteEntries: (...args: unknown[]) => pasteEntries(...args),
   importEntries: (...args: unknown[]) => importEntries(...args),
   importFilePayloads: (...args: unknown[]) => importFilePayloads(...args),
+  copyFiles: (...args: unknown[]) => copyFiles(...args),
+  writeFileBase64: (...args: unknown[]) => writeFileBase64(...args),
 }));
 
 vi.mock("../../../commands/gitCommands", () => ({
@@ -191,6 +210,8 @@ describe("RightPaneView delete flow", () => {
     pasteEntries.mockResolvedValue({ ok: true });
     importEntries.mockResolvedValue({ ok: true });
     importFilePayloads.mockResolvedValue({ ok: true });
+    copyFiles.mockResolvedValue({ ok: true, copiedPaths: [] });
+    writeFileBase64.mockResolvedValue({ ok: true });
     openTab.mockReset();
     closeTab.mockReset();
     fileManagerMountTracker.mockReset();
@@ -304,11 +325,9 @@ describe("RightPaneView delete flow", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Paste" }));
 
     await waitFor(() => {
-      expect(pasteEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
-        sourceRelativePaths: ["a.ts"],
-        destinationRelativePath: "",
-        mode: "copy",
+      expect(copyFiles).toHaveBeenCalledWith({
+        sourcePaths: ["/tmp/repo/a.ts"],
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
@@ -334,10 +353,9 @@ describe("RightPaneView delete flow", () => {
 
     await waitFor(() => {
       expect(readExternalClipboardSourcePaths).toHaveBeenCalled();
-      expect(importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(copyFiles).toHaveBeenCalledWith({
         sourcePaths: [copiedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
@@ -356,16 +374,15 @@ describe("RightPaneView delete flow", () => {
     fireEvent.drop(screen.getByTestId("repo-file-tree-area"), { dataTransfer });
 
     await waitFor(() => {
-      expect(importEntries).toHaveBeenCalledWith({
-        workspaceWorktreePath: "/tmp/repo",
+      expect(copyFiles).toHaveBeenCalledWith({
         sourcePaths: [droppedPath],
-        destinationRelativePath: "",
+        destinationDirectory: "/tmp/repo",
       });
     });
   });
 
   it("renders permission-related file operation errors", async () => {
-    pasteEntries.mockRejectedValue(new Error("Permission denied while accessing '/tmp/repo/a.ts'"));
+    copyFiles.mockRejectedValue(new Error("Permission denied while accessing '/tmp/repo/a.ts'"));
     Object.assign(navigator, {
       clipboard: {
         read: vi.fn().mockResolvedValue([]),

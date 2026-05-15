@@ -32,12 +32,12 @@ import {
   LuSun,
 } from "react-icons/lu";
 import { useLocation, useNavigate } from "react-router-dom";
-import { requestJson } from "../../api/restClient";
+import { resetAuthExpiredState } from "../../api/restClient";
 import { openExternalUrl } from "../../commands/appCommands";
 import { getRendererPlatform } from "../../helpers/platform";
 import { useThemePreference } from "../../hooks/useThemePreference";
 import { rendererQueryClient } from "../../queryClient";
-import { getDesktopHostBridge } from "../../rpc/rpcTransport";
+import { getDaemonClient } from "../../rpc/rpcTransport";
 import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
 import { authStore } from "../../store/authStore";
 import { sessionStore } from "../../store/sessionStore";
@@ -139,19 +139,13 @@ export function AppMenuView({ fullWidth = false, iconOnly = false }: { fullWidth
 
   const handleLogout = async () => {
     try {
-      const authTokens = await getDesktopHostBridge().getAuthTokens();
-      if (authTokens.authenticated && authTokens.refreshToken) {
-        await requestJson<{ ok?: boolean }>("/auth/revoke", {
-          method: "POST",
-          body: {
-            refreshToken: authTokens.refreshToken,
-          },
-        });
-      }
+      const daemonClient = await getDaemonClient();
+      await daemonClient.app.logout();
     } catch (error) {
-      console.warn("Failed to revoke auth session during logout", error);
+      console.warn("Failed to clear daemon auth state during logout", error);
     }
 
+    resetAuthExpiredState();
     setAuthState(false, true);
     clearSessionData();
     rendererQueryClient.clear();

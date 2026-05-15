@@ -1,0 +1,118 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useCommands } from "../../../../hooks/useCommands";
+
+export function useWebviewEvents(args: {
+  tabId: string;
+  resolvedUrl: string;
+  pageTitle: string;
+  addHistoryEntry: (url: string, title: string, faviconUrl?: string) => void;
+  setPageTitle: (title: string) => void;
+  onNavigated?: (url: string) => void;
+}) {
+  const { tabId, resolvedUrl, pageTitle, addHistoryEntry, setPageTitle, onNavigated } = args;
+  const cmd = useCommands();
+  const webviewRef = useRef<Electron.WebviewTag | null>(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+  const [isWebviewReady, setIsWebviewReady] = useState(false);
+
+  useEffect(() => {
+    setIsWebviewReady(false);
+    setCanGoBack(false);
+    setCanGoForward(false);
+  }, [resolvedUrl]);
+
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview) {
+      return;
+    }
+
+    const handlePageTitleUpdated = (event: Event) => {
+      const nextTitle = (event as { title?: string }).title?.trim();
+      if (!nextTitle) {
+        return;
+      }
+      setPageTitle(nextTitle);
+      addHistoryEntry(resolvedUrl, nextTitle);
+      cmd.renameTab(tabId, nextTitle);
+    };
+
+    const handleFaviconUpdated = (event: Event) => {
+      const favicons = (event as { favicons?: string[] }).favicons;
+      const faviconUrl = favicons?.[0];
+      cmd.setBrowserTabFaviconUrl(tabId, faviconUrl);
+      if (faviconUrl) {
+        addHistoryEntry(resolvedUrl, pageTitle, faviconUrl);
+      }
+    };
+
+    const updateNavigationState = () => {
+      if (!isWebviewReady) {
+        setCanGoBack(false);
+        setCanGoForward(false);
+        return;
+      }
+      setCanGoBack(webview.canGoBack());
+      setCanGoForward(webview.canGoForward());
+    };
+
+    // Persist the webview's committed URL to the tab store only after
+    // navigation fully completes, avoiding mid-load store writes that
+    // could trigger a React re-render and abort the in-flight load.
+    const persistNavigatedUrl = () => {
+      try {
+        const currentUrl = webview.getURL?.();
+        if (currentUrl && onNavigated) {
+          onNavigated(currentUrl);
+        }
+      } catch {
+        // Webview may not be attached; ignore.
+      }
+    };
+
+    const handleDomReady = () => {
+      setIsWebviewReady(true);
+      updateNavigationState();
+      persistNavigatedUrl();
+    };
+
+    const handleDidNavigate = () => {
+      updateNavigationState();
+      persistNavigatedUrl();
+    };
+
+    const handleDidStartLoading = () => {
+      updateNavigationState();
+    };
+
+    const handleDidStopLoading = () => {
+      updateNavigationState();
+    };
+
+    webview.addEventListener("page-title-updated", handlePageTitleUpdated);
+    webview.addEventListener("page-favicon-updated", handleFaviconUpdated);
+    webview.addEventListener("dom-ready", handleDomReady);
+    webview.addEventListener("did-navigate", handleDidNavigate);
+    webview.addEventListener("did-navigate-in-page", handleDidNavigate);
+    webview.addEventListener("did-start-loading", handleDidStartLoading);
+    webview.addEventListener("did-stop-loading", handleDidStopLoading);
+    updateNavigationState();
+
+    return () => {
+      webview.removeEventListener("page-title-updated", handlePageTitleUpdated);
+      webview.removeEventListener("page-favicon-updated", handleFaviconUpdated);
+      webview.removeEventListener("dom-ready", handleDomReady);
+      webview.removeEventListener("did-navigate", handleDidNavigate);
+      webview.removeEventListener("did-navigate-in-page", handleDidNavigate);
+      webview.removeEventListener("did-start-loading", handleDidStartLoading);
+      webview.removeEventListener("did-stop-loading", handleDidStopLoading);
+    };
+  }, [cmd, isWebviewReady, tabId, resolvedUrl, addHistoryEntry, pageTitle, setPageTitle, onNavigated]);
+
+  const setWebviewRef = useCallback((element: Electron.WebviewTag | null) => {
+    webviewRef.current = element;
+  }, []);
+
+  return { webviewRef, setWebviewRef, canGoBack, canGoForward, isWebviewReady };
+}

@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
   toggleMainWindowMaximized: vi.fn(),
   getMainWindowFullscreenState: vi.fn(),
-  getAuthStatus: vi.fn(),
+  checkAuthStatus: vi.fn(),
   getDaemonInfo: vi.fn(),
   login: vi.fn(),
 }));
@@ -35,6 +35,7 @@ vi.mock("../rpc/rpcTransport", () => ({
       getDefaultWorktreeLocation: mocks.getDefaultWorktreeLocation,
       openLocalFolderDialog: mocks.openLocalFolderDialog,
       toggleMainWindowMaximized: mocks.toggleMainWindowMaximized,
+      checkAuthStatus: mocks.checkAuthStatus,
     },
   })),
   getDesktopHostBridge: vi.fn(() => ({
@@ -42,7 +43,6 @@ vi.mock("../rpc/rpcTransport", () => ({
     openExternalUrl: mocks.openExternalUrl,
     toggleMainWindowMaximized: mocks.toggleMainWindowMaximized,
     getMainWindowFullscreenState: mocks.getMainWindowFullscreenState,
-    getAuthStatus: mocks.getAuthStatus,
     getDaemonInfo: mocks.getDaemonInfo,
     login: mocks.login,
   })),
@@ -51,6 +51,8 @@ vi.mock("../rpc/rpcTransport", () => ({
 describe("appCommands", () => {
   it("delegates shell commands to app shell service", async () => {
     mocks.getDefaultWorktreeLocation.mockResolvedValueOnce({ worktreePath: "/tmp/worktrees" });
+    mocks.checkAuthStatus.mockResolvedValueOnce({ authenticated: true, accessTokenExpiresAt: "2026-05-11T10:00:00Z" });
+    mocks.login.mockResolvedValueOnce({ authenticated: true, skipped: true });
 
     await openLocalFolderDialog("/tmp");
     await getDefaultWorktreeLocation();
@@ -70,7 +72,7 @@ describe("appCommands", () => {
     expect(mocks.toggleMainWindowMaximized).toHaveBeenCalledWith();
     expect(mocks.getMainWindowFullscreenState).toHaveBeenCalledWith();
     expect(mocks.openExternalUrl).toHaveBeenCalledWith({ url: "https://yishan.io/docs" });
-    expect(mocks.getAuthStatus).toHaveBeenCalledWith();
+    expect(mocks.checkAuthStatus).toHaveBeenCalledWith();
     expect(mocks.getDaemonInfo).toHaveBeenCalledWith();
     expect(mocks.login).toHaveBeenCalledWith();
   });

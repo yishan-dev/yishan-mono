@@ -213,6 +213,12 @@ func (c *Client) CloseWorkspace(orgID string, projectID string, input CloseWorks
 	return response, err
 }
 
+func (c *Client) RelayToken(nodeID string) (RelayTokenResponse, error) {
+	var response RelayTokenResponse
+	err := c.DoDecode("POST", "/nodes/"+nodeID+"/relay-token", nil, &response)
+	return response, err
+}
+
 func (c *Client) RefreshToken(refreshToken string) (RefreshTokenResponse, error) {
 	var response RefreshTokenResponse
 	err := c.DoDecode("POST", "/auth/refresh", map[string]string{

@@ -270,7 +270,14 @@ func registerLocalNodeAfterLogin() error {
 	}
 
 	updateIfExists := false
-	client := api.NewClient(appConfig.API.BaseURL, appConfig.API.Token, appConfig.API.RefreshToken, nil)
+	client := api.NewClient(
+		appConfig.API.BaseURL,
+		appConfig.API.Token,
+		appConfig.API.RefreshToken,
+		appConfig.API.AccessTokenExpiresAt,
+		appConfig.API.RefreshTokenExpiresAt,
+		nil,
+	)
 	_, err = client.RegisterNode(api.RegisterNodeInput{
 		NodeID: daemonID,
 		Name:   hostname,

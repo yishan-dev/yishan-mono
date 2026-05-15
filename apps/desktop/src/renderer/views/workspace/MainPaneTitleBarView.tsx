@@ -1,27 +1,19 @@
 import { Box, Button, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuChevronRight, LuFolderGit2, LuMonitor, LuPanelLeft, LuPanelRight } from "react-icons/lu";
+import { HiCubeTransparent, HiOutlineCube } from "react-icons/hi2";
+import { LuChevronRight, LuPanelLeft, LuPanelRight } from "react-icons/lu";
 import { getMainWindowFullscreenState } from "../../commands/appCommands";
+import { PaneHeader } from "../../components/PaneHeader";
 import { renderProjectIcon } from "../../components/projectIcons";
 import { getRendererPlatform } from "../../helpers/platform";
 import { useCommands } from "../../hooks/useCommands";
 import { useWorkspacePaneVisibilityContext } from "../../hooks/useWorkspacePaneVisibility";
 import { getShortcutDisplayLabelById } from "../../shortcuts/shortcutDisplay";
+import { chatStore } from "../../store/chatStore";
 import type { RepoWorkspaceItem, WorkspaceProjectRecord } from "../../store/types";
 import { workspaceStore } from "../../store/workspaceStore";
 import { WorkspacePortsMenuControl } from "./WorkspacePortsMenuControl";
-
-const titleBarSx = {
-  minHeight: 42,
-  px: 1.5,
-  borderBottom: 1,
-  borderColor: "divider",
-  bgcolor: "background.paper",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-} as const;
 
 /** Resolves the workspace displayed as local in the left pane for a project. */
 function resolvePrimaryWorkspaceId(project: WorkspaceProjectRecord | undefined, workspaces: RepoWorkspaceItem[]) {
@@ -42,10 +34,10 @@ function resolvePrimaryWorkspaceId(project: WorkspaceProjectRecord | undefined, 
 /** Renders the same workspace kind icon used by left-pane workspace rows. */
 function renderWorkspaceKindIcon(workspace: RepoWorkspaceItem | undefined, isPrimaryWorkspace: boolean, size: number) {
   if (workspace?.kind === "local" || isPrimaryWorkspace) {
-    return <LuMonitor size={size} />;
+    return <HiOutlineCube size={size} />;
   }
 
-  return <LuFolderGit2 size={size} />;
+  return <HiCubeTransparent size={size} />;
 }
 
 /** Renders the main pane title bar with repo/workspace selectors and pane toggle controls. */
@@ -56,6 +48,8 @@ export function MainPaneTitleBarView() {
   const workspaces = workspaceStore((state) => state.workspaces);
   const selectedProjectId = workspaceStore((state) => state.selectedProjectId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
+  const workspaceAgentStatusByWorkspaceId = chatStore((state) => state.workspaceAgentStatusByWorkspaceId);
+  const workspaceUnreadToneByWorkspaceId = chatStore((state) => state.workspaceUnreadToneByWorkspaceId);
   const { setSelectedRepoId, setSelectedWorkspaceId } = useCommands();
   const selectedRepo = projects.find((project) => project.id === selectedProjectId);
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
@@ -91,7 +85,23 @@ export function MainPaneTitleBarView() {
   const filteredWorkspaceOptions = workspacesForSelectedRepo.filter((workspace) =>
     workspace.name.toLowerCase().includes(workspaceSearchValue.trim().toLowerCase()),
   );
+  const resolveWorkspaceIconColor = (workspaceId: string): "warning.main" | "error.main" | "success.main" | "text.secondary" => {
+    const runtimeStatus = workspaceAgentStatusByWorkspaceId[workspaceId] ?? "idle";
+    const unreadTone = workspaceUnreadToneByWorkspaceId[workspaceId];
+    if (runtimeStatus === "waiting_input") {
+      return "warning.main";
+    }
 
+    if (unreadTone === "error") {
+      return "error.main";
+    }
+
+    if (unreadTone === "success") {
+      return "success.main";
+    }
+
+    return "text.secondary";
+  };
   useEffect(() => {
     let isDisposed = false;
     /** Syncs one fullscreen snapshot from the host window state. */
@@ -123,7 +133,7 @@ export function MainPaneTitleBarView() {
 
   return (
     <>
-      <Box component="header" className="electron-webkit-app-region-drag" sx={titleBarSx}>
+      <PaneHeader className="electron-webkit-app-region-drag">
         <Box
           className="electron-webkit-app-region-no-drag"
           sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}
@@ -175,7 +185,12 @@ export function MainPaneTitleBarView() {
             size="small"
             variant="outlined"
             aria-label={t("workspace.column")}
-            startIcon={renderWorkspaceKindIcon(selectedWorkspace, selectedWorkspace?.id === primaryWorkspaceId, 14)}
+            data-testid="main-pane-workspace-selector"
+            startIcon={
+              <Box component="span" sx={{ display: "inline-flex", color: "text.secondary" }}>
+                {renderWorkspaceKindIcon(selectedWorkspace, selectedWorkspace?.id === primaryWorkspaceId, 14)}
+              </Box>
+            }
             onClick={(event) => {
               setWorkspaceMenuAnchorEl(event.currentTarget);
               setWorkspaceSearchValue("");
@@ -214,7 +229,7 @@ export function MainPaneTitleBarView() {
             </Tooltip>
           ) : null}
         </Box>
-      </Box>
+      </PaneHeader>
       <Menu
         open={isRepoMenuOpen}
         anchorEl={repoMenuAnchorEl}
@@ -296,7 +311,10 @@ export function MainPaneTitleBarView() {
               setWorkspaceSearchValue("");
             }}
           >
-            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", mr: 1 }}>
+            <Box
+              component="span"
+              sx={{ display: "inline-flex", alignItems: "center", mr: 1, color: resolveWorkspaceIconColor(workspace.id) }}
+            >
               {renderWorkspaceKindIcon(workspace, workspace.id === primaryWorkspaceId, 14)}
             </Box>
             <Typography variant="body2" noWrap>

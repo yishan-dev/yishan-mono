@@ -371,11 +371,15 @@ describe("tabCommands", () => {
     markFileTabSaved("tab-1");
 
     expect(setSelectedTabId).toHaveBeenCalledWith("tab-1");
-    expect(openTabState).toHaveBeenCalledWith({ workspaceId: "workspace-1", kind: "file", path: "a.ts", content: "x" });
+    expect(openTabState).toHaveBeenCalledWith(
+      { workspaceId: "workspace-1", kind: "file", path: "a.ts", content: "x" },
+      { activePaneTabIds: undefined },
+    );
     expect(toggleTabPinnedState).toHaveBeenCalledWith("tab-1");
     expect(reorderTabState).toHaveBeenCalledWith("tab-1", "tab-2", "after");
     expect(renameTabState).toHaveBeenCalledWith("tab-1", "Renamed", undefined);
     expect(updateFileTabContentState).toHaveBeenCalledWith("tab-1", "next");
     expect(markFileTabSavedState).toHaveBeenCalledWith("tab-1");
   });
+
 });

@@ -9,6 +9,7 @@ const FRONTEND_MESSAGE_KEYS = [
   "gitChanged",
   "workspaceFilesChanged",
   "workspaceCreateProgress",
+  "openBrowserUrl",
 ] as const satisfies readonly RpcFrontendMessageKey[];
 
 const FRONTEND_MESSAGE_KEY_SET = new Set<string>(FRONTEND_MESSAGE_KEYS);
@@ -19,7 +20,8 @@ export type BackendEventName =
   | "notification.event"
   | "git.changed"
   | "workspace.files.changed"
-  | "workspace.create.progress";
+  | "workspace.create.progress"
+  | "open.browser.url";
 
 export type NormalizedBackendEvent =
   | {
@@ -51,6 +53,11 @@ export type NormalizedBackendEvent =
       source: "workspaceCreateProgress";
       name: "workspace.create.progress";
       payload: RpcFrontendMessagePayload<"workspaceCreateProgress">;
+    }
+  | {
+      source: "openBrowserUrl";
+      name: "open.browser.url";
+      payload: RpcFrontendMessagePayload<"openBrowserUrl">;
     };
 
 /**
@@ -63,6 +70,7 @@ export const BACKEND_EVENT_NAME_BY_SOURCE = {
   gitChanged: "git.changed",
   workspaceFilesChanged: "workspace.files.changed",
   workspaceCreateProgress: "workspace.create.progress",
+  openBrowserUrl: "open.browser.url",
 } as const satisfies Record<RpcFrontendMessageKey, BackendEventName>;
 
 /**
@@ -128,6 +136,7 @@ function isNotificationEventPayload(
     payload.body,
     payload.agent,
     payload.workspaceId,
+    payload.workspaceName,
     payload.sessionId,
     payload.navigationPath,
   ];
@@ -274,6 +283,23 @@ export function normalizeBackendEvent(envelope: DesktopRpcEventEnvelope): Normal
       source: "workspaceCreateProgress",
       name: BACKEND_EVENT_NAME_BY_SOURCE.workspaceCreateProgress,
       payload: payload as RpcFrontendMessagePayload<"workspaceCreateProgress">,
+    };
+  }
+
+  if (envelope.method === "openBrowserUrl") {
+    if (
+      typeof payload.url !== "string" ||
+      typeof payload.workspaceId !== "string" ||
+      typeof payload.tabId !== "string" ||
+      typeof payload.paneId !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      source: "openBrowserUrl",
+      name: BACKEND_EVENT_NAME_BY_SOURCE.openBrowserUrl,
+      payload: payload as RpcFrontendMessagePayload<"openBrowserUrl">,
     };
   }
 

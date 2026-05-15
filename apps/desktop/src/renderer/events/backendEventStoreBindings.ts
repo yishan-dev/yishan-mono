@@ -8,6 +8,7 @@ import {
   getNotificationPreferences,
   playNotificationSound,
 } from "../commands/notificationCommands";
+import { subscribeDaemonConnectionStatus } from "../rpc/rpcTransport";
 import { type WorkspaceAgentStatus, type WorkspaceUnreadTone, chatStore } from "../store/chatStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceCreateProgressStore } from "../store/workspaceCreateProgressStore";
@@ -22,24 +23,30 @@ type WorkspaceCreateProgressPayload = RpcFrontendMessagePayload<"workspaceCreate
 type AgentSessionLifecycleStatus = "running" | "waiting_input";
 
 type BackendEventStoreBindingsDependencies = {
+  subscribeDaemonConnectionStatus?: (listener: (status: "connected" | "connecting" | "disconnected") => void) => () => void;
   subscribeGitChanged: (listener: (workspaceWorktreePath: string) => void) => () => void;
   subscribeWorkspaceFilesChanged: (
     listener: (workspaceWorktreePath: string, changedRelativePaths?: string[]) => void,
   ) => () => void;
   subscribeInAppNotification: (listener: (payload: NotificationEventPayload) => void) => () => void;
   subscribeWorkspaceCreateProgress?: (listener: (payload: WorkspaceCreateProgressPayload) => void) => () => void;
+  subscribeOpenBrowserUrl?: (listener: (payload: { url: string; workspaceId: string }) => void) => () => void;
+  listWorkspaceWorktreePaths?: () => string[];
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
   incrementGitRefreshVersion: (workspaceWorktreePath: string) => void;
   setWorkspaceAgentStatusByWorkspaceId: (statusByWorkspaceId: Record<string, WorkspaceAgentStatus>) => void;
   recordWorkspaceUnreadNotification: (workspaceId: string, tone: WorkspaceUnreadTone) => void;
   applyWorkspaceCreateProgressEvent?: (payload: WorkspaceCreateProgressPayload) => void;
+  openBrowserTab?: (payload: { url: string; workspaceId: string }) => void;
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
   getNotificationPreferences?: () => Promise<NotificationPreferences>;
   isRelevantTerminalFocused?: (payload: NotificationEventPayload) => boolean;
+  resolveWorkspaceLabel?: (workspaceId: string) => string | undefined;
 };
 
 const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindingsDependencies = {
+  subscribeDaemonConnectionStatus,
   subscribeGitChanged: (listener) =>
     subscribeBackendEvent("git.changed", (event) => {
       if (event.source !== "gitChanged") {
@@ -68,6 +75,20 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
       listener(event.payload);
     });
   },
+  subscribeOpenBrowserUrl: (listener) => {
+    return subscribeBackendEvent("open.browser.url", (event) => {
+      if (event.source !== "openBrowserUrl") {
+        return;
+      }
+
+      listener(event.payload);
+    });
+  },
+  listWorkspaceWorktreePaths: () =>
+    workspaceStore
+      .getState()
+      .workspaces.map((workspace) => workspace.worktreePath.trim())
+      .filter((workspaceWorktreePath) => workspaceWorktreePath.length > 0),
   incrementFileTreeRefreshVersion: (workspaceWorktreePath, changedRelativePaths) => {
     workspaceStore.getState().incrementFileTreeRefreshVersion(workspaceWorktreePath, changedRelativePaths);
   },
@@ -83,6 +104,9 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   applyWorkspaceCreateProgressEvent: (payload) => {
     workspaceCreateProgressStore.getState().applyWorkspaceCreateProgressEvent(payload);
   },
+  openBrowserTab: (payload) => {
+    tabStore.getState().openTab({ kind: "browser", workspaceId: payload.workspaceId, url: payload.url });
+  },
   dispatchSystemNotification: async (input) => {
     await dispatchNotification(input);
   },
@@ -91,7 +115,61 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   },
   getNotificationPreferences,
   isRelevantTerminalFocused: isRelevantTerminalFocusedForNotification,
+  resolveWorkspaceLabel: (workspaceId) => {
+    const state = workspaceStore.getState();
+    const workspace = state.workspaces.find((candidate) => candidate.id === workspaceId);
+    const workspaceName = workspace?.name?.trim();
+    if (!workspaceName) {
+      return undefined;
+    }
+
+    const projectName = state.projects.find((project) => project.id === workspace.projectId)?.name?.trim();
+    return projectName ? `${projectName} / ${workspaceName}` : workspaceName;
+  },
 };
+
+function resolveWorkspaceCopyLabel(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+): string | undefined {
+  const workspaceId = payload.workspaceId?.trim();
+  if (workspaceId) {
+    const resolvedWorkspaceLabel = dependencies.resolveWorkspaceLabel?.(workspaceId)?.trim();
+    if (resolvedWorkspaceLabel) {
+      return resolvedWorkspaceLabel;
+    }
+  }
+
+  const workspaceName = payload.workspaceName?.trim();
+  return workspaceName || undefined;
+}
+
+function rewriteWorkspaceIdentifier(
+  value: string | undefined,
+  workspaceId: string | undefined,
+  workspaceLabel: string | undefined,
+): string | undefined {
+  if (!value) {
+    return value;
+  }
+  if (!workspaceId || !workspaceLabel || workspaceId === workspaceLabel) {
+    return value;
+  }
+
+  return value.split(workspaceId).join(workspaceLabel);
+}
+
+function buildSystemNotificationCopy(
+  payload: NotificationEventPayload,
+  dependencies: BackendEventStoreBindingsDependencies,
+): { title: string; body?: string } {
+  const workspaceId = payload.workspaceId?.trim();
+  const workspaceLabel = resolveWorkspaceCopyLabel(payload, dependencies);
+  return {
+    title: rewriteWorkspaceIdentifier(payload.title, workspaceId, workspaceLabel) ?? payload.title,
+    body: rewriteWorkspaceIdentifier(payload.body, workspaceId, workspaceLabel),
+  };
+}
 
 /**
  * Resolves one observer lifecycle status from notification observer metadata.
@@ -222,11 +300,10 @@ async function dispatchPreferenceBackedNotification(
     return;
   }
 
+  const notificationCopy = buildSystemNotificationCopy(payload, dependencies);
+
   if (preferences.osEnabled) {
-    await dependencies.dispatchSystemNotification({
-      title: payload.title,
-      body: payload.body,
-    });
+    await dependencies.dispatchSystemNotification(notificationCopy);
   }
 
   if (preferences.soundEnabled && preferences.volume > 0) {
@@ -258,6 +335,41 @@ export function createBackendEventStoreBindings(
     const unsubscribeGitChanged = dependencies.subscribeGitChanged((workspaceWorktreePath) => {
       dependencies.incrementGitRefreshVersion(workspaceWorktreePath);
     });
+    let hasObservedConnectedState = false;
+    let shouldRecoverWorkspaceViewsOnReconnect = false;
+    const unsubscribeDaemonConnectionStatus = (dependencies.subscribeDaemonConnectionStatus ?? subscribeDaemonConnectionStatus)(
+      (status) => {
+      if (status === "disconnected") {
+        shouldRecoverWorkspaceViewsOnReconnect = true;
+        return;
+      }
+
+      if (status !== "connected") {
+        return;
+      }
+
+      if (!hasObservedConnectedState) {
+        hasObservedConnectedState = true;
+        return;
+      }
+
+      if (!shouldRecoverWorkspaceViewsOnReconnect) {
+        return;
+      }
+
+      shouldRecoverWorkspaceViewsOnReconnect = false;
+
+      try {
+        const workspaceWorktreePaths = dependencies.listWorkspaceWorktreePaths?.() ?? [];
+        for (const workspaceWorktreePath of workspaceWorktreePaths) {
+          dependencies.incrementFileTreeRefreshVersion(workspaceWorktreePath, []);
+          dependencies.incrementGitRefreshVersion(workspaceWorktreePath);
+        }
+      } catch (error) {
+        console.error("[backendEventStoreBindings] Failed to recover workspace views after daemon reconnect", error);
+      }
+      },
+    );
     const unsubscribeWorkspaceFilesChanged = dependencies.subscribeWorkspaceFilesChanged(
       (workspaceWorktreePath, changedRelativePaths) => {
         dependencies.incrementFileTreeRefreshVersion(workspaceWorktreePath, changedRelativePaths);
@@ -295,11 +407,9 @@ export function createBackendEventStoreBindings(
           // Preference resolution and delivery failures should not block store state updates.
         });
       } else if (payload.showSystemNotification && !suppressNotificationEffects) {
+        const notificationCopy = buildSystemNotificationCopy(payload, dependencies);
         void dependencies
-          .dispatchSystemNotification({
-            title: payload.title,
-            body: payload.body,
-          })
+          .dispatchSystemNotification(notificationCopy)
           .catch(() => {
             // Notification delivery failures should not block store state updates.
           });
@@ -321,12 +431,17 @@ export function createBackendEventStoreBindings(
     const unsubscribeWorkspaceCreateProgress = dependencies.subscribeWorkspaceCreateProgress?.((payload) => {
       dependencies.applyWorkspaceCreateProgressEvent?.(payload);
     }) ?? (() => {});
+    const unsubscribeOpenBrowserUrl = dependencies.subscribeOpenBrowserUrl?.((payload) => {
+      dependencies.openBrowserTab?.(payload);
+    }) ?? (() => {});
 
     return () => {
       unsubscribeGitChanged();
+      unsubscribeDaemonConnectionStatus();
       unsubscribeWorkspaceFilesChanged();
       unsubscribeInAppNotification();
       unsubscribeWorkspaceCreateProgress();
+      unsubscribeOpenBrowserUrl();
       lifecycleBySessionKey.clear();
     };
   };

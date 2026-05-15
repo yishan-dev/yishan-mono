@@ -3,21 +3,13 @@ import { useTranslation } from "react-i18next";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type { TerminalDetectedPort } from "../../commands/terminalCommands";
 import { PortsTableMenu, type PortsTableMenuRow } from "../../components/PortsTableMenu";
+import { isTerminalTabWithSessionId } from "../../helpers/terminalTabUtils";
 import { useCommands } from "../../hooks/useCommands";
-import type { TabStoreState } from "../../store/tabStore";
 import { tabStore } from "../../store/tabStore";
 import { workspaceStore } from "../../store/workspaceStore";
 import { enqueueWorkspaceErrorNotice } from "../../store/workspaceLifecycleNoticeStore";
 
 const PORT_POLL_INTERVAL_MS = 3000;
-type TerminalTab = Extract<TabStoreState["tabs"][number], { kind: "terminal" }>;
-
-/** Narrows one tab union entry to a terminal tab with a non-empty bound session id. */
-function isTerminalTabWithSessionId(
-  tab: TabStoreState["tabs"][number],
-): tab is TerminalTab & { data: TerminalTab["data"] & { sessionId: string } } {
-  return tab.kind === "terminal" && Boolean(tab.data.sessionId?.trim());
-}
 
 /** Builds one stable row id for port-menu rendering and selection mapping. */
 function buildPortRowId(entry: TerminalDetectedPort): string {

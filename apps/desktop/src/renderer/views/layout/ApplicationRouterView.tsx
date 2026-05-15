@@ -1,4 +1,4 @@
-import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useNavigate } from "react-router-dom";
@@ -219,23 +219,7 @@ export function ApplicationRouterView() {
 
   if (!authStatusResolved) {
     return (
-      <Box sx={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <Box
-          component="header"
-          className="electron-webkit-app-region-drag"
-          sx={{
-            height: 42,
-            minHeight: 42,
-            px: 1,
-            bgcolor: "background.paper",
-            display: "flex",
-            alignItems: "center",
-          }}
-        />
-        <Box sx={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <CircularProgress size={28} />
-        </Box>
-      </Box>
+      <AppBootstrapLoadingView hasError={false} onRetry={() => {}} />
     );
   }
 

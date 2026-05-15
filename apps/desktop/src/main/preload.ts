@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { DESKTOP_RPC_IPC_CHANNELS, type DesktopBridge, type DesktopRpcEventEnvelope, HOST_IPC_CHANNELS } from "./ipc";
 
 /** Exposes immutable desktop bootstrap values for renderer transport initialization. */
@@ -11,6 +11,10 @@ const bridge: DesktopBridge = {
     openExternalUrl: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.openExternalUrl, input),
     readExternalClipboardSourcePaths: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.readExternalClipboardSourcePaths),
     readFileAsDataUrl: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.readFileAsDataUrl, input),
+    copyFiles: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.copyFiles, input),
+    writeFileBase64: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.writeFileBase64, input),
+    loadBrowserHistory: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.loadBrowserHistory),
+    appendBrowserHistory: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.appendBrowserHistory, input),
     dispatchNotification: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.dispatchNotification, input),
     playNotificationSound: (input) => ipcRenderer.invoke(HOST_IPC_CHANNELS.playNotificationSound, input),
     getPendingUpdate: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getPendingUpdate),
@@ -19,11 +23,11 @@ const bridge: DesktopBridge = {
     installUpdate: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.installUpdate),
     getAuthStatus: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthStatus),
     login: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.login),
-    getAuthTokens: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getAuthTokens),
     getDaemonInfo: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonInfo),
     restartDaemon: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.restartDaemon),
     getDaemonQuitOnExit: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonQuitOnExit),
     setDaemonQuitOnExit: (value) => ipcRenderer.invoke(HOST_IPC_CHANNELS.setDaemonQuitOnExit, value),
+    getDaemonJwt: () => ipcRenderer.invoke(HOST_IPC_CHANNELS.getDaemonJwt),
   },
   events: {
     subscribe: (listener: (envelope: DesktopRpcEventEnvelope) => void) => {
@@ -40,5 +44,6 @@ const bridge: DesktopBridge = {
 
 contextBridge.exposeInMainWorld("desktop", {
   platform: process.platform,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
 });
 contextBridge.exposeInMainWorld("__YISHAN__", Object.freeze(bridge));

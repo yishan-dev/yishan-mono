@@ -1,9 +1,10 @@
 import { Box, IconButton, Tooltip, Typography, useTheme } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuCode, LuColumns2, LuCopy, LuEye, LuExternalLink } from "react-icons/lu";
-import { getFileTreeIcon } from "./fileTreeIcons";
+import { LuCode, LuColumns2, LuEye } from "react-icons/lu";
 import { getLanguageId, isMarkdownFile } from "../helpers/editorLanguage";
 import { ensureEditorThemes, monaco, YISHAN_THEME_DARK, YISHAN_THEME_LIGHT } from "../helpers/monacoSetup";
+import { useGitGutterDecorations } from "../hooks/useGitGutterDecorations";
+import { FileViewerToolbar } from "./FileViewerToolbar";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 type MarkdownViewMode = "editor" | "split" | "preview";
@@ -11,6 +12,7 @@ type MarkdownViewMode = "editor" | "split" | "preview";
 type FileEditorProps = {
   path: string;
   content: string;
+  worktreePath?: string;
   isDeleted?: boolean;
   focusRequestKey?: number;
   onContentChange?: (content: string) => void;
@@ -25,6 +27,7 @@ type FileEditorProps = {
 export function FileEditor({
   path,
   content,
+  worktreePath,
   isDeleted = false,
   focusRequestKey = 0,
   onContentChange,
@@ -37,6 +40,7 @@ export function FileEditor({
   const editorHostRef = useRef<HTMLDivElement | null>(null);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const [editorInstance, setEditorInstance] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
   const contentRef = useRef(content);
   const onContentChangeRef = useRef(onContentChange);
   const onSaveRef = useRef(onSave);
@@ -62,13 +66,16 @@ export function FileEditor({
     () => (theme.palette.mode === "dark" ? YISHAN_THEME_DARK : YISHAN_THEME_LIGHT),
     [theme.palette.mode],
   );
-  const fileIcon = useMemo(() => getFileTreeIcon(path, false), [path]);
+
+  // Track the current editor content for git gutter decorations.
+  const [currentContent, setCurrentContent] = useState(content);
 
   const showEditor = viewMode === "editor" || viewMode === "split";
   const showPreview = viewMode === "preview" || viewMode === "split";
 
   useEffect(() => {
     contentRef.current = content;
+    setCurrentContent(content);
   }, [content]);
 
   useEffect(() => {
@@ -125,15 +132,19 @@ export function FileEditor({
 
     // Listen for content changes
     editor.onDidChangeModelContent(() => {
-      onContentChangeRef.current?.(editor.getValue());
+      const value = editor.getValue();
+      setCurrentContent(value);
+      onContentChangeRef.current?.(value);
     });
 
     editorRef.current = editor;
+    setEditorInstance(editor);
 
     return () => {
       editor.dispose();
       model.dispose();
       editorRef.current = null;
+      setEditorInstance(null);
     };
   }, [isDeleted, monacoTheme, path]);
 
@@ -185,6 +196,14 @@ export function FileEditor({
     setViewMode(mode);
   }, []);
 
+  // Apply git gutter decorations showing added/modified/deleted lines.
+  useGitGutterDecorations({
+    editor: editorInstance,
+    path,
+    worktreePath,
+    currentContent,
+  });
+
   const handleStartSplitDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!splitContainerRef.current) {
       return;
@@ -214,31 +233,20 @@ export function FileEditor({
 
   return (
     <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      {/* Toolbar */}
-      <Box
-        sx={{
-          minHeight: 34,
-          px: 1.5,
-          borderBottom: 1,
-          borderColor: "divider",
-          display: "flex",
-          alignItems: "center",
-          bgcolor: (muiTheme) =>
-            muiTheme.palette.mode === "dark" ? "background.default" : muiTheme.palette.background.paper,
-        }}
-      >
-        <Box component="img" src={fileIcon} alt="" sx={{ width: 14, height: 14, mr: 0.75, flexShrink: 0 }} />
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0, flex: 1 }}>
-          {path}
-        </Typography>
-        {isDeleted ? (
-          <Typography variant="caption" color="error.main" sx={{ mr: 1 }}>
-            File deleted
-          </Typography>
-        ) : null}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.75, flexShrink: 0 }}>
-          {/* Markdown view mode toggles */}
-          {isMarkdown ? (
+      <FileViewerToolbar
+        path={path}
+        onCopyPath={onCopyPath}
+        onOpenExternalApp={onOpenExternalApp}
+        openExternalAppLabel={openExternalAppLabel}
+        statusContent={
+          isDeleted ? (
+            <Typography variant="caption" color="error.main" sx={{ mr: 1 }}>
+              File deleted
+            </Typography>
+          ) : null
+        }
+        actions={
+          isMarkdown ? (
             <>
               <MarkdownViewModeToggle
                 mode="editor"
@@ -263,39 +271,9 @@ export function FileEditor({
               />
               <Box sx={{ width: "1px", height: 14, bgcolor: "divider", mx: 0.5 }} />
             </>
-          ) : null}
-          <Tooltip title="Copy file path" arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label="Copy file path"
-                onClick={() => {
-                  void onCopyPath?.(path);
-                }}
-                disabled={!onCopyPath}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuCopy size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={openExternalAppLabel} arrow>
-            <span>
-              <IconButton
-                size="small"
-                aria-label={openExternalAppLabel}
-                onClick={() => {
-                  void onOpenExternalApp?.(path);
-                }}
-                disabled={!onOpenExternalApp}
-                sx={{ p: 0.375, color: "text.secondary" }}
-              >
-                <LuExternalLink size={14} />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
+          ) : undefined
+        }
+      />
 
       {/* Content area */}
       <Box ref={splitContainerRef} sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "row" }}>
@@ -350,7 +328,7 @@ export function FileEditor({
               overflow: "hidden",
             }}
           >
-            <MarkdownPreview content={content} />
+            <MarkdownPreview content={content} filePath={path} worktreePath={worktreePath} />
           </Box>
         ) : null}
       </Box>

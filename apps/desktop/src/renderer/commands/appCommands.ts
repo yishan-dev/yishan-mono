@@ -1,5 +1,7 @@
-import type { DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
+import type { AppendBrowserHistoryInput, AuthStatusResult, BrowserHistoryGroup, DaemonInfoResult, DaemonRestartResult } from "../../main/ipc";
 import type { DesktopAgentKind } from "../helpers/agentSettings";
+import { linkSettingsStore, type LinkTarget } from "../store/linkSettingsStore";
+import { tabStore } from "../store/tabStore";
 import { getDaemonClient, getDesktopHostBridge } from "../rpc/rpcTransport";
 
 /** Opens one native folder picker and returns a selected directory path when available. */
@@ -41,9 +43,68 @@ export async function openExternalUrl(url: string) {
   return await getDesktopHostBridge().openExternalUrl({ url });
 }
 
+function isHttpUrl(url: string): boolean {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export type OpenLinkResult = {
+  opened: true;
+} | {
+  opened: false;
+  reason: string;
+};
+
+export type OpenLinkOptions = {
+  url: string;
+  workspaceId?: string;
+};
+
+export async function openLink(options: OpenLinkOptions): Promise<OpenLinkResult> {
+  const { url, workspaceId } = options;
+  const linkTarget: LinkTarget = linkSettingsStore.getState().linkTarget;
+
+  if (linkTarget === "built-in" && isHttpUrl(url)) {
+    const resolvedWorkspaceId = workspaceId ?? resolveActiveWorkspaceId();
+    if (resolvedWorkspaceId) {
+      tabStore.getState().openTab({ kind: "browser", workspaceId: resolvedWorkspaceId, url });
+      return { opened: true };
+    }
+  }
+
+  try {
+    const result = await openExternalUrl(url);
+    if (result.opened) {
+      return { opened: true };
+    }
+    return { opened: false, reason: result.reason };
+  } catch {
+    return { opened: false, reason: "open-failed" };
+  }
+}
+
+function resolveActiveWorkspaceId(): string | undefined {
+  const state = tabStore.getState();
+  const selectedTab = state.tabs.find((tab) => tab.id === state.selectedTabId);
+  return selectedTab?.workspaceId || state.selectedWorkspaceId || undefined;
+}
+
 /** Reads current desktop authentication status from main-process IPC. */
-export async function getAuthStatus() {
-  return await getDesktopHostBridge().getAuthStatus();
+export async function getAuthStatus(): Promise<AuthStatusResult> {
+  try {
+    const client = await getDaemonClient();
+    const result = await client.app.checkAuthStatus();
+    return {
+      authenticated: result.authenticated,
+      expiresAt: result.accessTokenExpiresAt,
+    };
+  } catch {
+    return { authenticated: false };
+  }
 }
 
 /** Reads current daemon identity and version from desktop main-process IPC. */
@@ -68,5 +129,20 @@ export async function setDaemonQuitOnExit(value: boolean): Promise<void> {
 
 /** Runs one desktop login flow through main-process IPC. */
 export async function login() {
-  return await getDesktopHostBridge().login();
+  const result = await getDesktopHostBridge().login();
+  if (result.authenticated) {
+    try {
+      const daemonClient = await getDaemonClient();
+      await daemonClient.app.reloadAuthConfig();
+    } catch {}
+  }
+  return result;
+}
+
+export async function loadBrowserHistory(): Promise<BrowserHistoryGroup[]> {
+  return await getDesktopHostBridge().loadBrowserHistory();
+}
+
+export async function appendBrowserHistory(input: AppendBrowserHistoryInput): Promise<{ ok: true }> {
+  return await getDesktopHostBridge().appendBrowserHistory(input);
 }

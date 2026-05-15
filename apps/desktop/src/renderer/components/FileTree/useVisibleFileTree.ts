@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
-import { buildTree, collectDirectoryPaths, collectExpandedItems, sortNodes } from "./treeUtils";
-import type { EditingEntry, TreeNode } from "./types";
+import { buildTree, collectDirectoryPaths, collectExpandedItems, computeVisibleRows, sortNodes } from "./treeUtils";
+import type { EditingEntry, VisibleRow } from "./types";
 
 type UseVisibleFileTreeInput = {
   files: string[];
@@ -11,13 +11,12 @@ type UseVisibleFileTreeInput = {
 };
 
 type UseVisibleFileTreeResult = {
-  topLevelNodes: TreeNode[];
+  visibleRows: VisibleRow[];
   directoryPaths: Set<string>;
   expandedItems: string[];
   setExpandedItems: Dispatch<SetStateAction<string[]>>;
 };
 
-/** Computes visible tree nodes and expansion state from files and create-draft state. */
 export function useVisibleFileTree({
   files,
   ignoredPathSet,
@@ -45,12 +44,11 @@ export function useVisibleFileTree({
     [editableFiles],
   );
 
-  const { topLevelNodes, defaultExpandedItems, directoryPaths } = useMemo(() => {
+  const { defaultExpandedItems, directoryPaths } = useMemo(() => {
     const root = buildTree(editableFiles);
     const nodes = [...root.children.values()].sort(sortNodes);
 
     return {
-      topLevelNodes: nodes,
       defaultExpandedItems: collectExpandedItems(nodes, ignoredPathSet, explicitDirectoryPathSet),
       directoryPaths: collectDirectoryPaths(nodes),
     };
@@ -59,7 +57,6 @@ export function useVisibleFileTree({
   const [uncontrolledExpandedItems, setUncontrolledExpandedItems] = useState<string[]>(defaultExpandedItems);
   const expandedItems = expandedItemsOverride ?? uncontrolledExpandedItems;
 
-  /** Applies one expanded-item update in controlled or uncontrolled mode. */
   const setExpandedItems = useCallback<Dispatch<SetStateAction<string[]>>>(
     (input) => {
       const nextExpandedItems = typeof input === "function" ? input(expandedItems) : input;
@@ -95,8 +92,15 @@ export function useVisibleFileTree({
     setUncontrolledExpandedItems(finalExpandedItems);
   }, [defaultExpandedItems, directoryPaths, expandedItems, expandedItemsOverride, onExpandedItemsChange]);
 
+  const expandedPathSet = useMemo(() => new Set(expandedItems), [expandedItems]);
+
+  const visibleRows = useMemo(
+    () => computeVisibleRows(editableFiles, expandedPathSet),
+    [editableFiles, expandedPathSet],
+  );
+
   return {
-    topLevelNodes,
+    visibleRows,
     directoryPaths,
     expandedItems,
     setExpandedItems,

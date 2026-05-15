@@ -100,6 +100,12 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	if !strings.Contains(stopCommand, "bash "+quoteShellPath(notifyPath)+" --agent claude --event Stop") {
 		t.Fatalf("expected managed Claude hook to use quoted notify script path: %s", stopCommand)
 	}
+	if !strings.Contains(stopCommand, "YISHAN_MANAGED_HOOK=claude") {
+		t.Fatalf("expected managed Claude hook to use new marker, got: %s", stopCommand)
+	}
+	if strings.Contains(settingsText, "yishan-managed-hook=claude") {
+		t.Fatalf("expected legacy Claude hook marker to be replaced")
+	}
 
 	codexHooksRaw, err := os.ReadFile(codexHooksPath)
 	if err != nil {
@@ -124,6 +130,12 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	codexStopCommand := commandFromDefinition(t, codexStopDefinitions[1])
 	if !strings.Contains(codexStopCommand, "bash "+quoteShellPath(notifyPath)+" --agent codex --event Stop") {
 		t.Fatalf("expected managed Codex hook to use quoted notify script path: %s", codexStopCommand)
+	}
+	if !strings.Contains(codexStopCommand, "YISHAN_MANAGED_HOOK=codex") {
+		t.Fatalf("expected managed Codex hook to use new marker, got: %s", codexStopCommand)
+	}
+	if strings.Contains(codexHooksText, "yishan-managed-hook=codex") {
+		t.Fatalf("expected legacy Codex hook marker to be replaced")
 	}
 	if _, ok := codexHooks["SessionStart"]; !ok {
 		t.Fatalf("expected Codex SessionStart hook")
@@ -157,8 +169,14 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 		!strings.Contains(cursorHooksText, "beforeMCPExecution") {
 		t.Fatalf("expected managed Cursor hook events to be present")
 	}
+	if !strings.Contains(cursorHooksText, "YISHAN_MANAGED_HOOK=cursor") {
+		t.Fatalf("expected managed Cursor hook to use new marker")
+	}
+	if strings.Contains(cursorHooksText, "yishan-managed-hook=cursor") {
+		t.Fatalf("expected legacy Cursor hook marker to be replaced")
+	}
 
-	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(crossPlatformDir(notifyPath), cursorHookScriptFileName))
+	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(filepath.Dir(notifyPath), cursorHookScriptFileName))
 	if err != nil {
 		t.Fatalf("read cursor hook script: %v", err)
 	}
@@ -238,6 +256,13 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 	if !strings.Contains(beforeAgentCommand, "bash "+quoteShellPath(notifyPath)+" --agent gemini --event Start") {
 		t.Fatalf("expected managed Gemini start command, got %s", beforeAgentCommand)
 	}
+	if !strings.Contains(beforeAgentCommand, "YISHAN_MANAGED_HOOK=gemini") {
+		t.Fatalf("expected managed Gemini hook to use new marker, got: %s", beforeAgentCommand)
+	}
+	geminiSettingsText := string(geminiSettingsRaw)
+	if strings.Contains(geminiSettingsText, "yishan-managed-hook=gemini") {
+		t.Fatalf("expected legacy Gemini hook marker to be replaced")
+	}
 	notificationDefinitions, ok := geminiHooks["Notification"].([]any)
 	if !ok || len(notificationDefinitions) != 1 {
 		t.Fatalf("expected exactly one managed Gemini Notification definition, got %#v", geminiHooks["Notification"])
@@ -251,7 +276,11 @@ func TestEnsureAgentHookSetupMergesClaudeGeminiHooksAndOpenCodePlugin(t *testing
 func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 	homeDir := t.TempDir()
 	configHome := filepath.Join(t.TempDir(), "config")
-	notifyPath := `C:\Users\me\notify.ps1`
+	// Use a temp dir for the notify script path so that filepath.Dir resolves
+	// correctly on all platforms (previously used a raw Windows path which
+	// caused cursor-hook.sh to be written to the package directory on Unix).
+	notifyDir := t.TempDir()
+	notifyPath := filepath.Join(notifyDir, "notify.ps1")
 
 	if err := EnsureAgentHookSetup(AgentHookSetupConfig{
 		NotifyScriptPath: notifyPath,
@@ -273,7 +302,8 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 	hooksValue := settings["hooks"].(map[string]any)
 	stopDefinitions := hooksValue["Stop"].([]any)
 	stopCommand := commandFromDefinition(t, stopDefinitions[0])
-	if !strings.Contains(stopCommand, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\me\notify.ps1" --agent claude`) {
+	if !strings.Contains(stopCommand, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`) ||
+		!strings.Contains(stopCommand, "--agent claude") {
 		t.Fatalf("expected PowerShell Claude command, got %s", stopCommand)
 	}
 
@@ -312,11 +342,13 @@ func TestEnsureAgentHookSetupUsesPowerShellCommandsOnWindows(t *testing.T) {
 		t.Fatalf("expected PowerShell Cursor command, got %q", string(cursorHooksRaw))
 	}
 
-	cursorHookScriptRaw, err := os.ReadFile(filepath.Join(crossPlatformDir(notifyPath), cursorHookScriptFileName))
+	cursorHookScriptPath := filepath.Join(notifyDir, cursorHookScriptFileName)
+	cursorHookScriptRaw, err := os.ReadFile(cursorHookScriptPath)
 	if err != nil {
 		t.Fatalf("read cursor hook script: %v", err)
 	}
-	if !strings.Contains(string(cursorHookScriptRaw), `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\me\notify.ps1"`) {
+	if !strings.Contains(string(cursorHookScriptRaw), `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`) ||
+		!strings.Contains(string(cursorHookScriptRaw), "notify.ps1") {
 		t.Fatalf("expected PowerShell cursor hook script forwarding, got %q", string(cursorHookScriptRaw))
 	}
 

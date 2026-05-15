@@ -13,8 +13,9 @@ import (
 var cursorHookScriptTemplate string
 
 const (
-	cursorManagedCommandMarker = "yishan-managed-hook=cursor"
-	cursorHookScriptFileName   = "cursor-hook.sh"
+	cursorManagedCommandMarker       = "YISHAN_MANAGED_HOOK=cursor"
+	cursorLegacyManagedCommandMarker = "yishan-managed-hook=cursor"
+	cursorHookScriptFileName         = "cursor-hook.sh"
 )
 
 type cursorHookInstaller struct{}
@@ -28,7 +29,7 @@ func (cursorHookInstaller) Install(ctx hookSetupContext) error {
 }
 
 func ensureCursorHookScript(notifyScriptPath string, goos string) (string, error) {
-	hookPath := filepath.Join(crossPlatformDir(notifyScriptPath), cursorHookScriptFileName)
+	hookPath := filepath.Join(filepath.Dir(notifyScriptPath), cursorHookScriptFileName)
 	notifyForwardCommand := "bash " + quoteShellPath(notifyScriptPath) + " --agent cursor --event \"$event_name\" >/dev/null 2>&1 || true"
 	if goos == "windows" {
 		notifyForwardCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + quotePowerShellPath(notifyScriptPath) + " --agent cursor --event \"$event_name\" >/dev/null 2>&1 || true"
@@ -46,22 +47,6 @@ func ensureCursorHookScript(notifyScriptPath string, goos string) (string, error
 		return "", err
 	}
 	return hookPath, nil
-}
-
-func crossPlatformDir(filePath string) string {
-	lastSlash := strings.LastIndex(filePath, "/")
-	lastBackslash := strings.LastIndex(filePath, `\`)
-	lastSep := lastSlash
-	if lastBackslash > lastSep {
-		lastSep = lastBackslash
-	}
-	if lastSep < 0 {
-		return "."
-	}
-	if lastSep == 0 {
-		return filePath[:1]
-	}
-	return filePath[:lastSep]
 }
 
 func ensureCursorHookSettings(cursorHookScriptPath string, homeDir string, goos string) error {
@@ -106,9 +91,10 @@ func ensureCursorHookSettings(cursorHookScriptPath string, homeDir string, goos 
 				continue
 			}
 			command, _ := entryMap["command"].(string)
-			if !strings.Contains(command, cursorManagedCommandMarker) {
-				filtered = append(filtered, entry)
+			if strings.Contains(command, cursorManagedCommandMarker) || strings.Contains(command, cursorLegacyManagedCommandMarker) {
+				continue
 			}
+			filtered = append(filtered, entry)
 		}
 		filtered = append(filtered, map[string]any{"command": managedCommand})
 		hooksValue[eventName] = filtered

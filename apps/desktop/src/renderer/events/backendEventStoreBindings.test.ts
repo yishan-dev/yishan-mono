@@ -75,11 +75,34 @@ function createInAppNotificationHarness() {
   };
 }
 
+function createDaemonConnectionStatusHarness() {
+  let listener: ((status: "connected" | "connecting" | "disconnected") => void) | null = null;
+  const unsubscribe = vi.fn();
+  const subscribeDaemonConnectionStatus = vi.fn(
+    (nextListener: (status: "connected" | "connecting" | "disconnected") => void) => {
+      listener = nextListener;
+      return () => {
+        unsubscribe();
+        listener = null;
+      };
+    },
+  );
+
+  return {
+    subscribeDaemonConnectionStatus,
+    unsubscribe,
+    emit(status: "connected" | "connecting" | "disconnected") {
+      listener?.(status);
+    },
+  };
+}
+
 describe("createBackendEventStoreBindings", () => {
   it("subscribes once and forwards git changed events to store action", () => {
     const harness = createGitChangedHarness();
     const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
     const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
     const incrementFileTreeRefreshVersion = vi.fn();
     const incrementGitRefreshVersion = vi.fn();
     const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
@@ -89,6 +112,8 @@ describe("createBackendEventStoreBindings", () => {
 
     const startBindings = createBackendEventStoreBindings({
       subscribeGitChanged: harness.subscribeGitChanged,
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => ["/tmp/repo/.worktrees/task-1"],
       subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
       subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
       incrementFileTreeRefreshVersion,
@@ -109,6 +134,88 @@ describe("createBackendEventStoreBindings", () => {
     expect(harness.unsubscribe).toHaveBeenCalledTimes(1);
     expect(workspaceFilesHarness.unsubscribe).toHaveBeenCalledTimes(1);
     expect(inAppNotificationHarness.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(daemonConnectionHarness.unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("forces file tree and git refresh after daemon reconnect", () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => ["/tmp/repo/.worktrees/task-1"],
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+    });
+
+    const stopBindings = startBindings();
+    daemonConnectionHarness.emit("connected");
+    daemonConnectionHarness.emit("disconnected");
+    daemonConnectionHarness.emit("connecting");
+    daemonConnectionHarness.emit("connected");
+
+    expect(incrementFileTreeRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1", []);
+    expect(incrementGitRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1");
+
+    stopBindings();
+  });
+
+  it("logs clear diagnostics when reconnect recovery fails", () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const daemonConnectionHarness = createDaemonConnectionStatusHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeDaemonConnectionStatus: daemonConnectionHarness.subscribeDaemonConnectionStatus,
+      listWorkspaceWorktreePaths: () => {
+        throw new Error("failed to enumerate workspaces");
+      },
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+    });
+
+    const stopBindings = startBindings();
+    daemonConnectionHarness.emit("connected");
+    daemonConnectionHarness.emit("disconnected");
+    daemonConnectionHarness.emit("connected");
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[backendEventStoreBindings] Failed to recover workspace views after daemon reconnect",
+      expect.any(Error),
+    );
+
+    stopBindings();
+    consoleErrorSpy.mockRestore();
   });
 
   it("forwards workspace file updates to file tree and git refresh actions", () => {
@@ -587,6 +694,107 @@ describe("createBackendEventStoreBindings", () => {
     });
     expect(recordWorkspaceUnreadNotification).toHaveBeenCalledWith("workspace-1", "error");
 
+    stopBindings();
+  });
+
+  it("rewrites workspace ids to workspace names for system notification copy", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+    const getNotificationPreferences = vi.fn(async () => ({
+      enabled: true,
+      osEnabled: true,
+      soundEnabled: false,
+      volume: 0.6,
+      focusOnClick: true,
+      enabledEventTypes: ["run-failed" as const],
+      eventSounds: {
+        "run-finished": "chime" as const,
+        "run-failed": "alert" as const,
+        "pending-question": "ping" as const,
+      },
+      enabledCategories: ["ai-task" as const],
+    }));
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      getNotificationPreferences,
+      resolveWorkspaceLabel: (workspaceId) => (workspaceId === "workspace-1" ? "Orders / Payments" : undefined),
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run Failed",
+      body: "Workspace workspace-1 has stopped with an error.",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-1",
+      notificationEventType: "run-failed",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Run Failed",
+      body: "Workspace Orders / Payments has stopped with an error.",
+    });
+    stopBindings();
+  });
+
+  it("keeps original copy when workspace name is unavailable", async () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      dispatchSystemNotification,
+      playNotificationSound,
+      resolveWorkspaceLabel: () => undefined,
+    });
+
+    const stopBindings = startBindings();
+    inAppNotificationHarness.emit({
+      id: "notification-1",
+      title: "Run Failed",
+      body: "Workspace workspace-2 has stopped with an error.",
+      tone: "error",
+      createdAt: "2026-04-03T10:00:00.000Z",
+      workspaceId: "workspace-2",
+      showSystemNotification: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(dispatchSystemNotification).toHaveBeenCalledWith({
+      title: "Run Failed",
+      body: "Workspace workspace-2 has stopped with an error.",
+    });
     stopBindings();
   });
 });

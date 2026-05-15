@@ -39,3 +39,158 @@ html[data-app-theme-mode="dark"] .MuiTreeItem-content[aria-selected="true"]:hove
   background-color: rgba(221, 226, 233, 0.12) !important;
   background-image: none !important;
 }
+
+/* ─── Git gutter change indicators ────────────────────────────────────────── */
+
+.git-gutter-added {
+  width: 3px !important;
+  margin-left: 3px;
+  border-radius: 1.5px;
+  background-color: #2ea043;
+  cursor: pointer;
+}
+
+.git-gutter-modified {
+  width: 3px !important;
+  margin-left: 3px;
+  border-radius: 1.5px;
+  background-color: #1a7fd4;
+  cursor: pointer;
+}
+
+.git-gutter-deleted {
+  width: 0 !important;
+  height: 0 !important;
+  margin-left: 1px;
+  border-radius: 0;
+  background-color: transparent;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid #f85149;
+  box-sizing: border-box;
+  cursor: pointer;
+  position: relative;
+  top: -4px;
+}
+
+/* Dark theme adjustments (slightly brighter) */
+html[data-app-theme-mode="dark"] .git-gutter-added {
+  background-color: #3fb950;
+}
+
+html[data-app-theme-mode="dark"] .git-gutter-modified {
+  background-color: #58a6ff;
+}
+
+html[data-app-theme-mode="dark"] .git-gutter-deleted {
+  border-left-color: #f85149;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* ─── Git inline diff viewzone ─────────────────────────────────────────────── */
+
+.git-inline-diff-zone {
+  background-color: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  margin: 2px 8px;
+  font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.git-inline-diff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background-color: #eaeef2;
+  border-bottom: 1px solid #d0d7de;
+  flex-shrink: 0;
+}
+
+.git-inline-diff-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #57606a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.git-inline-diff-close {
+  display: none;
+}
+
+.git-inline-diff-hint {
+  font-size: 10px;
+  color: #8b949e;
+  font-weight: 400;
+}
+
+.git-inline-diff-close:hover {
+  background-color: #d0d7de;
+  color: #24292f;
+}
+
+.git-inline-diff-content {
+  padding: 4px 8px;
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.git-inline-diff-line-old {
+  color: #82071e;
+  background-color: #ffebe9;
+  padding: 0 4px;
+  white-space: pre;
+  border-radius: 2px;
+  margin: 1px 0;
+}
+
+.git-inline-diff-line-new {
+  color: #116329;
+  background-color: #dafbe1;
+  padding: 0 4px;
+  white-space: pre;
+  border-radius: 2px;
+  margin: 1px 0;
+}
+
+/* Dark theme */
+html[data-app-theme-mode="dark"] .git-inline-diff-zone {
+  background-color: #1c2128;
+  border-color: #373e47;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+html[data-app-theme-mode="dark"] .git-inline-diff-header {
+  background-color: #272d36;
+  border-bottom-color: #373e47;
+}
+
+html[data-app-theme-mode="dark"] .git-inline-diff-label {
+  color: #8b949e;
+}
+
+html[data-app-theme-mode="dark"] .git-inline-diff-hint {
+  color: #6e7681;
+}
+
+html[data-app-theme-mode="dark"] .git-inline-diff-line-old {
+  color: #ffa198;
+  background-color: rgba(248, 81, 73, 0.15);
+}
+
+html[data-app-theme-mode="dark"] .git-inline-diff-line-new {
+  color: #7ee787;
+  background-color: rgba(63, 185, 80, 0.15);
+}

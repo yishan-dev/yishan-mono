@@ -7,14 +7,14 @@ import {
   DialogContent,
   DialogTitle,
   InputAdornment,
-  Menu,
   MenuItem,
+  Popover,
   Stack,
   TextField,
   Typography,
   useTheme,
 } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuChevronDown, LuFolderGit2, LuGitBranch } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +25,7 @@ import {
   suggestTargetBranchName,
 } from "../../../helpers/workspaceBranchNaming";
 import { renderProjectIcon } from "../../../components/projectIcons";
+import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
 import { buildWorkspaceNavigationPath } from "../../../navigation/workspaceNavigation";
 import { gitBranchStore, resolveGitBranchPrefix } from "../../../store/gitBranchStore";
@@ -32,7 +33,7 @@ import { workspaceStore } from "../../../store/workspaceStore";
 
 type CreateWorkspaceDialogViewProps = {
   open: boolean;
-  repoId: string;
+  projectId: string;
   mode?: "create" | "rename";
   workspaceId?: string;
   onClose: () => void;
@@ -132,7 +133,7 @@ const compactSelectSx = {
 /** Renders one create/rename workspace dialog that reuses shared name/branch form controls. */
 export function CreateWorkspaceDialogView({
   open,
-  repoId,
+  projectId,
   mode = "create",
   workspaceId,
   onClose,
@@ -149,8 +150,8 @@ export function CreateWorkspaceDialogView({
   const branchInputPlaceholder = isRenameMode
     ? t("workspace.rename.branchNameLabel")
     : t("workspace.create.branchNameLabel");
-  const [selectedRepoId, setSelectedRepoId] = useState(() =>
-    projects.some((project) => project.id === repoId) ? repoId : (projects[0]?.id ?? ""),
+  const [selectedProjectId, setSelectedProjectId] = useState(() =>
+    projects.some((project) => project.id === projectId) ? projectId : (projects[0]?.id ?? ""),
   );
   const [sourceBranchOptions, setSourceBranchOptions] = useState<string[]>([]);
   const [sourceBranchGroups, setSourceBranchGroups] = useState<BranchDropdownGroups>({
@@ -185,23 +186,23 @@ export function CreateWorkspaceDialogView({
     }
     hasSyncedRepoIdForOpenRef.current = true;
     hasEditedTargetBranchRef.current = false;
-    setSelectedRepoId((currentRepoId) => {
-      if (projects.some((project) => project.id === repoId)) {
-        return repoId;
+    setSelectedProjectId((currentProjectId) => {
+      if (projects.some((project) => project.id === projectId)) {
+        return projectId;
       }
-      if (projects.some((project) => project.id === currentRepoId)) {
-        return currentRepoId;
+      if (projects.some((project) => project.id === currentProjectId)) {
+        return currentProjectId;
       }
       return projects[0]?.id ?? "";
     });
-  }, [open, repoId, projects]);
+  }, [open, projectId, projects]);
 
-  const selectedRepo = projects.find((project) => project.id === selectedRepoId);
+  const selectedProject = projects.find((project) => project.id === selectedProjectId);
   const selectedWorkspace = workspaces.find(
-    (workspace) => workspace.id === workspaceId && workspace.repoId === selectedRepoId && workspace.kind !== "local",
+    (workspace) => workspace.id === workspaceId && workspace.repoId === selectedProjectId && workspace.kind !== "local",
   );
-  const selectedRepoBranchListPath =
-    selectedRepo?.localPath?.trim() || selectedRepo?.path?.trim() || selectedRepo?.worktreePath?.trim() || "";
+  const selectedProjectBranchListPath =
+    selectedProject?.localPath?.trim() || selectedProject?.path?.trim() || selectedProject?.worktreePath?.trim() || "";
   const resolvedPrefix = resolveGitBranchPrefix({
     prefixMode,
     customPrefix,
@@ -210,7 +211,7 @@ export function CreateWorkspaceDialogView({
   const defaultBranchPrefix = resolvedPrefix ? `${resolvedPrefix}/` : "";
 
   useEffect(() => {
-    if (!open || !selectedRepoBranchListPath || prefixMode !== "user") {
+    if (!open || !selectedProjectBranchListPath || prefixMode !== "user") {
       setResolvedGitUserName("");
       return;
     }
@@ -222,7 +223,7 @@ export function CreateWorkspaceDialogView({
     void (async () => {
       try {
         const authorName = await getGitAuthorName({
-          workspaceWorktreePath: selectedRepoBranchListPath,
+          workspaceWorktreePath: selectedProjectBranchListPath,
         });
         if (isCancelled) {
           return;
@@ -238,7 +239,7 @@ export function CreateWorkspaceDialogView({
     return () => {
       isCancelled = true;
     };
-  }, [getGitAuthorName, isRenameMode, open, prefixMode, selectedRepoBranchListPath]);
+  }, [getGitAuthorName, isRenameMode, open, prefixMode, selectedProjectBranchListPath]);
 
   useEffect(() => {
     if (!open || hasEditedTargetBranchRef.current || isRenameMode) {
@@ -249,7 +250,7 @@ export function CreateWorkspaceDialogView({
   }, [defaultBranchPrefix, isRenameMode, name, open]);
 
   useEffect(() => {
-    if (!open || !selectedRepoBranchListPath || isRenameMode) {
+    if (!open || !selectedProjectBranchListPath || isRenameMode) {
       const renameSourceBranch = selectedWorkspace?.sourceBranch?.trim() ?? "";
       if (isRenameMode && open) {
         setSourceBranchOptions(renameSourceBranch ? [renameSourceBranch] : []);
@@ -277,7 +278,7 @@ export function CreateWorkspaceDialogView({
 
     /** Applies one branch list into selector options while preserving manual current selection. */
     const applySourceBranchState = (branches: string[], nextGroups?: BranchDropdownGroups) => {
-      const nextSourceBranchState = resolveSourceBranchState(branches, selectedRepo?.defaultBranch ?? "");
+      const nextSourceBranchState = resolveSourceBranchState(branches, selectedProject?.defaultBranch ?? "");
       const resolvedGroups =
         nextGroups ??
         resolveSourceBranchGroups({
@@ -298,7 +299,7 @@ export function CreateWorkspaceDialogView({
     const loadSourceBranches = async () => {
       setIsLoadingSourceBranches(true);
       try {
-        const result = await listGitBranches({ workspaceWorktreePath: selectedRepoBranchListPath });
+        const result = await listGitBranches({ workspaceWorktreePath: selectedProjectBranchListPath });
         if (isCancelled) {
           return;
         }
@@ -331,8 +332,8 @@ export function CreateWorkspaceDialogView({
     isRenameMode,
     listGitBranches,
     open,
-    selectedRepo?.defaultBranch,
-    selectedRepoBranchListPath,
+    selectedProject?.defaultBranch,
+    selectedProjectBranchListPath,
     selectedWorkspace?.sourceBranch,
   ]);
 
@@ -352,7 +353,7 @@ export function CreateWorkspaceDialogView({
     }
 
     const normalizedName = name.trim();
-    if (!selectedRepoId || !normalizedName) {
+    if (!selectedProjectId || !normalizedName) {
       return;
     }
 
@@ -365,7 +366,7 @@ export function CreateWorkspaceDialogView({
     setIsCreatingWorkspace(true);
     try {
       const createdWorkspaceId = await createWorkspace({
-        projectId: selectedRepoId,
+        projectId: selectedProjectId,
         name: normalizedName,
         sourceBranch: sourceBranch.trim() || undefined,
         targetBranch: normalizedTargetBranch,
@@ -402,14 +403,14 @@ export function CreateWorkspaceDialogView({
     try {
       if (hasNameChanged) {
         renameWorkspace({
-          repoId: selectedRepoId,
+          repoId: selectedProjectId,
           workspaceId: selectedWorkspace.id,
           name: normalizedName,
         });
       }
       if (hasBranchChanged) {
         await renameWorkspaceBranch({
-          repoId: selectedRepoId,
+          repoId: selectedProjectId,
           workspaceId: selectedWorkspace.id,
           branch: normalizedTargetBranch,
         });
@@ -423,7 +424,7 @@ export function CreateWorkspaceDialogView({
   };
 
   const canCreateWorkspace =
-    Boolean(selectedRepoId) &&
+    Boolean(selectedProjectId) &&
     !isLoadingSourceBranches &&
     !isCreatingWorkspace &&
     Boolean(name.trim()) &&
@@ -442,14 +443,24 @@ export function CreateWorkspaceDialogView({
   const dialogTitle = isRenameMode ? t("workspace.rename.title") : t("workspace.create.title");
   const submitLabel = isRenameMode ? t("workspace.actions.rename") : t("workspace.actions.create");
   const canSubmitWorkspace = isRenameMode ? canRenameWorkspace : canCreateWorkspace;
+  const submitShortcutLabel = getRendererPlatform() === "darwin" ? "⌘↵" : "Ctrl+↵";
   const sourceBranchSelectValue = sourceBranchOptions.includes(sourceBranch) ? sourceBranch : "";
   const isSourceBranchMenuOpen = Boolean(sourceBranchMenuAnchorEl);
   const isSelectedSourceBranchWorktree = sourceBranchGroups.worktreeBranches.includes(sourceBranchSelectValue);
+
+  /** Submits the dialog form when Cmd+Enter (macOS) or Ctrl+Enter (Windows/Linux) is pressed. */
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && canSubmitWorkspace) {
+      event.preventDefault();
+      void (isRenameMode ? handleRenameWorkspace() : handleCreateWorkspace());
+    }
+  };
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
+      onKeyDown={handleDialogKeyDown}
       fullWidth
       maxWidth="sm"
       slotProps={{
@@ -472,8 +483,8 @@ export function CreateWorkspaceDialogView({
                 select
                 size="small"
                 fullWidth
-                value={selectedRepoId}
-                onChange={(event) => setSelectedRepoId(event.target.value)}
+                value={selectedProjectId}
+                onChange={(event) => setSelectedProjectId(event.target.value)}
                 sx={compactSelectSx}
                 disabled={isRenameMode}
                 slotProps={{
@@ -562,7 +573,7 @@ export function CreateWorkspaceDialogView({
                 fullWidth
                 value={sourceBranchSelectValue}
                 onClick={(event) => {
-                  if (isRenameMode || !selectedRepoId || sourceBranchOptions.length === 0) {
+                  if (isRenameMode || !selectedProjectId || sourceBranchOptions.length === 0) {
                     return;
                   }
                   setSourceBranchMenuAnchorEl(event.currentTarget);
@@ -581,24 +592,37 @@ export function CreateWorkspaceDialogView({
                   ),
                   endAdornment: (
                     <InputAdornment position="end" sx={{ ml: 0.5, color: "text.secondary" }}>
-                      <LuChevronDown size={16} />
+                      {isLoadingSourceBranches ? <CircularProgress size={14} /> : <LuChevronDown size={16} />}
                     </InputAdornment>
                   ),
                 }}
                 placeholder="Source branch"
-                disabled={isRenameMode || !selectedRepoId || sourceBranchOptions.length === 0}
+                disabled={isRenameMode || !selectedProjectId || sourceBranchOptions.length === 0}
               />
-              <Menu
+              <Popover
                 open={isSourceBranchMenuOpen}
                 anchorEl={sourceBranchMenuAnchorEl}
                 onClose={() => setSourceBranchMenuAnchorEl(null)}
-                PaperProps={{
-                  sx: {
-                    minWidth: 250,
-                    maxWidth: 350,
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                disableRestoreFocus
+                slotProps={{
+                  paper: {
+                    sx: {
+                      minWidth: 250,
+                      maxWidth: 350,
+                      mt: 0.5,
+                    },
                   },
                 }}
               >
+                {isLoadingSourceBranches ? (
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 3, px: 2, gap: 1 }}>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">Loading branches\u2026</Typography>
+                  </Box>
+                ) : (
+                <>
                 <BranchDropdown
                   groups={sourceBranchGroups}
                   selectedValue={sourceBranchSelectValue}
@@ -614,7 +638,9 @@ export function CreateWorkspaceDialogView({
                   emptyWorktreeLabel="No worktree branches"
                   emptyRemoteLabel="No remote branches"
                 />
-              </Menu>
+                </>
+                )}
+              </Popover>
             </Box>
           </Stack>
 
@@ -665,6 +691,9 @@ export function CreateWorkspaceDialogView({
             {isCreatingWorkspace ? <CircularProgress size={16} color="inherit" /> : null}
             <Typography component="span" sx={{ mx: "auto", fontWeight: 500 }}>
               {submitLabel}
+            </Typography>
+            <Typography component="span" variant="caption" sx={{ opacity: 0.7 }}>
+              {submitShortcutLabel}
             </Typography>
           </Button>
         </Stack>

@@ -25,6 +25,13 @@ export function findExistingTab(
     );
   }
 
+  if (input.kind === "browser") {
+    if (input.reuseExisting === false) {
+      return undefined;
+    }
+    return tabs.find((tab) => tab.workspaceId === targetWorkspaceId && tab.kind === "browser" && tab.data.url === input.url);
+  }
+
   if (input.reuseExisting === false) {
     return undefined;
   }

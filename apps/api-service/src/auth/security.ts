@@ -53,6 +53,47 @@ export async function signAccessToken(
   return sign(claims, secret, "HS256");
 }
 
+// ---------------------------------------------------------------------------
+// Relay token (node-scoped, short-lived)
+// ---------------------------------------------------------------------------
+
+export type RelayTokenClaims = {
+  type: "relay";
+  sub: string;
+  nodeId: string;
+  iss: string;
+  aud: string;
+  iat: number;
+  exp: number;
+};
+
+const RELAY_TOKEN_TTL_SECONDS = 300; // 5 minutes
+
+export async function signRelayToken(
+  payload: { sub: string; nodeId: string; iss: string; aud: string },
+  secret: string
+): Promise<{ token: string; expiresAt: string }> {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const exp = nowSeconds + RELAY_TOKEN_TTL_SECONDS;
+
+  const claims: RelayTokenClaims = {
+    type: "relay",
+    sub: payload.sub,
+    nodeId: payload.nodeId,
+    iss: payload.iss,
+    aud: payload.aud,
+    iat: nowSeconds,
+    exp,
+  };
+
+  const token = await sign(claims, secret, "HS256");
+  return { token, expiresAt: new Date(exp * 1000).toISOString() };
+}
+
+// ---------------------------------------------------------------------------
+// Access token verification
+// ---------------------------------------------------------------------------
+
 export async function verifyAccessToken(
   token: string,
   secret: string,

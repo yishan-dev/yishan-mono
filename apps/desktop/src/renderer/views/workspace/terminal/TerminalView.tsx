@@ -1,26 +1,27 @@
-import { Box, IconButton, InputBase, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import type { FitAddon } from "@xterm/addon-fit";
-import type { ISearchOptions, SearchAddon } from "@xterm/addon-search";
+import type { SearchAddon } from "@xterm/addon-search";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { useCommands } from "../../../hooks/useCommands";
 import { tabStore } from "../../../store/tabStore";
 import type { WorkspaceTab } from "../../../store/types";
 import { loadTerminalAddons } from "./terminalAddons";
 import {
-  isShiftEnterLineFeedChord,
   shouldClearTerminalOutputShortcut,
   shouldReleaseCommandWForTabCloseShortcut,
 } from "./terminalKeyboardUtils";
-import { TerminalSessionOrchestrator } from "./terminalSessionOrchestrator";
 import {
   formatTerminalCommandTitle,
   formatTerminalPathTitle,
-  resolveTerminalWorkspacePath,
 } from "./terminalTitleUtils";
+import { useTerminalSearchState } from "./useTerminalSearchState";
+import { useTerminalSessionLifecycle } from "./useTerminalSessionLifecycle";
+import { TerminalSearchPanel } from "./TerminalSearchPanel";
 import { createTerminalWriteQueue } from "./terminalWriteQueue";
 import type { TerminalWriteQueue } from "./terminalWriteQueue";
+import { useTerminalFileDrop } from "./useTerminalFileDrop";
 
 /** Resize debounce interval in milliseconds. */
 const RESIZE_DEBOUNCE_MS = 50;
@@ -30,15 +31,9 @@ type TerminalViewProps = {
   focusRequestKey?: number;
 };
 
-const TERMINAL_SEARCH_OPTIONS: ISearchOptions = {
-  caseSensitive: false,
-  regex: false,
-  wholeWord: false,
-  incremental: true,
-};
-
 /** Renders an xterm instance and binds it to a daemon-backed terminal session. */
 export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -50,16 +45,9 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
   const readIndexRef = useRef(0);
   const didRequestCloseRef = useRef(false);
   const lastAppliedTitleRef = useRef<string>("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const {
-    closeTab,
-    createTerminalSession,
-    listTerminalSessions,
-    readTerminalOutput,
     renameTab,
     resizeTerminal,
-    subscribeTerminalOutput,
     writeTerminalInput,
   } = useCommands();
 
@@ -108,47 +96,26 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     [renameTab, tabId, isUserRenamed],
   );
 
-  /** Clears current search decorations in the active terminal session. */
-  const clearTerminalSearchHighlights = useCallback((): void => {
-    const searchAddon = searchAddonRef.current;
-    if (!searchAddon) {
-      return;
-    }
+  const searchState = useTerminalSearchState({
+    terminalHostRef: containerRef,
+    searchInputRef,
+    xtermRef,
+    searchAddonRef,
+    focusRequestKey,
+  });
+  const {
+    isSearchOpen: isSearchPanelOpen,
+    searchQuery: terminalSearchQuery,
+    setSearchQuery: setTerminalSearchQuery,
+    runTerminalSearch,
+    closeSearchPanel,
+  } = searchState;
 
-    const searchAddonWithClear = searchAddon as unknown as {
-      clearDecorations?: () => void;
-      clearActiveDecoration?: () => void;
-    };
-    searchAddonWithClear.clearDecorations?.();
-    searchAddonWithClear.clearActiveDecoration?.();
-  }, []);
-
-  /** Runs one terminal-buffer search in the requested direction. */
-  const runTerminalSearch = useCallback(
-    (direction: "next" | "previous"): void => {
-      const searchAddon = searchAddonRef.current;
-      const query = searchQuery.trim();
-      if (!searchAddon || query.length === 0) {
-        return;
-      }
-
-      if (direction === "next") {
-        searchAddon.findNext(query, TERMINAL_SEARCH_OPTIONS);
-        return;
-      }
-
-      searchAddon.findPrevious(query, TERMINAL_SEARCH_OPTIONS);
-    },
-    [searchQuery],
-  );
-
-  /** Closes the search UI and clears all in-terminal search highlights. */
-  const closeSearchPanel = useCallback((): void => {
-    setIsSearchOpen(false);
-    setSearchQuery("");
-    clearTerminalSearchHighlights();
-    xtermRef.current?.focus();
-  }, [clearTerminalSearchHighlights]);
+  const { isFileDragOver } = useTerminalFileDrop({
+    containerRef,
+    xtermRef,
+    sessionIdRef,
+  });
 
   useEffect(() => {
     const host = terminalHostRef.current;
@@ -195,7 +162,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         return false;
       }
 
-      if (!isShiftEnterLineFeedChord(event)) {
+      if (!(event.shiftKey && event.key === "Enter")) {
         return true;
       }
 
@@ -253,6 +220,8 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         });
       }, RESIZE_DEBOUNCE_MS);
     });
+    // Observe the terminal host element directly — this is the element xterm
+    // renders into and is the correct measurement target for FitAddon.
     resizeObserver.observe(host);
 
     return () => {
@@ -274,298 +243,92 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     };
   }, [resizeTerminal, updateTerminalTabTitleFromCommand, writeTerminalInput]);
 
-  useEffect(() => {
-    const host = terminalHostRef.current;
-    if (!host) {
-      return;
-    }
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        setIsSearchOpen(true);
-        return;
-      }
-
-      if (!isSearchOpen) {
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeSearchPanel();
-        return;
-      }
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        runTerminalSearch(event.shiftKey ? "previous" : "next");
-      }
-    };
-
-    host.addEventListener("keydown", onKeyDown);
-    return () => {
-      host.removeEventListener("keydown", onKeyDown);
-    };
-  }, [closeSearchPanel, isSearchOpen, runTerminalSearch]);
-
-  useEffect(() => {
-    if (!isSearchOpen) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, [isSearchOpen]);
-
-  useEffect(() => {
-    if (focusRequestKey <= 0 || isSearchOpen) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      xtermRef.current?.focus();
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, [focusRequestKey, isSearchOpen]);
-
-  useEffect(() => {
-    if (!isSearchOpen) {
-      return;
-    }
-
-    const query = searchQuery.trim();
-    if (query.length === 0) {
-      clearTerminalSearchHighlights();
-      return;
-    }
-
-    searchAddonRef.current?.findNext(query, TERMINAL_SEARCH_OPTIONS);
-  }, [clearTerminalSearchHighlights, isSearchOpen, searchQuery]);
-
-  useEffect(() => {
-    const terminal = xtermRef.current;
-    const fitAddon = fitAddonRef.current;
-    if (!terminal || !fitAddon) {
-      return;
-    }
-    let cancelled = false;
-    const sessionOrchestrator = new TerminalSessionOrchestrator({
-      createTerminalSession,
-      listTerminalSessions,
-      readTerminalOutput,
-      resizeTerminal,
-      writeTerminalInput,
-    });
-
-    const attachSession = async () => {
-      const restored = await sessionOrchestrator.attachOrCreateAndRestore({
-        tabId,
-        terminal,
-        fitAddon,
-      });
-      if (!restored) {
-        return;
-      }
-      if (cancelled) {
-        return;
-      }
-
-      sessionIdRef.current = restored.sessionId;
-      readIndexRef.current = restored.nextIndex;
-      didRequestCloseRef.current = false;
-      const terminalTab = tabStore
-        .getState()
-        .tabs.find(
-          (candidate): candidate is Extract<WorkspaceTab, { kind: "terminal" }> =>
-            candidate.id === tabId && candidate.kind === "terminal",
-        );
-      const launchCommand = terminalTab?.data.launchCommand;
-      if (launchCommand) {
-        updateTerminalTabTitleFromCommand(launchCommand);
-      } else {
-        updateTerminalTabTitleFromPath(resolveTerminalWorkspacePath(terminalTab));
-      }
-
-      outputSubscriptionRef.current?.unsubscribe();
-      outputSubscriptionRef.current = await subscribeTerminalOutput({
-        sessionId: restored.sessionId,
-        onData: (payload) => {
-          if (payload.sessionId !== sessionIdRef.current) {
-            return;
-          }
-
-          if (payload.type === "output") {
-            if (payload.nextIndex <= readIndexRef.current) {
-              return;
-            }
-
-            readIndexRef.current = payload.nextIndex;
-            const { chunk } = payload;
-            if (!isTerminalAttached(terminal)) {
-              return;
-            }
-            if (chunk instanceof Uint8Array) {
-              // Binary fast-path: pass raw bytes directly to xterm.
-              if (chunk.byteLength > 0) {
-                terminalWriteQueueRef.current?.enqueue(chunk);
-              }
-            } else if (typeof chunk === "string" && chunk.length > 0) {
-              // JSON-RPC fallback: string data.
-              terminalWriteQueueRef.current?.enqueue(chunk);
-            }
-            return;
-          }
-
-          if (didRequestCloseRef.current) {
-            return;
-          }
-          didRequestCloseRef.current = true;
-          closeTab(tabId);
-        },
-        onError: (error) => {
-          reportTerminalAsyncError("subscribe terminal output", error);
-        },
-      });
-
-      if (cancelled) {
-        outputSubscriptionRef.current?.unsubscribe();
-        outputSubscriptionRef.current = null;
-        return;
-      }
-
-      if (restored.exited && !didRequestCloseRef.current) {
-        didRequestCloseRef.current = true;
-        closeTab(tabId);
-      }
-    };
-
-    void attachSession().catch((error) => {
-      reportTerminalAsyncError("attach terminal session", error);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    closeTab,
-    createTerminalSession,
-    listTerminalSessions,
-    readTerminalOutput,
-    resizeTerminal,
-    subscribeTerminalOutput,
+  useTerminalSessionLifecycle({
     tabId,
+    xtermRef,
+    fitAddonRef,
+    sessionIdRef,
+    outputSubscriptionRef,
+    readIndexRef,
+    didRequestCloseRef,
+    terminalWriteQueueRef,
     updateTerminalTabTitleFromCommand,
     updateTerminalTabTitleFromPath,
-    writeTerminalInput,
-  ]);
+    isTerminalAttached,
+    reportTerminalAsyncError,
+  });
 
   return (
     <Box
-      ref={terminalHostRef}
+      ref={containerRef}
       sx={{
         flex: 1,
         minHeight: 0,
         p: 1.5,
         bgcolor: "#2b3038",
         height: "100%",
-        "& .xterm-viewport": {
-          overflowY: "hidden",
-        },
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
       }}
     >
-      {isSearchOpen ? (
-        <Stack
-          direction="row"
-          spacing={1}
+      {isFileDragOver ? (
+        <Box
           sx={{
             position: "absolute",
-            top: 8,
-            right: 12,
+            inset: 0,
+            zIndex: 10,
+            display: "flex",
             alignItems: "center",
-            px: 1,
-            py: 0.5,
-            border: "1px solid #414754",
+            justifyContent: "center",
+            bgcolor: (theme) => `${theme.palette.primary.main}14`,
+            border: "2px dashed",
+            borderColor: "primary.main",
             borderRadius: 1,
-            bgcolor: "#31363f",
-            zIndex: 2,
+            pointerEvents: "none",
           }}
         >
-          <InputBase
-            inputRef={searchInputRef}
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value);
-            }}
-            placeholder="Find"
-            slotProps={{
-              input: {
-                "aria-label": "Search terminal output",
-              },
-            }}
+          <Box
             sx={{
-              width: 220,
-              px: 0.75,
-              py: 0.25,
-              border: "1px solid #414754",
-              borderRadius: 0.75,
-              color: "#e7ebf0",
-              fontSize: 13,
-            }}
-          />
-          <IconButton
-            aria-label="Previous terminal match"
-            size="small"
-            disabled={searchQuery.trim().length === 0}
-            onClick={() => {
-              runTerminalSearch("previous");
-            }}
-            sx={{
-              color: "#e7ebf0",
-              fontSize: 11,
-              "&.Mui-disabled": {
-                color: "#8b8b8b",
-              },
+              typography: "body2",
+              color: "primary.main",
+              fontWeight: 500,
+              px: 2,
+              py: 0.75,
+              borderRadius: 1,
+              bgcolor: "rgba(0, 0, 0, 0.6)",
             }}
           >
-            Prev
-          </IconButton>
-          <IconButton
-            aria-label="Next terminal match"
-            size="small"
-            disabled={searchQuery.trim().length === 0}
-            onClick={() => {
-              runTerminalSearch("next");
-            }}
-            sx={{
-              color: "#e7ebf0",
-              fontSize: 11,
-              "&.Mui-disabled": {
-                color: "#8b8b8b",
-              },
-            }}
-          >
-            Next
-          </IconButton>
-          <IconButton
-            aria-label="Close terminal search"
-            size="small"
-            onClick={closeSearchPanel}
-            sx={{ color: "#e7ebf0", fontSize: 11 }}
-          >
-            Close
-          </IconButton>
-         </Stack>
+            Drop to insert file path
+          </Box>
+        </Box>
       ) : null}
+      {isSearchPanelOpen ? (
+        <TerminalSearchPanel
+          searchInputRef={searchInputRef}
+          searchQuery={terminalSearchQuery}
+          onSearchQueryChange={setTerminalSearchQuery}
+          onSearchPrevious={() => {
+            runTerminalSearch("previous");
+          }}
+          onSearchNext={() => {
+            runTerminalSearch("next");
+          }}
+          onClose={closeSearchPanel}
+        />
+       ) : null}
+      <Box
+        ref={terminalHostRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          "& .xterm-viewport": {
+            overflowY: "hidden",
+          },
+        }}
+      />
     </Box>
   );
 });

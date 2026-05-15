@@ -58,10 +58,20 @@ export type MainWindowFullscreenState = {
   isFullscreen: boolean;
 };
 
+export type DaemonRelayStatus = {
+  enabled: boolean;
+  url: string;
+  connected: boolean;
+  connectedAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+};
+
 export type DaemonInfoResult = {
   version: string;
   daemonId: string;
   wsUrl: string;
+  relay?: DaemonRelayStatus;
 };
 
 export type DaemonRestartResult =
@@ -80,15 +90,6 @@ export type AuthLoginResult = {
   error?: string;
 };
 
-export type AuthTokensResult = {
-  authenticated: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  accessTokenExpiresAt?: string;
-  refreshTokenExpiresAt?: string;
-  error?: string;
-};
-
 export type ReadFileAsDataUrlInput = {
   absolutePath: string;
 };
@@ -96,6 +97,47 @@ export type ReadFileAsDataUrlInput = {
 export type ReadFileAsDataUrlResult =
   | { ok: true; dataUrl: string }
   | { ok: false; error: string };
+
+export type CopyFilesInput = {
+  /** Absolute source paths to copy from (external OS paths). */
+  sourcePaths: string[];
+  /** Absolute path of the destination directory to copy into. */
+  destinationDirectory: string;
+};
+
+export type CopyFilesResult =
+  | { ok: true; copiedPaths: string[] }
+  | { ok: false; error: string };
+
+export type WriteFileBase64Input = {
+  /** Absolute path of the file to write. */
+  absolutePath: string;
+  /** Base64-encoded file content. */
+  contentBase64: string;
+};
+
+export type WriteFileBase64Result =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export type BrowserHistoryEntry = {
+  url: string;
+  title: string;
+  faviconUrl?: string;
+  visitedAt: string;
+};
+
+export type BrowserHistoryGroup = {
+  host: string;
+  faviconUrl?: string;
+  entries: BrowserHistoryEntry[];
+};
+
+export type LoadBrowserHistoryResult = BrowserHistoryGroup[];
+
+export type AppendBrowserHistoryInput = {
+  entry: BrowserHistoryEntry;
+};
 
 export type DesktopHostBridge = {
   openLocalFolderDialog: (input?: OpenLocalFolderDialogInput) => Promise<string | null>;
@@ -105,6 +147,10 @@ export type DesktopHostBridge = {
   openExternalUrl: (input: OpenExternalUrlInput) => Promise<OpenExternalUrlResult>;
   readExternalClipboardSourcePaths: () => Promise<ExternalClipboardReadOutcome>;
   readFileAsDataUrl: (input: ReadFileAsDataUrlInput) => Promise<ReadFileAsDataUrlResult>;
+  copyFiles: (input: CopyFilesInput) => Promise<CopyFilesResult>;
+  writeFileBase64: (input: WriteFileBase64Input) => Promise<WriteFileBase64Result>;
+  loadBrowserHistory: () => Promise<LoadBrowserHistoryResult>;
+  appendBrowserHistory: (input: AppendBrowserHistoryInput) => Promise<{ ok: true }>;
   dispatchNotification: (input: DispatchNotificationInput) => Promise<NotificationDispatchResult>;
   playNotificationSound: (input: PlayNotificationSoundInput) => Promise<NotificationSoundPreviewResult>;
   getPendingUpdate: () => Promise<DesktopUpdateEventPayload | null>;
@@ -113,11 +159,11 @@ export type DesktopHostBridge = {
   installUpdate: () => Promise<{ ok: true }>;
   getAuthStatus: () => Promise<AuthStatusResult>;
   login: () => Promise<AuthLoginResult>;
-  getAuthTokens: () => Promise<AuthTokensResult>;
   getDaemonInfo: () => Promise<DaemonInfoResult>;
   restartDaemon: () => Promise<DaemonRestartResult>;
   getDaemonQuitOnExit: () => Promise<boolean>;
   setDaemonQuitOnExit: (value: boolean) => Promise<{ ok: true }>;
+  getDaemonJwt: () => Promise<string>;
 };
 
 export type DesktopRpcEventBridge = {
@@ -141,6 +187,10 @@ export const HOST_IPC_CHANNELS = {
   openExternalUrl: "desktop:host/open-external-url",
   readExternalClipboardSourcePaths: "desktop:host/read-external-clipboard-source-paths",
   readFileAsDataUrl: "desktop:host/read-file-as-data-url",
+  copyFiles: "desktop:host/copy-files",
+  writeFileBase64: "desktop:host/write-file-base64",
+  loadBrowserHistory: "desktop:host/load-browser-history",
+  appendBrowserHistory: "desktop:host/append-browser-history",
   dispatchNotification: "desktop:host/dispatch-notification",
   playNotificationSound: "desktop:host/play-notification-sound",
   getPendingUpdate: "desktop:host/get-pending-update",
@@ -149,9 +199,9 @@ export const HOST_IPC_CHANNELS = {
   installUpdate: "desktop:host/install-update",
   getAuthStatus: "desktop:host/get-auth-status",
   login: "desktop:host/login",
-  getAuthTokens: "desktop:host/get-auth-tokens",
   getDaemonInfo: "desktop:host/get-daemon-info",
   restartDaemon: "desktop:host/restart-daemon",
   getDaemonQuitOnExit: "desktop:host/get-daemon-quit-on-exit",
   setDaemonQuitOnExit: "desktop:host/set-daemon-quit-on-exit",
+  getDaemonJwt: "desktop:host/get-daemon-jwt",
 } as const;

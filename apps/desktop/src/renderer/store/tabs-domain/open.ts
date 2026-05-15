@@ -3,28 +3,30 @@ import type { OpenWorkspaceTabInput, WorkspaceTab } from "../types";
 import { findExistingTab } from "./shared";
 import type { WorkspaceTabStateSlice } from "./types";
 
-/** Returns one reusable temporary file tab in the target workspace. */
-function findTemporaryFileTab(
-  tabs: WorkspaceTab[],
-  workspaceId: string,
-): Extract<WorkspaceTab, { kind: "file" }> | null {
-  for (const tab of tabs) {
-    if (tab.workspaceId === workspaceId && tab.kind === "file" && tab.data.isTemporary) {
-      return tab;
-    }
-  }
-
-  return null;
+function isTemporaryTab(tab: WorkspaceTab): boolean {
+  return (
+    (tab.kind === "file" && tab.data.isTemporary) ||
+    (tab.kind === "image" && tab.data.isTemporary) ||
+    (tab.kind === "diff" && tab.data.isTemporary)
+  );
 }
 
-/** Returns one reusable temporary image tab in the target workspace. */
-function findTemporaryImageTab(
+/**
+ * Returns a reusable temporary tab in the target workspace.
+ * When restrictToTabIds is provided, only considers tabs in that set
+ * (i.e. only reuse a temp tab that belongs to the active pane).
+ */
+function findTemporaryTab(
   tabs: WorkspaceTab[],
   workspaceId: string,
-): Extract<WorkspaceTab, { kind: "image" }> | null {
+  restrictToTabIds?: string[],
+): WorkspaceTab | null {
+  const restrictSet = restrictToTabIds ? new Set(restrictToTabIds) : null;
   for (const tab of tabs) {
-    if (tab.workspaceId === workspaceId && tab.kind === "image" && tab.data.isTemporary) {
-      return tab;
+    if (tab.workspaceId === workspaceId && isTemporaryTab(tab)) {
+      if (!restrictSet || restrictSet.has(tab.id)) {
+        return tab;
+      }
     }
   }
 
@@ -81,6 +83,17 @@ function createTabFromOpenInput(input: OpenWorkspaceTabInput, workspaceId: strin
     };
   }
 
+  if (input.kind === "browser") {
+    return {
+      id: tabId,
+      workspaceId,
+      title: "Browser",
+      pinned: false,
+      kind: "browser",
+      data: buildTabDataByInput(input),
+    };
+  }
+
   return {
     id: tabId,
     workspaceId,
@@ -99,6 +112,7 @@ export function openTabState(
   state: WorkspaceTabStateSlice,
   input: OpenWorkspaceTabInput,
   nextTabId: string,
+  options?: { activePaneTabIds?: string[] },
 ): Partial<WorkspaceTabStateSlice> | null {
   const targetWorkspaceId = input.workspaceId ?? state.selectedWorkspaceId;
   if (!targetWorkspaceId) {
@@ -214,56 +228,38 @@ export function openTabState(
       };
     }
 
+    if (input.kind === "browser" && existingTab.kind === "browser") {
+      const nextUrl = input.url?.trim();
+      if (!nextUrl || nextUrl === existingTab.data.url) {
+        return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
+      }
+
+      return {
+        tabs: state.tabs.map((tab) =>
+          tab.id === existingTab.id && tab.kind === "browser"
+            ? {
+                ...tab,
+                data: {
+                  ...tab.data,
+                  url: nextUrl,
+                },
+              }
+            : tab,
+        ),
+        ...selectWorkspaceTab(state, targetWorkspaceId, existingTab.id),
+      };
+    }
+
     return selectWorkspaceTab(state, targetWorkspaceId, existingTab.id);
   }
 
-  if (input.kind === "image" && input.temporary) {
-    const temporaryImageTab = findTemporaryImageTab(state.tabs, targetWorkspaceId);
-    if (temporaryImageTab) {
+  if ((input.kind === "file" || input.kind === "image" || input.kind === "diff") && input.temporary) {
+    const existing = findTemporaryTab(state.tabs, targetWorkspaceId, options?.activePaneTabIds);
+    if (existing) {
+      const replacement = createTabFromOpenInput(input, targetWorkspaceId, existing.id);
       return {
-        tabs: state.tabs.map((tab) =>
-          tab.id === temporaryImageTab.id && tab.kind === "image"
-            ? {
-                ...tab,
-                title: getFileName(input.path),
-                data: {
-                  ...tab.data,
-                  path: input.path,
-                  dataUrl: input.dataUrl,
-                  isTemporary: true,
-                },
-              }
-            : tab,
-        ),
-        ...selectWorkspaceTab(state, targetWorkspaceId, temporaryImageTab.id),
-      };
-    }
-  }
-
-  if (input.kind === "file" && input.temporary) {
-    const temporaryTab = findTemporaryFileTab(state.tabs, targetWorkspaceId);
-    if (temporaryTab) {
-      const nextContent = input.content;
-      return {
-        tabs: state.tabs.map((tab) =>
-          tab.id === temporaryTab.id && tab.kind === "file"
-            ? {
-                ...tab,
-                title: getFileName(input.path),
-                data: {
-                  ...tab.data,
-                  path: input.path,
-                  content: typeof nextContent === "string" ? nextContent : tab.data.content,
-                  savedContent: typeof nextContent === "string" ? nextContent : tab.data.savedContent,
-                  isDirty: false,
-                  isTemporary: true,
-                  ...(input.isUnsupported ? { isUnsupported: true } : {}),
-                  ...(input.unsupportedReason ? { unsupportedReason: input.unsupportedReason } : {}),
-                },
-              }
-            : tab,
-        ),
-        ...selectWorkspaceTab(state, targetWorkspaceId, temporaryTab.id),
+        tabs: state.tabs.map((tab) => (tab.id === existing.id ? replacement : tab)),
+        ...selectWorkspaceTab(state, targetWorkspaceId, existing.id),
       };
     }
   }

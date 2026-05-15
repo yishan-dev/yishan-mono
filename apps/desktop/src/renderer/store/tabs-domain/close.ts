@@ -55,6 +55,35 @@ export function closeOtherTabsState(
   };
 }
 
+/** Closes every terminal tab across all workspaces and resets selection pointers. */
+export function closeAllTerminalTabsState(state: WorkspaceTabStateSlice): Partial<WorkspaceTabStateSlice> | null {
+  const terminalTabIds = new Set(
+    state.tabs.filter((tab) => tab.kind === "terminal").map((tab) => tab.id),
+  );
+  if (terminalTabIds.size === 0) {
+    return null;
+  }
+
+  const nextTabs = state.tabs.filter((tab) => !terminalTabIds.has(tab.id));
+  const nextSelectedByWorkspaceId = { ...state.selectedTabIdByWorkspaceId };
+  for (const [workspaceId, tabId] of Object.entries(nextSelectedByWorkspaceId)) {
+    if (terminalTabIds.has(tabId)) {
+      const fallback = nextTabs.find((tab) => tab.workspaceId === workspaceId)?.id ?? "";
+      nextSelectedByWorkspaceId[workspaceId] = fallback;
+    }
+  }
+  const nextSelectedTabId = terminalTabIds.has(state.selectedTabId)
+    ? (nextTabs.find((tab) => tab.workspaceId === state.selectedWorkspaceId)?.id ?? "")
+    : state.selectedTabId;
+
+  return {
+    tabs: nextTabs,
+    ...removeTabMetadataById(state, Array.from(terminalTabIds)),
+    selectedTabId: nextSelectedTabId,
+    selectedTabIdByWorkspaceId: nextSelectedByWorkspaceId,
+  };
+}
+
 /** Closes all unpinned tabs for a workspace and selects the nearest pinned tab when needed. */
 export function closeAllTabsState(
   state: WorkspaceTabStateSlice,

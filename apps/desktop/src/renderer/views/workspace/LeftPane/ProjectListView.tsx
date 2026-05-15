@@ -1,6 +1,5 @@
 import { Box, List } from "@mui/material";
-import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuSettings, LuTrash2 } from "react-icons/lu";
 import {
@@ -11,7 +10,6 @@ import {
   findExternalAppPreset,
   isExternalAppPlatformSupported,
 } from "../../../../shared/contracts/externalApps";
-import { inspectGitRepository } from "../../../commands/gitCommands";
 import { OPEN_CREATE_WORKSPACE_DIALOG_EVENT } from "../../../commands/workspaceCommands";
 import { ContextMenu, type ContextMenuEntry } from "../../../components/ContextMenu";
 import { ProjectRow } from "../../../components/ProjectRow";
@@ -28,18 +26,10 @@ import { ProjectConfigDialogView } from "./ProjectConfigDialogView";
 import { ProjectDeleteDialogView } from "./ProjectDeleteDialogView";
 import { WorkspaceDeleteDialogView } from "./WorkspaceDeleteDialogView";
 import { WorkspaceInfoPopperView } from "./WorkspaceInfoPopperView";
-
-type PendingWorkspaceDeletion = {
-  repoId: string;
-  workspaceId: string;
-  workspaceName: string;
-  allowRemoveBranch: boolean;
-};
-
-type PendingRepoDeletion = {
-  repoId: string;
-  repoName: string;
-};
+import { useProjectDeletionFlow } from "./useProjectDeletionFlow";
+import { useProjectListDialogState } from "./useProjectListDialogState";
+import { useWorkspaceDeletionFlow } from "./useWorkspaceDeletionFlow";
+import { useWorkspaceInfoHover } from "./useWorkspaceInfoHover";
 
 /**
  * Resolves the final workspace indicator from runtime status and unread notification tone.
@@ -69,9 +59,8 @@ function resolveWorkspaceIndicator(input: {
   return "none";
 }
 
-/** Renders repository rows and nested workspace rows with per-repo fold controls. */
+/** Renders project rows and nested workspace rows with per-project fold controls. */
 export function ProjectListView() {
-  const workspaceInfoCloseDelayMs = 120;
   const { t } = useTranslation();
   const projects = workspaceStore((state) => state.projects) ?? [];
   const workspaces = workspaceStore((state) => state.workspaces) ?? [];
@@ -92,10 +81,10 @@ export function ProjectListView() {
   const workspaceUnreadToneByWorkspaceId = chatStore((state) => state.workspaceUnreadToneByWorkspaceId);
   const markWorkspaceNotificationsRead = chatStore((state) => state.markWorkspaceNotificationsRead);
   const {
-    menu: repoContextMenu,
-    openMenu: openRepoContextMenu,
-    closeMenu: closeRepoContextMenu,
-    isOpen: isRepoContextMenuOpen,
+    menu: projectContextMenu,
+    openMenu: openProjectContextMenu,
+    closeMenu: closeProjectContextMenu,
+    isOpen: isProjectContextMenuOpen,
   } = useContextMenuState<{
     repoId: string;
     mouseX: number;
@@ -112,35 +101,43 @@ export function ProjectListView() {
     mouseX: number;
     mouseY: number;
   }>();
-  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
-  const [createWorkspaceRepoId, setCreateWorkspaceRepoId] = useState("");
-  const [renameWorkspaceContext, setRenameWorkspaceContext] = useState<{
-    repoId: string;
-    workspaceId: string;
-  } | null>(null);
-  const [isRepoConfigOpen, setIsRepoConfigOpen] = useState(false);
-  const [repoConfigRepoId, setRepoConfigRepoId] = useState("");
-  const [pendingWorkspaceDeletion, setPendingWorkspaceDeletion] = useState<PendingWorkspaceDeletion | null>(null);
-  const [isDeletingWorkspace, setIsDeletingWorkspace] = useState(false);
-  const [pendingRepoDeletion, setPendingRepoDeletion] = useState<PendingRepoDeletion | null>(null);
-  const deleteProjectMutation = useMutation({
-    mutationFn: async (repoId: string) => {
-      await deleteProject(repoId);
-    },
-    onSuccess: () => {
-      setPendingRepoDeletion(null);
-    },
-    onError: (error) => {
-      console.error("Failed to delete project", error);
-    },
+  const {
+    isCreateWorkspaceOpen,
+    createWorkspaceProjectId,
+    renameWorkspaceContext,
+    isProjectConfigOpen,
+    projectConfigProjectId,
+    setIsCreateWorkspaceOpen,
+    setCreateWorkspaceProjectId,
+    setRenameWorkspaceContext,
+    setIsProjectConfigOpen,
+    setProjectConfigProjectId,
+    handleOpenCreateWorkspace,
+    handleOpenProjectConfig,
+  } = useProjectListDialogState();
+  const {
+    pendingWorkspaceDeletion,
+    isDeletingWorkspace,
+    setPendingWorkspaceDeletion,
+    handleRequestWorkspaceDeletion,
+    handleCancelWorkspaceDeletion,
+    handleConfirmWorkspaceDeletion,
+  } = useWorkspaceDeletionFlow({
+    workspaces,
+    closeWorkspace,
   });
-  const isDeletingRepo = deleteProjectMutation.isPending;
-  const [foldedRepoIds, setFoldedRepoIds] = useState<string[]>([]);
-  const [workspaceInfoAnchorEl, setWorkspaceInfoAnchorEl] = useState<HTMLElement | null>(null);
-  const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState("");
-  const [hoveredWorkspaceCurrentBranch, setHoveredWorkspaceCurrentBranch] = useState("");
+  const {
+    pendingProjectDeletion,
+    isDeletingProject,
+    handleRequestProjectDeletion,
+    handleCancelProjectDeletion,
+    handleConfirmProjectDeletion,
+  } = useProjectDeletionFlow({
+    projects,
+    deleteProject,
+  });
+  const [foldedProjectIds, setFoldedProjectIds] = useState<string[]>([]);
   const [isAppFocused, setIsAppFocused] = useState(() => document.hasFocus());
-  const workspaceInfoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rendererPlatform = getRendererPlatform();
   const canOpenWorkspaceInExternalApp = isExternalAppPlatformSupported(rendererPlatform);
   const openWorkspaceInFileManagerActionLabel =
@@ -194,7 +191,7 @@ export function ProjectListView() {
 
   /** Closes all left-pane context menus and nested submenus together. */
   const closeAllContextMenus = () => {
-    closeRepoContextMenu();
+    closeProjectContextMenu();
     closeWorkspaceMenus();
   };
 
@@ -239,22 +236,31 @@ export function ProjectListView() {
         displayWorkspaceIdByProjectId[workspaceContextTarget.repoId] === workspaceContextTarget.id),
   );
 
-  /** Opens the create workspace dialog for one selected repository id. */
-  const handleOpenCreateWorkspace = useCallback((repoId: string) => {
-    setCreateWorkspaceRepoId(repoId);
-    setIsCreateWorkspaceOpen(true);
-  }, []);
+  const {
+    workspaceInfoAnchorEl,
+    hoveredWorkspace,
+    hoveredWorkspaceCurrentBranch,
+    isHoveredWorkspacePrimary,
+    isWorkspaceInfoOpen,
+    handleWorkspaceInfoMouseEnter,
+    handleWorkspaceInfoMouseLeave,
+    handleWorkspaceInfoPopoverMouseEnter,
+    handleWorkspaceInfoPopoverMouseLeave,
+  } = useWorkspaceInfoHover({
+    workspaces,
+    displayWorkspaceIdByProjectId,
+  });
 
   useEffect(() => {
-    const handleOpenCreateWorkspaceDialog = (event: Event) => {
-      const customEvent = event as CustomEvent<{ repoId?: string }>;
-      const requestedRepoId = customEvent.detail?.repoId?.trim();
-      if (!requestedRepoId) {
-        return;
-      }
+      const handleOpenCreateWorkspaceDialog = (event: Event) => {
+        const customEvent = event as CustomEvent<{ repoId?: string }>;
+        const requestedProjectId = customEvent.detail?.repoId?.trim();
+        if (!requestedProjectId) {
+          return;
+        }
 
-      handleOpenCreateWorkspace(requestedRepoId);
-    };
+        handleOpenCreateWorkspace(requestedProjectId);
+      };
 
     window.addEventListener(OPEN_CREATE_WORKSPACE_DIALOG_EVENT, handleOpenCreateWorkspaceDialog as EventListener);
     return () => {
@@ -262,186 +268,15 @@ export function ProjectListView() {
     };
   }, [handleOpenCreateWorkspace]);
 
-  /** Opens the repo config dialog for one selected repository id. */
-  const handleOpenRepoConfig = (repoId: string) => {
-    setRepoConfigRepoId(repoId);
-    setIsRepoConfigOpen(true);
-  };
-
-  /** Opens confirmation dialog for deleting a workspace row. */
-  const handleRequestWorkspaceDeletion = (repoId: string, workspaceId: string) => {
-    const workspace = workspaces.find((item) => item.id === workspaceId && item.repoId === repoId);
-    if (!workspace) {
-      return;
-    }
-
-    setPendingWorkspaceDeletion({
-      repoId,
-      workspaceId,
-      workspaceName: workspace.name,
-      allowRemoveBranch: true,
-    });
-  };
-
-  /** Clears workspace deletion confirmation state when cancellation is allowed. */
-  const handleCancelWorkspaceDeletion = () => {
-    if (isDeletingWorkspace) {
-      return;
-    }
-
-    setPendingWorkspaceDeletion(null);
-  };
-
-  /** Deletes the selected workspace after the user confirms in the dialog. */
-  const handleConfirmWorkspaceDeletion = async () => {
-    if (!pendingWorkspaceDeletion) {
-      return;
-    }
-
-    setIsDeletingWorkspace(true);
-    try {
-      await closeWorkspace(pendingWorkspaceDeletion.workspaceId, {
-        removeBranch: pendingWorkspaceDeletion.allowRemoveBranch,
-      });
-      setPendingWorkspaceDeletion(null);
-    } finally {
-      setIsDeletingWorkspace(false);
-    }
-  };
-
-  /** Opens confirmation dialog for deleting a repository row. */
-  const handleRequestRepoDeletion = (repoId: string) => {
-    const repo = projects.find((item) => item.id === repoId);
-    if (!repo) {
-      return;
-    }
-
-    setPendingRepoDeletion({
-      repoId,
-      repoName: repo.name,
-    });
-  };
-
-  /** Clears repository deletion confirmation state when cancellation is allowed. */
-  const handleCancelRepoDeletion = () => {
-    if (isDeletingRepo) {
-      return;
-    }
-
-    setPendingRepoDeletion(null);
-  };
-
-  /** Deletes the selected repository after the user confirms in the dialog. */
-  const handleConfirmRepoDeletion = () => {
-    if (!pendingRepoDeletion) {
-      return;
-    }
-
-    deleteProjectMutation.mutate(pendingRepoDeletion.repoId);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (!workspaceInfoCloseTimerRef.current) {
-        return;
-      }
-
-      clearTimeout(workspaceInfoCloseTimerRef.current);
-      workspaceInfoCloseTimerRef.current = null;
-    };
-  }, []);
 
   /** Toggles whether one repository row is folded in the list UI. */
-  const toggleRepoFold = (repoId: string) => {
-    setFoldedRepoIds((current) =>
-      current.includes(repoId) ? current.filter((item) => item !== repoId) : [...current, repoId],
+  const toggleProjectFold = (projectId: string) => {
+    setFoldedProjectIds((current) =>
+      current.includes(projectId) ? current.filter((item) => item !== projectId) : [...current, projectId],
     );
   };
 
-  /** Clears any pending delayed close for the workspace info popover. */
-  const clearWorkspaceInfoCloseTimer = () => {
-    if (!workspaceInfoCloseTimerRef.current) {
-      return;
-    }
-
-    clearTimeout(workspaceInfoCloseTimerRef.current);
-    workspaceInfoCloseTimerRef.current = null;
-  };
-
-  /** Schedules delayed close so users can move cursor from row into the popover. */
-  const scheduleWorkspaceInfoClose = () => {
-    clearWorkspaceInfoCloseTimer();
-    workspaceInfoCloseTimerRef.current = setTimeout(() => {
-      setHoveredWorkspaceId("");
-      setHoveredWorkspaceCurrentBranch("");
-      setWorkspaceInfoAnchorEl(null);
-      workspaceInfoCloseTimerRef.current = null;
-    }, workspaceInfoCloseDelayMs);
-  };
-
-  /** Opens the workspace details popover while hovering one workspace row. */
-  const handleWorkspaceInfoMouseEnter = (workspaceId: string, anchorEl: HTMLElement) => {
-    clearWorkspaceInfoCloseTimer();
-    if (workspaceId !== hoveredWorkspaceId) {
-      setHoveredWorkspaceCurrentBranch("");
-    }
-    setHoveredWorkspaceId(workspaceId);
-    setWorkspaceInfoAnchorEl(anchorEl);
-  };
-
-  /** Closes the workspace details popover when the cursor leaves a workspace row. */
-  const handleWorkspaceInfoMouseLeave = () => {
-    scheduleWorkspaceInfoClose();
-  };
-
-  /** Keeps the popover open while the cursor is inside it. */
-  const handleWorkspaceInfoPopoverMouseEnter = () => {
-    clearWorkspaceInfoCloseTimer();
-  };
-
-  /** Starts delayed close when the cursor leaves the popover surface. */
-  const handleWorkspaceInfoPopoverMouseLeave = () => {
-    scheduleWorkspaceInfoClose();
-  };
-
-  const hoveredWorkspace = workspaces.find((workspace) => workspace.id === hoveredWorkspaceId);
-  const isHoveredWorkspacePrimary = Boolean(
-    hoveredWorkspace &&
-      (hoveredWorkspace.kind === "local" || displayWorkspaceIdByProjectId[hoveredWorkspace.repoId] === hoveredWorkspace.id),
-  );
-  const isWorkspaceInfoOpen = Boolean(workspaceInfoAnchorEl) && Boolean(hoveredWorkspace);
-
-  useEffect(() => {
-    if (!hoveredWorkspaceId) {
-      setHoveredWorkspaceCurrentBranch("");
-      return;
-    }
-
-    const workspace = workspaces.find((ws) => ws.id === hoveredWorkspaceId);
-    const worktreePath = workspace?.worktreePath?.trim();
-    if (!worktreePath) {
-      setHoveredWorkspaceCurrentBranch("");
-      return;
-    }
-
-    let cancelled = false;
-    inspectGitRepository({ path: worktreePath })
-      .then((result) => {
-        if (!cancelled) {
-          setHoveredWorkspaceCurrentBranch(result.currentBranch || "");
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHoveredWorkspaceCurrentBranch("");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hoveredWorkspaceId, workspaces]);
-  useSuppressNativeContextMenuWhileOpen(isRepoContextMenuOpen || isWorkspaceContextMenuOpen);
+  useSuppressNativeContextMenuWhileOpen(isProjectContextMenuOpen || isWorkspaceContextMenuOpen);
 
   /** Opens one workspace root path in a selected external app preset. */
   const handleOpenWorkspaceInExternalApp = async (appId: ExternalAppId) => {
@@ -496,17 +331,17 @@ export function ProjectListView() {
     }
   };
 
-  const repoContextMenuItems: ContextMenuEntry[] = [
+  const projectContextMenuItems: ContextMenuEntry[] = [
     {
       id: "repo-config",
       label: t("project.actions.config"),
       icon: <LuSettings size={14} />,
       onSelect: () => {
-        if (!repoContextMenu) {
+        if (!projectContextMenu) {
           return;
         }
 
-        handleOpenRepoConfig(repoContextMenu.repoId);
+        handleOpenProjectConfig(projectContextMenu.repoId);
       },
     },
     {
@@ -514,11 +349,11 @@ export function ProjectListView() {
       label: t("project.actions.delete"),
       icon: <LuTrash2 size={14} />,
       onSelect: () => {
-        if (!repoContextMenu) {
+        if (!projectContextMenu) {
           return;
         }
 
-        handleRequestRepoDeletion(repoContextMenu.repoId);
+        handleRequestProjectDeletion(projectContextMenu.repoId);
       },
     },
   ];
@@ -629,7 +464,7 @@ export function ProjectListView() {
 
               closeWorkspaceMenus();
               setRenameWorkspaceContext({
-                repoId: workspace.repoId,
+                projectId: workspace.repoId,
                 workspaceId: workspace.id,
               });
             },
@@ -648,15 +483,15 @@ export function ProjectListView() {
         ]
       : []),
   ];
-  const repoContextMenuAnchorPosition = useMemo(
+  const projectContextMenuAnchorPosition = useMemo(
     () =>
-      repoContextMenu
+      projectContextMenu
         ? {
-            top: repoContextMenu.mouseY,
-            left: repoContextMenu.mouseX,
+            top: projectContextMenu.mouseY,
+            left: projectContextMenu.mouseX,
           }
         : undefined,
-    [repoContextMenu],
+    [projectContextMenu],
   );
   const workspaceContextMenuAnchorPosition = useMemo(
     () =>
@@ -672,48 +507,48 @@ export function ProjectListView() {
   return (
     <>
       <List data-testid="repo-workspace-list" disablePadding sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        {filteredProjects.map((repo) => {
-          const isRepoFolded = foldedRepoIds.includes(repo.id);
-          const localDisplayWorkspaceId = displayWorkspaceIdByProjectId[repo.id];
-          const repoWorkspaces = workspaceByProjectId[repo.id] ?? [];
+        {filteredProjects.map((project) => {
+          const isProjectFolded = foldedProjectIds.includes(project.id);
+          const localDisplayWorkspaceId = displayWorkspaceIdByProjectId[project.id];
+          const projectWorkspaces = workspaceByProjectId[project.id] ?? [];
           const displayedWorkspaces = localDisplayWorkspaceId
-            ? repoWorkspaces.filter((workspace) => workspace.kind !== "local")
-            : repoWorkspaces;
+            ? projectWorkspaces.filter((workspace) => workspace.kind !== "local")
+            : projectWorkspaces;
 
           return (
-            <Box key={repo.id} sx={{ mb: 0.5 }}>
+            <Box key={project.id} sx={{ mb: 0.5 }}>
               <ProjectRow
-                repo={repo}
-                isSelected={selectedProjectId === repo.id}
-                isFolded={isRepoFolded}
+                repo={project}
+                isSelected={selectedProjectId === project.id}
+                isFolded={isProjectFolded}
                 addWorkspaceAriaLabel={t("workspace.actions.add")}
                 addWorkspaceTooltipLabel={createWorkspaceTooltipLabel}
-                foldToggleAriaLabel={t(isRepoFolded ? "repo.actions.expand" : "repo.actions.collapse")}
+                foldToggleAriaLabel={t(isProjectFolded ? "repo.actions.expand" : "repo.actions.collapse")}
                 onSelect={() => {
-                  setSelectedRepoId(repo.id);
-                  setFoldedRepoIds((current) => current.filter((item) => item !== repo.id));
+                  setSelectedRepoId(project.id);
+                  setFoldedProjectIds((current) => current.filter((item) => item !== project.id));
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
                   closeWorkspaceMenus();
-                  setSelectedRepoId(repo.id);
-                  openRepoContextMenu({
-                    repoId: repo.id,
+                  setSelectedRepoId(project.id);
+                  openProjectContextMenu({
+                    repoId: project.id,
                     mouseX: event.clientX,
                     mouseY: event.clientY,
                   });
                 }}
                 onAddWorkspace={(event) => {
                   event.stopPropagation();
-                  handleOpenCreateWorkspace(repo.id);
+                  handleOpenCreateWorkspace(project.id);
                 }}
                 onToggleFold={(event) => {
                   event.stopPropagation();
-                  toggleRepoFold(repo.id);
+                  toggleProjectFold(project.id);
                 }}
               />
-              {!isRepoFolded ? (
+              {!isProjectFolded ? (
                 <List disablePadding sx={{ mt: 0.25 }}>
                   {displayedWorkspaces.map((workspace) => {
                     const isWorkspaceDisplayedAsLocal =
@@ -734,7 +569,7 @@ export function ProjectListView() {
                     return (
                       <WorkspaceRow
                         key={workspace.id}
-                        repoId={repo.id}
+                        repoId={project.id}
                         workspace={workspaceForRow}
                         isSelected={selectedWorkspaceId === workspace.id}
                         indicator={workspaceIndicator}
@@ -745,9 +580,9 @@ export function ProjectListView() {
                         doneIndicatorLabel={t("workspace.notifications.doneIndicator")}
                         failedIndicatorLabel={t("workspace.notifications.failedIndicator")}
                         onSelect={() => {
-                          setSelectedRepoId(repo.id);
+                          setSelectedRepoId(project.id);
                           setSelectedWorkspaceId(workspace.id);
-                          setFoldedRepoIds((current) => current.filter((item) => item !== repo.id));
+                          setFoldedProjectIds((current) => current.filter((item) => item !== project.id));
                         }}
                         onMouseEnter={(event) => {
                           handleWorkspaceInfoMouseEnter(workspace.id, event.currentTarget);
@@ -756,12 +591,12 @@ export function ProjectListView() {
                         onContextMenu={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          closeRepoContextMenu();
+                          closeProjectContextMenu();
                           closeWorkspaceMenus();
-                          setSelectedRepoId(repo.id);
+                          setSelectedRepoId(project.id);
                           setSelectedWorkspaceId(workspace.id);
                           openWorkspaceContextMenu({
-                            repoId: repo.id,
+                            repoId: project.id,
                             workspaceId: workspace.id,
                             mouseX: event.clientX,
                             mouseY: event.clientY,
@@ -778,10 +613,10 @@ export function ProjectListView() {
         })}
       </List>
       <ContextMenu
-        open={Boolean(repoContextMenu)}
+        open={Boolean(projectContextMenu)}
         onClose={closeAllContextMenus}
-        anchorPosition={repoContextMenuAnchorPosition}
-        items={repoContextMenuItems}
+        anchorPosition={projectContextMenuAnchorPosition}
+        items={projectContextMenuItems}
       />
       <ContextMenu
         open={Boolean(workspaceContextMenu)}
@@ -791,27 +626,27 @@ export function ProjectListView() {
       />
       <CreateWorkspaceDialogView
         open={isCreateWorkspaceOpen}
-        repoId={createWorkspaceRepoId}
+        projectId={createWorkspaceProjectId}
         onClose={() => {
           setIsCreateWorkspaceOpen(false);
-          setCreateWorkspaceRepoId("");
+          setCreateWorkspaceProjectId("");
         }}
       />
       <CreateWorkspaceDialogView
         mode="rename"
         open={Boolean(renameWorkspaceContext)}
-        repoId={renameWorkspaceContext?.repoId ?? ""}
+        projectId={renameWorkspaceContext?.projectId ?? ""}
         workspaceId={renameWorkspaceContext?.workspaceId ?? ""}
         onClose={() => {
           setRenameWorkspaceContext(null);
         }}
       />
       <ProjectConfigDialogView
-        open={isRepoConfigOpen}
-        repoId={repoConfigRepoId}
+        open={isProjectConfigOpen}
+        repoId={projectConfigProjectId}
         onClose={() => {
-          setIsRepoConfigOpen(false);
-          setRepoConfigRepoId("");
+          setIsProjectConfigOpen(false);
+          setProjectConfigProjectId("");
         }}
       />
       <WorkspaceDeleteDialogView
@@ -833,12 +668,12 @@ export function ProjectListView() {
         }}
       />
       <ProjectDeleteDialogView
-        open={Boolean(pendingRepoDeletion)}
-        repoName={pendingRepoDeletion?.repoName ?? ""}
-        isDeleting={isDeletingRepo}
-        onCancel={handleCancelRepoDeletion}
-        onConfirm={() => void handleConfirmRepoDeletion()}
-      />
+         open={Boolean(pendingProjectDeletion)}
+         repoName={pendingProjectDeletion?.projectName ?? ""}
+         isDeleting={isDeletingProject}
+         onCancel={handleCancelProjectDeletion}
+         onConfirm={() => void handleConfirmProjectDeletion()}
+       />
       <WorkspaceInfoPopperView
         open={isWorkspaceInfoOpen}
         anchorEl={workspaceInfoAnchorEl}

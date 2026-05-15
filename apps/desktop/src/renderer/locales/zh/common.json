@@ -22,8 +22,15 @@
       "closeAria": "关闭更新通知"
     },
     "bootstrap": {
+      "badge": "应用启动中",
       "title": "正在准备你的工作区",
       "description": "正在加载用户信息、组织、项目、节点和工作区...",
+      "phase": {
+        "auth": "正在验证你的登录会话",
+        "session": "正在同步用户与组织上下文",
+        "workspace": "正在恢复工作区状态与资源",
+        "nodes": "正在连接可用运行节点"
+      },
       "retry": "重试"
     }
   },
@@ -70,6 +77,7 @@
       "appearance": "外观",
       "daemon": "守护进程",
       "keybindings": "键盘快捷键",
+      "links": "链接",
       "notifications": "通知",
       "terminal": "终端",
       "workspace": "工作区"
@@ -138,6 +146,15 @@
         "zh": "中文"
       }
     },
+    "links": {
+      "title": "链接打开方式",
+      "description": "选择应用内 HTTP 链接的打开位置。",
+      "targetLabel": "链接打开方式",
+      "options": {
+        "built-in": "内置浏览器",
+        "external": "系统默认浏览器"
+      }
+    },
     "daemon": {
       "title": "守护进程",
       "description": "查看用于工作区、终端和后台服务的本地守护进程。",
@@ -168,7 +185,10 @@
         "action": "重启",
         "inProgress": "重启中…",
         "success": "守护进程已成功重启。",
-        "failed": "重启守护进程失败。"
+        "failed": "重启守护进程失败。",
+        "terminalCloseFailed": "关闭终端会话失败，请手动关闭后重试。",
+        "confirmTitle": "确认重启守护进程？",
+        "confirmMessage": "所有终端会话将被关闭，正在运行的进程将被终止。此操作无法撤销。"
       },
       "quitOnExit": {
         "label": "退出应用前关闭守护进程",
@@ -588,6 +608,7 @@
     "createMenu": {
       "label": "创建",
       "chat": "聊天",
+      "browser": "浏览器",
       "opencode": "OpenCode",
       "codex": "Codex",
       "claude": "Claude",
@@ -619,6 +640,7 @@
     "hint": "选择一个操作以开始。",
     "actions": {
       "openTerminal": "打开终端",
+      "openBrowser": "打开浏览器标签",
       "openChat": "打开聊天",
       "searchFiles": "搜索文件"
     }
@@ -649,6 +671,7 @@
       "closeTab": "关闭当前标签",
       "closeWorkspace": "关闭当前工作区",
       "openTerminal": "打开终端标签",
+      "openBrowser": "打开浏览器标签",
       "activateRepoPane": "激活仓库面板",
       "activateFilesPane": "激活文件面板",
       "activateChangesPane": "激活变更面板",

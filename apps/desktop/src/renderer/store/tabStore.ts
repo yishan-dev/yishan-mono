@@ -3,6 +3,7 @@ import { immer } from "zustand/middleware/immer";
 import { resolveSelectedTabIdForWorkspace } from "./tabs";
 import {
   closeAllTabsState,
+  closeAllTerminalTabsState,
   closeOtherTabsState,
   closeTabState,
   createSessionTabOptimisticState,
@@ -40,12 +41,17 @@ export type TabStoreState = {
   >;
   resolveSessionTab: (tabId: string, sessionId: string) => void;
   failSessionTabInit: (tabId: string) => void;
-  openTab: (input: OpenWorkspaceTabInput) => void;
+  openTab: (input: OpenWorkspaceTabInput, options?: { activePaneTabIds?: string[] }) => void;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
   closeAllTabs: (tabId: string) => void;
+  /** Closes every terminal tab across all workspaces (used before daemon restart). */
+  closeAllTerminalTabs: () => void;
   /** Persists one backend terminal session id on one terminal tab. */
   setTerminalTabSessionId: (tabId: string, sessionId: string) => void;
+  setBrowserTabFaviconUrl: (tabId: string, faviconUrl: string | undefined) => void;
+  /** Persists the current navigated URL on a browser tab so it survives unmount/remount cycles. */
+  setBrowserTabUrl: (tabId: string, url: string) => void;
   toggleTabPinned: (tabId: string) => void;
   reorderTab: (draggedTabId: string, targetTabId: string, position: "before" | "after") => void;
   renameTab: (tabId: string, title: string, options?: { userRenamed?: boolean }) => void;
@@ -197,8 +203,8 @@ export const tabStore = create<TabStoreState>()(
     failSessionTabInit: (tabId) => {
       set((state) => failSessionTabInitState(state, tabId));
     },
-    openTab: (input) => {
-      set((state) => openTabState(state, input, createClientTabId()) ?? state);
+    openTab: (input, options?) => {
+      set((state) => openTabState(state, input, createClientTabId(), options) ?? state);
     },
     closeTab: (tabId) => {
       set((state) => closeTabState(state, tabId) ?? state);
@@ -208,6 +214,9 @@ export const tabStore = create<TabStoreState>()(
     },
     closeAllTabs: (tabId) => {
       set((state) => closeAllTabsState(state, tabId) ?? state);
+    },
+    closeAllTerminalTabs: () => {
+      set((state) => closeAllTerminalTabsState(state) ?? state);
     },
     setTerminalTabSessionId: (tabId, sessionId) => {
       const normalizedTabId = tabId.trim();
@@ -229,6 +238,46 @@ export const tabStore = create<TabStoreState>()(
             : tab,
         ),
       }));
+    },
+    setBrowserTabFaviconUrl: (tabId, faviconUrl) => {
+      const normalizedTabId = tabId.trim();
+      const normalizedFaviconUrl = faviconUrl?.trim();
+      if (!normalizedTabId) {
+        return;
+      }
+
+      set((state) => ({
+        tabs: state.tabs.map((tab: WorkspaceTab) =>
+          tab.id === normalizedTabId && tab.kind === "browser"
+            ? (() => {
+                const nextData = { ...tab.data };
+                if (normalizedFaviconUrl) {
+                  nextData.faviconUrl = normalizedFaviconUrl;
+                } else {
+                  delete nextData.faviconUrl;
+                }
+
+                return {
+                  ...tab,
+                  data: nextData,
+                };
+              })()
+            : tab,
+        ),
+      }));
+    },
+    setBrowserTabUrl: (tabId, url) => {
+      const normalizedTabId = tabId.trim();
+      if (!normalizedTabId) {
+        return;
+      }
+
+      set((state) => {
+        const tab = state.tabs.find((t: WorkspaceTab) => t.id === normalizedTabId && t.kind === "browser");
+        if (tab && tab.kind === "browser") {
+          tab.data.url = url;
+        }
+      });
     },
     toggleTabPinned: (tabId) => {
       set((state) => toggleTabPinnedState(state, tabId));

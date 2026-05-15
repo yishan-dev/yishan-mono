@@ -20,6 +20,10 @@ type Config struct {
 	Level  string
 	Format string
 	Out    io.Writer
+	// FileOut is an optional additional writer for file-based logging.
+	// When set, logs are written to both Out (with format) and FileOut (always JSON).
+	// Typically this is a *FileWriter with rotation.
+	FileOut io.Writer
 }
 
 func Configure(cfg Config) error {
@@ -49,11 +53,27 @@ func Configure(cfg Config) error {
 	zerolog.SetGlobalLevel(parsedLevel)
 	zerolog.TimeFieldFormat = time.RFC3339
 
-	if format == FormatJSON {
-		log.Logger = zerolog.New(out).With().Timestamp().Logger()
-		return nil
+	// Determine the effective writer.
+	// If FileOut is configured, we use a multi-writer: the console/stderr output
+	// uses the configured format, while the file always gets JSON for machine parsing.
+	var writer io.Writer
+	if cfg.FileOut != nil {
+		var consoleOut io.Writer
+		if format == FormatJSON {
+			consoleOut = out
+		} else {
+			consoleOut = zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}
+		}
+		// zerolog multi-level writer: writes each log entry to all writers.
+		writer = zerolog.MultiLevelWriter(consoleOut, cfg.FileOut)
+	} else {
+		if format == FormatJSON {
+			writer = out
+		} else {
+			writer = zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}
+		}
 	}
 
-	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}).With().Timestamp().Logger()
+	log.Logger = zerolog.New(writer).With().Timestamp().Logger()
 	return nil
 }

@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
@@ -31,32 +31,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/** Renders the workspace dashboard and tracks notification/running-task state for pane indicators. */
-export function WorkspaceView() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const layoutRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState(1400);
-  const [isCreateRepoOpen, setIsCreateRepoOpen] = useState(false);
-  const paneVisibility = useWorkspacePaneVisibility();
-  const leftWidth = layoutStore((state) => state.leftWidth);
-  const rightWidth = layoutStore((state) => state.rightWidth);
-  const projects = workspaceStore((state) => state.projects);
-  const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
-  const selectedWorkspaceWorktreePath = workspaceStore(
-    (state) => state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.worktreePath,
-  );
-  const workspaceGitRefreshVersion = workspaceStore((state) => {
-    if (!selectedWorkspaceWorktreePath) {
-      return 0;
-    }
+type WorkspaceViewCommands = ReturnType<typeof useCommands>;
 
-    return state.gitRefreshVersionByWorktreePath?.[selectedWorkspaceWorktreePath] ?? 0;
-  });
-  const cmd = useCommands();
-  useAllWorkspacesGitSync();
-  const [terminalRecoveryCoordinator] = useState(() => new TerminalRecoveryCoordinator());
-  const { leftCollapsed, rightCollapsed, onToggleLeftPane, onToggleRightPane } = paneVisibility;
+/** Subscribes global app actions and routes them to workspace-level commands. */
+function useWorkspaceAppActions(input: { cmd: WorkspaceViewCommands; navigate: ReturnType<typeof useNavigate> }) {
+  const { cmd, navigate } = input;
 
   useEffect(() => {
     return subscribeAppActionEvent((payload) => {
@@ -92,6 +71,14 @@ export function WorkspaceView() {
         }
 
         navigate(targetPath);
+        return;
+      }
+
+      if (payload.action === ACTIONS.CLOSE_TAB) {
+        const selectedTabId = tabStore.getState().selectedTabId;
+        if (selectedTabId) {
+          cmd.closeTab(selectedTabId);
+        }
         return;
       }
 
@@ -139,6 +126,11 @@ export function WorkspaceView() {
       }
     });
   }, [cmd, navigate]);
+}
+
+/** Loads workspace data and restores terminal tabs persisted from previous sessions. */
+function useWorkspaceBootstrap(input: { cmd: WorkspaceViewCommands; terminalRecoveryCoordinator: TerminalRecoveryCoordinator }) {
+  const { cmd, terminalRecoveryCoordinator } = input;
 
   useEffect(() => {
     let disposed = false;
@@ -170,9 +162,17 @@ export function WorkspaceView() {
       unsubscribePersist?.();
     };
   }, [cmd, terminalRecoveryCoordinator]);
+}
+
+/** Observes one container element and reports its width whenever it changes. */
+function useElementWidthObserver(input: {
+  elementRef: RefObject<HTMLDivElement | null>;
+  onWidthChange: (width: number) => void;
+}) {
+  const { elementRef, onWidthChange } = input;
 
   useEffect(() => {
-    const root = layoutRef.current;
+    const root = elementRef.current;
     if (!root) {
       return;
     }
@@ -182,14 +182,24 @@ export function WorkspaceView() {
       if (!entry) {
         return;
       }
-      setContainerWidth(Math.max(0, entry.contentRect.width));
+      onWidthChange(Math.max(0, entry.contentRect.width));
     });
 
     observer.observe(root);
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [elementRef, onWidthChange]);
+}
+
+/** Refreshes selected workspace git changes with queued re-run protection. */
+function useWorkspaceGitRefreshQueue(input: {
+  cmd: WorkspaceViewCommands;
+  selectedWorkspaceId: string;
+  selectedWorkspaceWorktreePath: string | undefined;
+  workspaceGitRefreshVersion: number;
+}) {
+  const { cmd, selectedWorkspaceId, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion } = input;
 
   useEffect(() => {
     if (!selectedWorkspaceId || !selectedWorkspaceWorktreePath) {
@@ -227,6 +237,46 @@ export function WorkspaceView() {
       cancelled = true;
     };
   }, [cmd, selectedWorkspaceId, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
+}
+
+/** Renders the workspace dashboard and tracks notification/running-task state for pane indicators. */
+export function WorkspaceView() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(1400);
+  const [isCreateRepoOpen, setIsCreateRepoOpen] = useState(false);
+  const paneVisibility = useWorkspacePaneVisibility();
+  const leftWidth = layoutStore((state) => state.leftWidth);
+  const rightWidth = layoutStore((state) => state.rightWidth);
+  const projects = workspaceStore((state) => state.projects);
+  const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
+  const selectedWorkspaceWorktreePath = workspaceStore(
+    (state) => state.workspaces.find((workspace) => workspace.id === state.selectedWorkspaceId)?.worktreePath,
+  );
+  const workspaceGitRefreshVersion = workspaceStore((state) => {
+    if (!selectedWorkspaceWorktreePath) {
+      return 0;
+    }
+
+    return state.gitRefreshVersionByWorktreePath?.[selectedWorkspaceWorktreePath] ?? 0;
+  });
+  const cmd = useCommands();
+  useAllWorkspacesGitSync();
+  const [terminalRecoveryCoordinator] = useState(() => new TerminalRecoveryCoordinator());
+  const { leftCollapsed, rightCollapsed, onToggleLeftPane, onToggleRightPane } = paneVisibility;
+  useWorkspaceAppActions({ cmd, navigate });
+  useWorkspaceBootstrap({ cmd, terminalRecoveryCoordinator });
+  useElementWidthObserver({
+    elementRef: layoutRef,
+    onWidthChange: setContainerWidth,
+  });
+  useWorkspaceGitRefreshQueue({
+    cmd,
+    selectedWorkspaceId,
+    selectedWorkspaceWorktreePath,
+    workspaceGitRefreshVersion,
+  });
 
   const leftSep = leftCollapsed ? 0 : SEPARATOR_PX;
   const rightSep = rightCollapsed ? 0 : SEPARATOR_PX;

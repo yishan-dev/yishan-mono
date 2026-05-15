@@ -1,8 +1,6 @@
 import { Alert, Box, LinearProgress, Typography } from "@mui/material";
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -10,7 +8,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  type ExternalAppId,
   findExternalAppPreset,
   isExternalAppPlatformSupported,
 } from "../../../../shared/contracts/externalApps";
@@ -18,92 +15,19 @@ import { ContextMenu } from "../../../components/ContextMenu";
 import { FileQuickOpenDialog } from "../../../components/FileQuickOpenDialog";
 import { FileTree } from "../../../components/FileTree";
 import { FileTreeToolbar } from "../../../components/FileTree/FileTreeToolbar";
-import { resolveDestinationDirectoryPath } from "../../../components/FileTree/treeUtils";
-import type { FileTreeContextMenuRequest, FileTreeGitChangeKind } from "../../../components/FileTree/types";
+import type { FileTreeContextMenuRequest } from "../../../components/FileTree/types";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
 import { useContextMenuState } from "../../../hooks/useContextMenuState";
 import { useSuppressNativeContextMenuWhileOpen } from "../../../hooks/useSuppressNativeContextMenuWhileOpen";
-import { searchFiles } from "../../../search/fileSearch";
 import { tabStore } from "../../../store/tabStore";
 import { workspaceFileTreeStore } from "../../../store/workspaceFileTreeStore";
 import { workspaceStore } from "../../../store/workspaceStore";
-import { buildWorkspaceFileTreeContextMenuItems } from "./buildWorkspaceFileTreeContextMenuItems";
-import { CONTEXT_DIRECTORY_PATHS, useFileTreeOperations } from "./useFileTreeOperations";
-
-const MAX_FILE_SEARCH_RESULTS = 100;
-
-function normalizeGitChangeKind(kind: string): FileTreeGitChangeKind {
-  if (kind === "added" || kind === "modified" || kind === "deleted" || kind === "renamed") {
-    return kind;
-  }
-
-  return "modified";
-}
-
-function mergeGitChangeKinds(
-  currentKind: FileTreeGitChangeKind | undefined,
-  nextKind: FileTreeGitChangeKind,
-): FileTreeGitChangeKind {
-  if (!currentKind || currentKind === nextKind) {
-    return nextKind;
-  }
-
-  if (currentKind === "deleted" || nextKind === "deleted") {
-    return "deleted";
-  }
-
-  if (currentKind === "renamed" || nextKind === "renamed") {
-    return "renamed";
-  }
-
-  if (currentKind === "added" || nextKind === "added") {
-    return "added";
-  }
-
-  return "modified";
-}
-
-function normalizeGitChangePath(path: string): string {
-  const trimmedPath = path.trim().replace(/\\/g, "/");
-  if (!trimmedPath) {
-    return "";
-  }
-
-  const braceRenameMatch = trimmedPath.match(/^(.*)\{[^{}]* => ([^{}]+)\}(.*)$/);
-  let normalizedPath = braceRenameMatch
-    ? `${braceRenameMatch[1] ?? ""}${braceRenameMatch[2] ?? ""}${braceRenameMatch[3] ?? ""}`
-    : trimmedPath;
-
-  if (normalizedPath.includes(" -> ")) {
-    const renamedParts = normalizedPath.split(" -> ");
-    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
-  } else if (normalizedPath.includes(" => ")) {
-    const renamedParts = normalizedPath.split(" => ");
-    normalizedPath = renamedParts[renamedParts.length - 1] ?? normalizedPath;
-  }
-
-  return normalizedPath.trim().replace(/^"+|"+$/g, "").replace(/^\/+|\/+$/g, "");
-}
-
-function areGitChangeMapsEqual(
-  leftMap: Record<string, FileTreeGitChangeKind>,
-  rightMap: Record<string, FileTreeGitChangeKind>,
-): boolean {
-  const leftKeys = Object.keys(leftMap);
-  const rightKeys = Object.keys(rightMap);
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    if (leftMap[key] !== rightMap[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
+import { useFileSearchController } from "./useFileSearchController";
+import { useFileTreeContextMenuItems } from "./useFileTreeContextMenuItems";
+import { useFileTreeCreateEntryRequest } from "./useFileTreeCreateEntryRequest";
+import { useFileTreeGitChanges } from "./useFileTreeGitChanges";
+import { useFileTreeOperations } from "./useFileTreeOperations";
 
 type FileManagerViewProps = {
   openFileSearchRequestKey?: number;
@@ -130,39 +54,9 @@ export function FileManagerView({
   onFileSearchRequestHandled,
 }: FileManagerViewProps) {
   const { t } = useTranslation();
-  const {
-    repoFiles,
-    ignoredRepoPaths,
-    loadedDirectoryPaths,
-    searchRepoFiles,
-    searchIgnoredRepoPaths,
-    fileOperationState,
-    fileOperationError,
-    fileTreeSelectionRequest,
-    canPasteEntries,
-    canUndoLastEntryOperation,
-    revealFileInTree,
-    loadExpandedDirectory,
-    ensurePathLoaded,
-    loadAllRepoFiles,
-    openWorkspaceFile,
-    onCreateFile,
-    onCreateFolder,
-    onRenameEntry,
-    onDeleteEntry,
-    onCopyPath,
-    onCopyRelativePath,
-    onOpenInFileManager,
-    onOpenInExternalApp,
-    onCopyEntry,
-    onCutEntry,
-    onPasteEntries,
-    onDropExternalEntries,
-    onRefresh,
-    onUndoLastEntryOperation,
-  } = useFileTreeOperations();
+  const ops = useFileTreeOperations();
   const rendererPlatform = getRendererPlatform();
-  const { listGitChanges } = useCommands();
+  const cmd = useCommands();
   const canOpenInExternalApp = isExternalAppPlatformSupported(rendererPlatform);
   const lastUsedExternalAppId = workspaceStore((state) => state.lastUsedExternalAppId);
   const selectedWorkspaceId = workspaceStore((state) => state.selectedWorkspaceId);
@@ -180,15 +74,7 @@ export function FileManagerView({
     ? findExternalAppPreset(lastUsedExternalAppId)
     : null;
 
-  const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
-  const [fileSearchQuery, setFileSearchQuery] = useState("");
-  const [selectedSearchResultIndex, setSelectedSearchResultIndex] = useState(0);
-  const [, setCreateEntryRequestId] = useState(0);
-  const [createEntryRequest, setCreateEntryRequest] = useState<{
-    kind: "file" | "folder";
-    basePath?: string;
-    requestId: number;
-  } | null>(null);
+  const { createEntryRequest, requestCreateFile, requestCreateFolder } = useFileTreeCreateEntryRequest();
   const {
     menu: contextMenu,
     openMenu: openContextMenu,
@@ -196,17 +82,23 @@ export function FileManagerView({
     isOpen: hasOpenContextMenu,
   } = useContextMenuState<FileTreeContextMenuRequest>();
   const selectedEntryPath = workspaceFileTreeStore((state) => state.selectedEntryPath);
+  const selectedEntryIsDirectory = selectedEntryPath
+    ? ops.repoFiles.some((p) => p === selectedEntryPath + "/")
+    : false;
+  const createEntryBasePath = selectedEntryPath
+    ? selectedEntryIsDirectory
+      ? selectedEntryPath
+      : selectedEntryPath.split("/").slice(0, -1).join("/")
+    : "";
   const deleteSelectionRequestId = workspaceFileTreeStore((state) => state.deleteSelectionRequestId);
   const undoRequestId = workspaceFileTreeStore((state) => state.undoRequestId);
   const setSelectedEntryPath = workspaceFileTreeStore((state) => state.setSelectedEntryPath);
   const [lastHandledDeleteSelectionRequestId, setLastHandledDeleteSelectionRequestId] = useState(0);
   const [lastHandledUndoRequestId, setLastHandledUndoRequestId] = useState(0);
   const [expandedItemsByWorkspaceId, setExpandedItemsByWorkspaceId] = useState<Record<string, string[]>>({});
-  const [gitChangesByPath, setGitChangesByPath] = useState<Record<string, FileTreeGitChangeKind>>({});
   const selectedTabId = tabStore((state) => state.selectedTabId);
   const tabs = tabStore((state) => state.tabs);
   const lastRevealedTabIdRef = useRef("");
-  const gitChangeLoadRequestIdRef = useRef(0);
 
   const expandedItems = selectedWorkspaceId ? (expandedItemsByWorkspaceId[selectedWorkspaceId] ?? []) : [];
 
@@ -233,52 +125,28 @@ export function FileManagerView({
 
   useSuppressNativeContextMenuWhileOpen(hasOpenContextMenu);
 
-  const visibleTreeFiles = repoFiles;
+  const visibleTreeFiles = ops.repoFiles;
   const ignoredSearchRepoPathSet = useMemo(
-    () => new Set(searchIgnoredRepoPaths.map((path) => path.replace(/\/+$/, ""))),
-    [searchIgnoredRepoPaths],
+    () => new Set(ops.searchIgnoredRepoPaths.map((path) => path.replace(/\/+$/, ""))),
+    [ops.searchIgnoredRepoPaths],
   );
   const searchableFiles = useMemo(
-    () => searchRepoFiles.filter((path) => !ignoredSearchRepoPathSet.has(path.replace(/\/+$/, ""))),
-    [ignoredSearchRepoPathSet, searchRepoFiles],
+    () => ops.searchRepoFiles.filter((path) => !ignoredSearchRepoPathSet.has(path.replace(/\/+$/, ""))),
+    [ignoredSearchRepoPathSet, ops.searchRepoFiles],
   );
-  const trimmedFileSearchQuery = fileSearchQuery.trim();
-  const deferredFileSearchQuery = useDeferredValue(trimmedFileSearchQuery);
-  const fileSearchResults = useMemo(
-    () =>
-      deferredFileSearchQuery
-        ? searchFiles(searchableFiles, deferredFileSearchQuery).slice(0, MAX_FILE_SEARCH_RESULTS)
-        : [],
-    [deferredFileSearchQuery, searchableFiles],
-  );
+  const gitChangesByPath = useFileTreeGitChanges({
+    listGitChanges: cmd.listGitChanges,
+    selectedWorkspaceWorktreePath,
+    workspaceGitRefreshVersion,
+  });
 
   useEffect(() => {
-    if (openFileSearchRequestKey <= lastHandledFileSearchRequestKey) {
+    if (!ops.fileTreeSelectionRequest?.path) {
       return;
     }
 
-    setFileSearchQuery("");
-    setSelectedSearchResultIndex(0);
-    setIsFileSearchOpen(true);
-    void loadAllRepoFiles();
-    onFileSearchRequestHandled?.(openFileSearchRequestKey);
-  }, [lastHandledFileSearchRequestKey, loadAllRepoFiles, onFileSearchRequestHandled, openFileSearchRequestKey]);
-
-  useEffect(() => {
-    if (selectedSearchResultIndex < fileSearchResults.length) {
-      return;
-    }
-
-    setSelectedSearchResultIndex(Math.max(0, fileSearchResults.length - 1));
-  }, [fileSearchResults.length, selectedSearchResultIndex]);
-
-  useEffect(() => {
-    if (!fileTreeSelectionRequest?.path) {
-      return;
-    }
-
-    setSelectedEntryPath(fileTreeSelectionRequest.path);
-  }, [fileTreeSelectionRequest, setSelectedEntryPath]);
+    setSelectedEntryPath(ops.fileTreeSelectionRequest.path);
+  }, [ops.fileTreeSelectionRequest, setSelectedEntryPath]);
 
   useEffect(() => {
     const selectedTab = tabs.find((tab) => tab.id === selectedTabId && tab.workspaceId === selectedWorkspaceId);
@@ -292,8 +160,8 @@ export function FileManagerView({
     }
 
     lastRevealedTabIdRef.current = selectedTab.id;
-    revealFileInTree(selectedTab.data.path);
-  }, [revealFileInTree, selectedTabId, selectedWorkspaceId, tabs]);
+    ops.revealFileInTree(selectedTab.data.path);
+  }, [ops, selectedTabId, selectedWorkspaceId, tabs]);
 
   useEffect(() => {
     if (deleteSelectionRequestId <= lastHandledDeleteSelectionRequestId) {
@@ -305,8 +173,8 @@ export function FileManagerView({
       return;
     }
 
-    void onDeleteEntry(selectedEntryPath);
-  }, [deleteSelectionRequestId, lastHandledDeleteSelectionRequestId, onDeleteEntry, selectedEntryPath]);
+    void ops.onDeleteEntry(selectedEntryPath);
+  }, [deleteSelectionRequestId, lastHandledDeleteSelectionRequestId, ops, selectedEntryPath]);
 
   useEffect(() => {
     if (undoRequestId <= lastHandledUndoRequestId) {
@@ -314,67 +182,17 @@ export function FileManagerView({
     }
 
     setLastHandledUndoRequestId(undoRequestId);
-    if (!canUndoLastEntryOperation) {
+    if (!ops.canUndoLastEntryOperation) {
       return;
     }
 
-    void onUndoLastEntryOperation();
-  }, [canUndoLastEntryOperation, lastHandledUndoRequestId, onUndoLastEntryOperation, undoRequestId]);
-
-  useEffect(() => {
-    const requestId = gitChangeLoadRequestIdRef.current + 1;
-    gitChangeLoadRequestIdRef.current = requestId;
-
-    if (!selectedWorkspaceWorktreePath) {
-      setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
-      return;
-    }
-
-    void workspaceGitRefreshVersion;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const sections = await listGitChanges({
-          workspaceWorktreePath: selectedWorkspaceWorktreePath,
-        });
-
-        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        const nextMap: Record<string, FileTreeGitChangeKind> = {};
-        for (const file of [...sections.unstaged, ...sections.staged, ...sections.untracked]) {
-          const normalizedPath = normalizeGitChangePath(file.path);
-          if (!normalizedPath || normalizedPath.endsWith("/")) {
-            continue;
-          }
-
-          const nextKind = normalizeGitChangeKind(file.kind);
-          nextMap[normalizedPath] = mergeGitChangeKinds(nextMap[normalizedPath], nextKind);
-        }
-
-        setGitChangesByPath((currentMap) => (areGitChangeMapsEqual(currentMap, nextMap) ? currentMap : nextMap));
-      } catch (error) {
-        console.error("Failed to load file-tree git changes", error);
-        if (cancelled || gitChangeLoadRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        setGitChangesByPath((currentMap) => (Object.keys(currentMap).length === 0 ? currentMap : {}));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [listGitChanges, selectedWorkspaceWorktreePath, workspaceGitRefreshVersion]);
+    void ops.onUndoLastEntryOperation();
+  }, [lastHandledUndoRequestId, ops, undoRequestId]);
 
   const openSearchResult = useCallback(
     async (path: string) => {
       if (path.endsWith("/")) {
         const directoryPath = path.replace(/\/+$/, "");
-        await loadExpandedDirectory(directoryPath);
         if (!expandedItems.includes(directoryPath)) {
           handleExpandedItemsChange([...expandedItems, directoryPath]);
         }
@@ -383,225 +201,87 @@ export function FileManagerView({
         return;
       }
 
-      await openWorkspaceFile(path);
+      await ops.openWorkspaceFile(path);
       setIsFileSearchOpen(false);
     },
-    [expandedItems, handleExpandedItemsChange, loadExpandedDirectory, openWorkspaceFile, setSelectedEntryPath],
+    [expandedItems, handleExpandedItemsChange, ops, setSelectedEntryPath],
   );
+  const {
+    isFileSearchOpen,
+    setIsFileSearchOpen,
+    fileSearchQuery,
+    setFileSearchQuery,
+    selectedSearchResultIndex,
+    setSelectedSearchResultIndex,
+    fileSearchResults,
+    handleFileSearchInputKeyDown,
+  } = useFileSearchController({
+    searchableFiles,
+    loadAllRepoFiles: ops.loadAllRepoFiles,
+    openFileSearchRequestKey,
+    lastHandledFileSearchRequestKey,
+    onFileSearchRequestHandled,
+    openSearchResult,
+  });
 
-  /** Opens the currently highlighted quick-search result if one exists. */
-  const openSelectedSearchResult = useCallback(async () => {
-    const selectedResult = fileSearchResults[selectedSearchResultIndex];
-    if (!selectedResult) {
-      return;
-    }
+  const fileOperationModeLabel = ops.fileOperationState ? t(`files.operations.modes.${ops.fileOperationState.mode}`) : "";
 
-    await openSearchResult(selectedResult.path);
-  }, [fileSearchResults, openSearchResult, selectedSearchResultIndex]);
-
-  /** Handles keyboard navigation and submit behavior in the quick-search input. */
-  const handleFileSearchInputKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (fileSearchResults.length === 0) {
-          return;
-        }
-
-        setSelectedSearchResultIndex((current) => Math.min(current + 1, fileSearchResults.length - 1));
-        return;
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        if (fileSearchResults.length === 0) {
-          return;
-        }
-
-        setSelectedSearchResultIndex((current) => Math.max(current - 1, 0));
-        return;
-      }
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        void openSelectedSearchResult();
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsFileSearchOpen(false);
-      }
-    },
-    [fileSearchResults.length, openSelectedSearchResult],
-  );
-
-  const fileOperationModeLabel = fileOperationState ? t(`files.operations.modes.${fileOperationState.mode}`) : "";
-
-  const contextPasteDestination = resolveDestinationDirectoryPath(
-    contextMenu?.targetPath ?? "",
-    Boolean(contextMenu?.targetIsDirectory),
-  );
-  const showOpenInExternalAppMenuItem = Boolean(canOpenInExternalApp && contextMenu?.targetPath);
-  const showOpenInLastUsedExternalAppMenuItem = Boolean(
-    showOpenInExternalAppMenuItem && lastUsedWorkspaceExternalAppPreset,
-  );
-  const contextMenuItems = buildWorkspaceFileTreeContextMenuItems({
-    labels: {
-      createFile: t("files.actions.createFile"),
-      createFolder: t("files.actions.createFolder"),
-      rename: t("files.actions.rename"),
-      delete: t("files.actions.delete"),
-      copy: t("files.actions.copy"),
-      cut: t("files.actions.cut"),
-      paste: t("files.actions.paste"),
-      copyPath: t("files.actions.copyPath"),
-      copyRelativePath: t("files.actions.copyRelativePath"),
-      openInFileManager:
-        rendererPlatform === "win32" ? t("files.actions.openInExplorer") : t("files.actions.openInFinder"),
-      openInExternalApp: t("files.actions.openInExternalApp"),
-      openInLastUsedExternalApp: lastUsedWorkspaceExternalAppPreset
-        ? t("files.actions.openInExternalAppQuick", { app: lastUsedWorkspaceExternalAppPreset.label })
-        : "",
-    },
-    canCreateAtContext: !contextMenu?.targetPath || Boolean(contextMenu.targetIsDirectory),
-    canCreateFile: Boolean(onCreateFile),
-    canCreateFolder: Boolean(onCreateFolder),
-    canRenameEntry: Boolean(onRenameEntry),
-    canDeleteEntry: Boolean(onDeleteEntry),
-    canCopyEntry: Boolean(onCopyEntry),
-    canCutEntry: Boolean(onCutEntry),
-    canPasteEntries: Boolean(canPasteEntries),
-    canCopyPath: Boolean(onCopyPath),
-    canCopyRelativePath: Boolean(onCopyRelativePath),
-    canOpenInFileManager: Boolean(onOpenInFileManager),
-    showOpenInExternalAppMenuItem,
-    showOpenInLastUsedExternalAppMenuItem,
-    contextBasePath: contextMenu?.basePath ?? "",
-    contextTargetPath: contextMenu?.targetPath ?? "",
-    contextPasteDestination,
+  const { items: contextMenuItems, anchorPosition: contextMenuAnchorPosition } = useFileTreeContextMenuItems({
+    t,
+    rendererPlatform,
+    contextMenu,
+    closeContextMenu,
+    canOpenInExternalApp,
     lastUsedWorkspaceExternalAppPreset,
+    canPasteEntries: ops.canPasteEntries,
     handlers: {
-      startCreate: (_basePath, isDirectory) => {
-        if (!contextMenu) {
-          return;
-        }
-        if (isDirectory) {
-          contextMenu.startCreateFolder();
-          closeContextMenu();
-          return;
-        }
-        contextMenu.startCreateFile();
-        closeContextMenu();
-      },
-      rename: () => {
-        contextMenu?.startRename?.();
-        closeContextMenu();
-      },
-      delete: async () => {
-        if (!onDeleteEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onDeleteEntry(contextMenu.targetPath);
-      },
-      copyEntry: async () => {
-        if (!onCopyEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyEntry(contextMenu.targetPath);
-      },
-      cutEntry: async () => {
-        if (!onCutEntry || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCutEntry(contextMenu.targetPath);
-      },
-      pasteEntries: async (destinationPath: string) => {
-        if (!onPasteEntries || !canPasteEntries) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onPasteEntries(destinationPath);
-      },
-      copyPath: async () => {
-        if (!onCopyPath || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyPath(contextMenu.targetPath);
-      },
-      copyRelativePath: async () => {
-        if (!onCopyRelativePath || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onCopyRelativePath(contextMenu.targetPath);
-      },
-      openInFileManager: async () => {
-        if (!onOpenInFileManager || !contextMenu?.targetPath) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onOpenInFileManager(contextMenu.targetPath);
-      },
-      openInExternalApp: async (appId: ExternalAppId) => {
-        if (!onOpenInExternalApp) {
-          closeContextMenu();
-          return;
-        }
-        closeContextMenu();
-        await onOpenInExternalApp({ appId, path: contextMenu?.targetPath || undefined });
-      },
+      onCreateFile: ops.onCreateFile,
+      onCreateFolder: ops.onCreateFolder,
+      onRenameEntry: ops.onRenameEntry,
+      onDeleteEntry: ops.onDeleteEntry,
+      onCopyPath: ops.onCopyPath,
+      onCopyRelativePath: ops.onCopyRelativePath,
+      onOpenInFileManager: ops.onOpenInFileManager,
+      onOpenInExternalApp: ops.onOpenInExternalApp,
+      onCopyEntry: ops.onCopyEntry,
+      onCutEntry: ops.onCutEntry,
+      onPasteEntries: ops.onPasteEntries,
     },
   });
-  const contextMenuAnchorPosition =
-    contextMenu && typeof contextMenu.mouseX === "number" && typeof contextMenu.mouseY === "number"
-      ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
-      : undefined;
 
-  const fileOperationProgressText = fileOperationState
-    ? fileOperationState.currentPath
+  const fileOperationProgressText = ops.fileOperationState
+    ? ops.fileOperationState.currentPath
       ? t("files.operations.progressWithPath", {
           mode: fileOperationModeLabel,
-          processed: fileOperationState.processed,
-          total: fileOperationState.total,
-          path: fileOperationState.currentPath,
+          processed: ops.fileOperationState.processed,
+          total: ops.fileOperationState.total,
+          path: ops.fileOperationState.currentPath,
         })
       : t("files.operations.progress", {
           mode: fileOperationModeLabel,
-          processed: fileOperationState.processed,
-          total: fileOperationState.total,
+          processed: ops.fileOperationState.processed,
+          total: ops.fileOperationState.total,
         })
     : "";
 
   return (
     <Box sx={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      {fileOperationState?.status === "running" ? (
+      {ops.fileOperationState?.status === "running" ? (
         <Box sx={{ px: 1.5, pt: 1, pb: 0.25, display: "flex", flexDirection: "column", gap: 0.5, flexShrink: 0 }}>
           <Typography variant="caption" color="text.secondary" data-testid="file-operation-progress-label">
             {fileOperationProgressText}
           </Typography>
           <LinearProgress
             variant="determinate"
-            value={getFileOperationProgressValue(fileOperationState)}
+            value={getFileOperationProgressValue(ops.fileOperationState)}
             data-testid="file-operation-progress-bar"
           />
         </Box>
       ) : null}
-      {fileOperationError ? (
+      {ops.fileOperationError ? (
         <Box sx={{ px: 1.5, pt: 1, flexShrink: 0 }}>
           <Alert severity="error" data-testid="file-operation-error">
-            {fileOperationError}
+            {ops.fileOperationError}
           </Alert>
         </Box>
       ) : null}
@@ -609,71 +289,62 @@ export function FileManagerView({
         createFileActionLabel={t("files.actions.createFile")}
         createFolderActionLabel={t("files.actions.createFolder")}
         refreshActionLabel={t("files.actions.refresh")}
-        canCreateFile={Boolean(onCreateFile)}
-        canCreateFolder={Boolean(onCreateFolder)}
-        canRefresh={Boolean(onRefresh)}
+        canCreateFile={Boolean(ops.onCreateFile)}
+        canCreateFolder={Boolean(ops.onCreateFolder)}
+        canRefresh={Boolean(ops.onRefresh)}
         onCreateFile={() => {
-          setCreateEntryRequestId((current) => {
-            const requestId = current + 1;
-            setCreateEntryRequest({ kind: "file", requestId });
-            return requestId;
-          });
+          requestCreateFile(createEntryBasePath);
         }}
         onCreateFolder={() => {
-          setCreateEntryRequestId((current) => {
-            const requestId = current + 1;
-            setCreateEntryRequest({ kind: "folder", requestId });
-            return requestId;
-          });
+          requestCreateFolder(createEntryBasePath);
         }}
         onRefresh={() => {
-          void onRefresh?.();
+          void ops.onRefresh?.();
         }}
       />
       <FileTree
         files={visibleTreeFiles}
         gitChangesByPath={gitChangesByPath}
-        ignoredPaths={ignoredRepoPaths}
-        loadedDirectoryPaths={loadedDirectoryPaths}
-        expandableDirectoryPaths={CONTEXT_DIRECTORY_PATHS}
+        ignoredPaths={ops.ignoredRepoPaths}
         expandedItems={expandedItems}
-        selectionRequest={fileTreeSelectionRequest}
+        worktreePath={selectedWorkspaceWorktreePath || undefined}
+        selectionRequest={ops.fileTreeSelectionRequest}
         createEntryRequest={createEntryRequest}
         onExpandedItemsChange={handleExpandedItemsChange}
-        onLoadDirectory={loadExpandedDirectory}
-        onEnsurePathLoaded={ensurePathLoaded}
+        onEnsurePathLoaded={ops.ensurePathLoaded}
         onSelectEntry={({ path, isDirectory }) => {
           setSelectedEntryPath(path);
           if (isDirectory) {
             return;
           }
 
-          void openWorkspaceFile(path, { temporary: true });
+          void ops.openWorkspaceFile(path, { temporary: true });
         }}
         onOpenEntry={({ path, isDirectory }) => {
           if (isDirectory) {
             return;
           }
 
-          void openWorkspaceFile(path);
+          void ops.openWorkspaceFile(path);
         }}
         onCreateEntry={async ({ path, isDirectory }) => {
           if (isDirectory) {
-            await onCreateFolder(path);
+            await ops.onCreateFolder(path);
             return;
           }
 
-          await onCreateFile(path);
+          await ops.onCreateFile(path);
         }}
-        onRenameEntry={onRenameEntry}
-        onDeleteEntry={onDeleteEntry}
-        onCopyEntry={onCopyEntry}
-        onCutEntry={onCutEntry}
-        canPasteEntries={canPasteEntries}
-        onPasteEntries={onPasteEntries}
-        onDropExternalEntries={onDropExternalEntries}
-        canUndoLastEntryOperation={canUndoLastEntryOperation}
-        onUndoLastEntryOperation={onUndoLastEntryOperation}
+        onRenameEntry={ops.onRenameEntry}
+        onDeleteEntry={ops.onDeleteEntry}
+        onCopyEntry={ops.onCopyEntry}
+        onCutEntry={ops.onCutEntry}
+        canPasteEntries={ops.canPasteEntries}
+        onPasteEntries={ops.onPasteEntries}
+        onDropExternalEntries={ops.onDropExternalEntries}
+        onMoveEntries={ops.onMoveEntries}
+        canUndoLastEntryOperation={ops.canUndoLastEntryOperation}
+        onUndoLastEntryOperation={ops.onUndoLastEntryOperation}
         onItemContextMenu={(request) => {
           openContextMenu(request);
         }}

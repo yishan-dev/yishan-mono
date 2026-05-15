@@ -9,7 +9,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 )
+
+const fetchTimeout = 15 * time.Second
+const branchCacheTTL = 30 * time.Second
 
 type GitStatusResponse struct {
 	Branch string   `json:"branch"`
@@ -51,6 +55,13 @@ type GitCommitComparison struct {
 	Commits         []GitCommit `json:"commits"`
 }
 
+type GitBranchDiffSummary struct {
+	FileCount int      `json:"fileCount"`
+	Additions int      `json:"additions"`
+	Deletions int      `json:"deletions"`
+	Files     []string `json:"files"`
+}
+
 type GitDiffContent struct {
 	OldContent string `json:"oldContent"`
 	NewContent string `json:"newContent"`
@@ -70,10 +81,19 @@ type GitInspectResult struct {
 	CurrentBranch   string `json:"currentBranch,omitempty"`
 }
 
-type GitService struct{}
+type branchCacheEntry struct {
+	data GitBranchList
+	at   time.Time
+}
+
+type GitService struct {
+	branchCache map[string]branchCacheEntry
+}
 
 func NewGitService() *GitService {
-	return &GitService{}
+	return &GitService{
+		branchCache: make(map[string]branchCacheEntry),
+	}
 }
 
 func (s *GitService) Status(ctx context.Context, root string) (GitStatusResponse, error) {
@@ -168,7 +188,148 @@ func (s *GitService) ListChanges(ctx context.Context, root string) (GitChangesBy
 		}
 	}
 
+	sections = reconcileUnstagedDeleteUntrackedAddPairs(sections)
+
 	return sections, nil
+}
+
+func reconcileUnstagedDeleteUntrackedAddPairs(input GitChangesBySection) GitChangesBySection {
+	deletedUnstaged := make([]GitChange, 0)
+	addedUntracked := make([]GitChange, 0)
+	for _, file := range input.Unstaged {
+		if file.Kind == "deleted" {
+			deletedUnstaged = append(deletedUnstaged, file)
+		}
+	}
+	for _, file := range input.Untracked {
+		if file.Kind == "added" {
+			addedUntracked = append(addedUntracked, file)
+		}
+	}
+	if len(deletedUnstaged) == 0 || len(addedUntracked) == 0 {
+		return input
+	}
+
+	renamesByNewPath := map[string]GitChange{}
+	consumedDeletedPaths := map[string]bool{}
+	consumedAddedPaths := map[string]bool{}
+
+	for _, deletedFile := range deletedUnstaged {
+		deletedExt := fileExtension(deletedFile.Path)
+		deletedParent := parentPath(deletedFile.Path)
+
+		var sameDirectoryCandidate *GitChange
+		for i := range addedUntracked {
+			candidate := addedUntracked[i]
+			if consumedAddedPaths[candidate.Path] {
+				continue
+			}
+			if parentPath(candidate.Path) != deletedParent {
+				continue
+			}
+			if deletedExt == "" || fileExtension(candidate.Path) == deletedExt {
+				sameDirectoryCandidate = &candidate
+				break
+			}
+		}
+
+		fallbackCandidate := sameDirectoryCandidate
+		if fallbackCandidate == nil {
+			for i := range addedUntracked {
+				candidate := addedUntracked[i]
+				if consumedAddedPaths[candidate.Path] {
+					continue
+				}
+				if deletedExt != "" && fileExtension(candidate.Path) == deletedExt {
+					fallbackCandidate = &candidate
+					break
+				}
+			}
+		}
+
+		if fallbackCandidate == nil {
+			continue
+		}
+
+		consumedDeletedPaths[deletedFile.Path] = true
+		consumedAddedPaths[fallbackCandidate.Path] = true
+
+		existingRename, hasExisting := renamesByNewPath[fallbackCandidate.Path]
+		if hasExisting {
+			existingRename.Additions = maxInt(existingRename.Additions, fallbackCandidate.Additions)
+			existingRename.Deletions = maxInt(existingRename.Deletions, fallbackCandidate.Deletions)
+			renamesByNewPath[fallbackCandidate.Path] = existingRename
+			continue
+		}
+
+		renamesByNewPath[fallbackCandidate.Path] = GitChange{
+			Path:      fallbackCandidate.Path,
+			Kind:      "renamed",
+			Additions: maxInt(0, fallbackCandidate.Additions),
+			Deletions: maxInt(0, fallbackCandidate.Deletions),
+		}
+	}
+
+	if len(renamesByNewPath) == 0 {
+		return input
+	}
+
+	nextUnstaged := make([]GitChange, 0, len(input.Unstaged)+len(renamesByNewPath))
+	for _, file := range input.Unstaged {
+		if consumedDeletedPaths[file.Path] {
+			continue
+		}
+		nextUnstaged = append(nextUnstaged, file)
+	}
+	for _, renamed := range renamesByNewPath {
+		nextUnstaged = append(nextUnstaged, renamed)
+	}
+
+	nextUntracked := make([]GitChange, 0, len(input.Untracked))
+	for _, file := range input.Untracked {
+		if consumedAddedPaths[file.Path] {
+			continue
+		}
+		nextUntracked = append(nextUntracked, file)
+	}
+
+	input.Unstaged = nextUnstaged
+	input.Untracked = nextUntracked
+	return input
+}
+
+func parentPath(path string) string {
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+	slashIndex := strings.LastIndex(normalizedPath, "/")
+	if slashIndex <= 0 {
+		return ""
+	}
+	return normalizedPath[:slashIndex]
+}
+
+func fileExtension(path string) string {
+	fileName := path
+	if slashIndex := strings.LastIndex(strings.ReplaceAll(path, "\\", "/"), "/"); slashIndex >= 0 {
+		fileName = strings.ReplaceAll(path, "\\", "/")[slashIndex+1:]
+	}
+	dotIndex := strings.LastIndex(fileName, ".")
+	if dotIndex <= 0 || dotIndex == len(fileName)-1 {
+		return ""
+	}
+	return strings.ToLower(fileName[dotIndex+1:])
+}
+
+func maxInt(values ...int) int {
+	if len(values) == 0 {
+		return 0
+	}
+	maxValue := values[0]
+	for _, value := range values[1:] {
+		if value > maxValue {
+			maxValue = value
+		}
+	}
+	return maxValue
 }
 
 func (s *GitService) TrackChanges(ctx context.Context, root string, paths []string) error {
@@ -269,7 +430,7 @@ func (s *GitService) ListCommitsToTarget(ctx context.Context, root string, targe
 	if err != nil {
 		return GitCommitComparison{}, err
 	}
-	allChanged, err := gitCommand(ctx, root, "diff", "--name-only", fmt.Sprintf("%s..HEAD", targetBranch))
+	allChanged, err := gitCommand(ctx, root, "diff", "--name-only", fmt.Sprintf("%s...HEAD", targetBranch))
 	if err != nil {
 		return GitCommitComparison{}, err
 	}
@@ -321,6 +482,31 @@ func (s *GitService) ListCommitsToTarget(ctx context.Context, root string, targe
 	}, nil
 }
 
+func (s *GitService) BranchDiffSummary(ctx context.Context, root string, targetBranch string) (GitBranchDiffSummary, error) {
+	if strings.TrimSpace(targetBranch) == "" {
+		return GitBranchDiffSummary{}, NewRPCError(-32602, "targetBranch is required")
+	}
+
+	// Use three-dot diff to compare HEAD against merge-base with targetBranch.
+	numstat, err := gitCommand(ctx, root, "diff", "--numstat", fmt.Sprintf("%s...HEAD", targetBranch))
+	if err != nil {
+		return GitBranchDiffSummary{}, err
+	}
+
+	stats := parseNumstat(numstat)
+	files := make([]string, 0, len(stats))
+	additions := 0
+	deletions := 0
+	for path, v := range stats {
+		files = append(files, path)
+		additions += v[0]
+		deletions += v[1]
+	}
+	sort.Strings(files)
+
+	return GitBranchDiffSummary{FileCount: len(files), Additions: additions, Deletions: deletions, Files: files}, nil
+}
+
 func (s *GitService) ReadCommitDiff(ctx context.Context, root string, commitHash string, path string) (GitDiffContent, error) {
 	if strings.TrimSpace(commitHash) == "" || strings.TrimSpace(path) == "" {
 		return GitDiffContent{}, NewRPCError(-32602, "commitHash and path are required")
@@ -340,7 +526,24 @@ func (s *GitService) ReadBranchComparisonDiff(ctx context.Context, root string, 
 }
 
 func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchList, error) {
-	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
+	if entry, ok := s.branchCache[root]; ok && time.Since(entry.at) < branchCacheTTL {
+		return entry.data, nil
+	}
+
+	fetchCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	s.FetchRef(fetchCtx, root, "")
+	cancel()
+
+	list, err := s.listBranchesFromGit(ctx, root)
+	if err != nil {
+		return GitBranchList{}, err
+	}
+
+	s.branchCache[root] = branchCacheEntry{data: list, at: time.Now()}
+	return list, nil
+}
+
+func (s *GitService) listBranchesFromGit(ctx context.Context, root string) (GitBranchList, error) {	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
 	if err != nil {
 		return GitBranchList{}, err
 	}
@@ -486,16 +689,27 @@ func (s *GitService) RemoveBranch(ctx context.Context, root string, branch strin
 	return err
 }
 
-func (s *GitService) FetchRemotes(ctx context.Context, root string) error {
+func (s *GitService) FetchRef(ctx context.Context, root string, ref string) error {
 	remotesOut, err := gitCommand(ctx, root, "remote")
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(remotesOut) == "" {
+	remotes := splitNonEmptyLines(remotesOut)
+	if len(remotes) == 0 {
 		return nil
 	}
 
-	_, err = gitCommandCombined(ctx, root, "fetch", "--all", "--prune")
+	remote := "origin"
+	if !slices.Contains(remotes, "origin") {
+		remote = remotes[0]
+	}
+
+	args := []string{"fetch", remote, "--quiet", "--no-tags"}
+	if strings.TrimSpace(ref) != "" && ref != "HEAD" {
+		args = append(args, ref)
+	}
+
+	_, err = gitCommandCombined(ctx, root, args...)
 	return err
 }
 

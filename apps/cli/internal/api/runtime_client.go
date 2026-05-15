@@ -12,6 +12,8 @@ func NewRuntimeClient(appCfg *config.Config) *Client {
 		appCfg.API.BaseURL,
 		appCfg.API.Token,
 		appCfg.API.RefreshToken,
+		appCfg.API.AccessTokenExpiresAt,
+		appCfg.API.RefreshTokenExpiresAt,
 		func(update TokenUpdate) error {
 			if err := config.UpdateFile(appCfg.ConfigPath, func(cfg *viper.Viper) {
 				cfg.Set("api_base_url", appCfg.API.BaseURL)

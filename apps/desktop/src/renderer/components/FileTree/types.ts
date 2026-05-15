@@ -15,15 +15,15 @@ export type FileTreeProps = {
   files: string[];
   gitChangesByPath?: Record<string, FileTreeGitChangeKind>;
   ignoredPaths?: string[];
-  loadedDirectoryPaths?: string[];
-  expandableDirectoryPaths?: string[];
   expandedItems?: string[];
+  /** Absolute path to the workspace root. When provided, rows become draggable
+   *  and the drag payload contains absolute paths (worktreePath + relative path). */
+  worktreePath?: string;
   selectionRequest?: { path: string; requestId: number; focus?: boolean } | null;
   createEntryRequest?: { kind: "file" | "folder"; basePath?: string; requestId: number } | null;
   onSelectEntry?: (input: { path: string; isDirectory: boolean }) => void;
   onOpenEntry?: (input: { path: string; isDirectory: boolean }) => void;
   onExpandedItemsChange?: (items: string[]) => void;
-  onLoadDirectory?: (path: string) => void | Promise<void>;
   onEnsurePathLoaded?: (path: string) => void | Promise<void>;
   onCreateEntry?: (input: { path: string; isDirectory: boolean }) => void | Promise<void>;
   onRenameEntry?: (path: string, nextName: string) => void | Promise<void>;
@@ -35,6 +35,8 @@ export type FileTreeProps = {
   onUndoLastEntryOperation?: () => void | Promise<void>;
   canUndoLastEntryOperation?: boolean;
   onDropExternalEntries?: (sourcePaths: string[], destinationPath: string) => void | Promise<void>;
+  /** Called when entries are drag-and-dropped within the tree to move them to a new directory. */
+  onMoveEntries?: (sourceRelativePaths: string[], destinationPath: string) => void | Promise<void>;
   onItemContextMenu?: (request: FileTreeContextMenuRequest) => void;
 };
 
@@ -43,6 +45,14 @@ export type TreeNode = {
   path: string;
   isDirectory: boolean;
   children: Map<string, TreeNode>;
+};
+
+export type VisibleRow = {
+  path: string;
+  name: string;
+  depth: number;
+  isDirectory: boolean;
+  hasChildren: boolean;
 };
 
 export type EditingEntry = {

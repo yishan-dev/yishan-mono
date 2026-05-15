@@ -2,6 +2,7 @@ import { Badge, Box, IconButton, ToggleButton, ToggleButtonGroup, Tooltip } from
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LuFolderTree, LuGitBranch, LuPanelRight } from "react-icons/lu";
+import { PaneHeader } from "../../../components/PaneHeader";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { getShortcutDisplayLabelById } from "../../../shortcuts/shortcutDisplay";
 import { workspacePaneStore } from "../../../store/workspacePaneStore";
@@ -12,16 +13,6 @@ import { FileManagerView } from "./FileManagerView";
 export type RightPaneViewProps = {
   onToggleRightPane?: () => void;
 };
-
-const paneHeaderSx = {
-  minHeight: 42,
-  px: 1.5,
-  borderBottom: 1,
-  borderColor: "divider",
-  bgcolor: "background.paper",
-  display: "flex",
-  alignItems: "center",
-} as const;
 
 /**
  * Renders the workspace right pane with file and git changes tabs.
@@ -57,7 +48,7 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
         overflow: "hidden",
       }}
     >
-      <Box component="header" className="electron-webkit-app-region-drag" sx={{ ...paneHeaderSx }}>
+      <PaneHeader className="electron-webkit-app-region-drag" justifyContent="flex-start">
         <Box className="electron-webkit-app-region-no-drag" sx={{ minWidth: 0 }}>
           <ToggleButtonGroup
             value={activeTab}
@@ -151,7 +142,7 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
             </IconButton>
           </span>
         </Tooltip>
-      </Box>
+      </PaneHeader>
       <Box
         sx={{
           display: activeTab === "files" ? "block" : "none",

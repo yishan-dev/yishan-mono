@@ -6,7 +6,7 @@ import { WebFontsAddon } from "@xterm/addon-web-fonts";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import type { ITerminalAddon, Terminal } from "@xterm/xterm";
-import { openExternalUrl } from "../../../commands/appCommands";
+import { openLink } from "../../../commands/appCommands";
 
 type Logger = Pick<Console, "warn">;
 
@@ -100,11 +100,10 @@ function loadAddonSafely(
   }
 }
 
-/** Opens one xterm web link through the desktop host bridge. */
 async function openExternalLink(event: MouseEvent, uri: string, logger: Logger): Promise<void> {
   event.preventDefault();
   try {
-    const result = await openExternalUrl(uri);
+    const result = await openLink({ url: uri });
     if (!result.opened) {
       logger.warn(`Failed to open xterm external link (${result.reason})`, { uri });
     }

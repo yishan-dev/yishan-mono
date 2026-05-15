@@ -1,12 +1,14 @@
-import { readFileSync, statSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
 import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import { ACTIONS, type AppActionPayload } from "../shared/contracts/actions";
+import { appendBrowserHistoryEntry, loadBrowserHistoryGroups } from "./browser/browserHistory";
 import { configureApplicationMenu } from "./app/menu";
-import { getAuthStatus, getAuthTokens, login } from "./auth/cliAuth";
+import { getAuthStatus, login } from "./auth/cliAuth";
 import { DaemonManager } from "./daemon/daemonManager";
 import { getDaemonQuitOnExit, setDaemonQuitOnExit } from "./daemon/daemonSettings";
+import { createDaemonJwt, ensureDaemonJwtSecret } from "./daemon/daemonSecret";
 import { launchPath, openExternalUrl } from "./integrations/externalAppLauncher";
 import { readExternalClipboardSourcePathsFromSystem } from "./integrations/externalClipboardPipeline";
 import { DESKTOP_RPC_IPC_CHANNELS, type DesktopUpdateEventPayload, HOST_IPC_CHANNELS } from "./ipc";
@@ -29,6 +31,7 @@ export class DesktopApplication {
   private pendingProtocolUrl: string | null = null;
   private pendingUpdateReady: DesktopUpdateEventPayload | null = null;
   private cachedDaemonQuitOnExit: boolean | null = null;
+  private daemonJwtSecret: string | null = null;
 
   /**
    * Starts the desktop app and exits on startup failure.
@@ -90,6 +93,7 @@ export class DesktopApplication {
       this.cachedDaemonQuitOnExit = false;
     }
 
+    this.daemonJwtSecret = await ensureDaemonJwtSecret();
     await this.daemonManager.ensureStarted();
     this.registerHostIpcHandlers();
     this.registerAuthIpcHandlers();
@@ -119,10 +123,17 @@ export class DesktopApplication {
       }
 
       event.preventDefault();
-      this.hasProcessedBeforeQuit = true;
 
-      void this.runBeforeQuitCleanup().finally(() => {
-        app.quit();
+      void this.confirmQuit().then((shouldQuit) => {
+        if (!shouldQuit) {
+          this.isQuitting = false;
+          return;
+        }
+
+        this.hasProcessedBeforeQuit = true;
+        void this.runBeforeQuitCleanup().finally(() => {
+          app.quit();
+        });
       });
     });
 
@@ -180,10 +191,6 @@ export class DesktopApplication {
       return await login();
     });
 
-    ipcMain.handle(HOST_IPC_CHANNELS.getAuthTokens, async () => {
-      return await getAuthTokens();
-    });
-
     ipcMain.handle(HOST_IPC_CHANNELS.getDaemonInfo, async () => {
       return await this.daemonManager.getInfo();
     });
@@ -222,6 +229,13 @@ export class DesktopApplication {
       await setDaemonQuitOnExit(value);
       this.cachedDaemonQuitOnExit = value;
       return { ok: true as const };
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.getDaemonJwt, async () => {
+      if (!this.daemonJwtSecret) {
+        this.daemonJwtSecret = await ensureDaemonJwtSecret();
+      }
+      return createDaemonJwt(this.daemonJwtSecret);
     });
   }
 
@@ -327,6 +341,71 @@ export class DesktopApplication {
       }
     });
 
+    ipcMain.handle(HOST_IPC_CHANNELS.copyFiles, async (_event, input) => {
+      try {
+        const sourcePaths: string[] = Array.isArray(input?.sourcePaths) ? input.sourcePaths : [];
+        const destinationDirectory = String(input?.destinationDirectory ?? "");
+        if (sourcePaths.length === 0) {
+          return { ok: false, error: "sourcePaths is required" };
+        }
+        if (!destinationDirectory) {
+          return { ok: false, error: "destinationDirectory is required" };
+        }
+
+        // Ensure destination directory exists
+        mkdirSync(destinationDirectory, { recursive: true });
+
+        const copiedPaths: string[] = [];
+        for (const sourcePath of sourcePaths) {
+          const name = basename(sourcePath);
+          const destPath = join(destinationDirectory, name);
+          const stat = statSync(sourcePath);
+          if (stat.isDirectory()) {
+            cpSync(sourcePath, destPath, { recursive: true });
+          } else {
+            copyFileSync(sourcePath, destPath);
+          }
+          copiedPaths.push(destPath);
+        }
+
+        return { ok: true, copiedPaths };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.writeFileBase64, async (_event, input) => {
+      try {
+        const absolutePath = String(input?.absolutePath ?? "");
+        const contentBase64 = String(input?.contentBase64 ?? "");
+        if (!absolutePath) {
+          return { ok: false, error: "absolutePath is required" };
+        }
+        if (!contentBase64) {
+          return { ok: false, error: "contentBase64 is required" };
+        }
+
+        // Ensure parent directory exists
+        const parentDir = join(absolutePath, "..");
+        mkdirSync(parentDir, { recursive: true });
+
+        const buffer = Buffer.from(contentBase64, "base64");
+        writeFileSync(absolutePath, buffer);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.loadBrowserHistory, async () => {
+      return await loadBrowserHistoryGroups();
+    });
+
+    ipcMain.handle(HOST_IPC_CHANNELS.appendBrowserHistory, async (_event, input) => {
+      await appendBrowserHistoryEntry(input?.entry);
+      return { ok: true };
+    });
+
     ipcMain.handle(HOST_IPC_CHANNELS.dispatchNotification, async (_event, input) => {
       const notificationResult = await notificationAdapter.driver.show({
         title: input.title,
@@ -400,6 +479,24 @@ export class DesktopApplication {
     } catch (error: unknown) {
       console.warn("Failed to stop daemon service during desktop shutdown", error);
     }
+  }
+
+  private async confirmQuit(): Promise<boolean> {
+    const messageBoxOptions: Electron.MessageBoxOptions = {
+      type: "question",
+      buttons: ["Cancel", "Quit"],
+      defaultId: 0,
+      cancelId: 0,
+      title: "Quit Yishan?",
+      message: "Are you sure you want to quit Yishan?",
+      noLink: true,
+    };
+
+    const result = this.mainWindow
+      ? await dialog.showMessageBox(this.mainWindow, messageBoxOptions)
+      : await dialog.showMessageBox(messageBoxOptions);
+
+    return result.response === 1;
   }
 
   /** Focuses the main window when menu actions should bring the app forward. */
@@ -501,6 +598,7 @@ export class DesktopApplication {
         preload: join(__dirname, "preload.js"),
         contextIsolation: true,
         nodeIntegration: false,
+        webviewTag: true,
       },
     });
 
@@ -532,6 +630,19 @@ export class DesktopApplication {
         this.dispatchAction({ action: ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP });
       });
     }
+
+    // Intercept popup/new-window requests from <webview> guests (e.g. Cmd+Click,
+    // target="_blank", window.open) and forward the URL to the renderer so it can
+    // open the destination in a new in-app browser tab instead of a popup window.
+    mainWindow.webContents.on("did-attach-webview", (_event, webviewContents) => {
+      webviewContents.setWindowOpenHandler((details) => {
+        mainWindow.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
+          method: "webviewOpenUrl",
+          payload: { url: details.url },
+        });
+        return { action: "deny" };
+      });
+    });
 
     mainWindow.on("closed", () => {
       if (this.mainWindow === mainWindow) {

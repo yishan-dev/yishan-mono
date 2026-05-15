@@ -1,4 +1,4 @@
-import { BiBell, BiChip, type BiCog, BiGitBranch, BiPalette, BiSolidKeyboard, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
+import { BiBell, BiChip, type BiCog, BiGitBranch, BiLinkExternal, BiPalette, BiSolidKeyboard, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
 import { AGENT_SETTINGS_LABEL_KEY_BY_KIND, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
 import {
   NOTIFICATION_SETTINGS_SEARCH_ITEMS,
@@ -11,6 +11,7 @@ export type SettingsTab =
   | "appearance"
   | "daemon"
   | "keybindings"
+  | "links"
   | "notifications"
   | "terminal"
   | "workspace";
@@ -43,6 +44,7 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
     titleKey: "settings.sections.app",
     items: [
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
+      { tab: "links", labelKey: "settings.items.links", icon: BiLinkExternal },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
       { tab: "keybindings", labelKey: "settings.items.keybindings", icon: BiSolidKeyboard },
@@ -169,6 +171,22 @@ const LANGUAGE_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   },
 ];
 
+const LINKS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "link-target",
+    tab: "links",
+    icon: BiLinkExternal,
+    labelKey: "settings.links.title",
+    sectionLabelKey: "settings.items.links",
+    keywordKeys: [
+      "settings.links.description",
+      "settings.links.targetLabel",
+      "settings.links.options.built-in",
+      "settings.links.options.external",
+    ],
+  },
+];
+
 const KEYBINDINGS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   {
     id: "keybindings-list",
@@ -245,6 +263,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...AGENT_SEARCH_ITEMS,
   ...APPEARANCE_SEARCH_ITEMS,
   ...LANGUAGE_SEARCH_ITEMS,
+  ...LINKS_SEARCH_ITEMS,
   ...KEYBINDINGS_SEARCH_ITEMS,
   ...DAEMON_SEARCH_ITEMS,
   ...GIT_WORKSPACE_SEARCH_ITEMS,

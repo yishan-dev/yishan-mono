@@ -18,7 +18,8 @@ describe("DaemonManager", () => {
       stdout: "",
       stderr: "start failed",
     });
-    const manager = new DaemonManager({ run });
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("offline"));
+    const manager = new DaemonManager({ run, fetch });
 
     await expect(manager.ensureStarted()).rejects.toThrow("Failed to start daemon");
   });

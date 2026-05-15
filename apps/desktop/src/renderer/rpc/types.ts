@@ -17,6 +17,10 @@ export type DaemonRpcClient = {
     checkAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
     ensureAgentGlobalConfigExternalDirectoryPermission: (input?: unknown) => Promise<unknown>;
     persistAuthTokens: (input: Rpc.PersistAuthTokensInput) => Promise<{ ok: boolean }>;
+    getAccessToken: (input?: unknown) => Promise<Rpc.GetAccessTokenOutput>;
+    checkAuthStatus: (input?: unknown) => Promise<Rpc.CheckAuthStatusOutput>;
+    logout: (input?: unknown) => Promise<Rpc.LogoutOutput>;
+    reloadAuthConfig: (input?: unknown) => Promise<Rpc.ReloadAuthConfigOutput>;
   };
   workspace: {
     list: (input?: unknown) => Promise<unknown>;
@@ -53,6 +57,7 @@ export type DaemonRpcClient = {
     commitChanges: (input: Rpc.GitCommitInput) => Promise<string>;
     getBranchStatus: (input: Rpc.GitWorktreeInput) => Promise<Rpc.GitBranchStatusResponse>;
     listCommitsToTarget: (input: Rpc.GitTargetBranchInput) => Promise<Rpc.GitCommitComparisonResponse>;
+    getBranchDiffSummary: (input: Rpc.GitTargetBranchInput) => Promise<Rpc.GitBranchDiffSummaryResponse>;
     listBranches: (input: Rpc.GitWorktreeInput) => Promise<Rpc.GitBranchListResponse>;
     pushBranch: (input: Rpc.GitWorktreeInput) => Promise<string>;
     publishBranch: (input: Rpc.GitWorktreeInput) => Promise<string>;

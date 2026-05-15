@@ -26,6 +26,12 @@ var openCodeWrapperScript string
 //go:embed assets/bin/generic-agent
 var genericAgentWrapperScript string
 
+//go:embed assets/bin/open
+var openWrapperScript string
+
+//go:embed assets/bin/xdg-open
+var xdgOpenWrapperScript string
+
 //go:embed assets/lib/common.sh
 var commonLibScript string
 
@@ -45,7 +51,7 @@ func ensureManagedHookAssets(managedRootDir string) (hookAssetPaths, error) {
 		notifyPowerShellScriptPath: filepath.Join(managedRootDir, "notify.ps1"),
 	}
 
-	for _, asset := range []struct {
+	assets := []struct {
 		path    string
 		content string
 		mode    os.FileMode
@@ -59,7 +65,23 @@ func ensureManagedHookAssets(managedRootDir string) (hookAssetPaths, error) {
 		{path: filepath.Join(managedRootDir, "bin", "cursor"), content: genericAgentWrapperScript, mode: 0o755},
 		{path: filepath.Join(managedRootDir, "lib", "common.sh"), content: commonLibScript, mode: 0o755},
 		{path: filepath.Join(managedRootDir, "lib", "hook_ingress.sh"), content: hookIngressLibScript, mode: 0o755},
-	} {
+	}
+	if runtime.GOOS == "darwin" {
+		assets = append(assets, struct {
+			path    string
+			content string
+			mode    os.FileMode
+		}{path: filepath.Join(managedRootDir, "bin", "open"), content: openWrapperScript, mode: 0o755})
+	}
+	if runtime.GOOS == "linux" {
+		assets = append(assets, struct {
+			path    string
+			content string
+			mode    os.FileMode
+		}{path: filepath.Join(managedRootDir, "bin", "xdg-open"), content: xdgOpenWrapperScript, mode: 0o755})
+	}
+
+	for _, asset := range assets {
 		if err := writeTextFileIfChanged(asset.path, asset.content, asset.mode); err != nil {
 			return hookAssetPaths{}, fmt.Errorf("write wrapper asset %s: %w", asset.path, err)
 		}

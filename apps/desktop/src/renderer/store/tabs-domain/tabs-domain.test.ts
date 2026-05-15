@@ -101,6 +101,23 @@ describe("tabs-domain open", () => {
     expect(created && created.kind === "terminal" ? created.data.paneId : undefined).toBe("pane-new-terminal");
   });
 
+  it("opens a browser tab and selects it", () => {
+    const state = createBaseState();
+    const patch = openTabState(
+      state,
+      {
+        kind: "browser",
+        url: "https://example.com",
+      },
+      "new-browser",
+    );
+
+    expect(patch).toBeTruthy();
+    expect(patch?.selectedTabId).toBe("new-browser");
+    const created = patch?.tabs?.find((tab) => tab.id === "new-browser");
+    expect(created?.kind).toBe("browser");
+  });
+
   it("creates a new terminal tab when reuseExisting is disabled", () => {
     const state = createBaseState();
     const patch = openTabState(
@@ -216,6 +233,87 @@ describe("tabs-domain open", () => {
     expect(patch?.selectedTabId).toBe("file-1");
     const promotedTab = patch?.tabs?.find((tab) => tab.id === "file-1");
     expect(promotedTab && promotedTab.kind === "file" ? promotedTab.data.isTemporary : undefined).toBe(false);
+  });
+  it("reuses a temporary tab only when it belongs to the active pane", () => {
+    const state = createBaseState();
+    // Two temp tabs: file-1 is in "pane A", file-2 is a temp tab in "pane B"
+    const multiPaneState: WorkspaceTabStateSlice = {
+      ...state,
+      tabs: [
+        ...state.tabs.map((tab) =>
+          tab.id === "file-1" && tab.kind === "file"
+            ? { ...tab, data: { ...tab.data, isTemporary: true } }
+            : tab,
+        ),
+        {
+          id: "file-2",
+          workspaceId: "workspace-1",
+          title: "b.ts",
+          pinned: false,
+          kind: "file",
+          data: {
+            path: "src/b.ts",
+            content: "b1",
+            savedContent: "b1",
+            isDirty: false,
+            isTemporary: true,
+          },
+        },
+      ],
+    };
+
+    // active pane contains file-1 → reuse it
+    const reusePatch = openTabState(
+      multiPaneState,
+      { kind: "file", path: "src/c.ts", content: "c", temporary: true },
+      "new-id",
+      { activePaneTabIds: ["session-1", "file-1"] },
+    );
+    expect(reusePatch?.selectedTabId).toBe("file-1");
+    expect(reusePatch?.tabs?.some((tab) => tab.id === "new-id")).toBe(false);
+    const reusedTab = reusePatch?.tabs?.find((tab) => tab.id === "file-1");
+    expect(reusedTab && reusedTab.kind === "file" ? reusedTab.data.path : "").toBe("src/c.ts");
+
+    // active pane contains file-2 but NOT file-1 → reuse file-2
+    const reuseOtherPanePatch = openTabState(
+      multiPaneState,
+      { kind: "file", path: "src/d.ts", content: "d", temporary: true },
+      "new-id-2",
+      { activePaneTabIds: ["session-1", "file-2"] },
+    );
+    expect(reuseOtherPanePatch?.selectedTabId).toBe("file-2");
+    const reusedOtherTab = reuseOtherPanePatch?.tabs?.find((tab) => tab.id === "file-2");
+    expect(reusedOtherTab && reusedOtherTab.kind === "file" ? reusedOtherTab.data.path : "").toBe("src/d.ts");
+
+    // active pane has NO temp tabs → create a new one
+    const createPatch = openTabState(
+      multiPaneState,
+      { kind: "file", path: "src/e.ts", content: "e", temporary: true },
+      "new-id-3",
+      { activePaneTabIds: ["session-1"] },
+    );
+    expect(createPatch?.selectedTabId).toBe("new-id-3");
+    expect(createPatch?.tabs?.some((tab) => tab.id === "new-id-3")).toBe(true);
+  });
+
+  it("falls back to global temp tab search when no active pane info is provided", () => {
+    const state = createBaseState();
+    // file-1 is a temp tab
+    const previewState: WorkspaceTabStateSlice = {
+      ...state,
+      tabs: state.tabs.map((tab) =>
+        tab.id === "file-1" && tab.kind === "file"
+          ? { ...tab, data: { ...tab.data, isTemporary: true } }
+          : tab,
+      ),
+    };
+
+    const patch = openTabState(
+      previewState,
+      { kind: "file", path: "src/c.ts", content: "c", temporary: true },
+      "new-id",
+    );
+    expect(patch?.selectedTabId).toBe("file-1");
   });
 });
 
@@ -499,6 +597,7 @@ describe("tabs-domain layout and session", () => {
             path: "src/a.ts",
             oldContent: "old",
             newContent: "new",
+            isTemporary: false,
           },
         },
       ],
@@ -595,6 +694,7 @@ describe("tabs-domain rename", () => {
             path: "src/a.ts",
             oldContent: "old",
             newContent: "new",
+            isTemporary: false,
           },
         },
       ],

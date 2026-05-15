@@ -2,6 +2,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 
 import type { AppDb } from "@/db/client";
 import { nodes, organizationMembers } from "@/db/schema";
+import { signRelayToken } from "@/auth/security";
 import {
   NodeDeletePermissionRequiredError,
   NodeNotFoundError,
@@ -287,5 +288,38 @@ export class NodeService {
 
       await tx.delete(nodes).where(eq(nodes.id, input.nodeId));
     });
+  }
+
+  async issueRelayToken(input: {
+    actorUserId: string;
+    nodeId: string;
+    jwtSecret: string;
+    jwtIssuer: string;
+    jwtAudience: string;
+  }): Promise<{ token: string; expiresAt: string }> {
+    const rows = await this.db
+      .select({ id: nodes.id, ownerUserId: nodes.ownerUserId })
+      .from(nodes)
+      .where(eq(nodes.id, input.nodeId))
+      .limit(1);
+
+    const node = rows[0];
+    if (!node) {
+      throw new NodeNotFoundError(input.nodeId);
+    }
+
+    if (node.ownerUserId !== input.actorUserId) {
+      throw new NodeDeletePermissionRequiredError();
+    }
+
+    return signRelayToken(
+      {
+        sub: input.actorUserId,
+        nodeId: input.nodeId,
+        iss: input.jwtIssuer,
+        aud: input.jwtAudience,
+      },
+      input.jwtSecret,
+    );
   }
 }

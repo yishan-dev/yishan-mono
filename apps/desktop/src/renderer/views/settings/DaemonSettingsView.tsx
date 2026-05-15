@@ -1,9 +1,14 @@
-import { Alert, Box, Button, Chip, CircularProgress, Snackbar, Typography } from "@mui/material";
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Typography } from "@mui/material";
+import { CenteredSpinner } from "../../components/CenteredSpinner";
+import { StatusIndicator } from "../../components/StatusIndicator";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonInfoResult } from "../../../main/ipc";
 import { SettingsCard, SettingsControlRow, SettingsRows, SettingsSectionHeader, SettingsToggleRow } from "../../components/settings";
+import { closeTerminalSession } from "../../commands/terminalCommands";
 import { getDesktopHostBridge } from "../../rpc/rpcTransport";
+import { tabStore } from "../../store/tabStore";
+import { clearTerminalRecoveryStorage } from "../workspace/terminal/terminalRecovery";
 
 /** Renders one settings panel for inspecting the local daemon connection. */
 export function DaemonSettingsView() {
@@ -15,6 +20,7 @@ export function DaemonSettingsView() {
   const [isRestarting, setIsRestarting] = useState(false);
   const [restartError, setRestartError] = useState<string | null>(null);
   const [restartSuccessOpen, setRestartSuccessOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [quitOnExit, setQuitOnExit] = useState(false);
   const [isLoadingQuitOnExit, setIsLoadingQuitOnExit] = useState(true);
   const [isSavingQuitOnExit, setIsSavingQuitOnExit] = useState(false);
@@ -82,10 +88,43 @@ export function DaemonSettingsView() {
     setIsRestarting(true);
     setRestartError(null);
     setDaemonInfo(null);
-    // Invalidate any in-flight load so stale data cannot overwrite post-restart state.
     latestLoadIdRef.current += 1;
 
     try {
+      const terminalTabs = tabStore.getState().tabs.filter((tab) => tab.kind === "terminal");
+      if (terminalTabs.length > 0) {
+        const sessionIds = [
+          ...new Set(
+            terminalTabs
+              .map((tab) => (tab.kind === "terminal" ? tab.data.sessionId?.trim() : undefined))
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ];
+
+        const closeErrors: string[] = [];
+        for (const sessionId of sessionIds) {
+          try {
+            await closeTerminalSession({ sessionId });
+          } catch (error) {
+            closeErrors.push(sessionId);
+            console.warn("[DaemonSettingsView] Failed to close terminal session", sessionId, error);
+          }
+        }
+
+        tabStore.getState().closeAllTerminalTabs();
+        clearTerminalRecoveryStorage();
+
+        if (closeErrors.length > 0) {
+          if (!isMountedRef.current) {
+            return;
+          }
+          setRestartError(t("settings.daemon.restart.terminalCloseFailed"));
+          setHasLoadError(true);
+          setIsRestarting(false);
+          return;
+        }
+      }
+
       const result = await getDesktopHostBridge().restartDaemon();
       if (!isMountedRef.current) {
         return;
@@ -154,9 +193,7 @@ export function DaemonSettingsView() {
       />
       <SettingsCard>
         {isLoading ? (
-          <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-            <CircularProgress size={20} />
-          </Box>
+          <CenteredSpinner />
         ) : (
           <>
             {hasLoadError ? <Alert severity="error">{t("settings.daemon.loadError")}</Alert> : null}
@@ -164,11 +201,9 @@ export function DaemonSettingsView() {
               <SettingsControlRow
                 title={t("settings.daemon.rows.status")}
                 control={
-                  <Chip
-                    size="small"
+                  <StatusIndicator
                     label={statusLabel}
-                    color={daemonInfo ? "success" : "default"}
-                    variant={daemonInfo ? "filled" : "outlined"}
+                    color={daemonInfo ? "success" : "disabled"}
                   />
                 }
               />
@@ -220,7 +255,7 @@ export function DaemonSettingsView() {
                   variant="contained"
                   color="primary"
                   onClick={() => {
-                    void handleRestart();
+                    setIsConfirmOpen(true);
                   }}
                   disabled={isRestarting || isLoading}
                   startIcon={isRestarting ? <CircularProgress size={14} color="inherit" /> : null}
@@ -242,6 +277,70 @@ export function DaemonSettingsView() {
         </SettingsCard>
       </Box>
 
+      <Box sx={{ mt: 3 }}>
+        <SettingsSectionHeader
+          title={t("settings.daemon.relay.title")}
+          description={t("settings.daemon.relay.description")}
+        />
+        <SettingsCard>
+          {isLoading ? (
+            <CenteredSpinner />
+          ) : (
+            <SettingsRows>
+              <SettingsControlRow
+                title={t("settings.daemon.relay.rows.status")}
+                control={
+                  <StatusIndicator
+                    label={
+                      !daemonInfo?.relay?.enabled
+                        ? t("settings.daemon.relay.status.disabled")
+                        : daemonInfo.relay.connected
+                          ? t("settings.daemon.relay.status.connected")
+                          : t("settings.daemon.relay.status.disconnected")
+                    }
+                    color={
+                      !daemonInfo?.relay?.enabled
+                        ? "disabled"
+                        : daemonInfo.relay.connected
+                          ? "success"
+                          : "error"
+                    }
+                  />
+                }
+              />
+              <SettingsControlRow
+                title={t("settings.daemon.relay.rows.url")}
+                control={
+                  <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                    {daemonInfo?.relay?.url || t("settings.daemon.values.unknown")}
+                  </Typography>
+                }
+              />
+              {daemonInfo?.relay?.connectedAt ? (
+                <SettingsControlRow
+                  title={t("settings.daemon.relay.rows.connectedAt")}
+                  control={
+                    <Typography variant="body2">
+                      {new Date(daemonInfo.relay.connectedAt).toLocaleString()}
+                    </Typography>
+                  }
+                />
+              ) : null}
+              {daemonInfo?.relay?.lastError ? (
+                <SettingsControlRow
+                  title={t("settings.daemon.relay.rows.lastError")}
+                  control={
+                    <Typography variant="body2" color="error">
+                      {daemonInfo.relay.lastError}
+                    </Typography>
+                  }
+                />
+              ) : null}
+            </SettingsRows>
+          )}
+        </SettingsCard>
+      </Box>
+
       <Snackbar
         open={restartSuccessOpen}
         autoHideDuration={4000}
@@ -252,6 +351,37 @@ export function DaemonSettingsView() {
           {t("settings.daemon.restart.success")}
         </Alert>
       </Snackbar>
+
+      <Dialog
+        open={isConfirmOpen}
+        onClose={isRestarting ? undefined : () => setIsConfirmOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        disableEscapeKeyDown={isRestarting}
+      >
+        <DialogTitle>{t("settings.daemon.restart.confirmTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {t("settings.daemon.restart.confirmMessage")}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsConfirmOpen(false)} disabled={isRestarting}>
+            {t("common.actions.cancel")}
+          </Button>
+          <Button
+            color="warning"
+            onClick={() => {
+              setIsConfirmOpen(false);
+              void handleRestart();
+            }}
+            disabled={isRestarting}
+            startIcon={isRestarting ? <CircularProgress size={14} color="inherit" /> : undefined}
+          >
+            {t("settings.daemon.restart.action")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

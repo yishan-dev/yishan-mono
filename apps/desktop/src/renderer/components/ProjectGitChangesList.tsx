@@ -14,7 +14,7 @@ import { type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, u
 import { LuChevronDown, LuChevronRight, LuCopy, LuCornerUpLeft, LuMinus, LuPlus } from "react-icons/lu";
 import { GitChangeTotals } from "./GitChangeTotals";
 
-export type ProjectGitChangeKind = "added" | "modified" | "deleted" | "renamed";
+export type ProjectGitChangeKind = "added" | "modified" | "deleted" | "renamed" | "untracked";
 
 export type ProjectGitChangeItem = {
   path: string;
@@ -64,6 +64,10 @@ function getChangeColors(kind: ProjectGitChangeKind, sectionId: string) {
 
   if (kind === "renamed") {
     return { icon: "R", color: "info.main" };
+  }
+
+  if (kind === "untracked") {
+    return { icon: "?", color: "info.main" };
   }
 
   if (kind === "added") {

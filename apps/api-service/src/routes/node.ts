@@ -4,7 +4,8 @@ import { zValidator } from "@hono/zod-validator";
 import {
   deleteNodeHandler,
   listNodesHandler,
-  registerNodeHandler
+  registerNodeHandler,
+  relayTokenHandler
 } from "@/handlers/node";
 import {
   completeScheduledJobRunHandler,
@@ -14,6 +15,7 @@ import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
 import { validationErrorResponse } from "@/validation/error-response";
 import {
+  nodeRelayTokenParamsSchema,
   organizationNodeDeleteParamsSchema,
   organizationNodeParamsSchema,
   registerNodeBodySchema
@@ -49,7 +51,6 @@ nodeRouter.post(
   (c) => registerNodeHandler(c, c.req.valid("json"))
 );
 
-
 nodeRouter.put(
   "/nodes/:nodeId/scheduled-jobs/runs/start",
   zValidator("param", nodeScheduledJobParamsSchema, validationErrorResponse),
@@ -62,4 +63,10 @@ nodeRouter.put(
   zValidator("param", nodeScheduledJobParamsSchema, validationErrorResponse),
   zValidator("json", completeScheduledJobRunBodySchema, validationErrorResponse),
   (c) => completeScheduledJobRunHandler(c, c.req.valid("param"), c.req.valid("json"))
+);
+
+nodeRouter.post(
+  "/nodes/:nodeId/relay-token",
+  zValidator("param", nodeRelayTokenParamsSchema, validationErrorResponse),
+  (c) => relayTokenHandler(c, c.req.valid("param"))
 );

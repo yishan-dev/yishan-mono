@@ -1,8 +1,8 @@
-import { Box, ButtonBase, IconButton, Menu, MenuItem, Typography } from "@mui/material";
+import { Box, ButtonBase, Divider, IconButton, Menu, MenuItem, Typography } from "@mui/material";
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuPin, LuPlus, LuSquareTerminal, LuX } from "react-icons/lu";
+import { LuColumns2, LuGlobe, LuPin, LuPlus, LuRows2, LuSquareTerminal, LuX } from "react-icons/lu";
 import {
   AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND,
   type DesktopAgentKind,
@@ -21,13 +21,29 @@ type WorkspaceTab = {
   isTemporary?: boolean;
 };
 
-export type TabBarCreateOption = "terminal" | DesktopAgentKind;
+export type TabBarCreateOption = "browser" | "terminal" | DesktopAgentKind;
 
 type AgentCreateOption = DesktopAgentKind;
 
 /** Returns true when one create-menu option targets an agent terminal preset. */
 function isAgentCreateOption(option: TabBarCreateOption): option is AgentCreateOption {
-  return option !== "terminal";
+  return option !== "terminal" && option !== "browser";
+}
+
+const dirtyDotSx = {
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  bgcolor: "primary.main",
+  flexShrink: 0,
+} as const;
+
+/** Renders one small colored dot indicating unsaved changes on a tab. */
+function TabDirtyDot({ tabId, isDirty }: { tabId: string; isDirty?: boolean }) {
+  if (!isDirty) {
+    return null;
+  }
+  return <Box component="span" data-testid={`tab-dirty-dot-${tabId}`} aria-hidden sx={dirtyDotSx} />;
 }
 
 type TabBarProps = {
@@ -44,6 +60,16 @@ type TabBarProps = {
   getTabIcon?: (tab: WorkspaceTab) => ReactNode;
   enabledAgentKinds?: AgentCreateOption[];
   disabled?: boolean;
+  /** Called when a tab drag starts - useful for enabling split drop zones. */
+  onTabDragStart?: (tabId: string) => void;
+  /** Called when a tab drag ends. */
+  onTabDragEnd?: () => void;
+  /** When false, the active tab left border shows grey instead of primary color. */
+  focused?: boolean;
+  /** Called when the user clicks "Split Right". Only shown when provided. */
+  onSplitRight?: () => void;
+  /** Called when the user clicks "Split Down". Only shown when provided. */
+  onSplitDown?: () => void;
 };
 
 /**
@@ -66,12 +92,24 @@ export function TabBar({
   getTabIcon,
   enabledAgentKinds,
   disabled,
+  onTabDragStart,
+  onTabDragEnd,
+  focused = true,
+  onSplitRight,
+  onSplitDown,
 }: TabBarProps) {
   const { t } = useTranslation();
   const untitledLabel = t("tabs.untitled");
   const newTabLabel = t("tabs.new");
   const createMenuLabel = t("tabs.createMenu.label");
   const terminalTitle = t("terminal.title");
+  const browserCreateLabel = t("tabs.createMenu.browser");
+  const browserTitle =
+    browserCreateLabel !== "tabs.createMenu.browser"
+      ? browserCreateLabel
+      : t("browser.title") !== "browser.title"
+        ? t("browser.title")
+        : "Browser";
   const createLabelByAgentKind = SUPPORTED_DESKTOP_AGENT_KINDS.reduce<Record<DesktopAgentKind, string>>(
     (next, agentKind) => {
       next[agentKind] = t(AGENT_TAB_CREATE_MENU_LABEL_KEY_BY_KIND[agentKind]);
@@ -93,6 +131,7 @@ export function TabBar({
     tabId: string;
   } | null>(null);
   const [createMenuAnchor, setCreateMenuAnchor] = useState<HTMLElement | null>(null);
+  const [splitMenuAnchor, setSplitMenuAnchor] = useState<HTMLElement | null>(null);
   const [draggedTabId, setDraggedTabId] = useState("");
   const [dropTarget, setDropTarget] = useState<{
     tabId: string;
@@ -207,6 +246,7 @@ export function TabBar({
   const resetDragState = () => {
     setDraggedTabId("");
     setDropTarget(null);
+    onTabDragEnd?.();
   };
 
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>, tab: WorkspaceTab) => {
@@ -238,6 +278,12 @@ export function TabBar({
       icon: <LuSquareTerminal size={14} />,
       shortcutLabel: getShortcutDisplayLabelById("open-terminal", platform),
     },
+    {
+      option: "browser",
+      label: browserTitle,
+      icon: <LuGlobe size={14} />,
+      shortcutLabel: getShortcutDisplayLabelById("open-browser", platform),
+    },
     ...SUPPORTED_DESKTOP_AGENT_KINDS.map((agentKind) => {
       const label = createLabelByAgentKind[agentKind];
       return {
@@ -251,6 +297,7 @@ export function TabBar({
   const createOptions = allCreateOptions.filter(
     (item) => !isAgentCreateOption(item.option) || enabledAgentKindSet.has(item.option),
   );
+  const hasAgentCreateOptions = createOptions.some((item) => isAgentCreateOption(item.option));
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLDivElement>, tab: WorkspaceTab) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
@@ -290,11 +337,11 @@ export function TabBar({
     mb: active ? "-1px" : 0,
     transition: "background-color 120ms ease",
     borderRight: "1px solid",
-    borderColor: "divider",
+    borderRightColor: "divider",
     ...(active
       ? {
           borderLeft: "1px solid",
-          borderLeftColor: "primary.main",
+          borderLeftColor: focused ? "primary.main" : "divider",
           "&::after": {
             content: '""',
             position: "absolute",
@@ -359,6 +406,8 @@ export function TabBar({
     setDraggedTabId(tab.id);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", tab.id);
+    event.dataTransfer.setData("application/x-tab-id", tab.id);
+    onTabDragStart?.(tab.id);
   };
 
   const handleTabDragOver = (event: DragEvent<HTMLDivElement>, tab: WorkspaceTab) => {
@@ -456,8 +505,150 @@ export function TabBar({
   const pinnedTabs = tabs.filter((tab) => tab.pinned);
   const unpinnedTabs = tabs.filter((tab) => !tab.pinned);
 
+  const renderTabItem = (tab: WorkspaceTab) => {
+    const active = tab.id === selectedTabId;
+    const editing = tab.id === editingTabId;
+    const pinned = tab.pinned;
+
+    return (
+      <Box
+        key={tab.id}
+        ref={(element: HTMLDivElement | null) => {
+          tabItemRefs.current[tab.id] = element;
+        }}
+        draggable={canDragTabs && !editing}
+        onContextMenu={(event) => handleContextMenu(event, tab)}
+        onDragStart={(event) => handleTabDragStart(event, tab)}
+        onDragOver={(event) => handleTabDragOver(event, tab)}
+        onDrop={(event) => handleTabDrop(event, tab)}
+        onDragEnd={resetDragState}
+        sx={{
+          ...buildTabContainerSx(active, editing),
+          ...(dropTarget?.tabId === tab.id && {
+            ...(dropTarget.position === "before"
+              ? {
+                  boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
+                }
+              : {
+                  boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
+                }),
+          }),
+          opacity: draggedTabId === tab.id ? 0.9 : 1,
+        }}
+      >
+        {editing ? (
+          <Box
+            className="tab-content"
+            sx={{
+              py: 0.75,
+              pl: 0.5,
+              pr: 0.25,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            {getTabIcon?.(tab)}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
+            <Box
+              ref={editingRef}
+              component="div"
+              contentEditable
+              suppressContentEditableWarning
+              aria-label={renameTabLabel}
+              onKeyDown={(event) => handleRenameKeyDown(event, tab)}
+              onInput={(event) => {
+                editingDraftRef.current = event.currentTarget.textContent ?? "";
+              }}
+              onBlur={() => handleRenameBlur(tab)}
+              sx={{
+                typography: "body2",
+                color: active ? "text.primary" : "text.secondary",
+                minWidth: 24,
+                maxWidth: 220,
+                outline: "none",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {tab.title || untitledLabel}
+            </Box>
+          </Box>
+        ) : (
+          <ButtonBase
+            className="tab-content"
+            disableRipple
+            onClick={() => onSelectTab(tab.id)}
+            onDoubleClick={() => beginRename(tab)}
+            sx={{
+              typography: "body2",
+              color: active ? "text.primary" : "text.secondary",
+              py: 1,
+              pl: 0.5,
+              pr: 0.25,
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            {getTabIcon?.(tab)}
+            <TabDirtyDot tabId={tab.id} isDirty={tab.isDirty} />
+            <Box
+              component="span"
+              style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
+              sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {tab.title || untitledLabel}
+            </Box>
+          </ButtonBase>
+        )}
+        {pinned ? (
+          <IconButton
+            className="tab-pin"
+            size="small"
+            aria-label={unpinTabActionLabel}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePinTab?.(tab.id);
+            }}
+            disabled={editing || !onTogglePinTab}
+            sx={{
+              color: active ? "text.primary" : "text.secondary",
+              p: 0.5,
+              mr: -2,
+              display: editing ? "none" : "inline-flex",
+            }}
+          >
+            <LuPin size={14} />
+          </IconButton>
+        ) : (
+          <IconButton
+            className="tab-close"
+            size="small"
+            aria-label={closeTabActionLabel}
+            onClick={(event) => {
+              event.stopPropagation();
+              onCloseTab(tab.id);
+            }}
+            disabled={editing}
+            sx={{
+              color: active ? "text.primary" : "text.secondary",
+              p: 0.5,
+              mr: -2,
+              display: editing ? "none" : "inline-flex",
+            }}
+          >
+            <LuX size={14} />
+          </IconButton>
+        )}
+      </Box>
+    );
+  };
+
   return (
-    <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, height: "100%" }}>
+    <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, width: "100%", height: "100%" }}>
       <Box
         sx={{
           flex: 1,
@@ -467,173 +658,7 @@ export function TabBar({
           height: "100%",
         }}
       >
-        {pinnedTabs.map((tab) => {
-          const active = tab.id === selectedTabId;
-          const editing = tab.id === editingTabId;
-          const pinned = tab.pinned;
-
-          return (
-            <Box
-              key={tab.id}
-              ref={(element: HTMLDivElement | null) => {
-                tabItemRefs.current[tab.id] = element;
-              }}
-              draggable={canDragTabs && !editing}
-              onContextMenu={(event) => handleContextMenu(event, tab)}
-              onDragStart={(event) => handleTabDragStart(event, tab)}
-              onDragOver={(event) => handleTabDragOver(event, tab)}
-              onDrop={(event) => handleTabDrop(event, tab)}
-              onDragEnd={resetDragState}
-              sx={{
-                ...buildTabContainerSx(active, editing),
-                ...(dropTarget?.tabId === tab.id && {
-                  ...(dropTarget.position === "before"
-                    ? {
-                        boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
-                      }
-                    : {
-                        boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
-                      }),
-                }),
-                opacity: draggedTabId === tab.id ? 0.9 : 1,
-              }}
-            >
-              {editing ? (
-                <Box
-                  className="tab-content"
-                  sx={{
-                    py: 0.75,
-                    pl: 0.5,
-                    pr: 0.25,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  {getTabIcon?.(tab)}
-                  {tab.isDirty ? (
-                    <Box
-                      component="span"
-                      data-testid={`tab-dirty-dot-${tab.id}`}
-                      aria-hidden
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                  <Box
-                    ref={editingRef}
-                    component="div"
-                    contentEditable
-                    suppressContentEditableWarning
-                    aria-label={renameTabLabel}
-                    onKeyDown={(event) => handleRenameKeyDown(event, tab)}
-                    onInput={(event) => {
-                      editingDraftRef.current = event.currentTarget.textContent ?? "";
-                    }}
-                    onBlur={() => handleRenameBlur(tab)}
-                    sx={{
-                      typography: "body2",
-                      color: active ? "text.primary" : "text.secondary",
-                      minWidth: 24,
-                      maxWidth: 220,
-                      outline: "none",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {tab.title || untitledLabel}
-                  </Box>
-                </Box>
-              ) : (
-                <ButtonBase
-                  className="tab-content"
-                  disableRipple
-                  onClick={() => onSelectTab(tab.id)}
-                  onDoubleClick={() => beginRename(tab)}
-                  sx={{
-                    typography: "body2",
-                    color: active ? "text.primary" : "text.secondary",
-                    py: 1,
-                    pl: 0.5,
-                    pr: 0.25,
-                    whiteSpace: "nowrap",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  {getTabIcon?.(tab)}
-                  {tab.isDirty ? (
-                    <Box
-                      component="span"
-                      data-testid={`tab-dirty-dot-${tab.id}`}
-                      aria-hidden
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                  <Box
-                    component="span"
-                    style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
-                    sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    {tab.title || untitledLabel}
-                  </Box>
-                </ButtonBase>
-              )}
-              {pinned ? (
-                <IconButton
-                  className="tab-pin"
-                  size="small"
-                  aria-label={unpinTabActionLabel}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onTogglePinTab?.(tab.id);
-                  }}
-                  disabled={editing || !onTogglePinTab}
-                  sx={{
-                    color: active ? "text.primary" : "text.secondary",
-                    p: 0.5,
-                    mr: -2,
-                    display: editing ? "none" : "inline-flex",
-                  }}
-                >
-                  <LuPin size={14} />
-                </IconButton>
-              ) : (
-                <IconButton
-                  className="tab-close"
-                  size="small"
-                  aria-label={closeTabActionLabel}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCloseTab(tab.id);
-                  }}
-                  disabled={editing}
-                  sx={{
-                    color: active ? "text.primary" : "text.secondary",
-                    p: 0.5,
-                    mr: -2,
-                    display: editing ? "none" : "inline-flex",
-                  }}
-                >
-                  <LuX size={14} />
-                </IconButton>
-              )}
-            </Box>
-          );
-        })}
+        {pinnedTabs.map(renderTabItem)}
         <Box
           ref={scrollableTabsContainerRef}
           onDragOver={handleTabsContainerDragOver}
@@ -653,184 +678,29 @@ export function TabBar({
             },
           }}
         >
-          {unpinnedTabs.map((tab) => {
-            const active = tab.id === selectedTabId;
-            const editing = tab.id === editingTabId;
-            const pinned = tab.pinned;
-
-            return (
-              <Box
-                key={tab.id}
-                ref={(element: HTMLDivElement | null) => {
-                  tabItemRefs.current[tab.id] = element;
-                }}
-                draggable={canDragTabs && !editing}
-                onContextMenu={(event) => handleContextMenu(event, tab)}
-                onDragStart={(event) => handleTabDragStart(event, tab)}
-                onDragOver={(event) => handleTabDragOver(event, tab)}
-                onDrop={(event) => handleTabDrop(event, tab)}
-                onDragEnd={resetDragState}
-                sx={{
-                  ...buildTabContainerSx(active, editing),
-                  ...(dropTarget?.tabId === tab.id && {
-                    ...(dropTarget.position === "before"
-                      ? {
-                          boxShadow: (theme) => `inset 2px 0 0 ${theme.palette.primary.main}`,
-                        }
-                      : {
-                          boxShadow: (theme) => `inset -2px 0 0 ${theme.palette.primary.main}`,
-                        }),
-                  }),
-                  opacity: draggedTabId === tab.id ? 0.9 : 1,
-                }}
-              >
-                {editing ? (
-                  <Box
-                    className="tab-content"
-                    sx={{
-                      py: 0.75,
-                      pl: 0.5,
-                      pr: 0.25,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                    }}
-                  >
-                    {getTabIcon?.(tab)}
-                    {tab.isDirty ? (
-                      <Box
-                        component="span"
-                        data-testid={`tab-dirty-dot-${tab.id}`}
-                        aria-hidden
-                        sx={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          bgcolor: "primary.main",
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Box
-                      ref={editingRef}
-                      component="div"
-                      contentEditable
-                      suppressContentEditableWarning
-                      aria-label={renameTabLabel}
-                      onKeyDown={(event) => handleRenameKeyDown(event, tab)}
-                      onInput={(event) => {
-                        editingDraftRef.current = event.currentTarget.textContent ?? "";
-                      }}
-                      onBlur={() => handleRenameBlur(tab)}
-                      sx={{
-                        typography: "body2",
-                        color: active ? "text.primary" : "text.secondary",
-                        minWidth: 24,
-                        maxWidth: 220,
-                        outline: "none",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {tab.title || untitledLabel}
-                    </Box>
-                  </Box>
-                ) : (
-                  <ButtonBase
-                    className="tab-content"
-                    disableRipple
-                    onClick={() => onSelectTab(tab.id)}
-                    onDoubleClick={() => beginRename(tab)}
-                    sx={{
-                      typography: "body2",
-                      color: active ? "text.primary" : "text.secondary",
-                      py: 1,
-                      pl: 0.5,
-                      pr: 0.25,
-                      whiteSpace: "nowrap",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                    }}
-                  >
-                    {getTabIcon?.(tab)}
-                    {tab.isDirty ? (
-                      <Box
-                        component="span"
-                        data-testid={`tab-dirty-dot-${tab.id}`}
-                        aria-hidden
-                        sx={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          bgcolor: "primary.main",
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Box
-                      component="span"
-                      style={{ fontStyle: tab.isTemporary ? "italic" : "normal" }}
-                      sx={{ overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      {tab.title || untitledLabel}
-                    </Box>
-                  </ButtonBase>
-                )}
-                {pinned ? (
-                  <IconButton
-                    className="tab-pin"
-                    size="small"
-                    aria-label={unpinTabActionLabel}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onTogglePinTab?.(tab.id);
-                    }}
-                    disabled={editing || !onTogglePinTab}
-                    sx={{
-                      color: active ? "text.primary" : "text.secondary",
-                      p: 0.5,
-                      mr: -2,
-                      display: editing ? "none" : "inline-flex",
-                    }}
-                  >
-                    <LuPin size={14} />
-                  </IconButton>
-                ) : (
-                  <IconButton
-                    className="tab-close"
-                    size="small"
-                    aria-label={closeTabActionLabel}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onCloseTab(tab.id);
-                    }}
-                    disabled={editing}
-                    sx={{
-                      color: active ? "text.primary" : "text.secondary",
-                      p: 0.5,
-                      mr: -2,
-                      display: editing ? "none" : "inline-flex",
-                    }}
-                  >
-                    <LuX size={14} />
-                  </IconButton>
-                )}
-              </Box>
-            );
-          })}
+          {unpinnedTabs.map(renderTabItem)}
         </Box>
+        <IconButton
+          size="small"
+          aria-label={newTabLabel}
+          onClick={(event) => setCreateMenuAnchor(event.currentTarget)}
+          disabled={disabled}
+          sx={{ flexShrink: 0, alignSelf: "center" }}
+        >
+          <LuPlus size={16} />
+        </IconButton>
       </Box>
-      <IconButton
-        size="small"
-        aria-label={newTabLabel}
-        onClick={(event) => setCreateMenuAnchor(event.currentTarget)}
-        disabled={disabled}
-        sx={{ flexShrink: 0, alignSelf: "center" }}
-      >
-        <LuPlus size={16} />
-      </IconButton>
+      {(onSplitRight || onSplitDown) && (
+        <IconButton
+          size="small"
+          aria-label="Split pane"
+          onClick={(event) => setSplitMenuAnchor(event.currentTarget)}
+          disabled={disabled || !selectedTabId}
+          sx={{ flexShrink: 0, alignSelf: "center", color: "text.secondary" }}
+        >
+          <LuColumns2 size={16} />
+        </IconButton>
+      )}
       <Menu
         anchorEl={createMenuAnchor}
         open={Boolean(createMenuAnchor)}
@@ -844,27 +714,68 @@ export function TabBar({
         }}
       >
         {createOptions.map((item) => (
-          <MenuItem
-            key={item.option}
-            onClick={() => {
-              onCreateTab(item.option);
-              setCreateMenuAnchor(null);
-            }}
-            disabled={disabled}
-            sx={{ gap: 1 }}
-            aria-label={`${createMenuLabel}: ${item.label}`}
-          >
-            {item.icon}
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, width: "100%" }}>
-              <Box component="span">{item.label}</Box>
-              {item.shortcutLabel ? (
-                <Typography variant="caption" color="text.secondary" component="span" aria-hidden="true">
-                  {item.shortcutLabel}
-                </Typography>
-              ) : null}
-            </Box>
-          </MenuItem>
+          <Box key={item.option}>
+            <MenuItem
+              onClick={() => {
+                onCreateTab(item.option);
+                setCreateMenuAnchor(null);
+              }}
+              disabled={disabled}
+              sx={{ gap: 1 }}
+              aria-label={`${createMenuLabel}: ${item.label}`}
+            >
+              {item.icon}
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, width: "100%" }}>
+                <Box component="span">{item.label}</Box>
+                {item.shortcutLabel ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    component="span"
+                    aria-hidden="true"
+                    sx={{ fontSize: 13, lineHeight: 1 }}
+                  >
+                    {item.shortcutLabel}
+                  </Typography>
+                ) : null}
+              </Box>
+            </MenuItem>
+            {item.option === "browser" && hasAgentCreateOptions ? <Divider sx={{ my: 0.5 }} /> : null}
+          </Box>
         ))}
+      </Menu>
+      <Menu
+        anchorEl={splitMenuAnchor}
+        open={Boolean(splitMenuAnchor)}
+        onClose={() => setSplitMenuAnchor(null)}
+        slotProps={{ paper: { sx: { minWidth: 160 } } }}
+      >
+        {onSplitRight && (
+          <MenuItem
+            onClick={() => {
+              onSplitRight();
+              setSplitMenuAnchor(null);
+            }}
+            disabled={disabled || !selectedTabId}
+            sx={{ gap: 1 }}
+          >
+            <LuColumns2 size={14} />
+            <Box component="span">Split Right</Box>
+          </MenuItem>
+        )}
+        {onSplitDown && (
+          <MenuItem
+            onClick={() => {
+              onSplitDown();
+              setSplitMenuAnchor(null);
+            }}
+            disabled={disabled || !selectedTabId}
+            sx={{ gap: 1 }}
+          >
+            <LuRows2 size={14} />
+            <Box component="span">Split Down</Box>
+          </MenuItem>
+        )}
       </Menu>
       <Menu
         open={Boolean(contextMenu)}

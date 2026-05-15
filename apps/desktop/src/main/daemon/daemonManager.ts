@@ -5,7 +5,8 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { isDevMode } from "../runtime/environment";
 
-const DAEMON_START_ARGS = ["daemon", "start", "--jwt-required=false"];
+const DAEMON_START_ARGS = ["daemon", "start", "--jwt-required=true"];
+const DAEMON_DEV_RELAY_URL = "http://127.0.0.1:8788";
 const DAEMON_STOP_ARGS = ["daemon", "stop"];
 const DAEMON_STATE_FILE_NAME = "daemon.state.json";
 const DAEMON_ID_FILE_NAME = "daemon.id";
@@ -39,10 +40,20 @@ type DaemonManagerOptions = {
   fetch?: typeof fetch;
 };
 
+type DaemonRelayInfo = {
+  enabled: boolean;
+  url: string;
+  connected: boolean;
+  connectedAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+};
+
 type DaemonInfo = {
   version: string;
   daemonId: string;
   wsUrl: string;
+  relay?: DaemonRelayInfo;
 };
 
 type DaemonState = {
@@ -309,6 +320,7 @@ export class DaemonManager {
   private readonly run: CliCommandRunner;
   private readonly logger: DaemonLogger;
   private readonly fetchFn: typeof fetch;
+  private readonly preferCliStartPath: boolean;
   private ensureStartedInFlight: Promise<void> | null = null;
   private devDaemonChild: ChildProcess | null = null;
 
@@ -316,6 +328,7 @@ export class DaemonManager {
     this.run = options?.run ?? runCliCommand;
     this.logger = options?.logger ?? console;
     this.fetchFn = options?.fetch ?? fetch;
+    this.preferCliStartPath = Boolean(options?.run);
   }
 
   private async waitForHealthy(options?: { retryCount?: number; retryDelayMs?: number }): Promise<void> {
@@ -354,7 +367,8 @@ export class DaemonManager {
 
     const invocation = resolveCliInvocation();
     let output = "";
-    const child = spawn(invocation.executablePath, [...invocation.prefixArgs, "daemon", "run", "--jwt-required=false"], {
+    const daemonRunArgs = ["daemon", "run", "--jwt-required=true", "--relay-url", DAEMON_DEV_RELAY_URL];
+    const child = spawn(invocation.executablePath, [...invocation.prefixArgs, ...daemonRunArgs], {
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env,
       cwd: invocation.cwd,
@@ -435,7 +449,7 @@ export class DaemonManager {
       // Continue to active recovery path.
     }
 
-    if (isDevMode()) {
+    if (isDevMode() && !this.preferCliStartPath) {
       try {
         await this.startDevForegroundDaemon();
       } catch (error) {
@@ -498,7 +512,7 @@ export class DaemonManager {
       throw new Error(`Failed to load daemon health: HTTP ${response.status}`);
     }
 
-    const body = (await response.json()) as { version?: unknown; daemonId?: unknown };
+    const body = (await response.json()) as { version?: unknown; daemonId?: unknown; relay?: unknown };
     const version = typeof body.version === "string" ? body.version.trim() : "";
     const daemonIdFromHealth = typeof body.daemonId === "string" ? body.daemonId.trim() : "";
     const daemonId = daemonIdFromHealth || (await readPersistedDaemonId());
@@ -506,6 +520,20 @@ export class DaemonManager {
       throw new Error("daemon health response is invalid");
     }
 
-    return { version, daemonId, wsUrl };
+    const result: DaemonInfo = { version, daemonId, wsUrl };
+
+    if (body.relay != null && typeof body.relay === "object") {
+      const r = body.relay as Record<string, unknown>;
+      result.relay = {
+        enabled: r.enabled === true,
+        url: typeof r.url === "string" ? r.url : "",
+        connected: r.connected === true,
+        connectedAt: typeof r.connectedAt === "string" ? r.connectedAt : undefined,
+        lastError: typeof r.lastError === "string" ? r.lastError : undefined,
+        lastErrorAt: typeof r.lastErrorAt === "string" ? r.lastErrorAt : undefined,
+      };
+    }
+
+    return result;
   }
 }

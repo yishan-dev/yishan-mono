@@ -105,6 +105,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
         oldContent: input.oldContent,
         newContent: input.newContent,
         source: input.diffSource,
+        isTemporary: Boolean(input.temporary),
       } as WorkspaceTabDataByKind[T["kind"]];
     }
 
@@ -119,6 +120,7 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       oldContent,
       newContent,
       source: input.diffSource,
+      isTemporary: Boolean(input.temporary),
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 
@@ -141,6 +143,12 @@ export function buildTabDataByInput<T extends OpenWorkspaceTabInput>(input: T): 
       path: input.path,
       dataUrl: input.dataUrl,
       isTemporary: Boolean(input.temporary),
+    } as WorkspaceTabDataByKind[T["kind"]];
+  }
+
+  if (input.kind === "browser") {
+    return {
+      url: input.url?.trim() || "",
     } as WorkspaceTabDataByKind[T["kind"]];
   }
 

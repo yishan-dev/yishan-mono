@@ -155,6 +155,10 @@ vi.mock("../../../store/chatStore", () => ({
   chatStore: mocked.workspaceStore,
 }));
 
+vi.mock("../../../store/workspaceCreateProgressStore", () => ({
+  workspaceCreateProgressStore: vi.fn(() => undefined),
+}));
+
 vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
     setSelectedRepoId: mocked.setSelectedRepoId,
@@ -667,7 +671,6 @@ describe("ProjectListView", () => {
 
     const doneBadge = screen.getByTestId("workspace-status-done-badge-workspace-1");
     expect(doneBadge).toBeTruthy();
-    expect(within(doneBadge).getByTestId("workspace-icon-workspace-1")).toBeTruthy();
   });
 
   it("renders failed indicator for background workspace notifications", () => {
@@ -678,7 +681,6 @@ describe("ProjectListView", () => {
 
     const failedBadge = screen.getByTestId("workspace-status-failed-badge-workspace-1");
     expect(failedBadge).toBeTruthy();
-    expect(within(failedBadge).getByTestId("workspace-icon-workspace-1")).toBeTruthy();
   });
 
   it("clears unread indicator after opening that workspace while app is focused", () => {
@@ -755,7 +757,7 @@ describe("ProjectListView", () => {
     vi.useRealTimers();
   });
 
-  it("does not show source branch for primary workspace when current branch is not main", async () => {
+  it("does not show source branch for primary workspace", async () => {
     vi.useFakeTimers();
     vi.mocked(inspectGitRepository).mockResolvedValueOnce({ isGitRepository: true, currentBranch: "feature/live-branch" });
     mocked.stateRef.current = {
@@ -800,7 +802,7 @@ describe("ProjectListView", () => {
     vi.useRealTimers();
   });
 
-  it("shows source branch fallback for primary workspace on main when source metadata is unavailable", async () => {
+  it("does not show source branch for primary workspace even on main branch", async () => {
     vi.useFakeTimers();
     vi.mocked(inspectGitRepository).mockResolvedValueOnce({ isGitRepository: true, currentBranch: "main" });
     mocked.stateRef.current = {
@@ -841,7 +843,7 @@ describe("ProjectListView", () => {
 
     const infoPopper = screen.getByTestId("workspace-info-popper");
     expect(infoPopper.textContent).toContain("workspace.info.branch: main");
-    expect(infoPopper.textContent).toContain("workspace.info.sourceBranch: workspace.info.unavailable");
+    expect(infoPopper.textContent).not.toContain("workspace.info.sourceBranch:");
     vi.useRealTimers();
   });
 });

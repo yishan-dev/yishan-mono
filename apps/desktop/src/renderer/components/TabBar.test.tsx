@@ -15,6 +15,7 @@ vi.mock("react-i18next", () => ({
           "tabs.createMenu.label": "Create",
           "tabs.createMenu.chat": "Chat",
           "terminal.title": "Terminal",
+          "browser.title": "Browser",
           "tabs.createMenu.opencode": "OpenCode",
           "tabs.createMenu.codex": "Codex",
           "tabs.createMenu.claude": "Claude",
@@ -45,6 +46,9 @@ vi.mock("../shortcuts/shortcutDisplay", () => ({
     }
     if (shortcutId === "open-terminal") {
       return "⌘+T";
+    }
+    if (shortcutId === "open-browser") {
+      return "⌘+⇧+B";
     }
 
     return null;
@@ -242,6 +246,16 @@ describe("TabBar interactions", () => {
     expect(onCreateTab).toHaveBeenCalledWith("terminal");
   });
 
+  it("creates a browser tab from plus button menu", async () => {
+    const onCreateTab = vi.fn();
+    renderTabBar({ onCreateTab });
+
+    fireEvent.click(screen.getByRole("button", { name: "New tab" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Create: Browser/ }));
+
+    expect(onCreateTab).toHaveBeenCalledWith("browser");
+  });
+
   it("shows shortcut for terminal in create menu", async () => {
     renderTabBar();
 
@@ -249,6 +263,15 @@ describe("TabBar interactions", () => {
     await screen.findByRole("menuitem", { name: /Create: Terminal/ });
 
     expect(screen.getByText("⌘+T")).toBeTruthy();
+  });
+
+  it("shows shortcut for browser in create menu", async () => {
+    renderTabBar();
+
+    fireEvent.click(screen.getByRole("button", { name: "New tab" }));
+    await screen.findByRole("menuitem", { name: /Create: Browser/ });
+
+    expect(screen.getByText("⌘+⇧+B")).toBeTruthy();
   });
 
   it("hides disabled agents from create menu", async () => {

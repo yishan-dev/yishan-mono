@@ -25,6 +25,7 @@ export type RpcSchema = {
         createdAt: string;
         agent?: string;
         workspaceId?: string;
+        workspaceName?: string;
         sessionId?: string;
         navigationPath?: string;
         notificationEventType?: NotificationEventType;
@@ -53,6 +54,12 @@ export type RpcSchema = {
         status: "pending" | "running" | "completed" | "failed" | "skipped" | "warning";
         message?: string;
         createdAt: string;
+      };
+      openBrowserUrl: {
+        url: string;
+        workspaceId: string;
+        tabId: string;
+        paneId: string;
       };
     };
   };

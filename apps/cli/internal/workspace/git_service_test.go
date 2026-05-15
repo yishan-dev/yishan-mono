@@ -219,48 +219,37 @@ func TestGitServiceListChangesRenameScenarios(t *testing.T) {
 	}
 }
 
-func TestGitServiceFetchRemotes(t *testing.T) {
-	remote := filepath.Join(t.TempDir(), "remote.git")
-	runGit(t, t.TempDir(), "init", "--bare", remote)
-
-	root := filepath.Join(t.TempDir(), "repo")
-	runGit(t, t.TempDir(), "clone", remote, root)
-	runGit(t, root, "config", "user.name", "Test User")
-	runGit(t, root, "config", "user.email", "test@example.com")
-
-	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("seed\n"), 0o644); err != nil {
-		t.Fatalf("write seed: %v", err)
-	}
-	runGit(t, root, "add", "seed.txt")
-	runGit(t, root, "commit", "-m", "seed")
-	runGit(t, root, "push", "origin", "HEAD:main")
-
-	other := filepath.Join(t.TempDir(), "other")
-	runGit(t, t.TempDir(), "clone", remote, other)
-	runGit(t, other, "checkout", "-B", "main", "origin/main")
-	runGit(t, other, "config", "user.name", "Test User")
-	runGit(t, other, "config", "user.email", "test@example.com")
-	if err := os.WriteFile(filepath.Join(other, "latest.txt"), []byte("latest\n"), 0o644); err != nil {
-		t.Fatalf("write latest: %v", err)
-	}
-	runGit(t, other, "add", "latest.txt")
-	runGit(t, other, "commit", "-m", "latest")
-	runGit(t, other, "push", "origin", "HEAD:main")
-
-	before := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
-	latest := strings.TrimSpace(runGit(t, other, "rev-parse", "HEAD"))
-	if before == latest {
-		t.Fatal("expected local remote-tracking branch to be stale before fetch")
-	}
-
+func TestGitServiceListChangesReconcilesDeleteAndUntrackedAsRename(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
 	svc := NewGitService()
-	if err := svc.FetchRemotes(context.Background(), root); err != nil {
-		t.Fatalf("fetch remotes: %v", err)
+
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("v1\n"), 0o644); err != nil {
+		t.Fatalf("write AGENTS.md: %v", err)
+	}
+	runGit(t, root, "add", "AGENTS.md")
+	runGit(t, root, "commit", "-m", "seed")
+
+	if err := os.Remove(filepath.Join(root, "AGENTS.md")); err != nil {
+		t.Fatalf("remove AGENTS.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "AGENTS1.md"), []byte("v2\n"), 0o644); err != nil {
+		t.Fatalf("write AGENTS1.md: %v", err)
 	}
 
-	after := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
-	if after != latest {
-		t.Fatalf("expected origin/main %q after fetch, got %q", latest, after)
+	changes, err := svc.ListChanges(context.Background(), root)
+	if err != nil {
+		t.Fatalf("list changes: %v", err)
+	}
+
+	if len(changes.Untracked) != 0 {
+		t.Fatalf("expected no untracked entries after rename reconciliation, got %+v", changes.Untracked)
+	}
+	if len(changes.Unstaged) != 1 {
+		t.Fatalf("expected one unstaged entry after rename reconciliation, got %+v", changes.Unstaged)
+	}
+	if changes.Unstaged[0].Kind != "renamed" || changes.Unstaged[0].Path != "AGENTS1.md" {
+		t.Fatalf("expected one renamed unstaged entry for AGENTS1.md, got %+v", changes.Unstaged)
 	}
 }
 
@@ -318,5 +307,115 @@ func TestGitServiceCreateAndRemoveWorktree(t *testing.T) {
 	}
 	if branches := strings.TrimSpace(runGit(t, root, "branch", "--list", "feature/worktree")); branches != "" {
 		t.Fatalf("expected worktree branch removed, got %q", branches)
+	}
+}
+
+func TestGitServiceFetchRef(t *testing.T) {
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, t.TempDir(), "init", "--bare", remote)
+
+	root := filepath.Join(t.TempDir(), "repo")
+	runGit(t, t.TempDir(), "clone", remote, root)
+	runGit(t, root, "config", "user.name", "Test User")
+	runGit(t, root, "config", "user.email", "test@example.com")
+
+	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("seed\n"), 0o644); err != nil {
+		t.Fatalf("write seed: %v", err)
+	}
+	runGit(t, root, "add", "seed.txt")
+	runGit(t, root, "commit", "-m", "seed")
+	runGit(t, root, "push", "origin", "HEAD:main")
+
+	other := filepath.Join(t.TempDir(), "other")
+	runGit(t, t.TempDir(), "clone", remote, other)
+	runGit(t, other, "checkout", "-B", "main", "origin/main")
+	runGit(t, other, "config", "user.name", "Test User")
+	runGit(t, other, "config", "user.email", "test@example.com")
+	if err := os.WriteFile(filepath.Join(other, "latest.txt"), []byte("latest\n"), 0o644); err != nil {
+		t.Fatalf("write latest: %v", err)
+	}
+	runGit(t, other, "add", "latest.txt")
+	runGit(t, other, "commit", "-m", "latest")
+	runGit(t, other, "push", "origin", "HEAD:main")
+
+	before := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
+	latest := strings.TrimSpace(runGit(t, other, "rev-parse", "HEAD"))
+	if before == latest {
+		t.Fatal("expected local remote-tracking branch to be stale before fetch")
+	}
+
+	svc := NewGitService()
+	if err := svc.FetchRef(context.Background(), root, "main"); err != nil {
+		t.Fatalf("FetchRef: %v", err)
+	}
+
+	after := strings.TrimSpace(runGit(t, root, "rev-parse", "origin/main"))
+	if after != latest {
+		t.Fatalf("expected origin/main %q after fetch, got %q", latest, after)
+	}
+}
+
+func TestGitServiceBranchDiffSummaryDivergedBranch(t *testing.T) {
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, t.TempDir(), "init", "--bare", remote)
+
+	repo := filepath.Join(t.TempDir(), "repo")
+	runGit(t, t.TempDir(), "clone", remote, repo)
+	runGit(t, repo, "config", "user.name", "Test User")
+	runGit(t, repo, "config", "user.email", "test@example.com")
+
+	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("v1\n"), 0o644)
+	runGit(t, repo, "add", "shared.txt")
+	runGit(t, repo, "commit", "-m", "shared v1")
+	runGit(t, repo, "push", "origin", "HEAD:main")
+
+	worktree := filepath.Join(t.TempDir(), "wt-feature")
+	svc := NewGitService()
+	if err := svc.CreateWorktree(context.Background(), repo, "feature", worktree, true, "HEAD"); err != nil {
+		t.Fatalf("create worktree: %v", err)
+	}
+
+	os.WriteFile(filepath.Join(worktree, "feature.txt"), []byte("feature work\n"), 0o644)
+	runGit(t, worktree, "add", "feature.txt")
+	runGit(t, worktree, "commit", "-m", "add feature file")
+
+	runGit(t, repo, "checkout", "main")
+	os.WriteFile(filepath.Join(repo, "main-only.txt"), []byte("main work\n"), 0o644)
+	runGit(t, repo, "add", "main-only.txt")
+	runGit(t, repo, "commit", "-m", "add main-only file")
+	runGit(t, repo, "push", "origin", "HEAD:main")
+
+	runGit(t, worktree, "fetch", "origin")
+
+	summary, err := svc.BranchDiffSummary(context.Background(), worktree, "origin/main")
+	if err != nil {
+		t.Fatalf("BranchDiffSummary: %v", err)
+	}
+	if summary.FileCount != 1 {
+		t.Fatalf("expected 1 file in branch diff summary (feature.txt only), got %d", summary.FileCount)
+	}
+
+	comparison, err := svc.ListCommitsToTarget(context.Background(), worktree, "origin/main")
+	if err != nil {
+		t.Fatalf("ListCommitsToTarget: %v", err)
+	}
+	if len(comparison.Commits) != 1 {
+		t.Fatalf("expected 1 commit ahead of origin/main, got %d", len(comparison.Commits))
+	}
+	if len(comparison.AllChangedFiles) != 1 {
+		t.Fatalf("expected 1 changed file (feature.txt only), got %d: %v", len(comparison.AllChangedFiles), comparison.AllChangedFiles)
+	}
+	if comparison.AllChangedFiles[0] != "feature.txt" {
+		t.Fatalf("expected changed file feature.txt, got %q", comparison.AllChangedFiles[0])
+	}
+}
+
+func TestGitServiceFetchRefNoRemote(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewGitService()
+
+	if err := svc.FetchRef(context.Background(), root, "main"); err != nil {
+		t.Fatalf("expected no error for repo without remotes, got: %v", err)
 	}
 }

@@ -115,6 +115,11 @@ type CreateWorkspaceResponse struct {
 	Workspace Workspace `json:"workspace"`
 }
 
+type RelayTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
 type RefreshTokenResponse struct {
 	TokenType             string `json:"tokenType"`
 	AccessToken           string `json:"accessToken"`

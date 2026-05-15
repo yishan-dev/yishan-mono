@@ -45,9 +45,10 @@ type CreateProgressEvent struct {
 type CreateProgressReporter func(CreateProgressEvent)
 
 type createProgressStep struct {
-	ID    string
-	Label string
-	Run   func() (CreateProgressStatus, string, error)
+	ID      string
+	Label   string
+	Timeout time.Duration
+	Run     func(ctx context.Context) (CreateProgressStatus, string, error)
 }
 
 func (m *Manager) CreateWorkspace(ctx context.Context, req CreateRequest) (Workspace, error) {
@@ -106,29 +107,35 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath}
 	steps := []createProgressStep{
 		{
-			ID:    "update",
-			Label: "Fetch repository",
-			Run: func() (CreateProgressStatus, string, error) {
-				if err := m.gits.FetchRemotes(ctx, sourcePath); err != nil {
+			ID:      "worktree",
+			Label:   "Create local worktree",
+			Timeout: 10 * time.Minute,
+			Run: func(stepCtx context.Context) (CreateProgressStatus, string, error) {
+				err := m.gits.CreateWorktree(stepCtx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch))
+				if err == nil {
+					return CreateProgressCompleted, worktreePath, nil
+				}
+
+				if !isMissingRefError(err) {
 					return CreateProgressFailed, err.Error(), err
 				}
-				return CreateProgressCompleted, "", nil
-			},
-		},
-		{
-			ID:    "worktree",
-			Label: "Create local worktree",
-			Run: func() (CreateProgressStatus, string, error) {
-				if err := m.gits.CreateWorktree(ctx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch)); err != nil {
+
+				reportProgress("worktree", "Create local worktree", CreateProgressRunning, "Fetching missing refs...")
+				if fetchErr := m.gits.FetchRef(stepCtx, sourcePath, strings.TrimSpace(req.SourceBranch)); fetchErr != nil {
+					return CreateProgressFailed, fetchErr.Error(), fetchErr
+				}
+
+				if err := m.gits.CreateWorktree(stepCtx, sourcePath, req.TargetBranch, worktreePath, true, strings.TrimSpace(req.SourceBranch)); err != nil {
 					return CreateProgressFailed, err.Error(), err
 				}
 				return CreateProgressCompleted, worktreePath, nil
 			},
 		},
 		{
-			ID:    "context",
-			Label: "Link project context",
-			Run: func() (CreateProgressStatus, string, error) {
+			ID:      "context",
+			Label:   "Link project context",
+			Timeout: 30 * time.Second,
+			Run: func(stepCtx context.Context) (CreateProgressStatus, string, error) {
 				if !req.ContextEnabled {
 					return CreateProgressSkipped, "Context link disabled", nil
 				}
@@ -145,19 +152,17 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 			},
 		},
 		{
-			ID:    "setup",
-			Label: "Run setup script",
-			Run: func() (CreateProgressStatus, string, error) {
-				hookResult, hookErr := RunHook(ctx, HookRequest{
+			ID:      "setup",
+			Label:   "Run setup script",
+			Timeout: 5 * time.Minute,
+			Run: func(stepCtx context.Context) (CreateProgressStatus, string, error) {
+				hookResult, hookErr := RunHook(stepCtx, HookRequest{
 					Command:       req.SetupHook,
 					WorkspaceID:   ws.ID,
 					WorkspacePath: ws.Path,
 					HookName:      "setup",
 				})
 				if hookErr != nil {
-					// System-level hook failure (e.g. shell not found). Treat as
-					// non-fatal: workspace was created successfully, surface the error
-					// in the result so callers can warn the user.
 					hookResult.Error = fmt.Sprintf("setup hook: %v", hookErr)
 					ws.SetupHookResult = &hookResult
 					return CreateProgressWarning, hookResult.Error, nil
@@ -176,7 +181,11 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 
 	for _, step := range steps {
 		reportProgress(step.ID, step.Label, CreateProgressRunning, "")
-		status, message, err := step.Run()
+
+		stepCtx, cancel := context.WithTimeout(ctx, step.Timeout)
+		status, message, err := step.Run(stepCtx)
+		cancel()
+
 		if err != nil {
 			reportProgress(step.ID, step.Label, status, message)
 			return Workspace{}, err
@@ -224,4 +233,16 @@ func safeRelativePath(input string, field string) (string, error) {
 		return "", NewRPCError(-32602, field+" must not escape .yishan")
 	}
 	return cleaned, nil
+}
+
+func isMissingRefError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "not a valid object name") ||
+		strings.Contains(msg, "unknown revision") ||
+		strings.Contains(msg, "fatal: bad revision") ||
+		strings.Contains(msg, "Invalid object name") ||
+		strings.Contains(msg, "ambiguous argument")
 }

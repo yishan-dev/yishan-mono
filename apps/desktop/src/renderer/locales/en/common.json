@@ -22,8 +22,15 @@
       "closeAria": "Close update notification"
     },
     "bootstrap": {
+      "badge": "APP STARTUP",
       "title": "Preparing your workspace",
       "description": "Loading user info, organizations, projects, nodes, and workspaces...",
+      "phase": {
+        "auth": "Verifying your sign-in session",
+        "session": "Syncing user and organization context",
+        "workspace": "Restoring workspace state and resources",
+        "nodes": "Connecting available runtime nodes"
+      },
       "retry": "Retry"
     }
   },
@@ -71,6 +78,7 @@
       "appearance": "Appearance",
       "daemon": "Daemon",
       "keybindings": "Keyboard Shortcuts",
+      "links": "Links",
       "notifications": "Notifications",
       "terminal": "Terminal",
       "workspace": "Workspace"
@@ -154,6 +162,15 @@
         "zh": "Chinese"
       }
     },
+    "links": {
+      "title": "Link opening behavior",
+      "description": "Choose where HTTP links open inside the app.",
+      "targetLabel": "Open links in",
+      "options": {
+        "built-in": "Built-in browser",
+        "external": "System default browser"
+      }
+    },
     "daemon": {
       "title": "Daemon",
       "description": "Inspect the local daemon used for workspaces, terminals, and background services.",
@@ -184,11 +201,29 @@
         "action": "Restart",
         "inProgress": "Restarting…",
         "success": "Daemon restarted successfully.",
-        "failed": "Failed to restart daemon."
+        "failed": "Failed to restart daemon.",
+        "terminalCloseFailed": "Failed to close terminal sessions. Please close them manually and try again.",
+        "confirmTitle": "Restart daemon?",
+        "confirmMessage": "All terminal sessions will be closed and their running processes terminated. This action cannot be undone."
       },
       "quitOnExit": {
         "label": "Quit daemon before app exits",
         "description": "When enabled, the daemon is stopped before the desktop app exits. When disabled, the daemon continues running in the background."
+      },
+      "relay": {
+        "title": "Relay Connection",
+        "description": "Status of the outbound relay connection used for remote access.",
+        "rows": {
+          "status": "Connection",
+          "url": "Relay address",
+          "connectedAt": "Connected since",
+          "lastError": "Last error"
+        },
+        "status": {
+          "connected": "Connected",
+          "disconnected": "Disconnected",
+          "disabled": "Disabled"
+        }
       }
     },
     "terminal": {
@@ -604,6 +639,7 @@
     "createMenu": {
       "label": "Create",
       "chat": "Chat",
+      "browser": "Browser",
       "opencode": "OpenCode",
       "codex": "Codex",
       "claude": "Claude",
@@ -635,6 +671,7 @@
     "hint": "Choose an action to get started.",
     "actions": {
       "openTerminal": "Open terminal",
+      "openBrowser": "Open browser tab",
       "openChat": "Open chat",
       "searchFiles": "Search files"
     }
@@ -665,6 +702,7 @@
       "closeTab": "Close selected tab",
       "closeWorkspace": "Close selected workspace",
       "openTerminal": "Open terminal tab",
+      "openBrowser": "Open browser tab",
       "activateRepoPane": "Activate repository pane",
       "activateFilesPane": "Activate files pane",
       "activateChangesPane": "Activate changes pane",

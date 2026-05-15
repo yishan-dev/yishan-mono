@@ -1,0 +1,72 @@
+name: Deploy Relay
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/relay/**"
+      - ".github/workflows/deploy-relay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+concurrency:
+  group: deploy-relay
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yishan-io/relay
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        working-directory: apps/relay
+        run: |
+          docker build \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest \
+            .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production - relay
+    steps:
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.RELAY_SSH_HOST }}
+          username: ${{ secrets.RELAY_SSH_USER }}
+          key: ${{ secrets.RELAY_SSH_KEY }}
+          script_stop: true
+          script: |
+            docker pull ${{ env.IMAGE }}:${{ github.sha }}
+            if docker inspect relay >/dev/null 2>&1; then
+              docker stop relay
+              docker rm relay
+            fi
+            docker run -d \
+              --name relay \
+              --restart unless-stopped \
+              --env-file /opt/relay/.env \
+              -p 8788:8788 \
+              ${{ env.IMAGE }}:${{ github.sha }}
+            docker image prune -f

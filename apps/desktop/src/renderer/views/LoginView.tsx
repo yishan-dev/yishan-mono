@@ -5,6 +5,8 @@ import { FaGoogle } from "react-icons/fa";
 import logo from "../../assets/images/yishan-transparent.png";
 import { resetAuthExpiredState } from "../api/restClient";
 import { login } from "../commands/appCommands";
+import { AppBackgroundContainer } from "../components/AppBackgroundContainer";
+import { CenteredContentLayout } from "../components/CenteredContentLayout";
 import { authStore } from "../store/authStore";
 
 /** Renders one pre-authentication entry screen with Google sign-in action. */
@@ -35,55 +37,42 @@ export function LoginView() {
   };
 
   return (
-    <Box
-      className="electron-webkit-app-region-drag"
-      sx={{
-        height: "100%",
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        px: 3,
-        userSelect: "none",
-      }}
-    >
-      <Stack
-        spacing={2.5}
-        sx={{
-          width: "100%",
-          maxWidth: 460,
-          textAlign: "center",
-        }}
-      >
-        <Box component="img" src={logo} alt="" sx={{ width: 256, height: 256, alignSelf: "center" }} />
-        <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700}>
-            {t("auth.login.title")}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {t("auth.login.description")}
-          </Typography>
-        </Stack>
-
-        {errorMessage ? (
-          <Alert severity="error" role="alert" className="electron-webkit-app-region-no-drag">
-            {errorMessage}
-          </Alert>
-        ) : null}
-
-        <Button
-          className="electron-webkit-app-region-no-drag"
-          variant="contained"
-          size="large"
-          onClick={() => {
-            void handleGoogleSignIn();
-          }}
-          disabled={isSigningIn}
-          startIcon={isSigningIn ? <CircularProgress size={18} color="inherit" /> : <FaGoogle size={18} />}
+    <AppBackgroundContainer>
+      <CenteredContentLayout className="electron-webkit-app-region-drag" maxWidth={460}>
+        <Stack
+          spacing={2.5}
+          sx={{ textAlign: "center" }}
         >
-          {isSigningIn ? t("auth.login.signingIn") : t("auth.login.googleCta")}
-        </Button>
-      </Stack>
-    </Box>
+          <Box component="img" src={logo} alt="" sx={{ width: 256, height: 256, alignSelf: "center" }} />
+          <Stack spacing={1}>
+            <Typography variant="h4" fontWeight={700}>
+              {t("auth.login.title")}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t("auth.login.description")}
+            </Typography>
+          </Stack>
+
+          {errorMessage ? (
+            <Alert severity="error" role="alert" className="electron-webkit-app-region-no-drag">
+              {errorMessage}
+            </Alert>
+          ) : null}
+
+          <Button
+            className="electron-webkit-app-region-no-drag"
+            variant="contained"
+            size="large"
+            onClick={() => {
+              void handleGoogleSignIn();
+            }}
+            disabled={isSigningIn}
+            startIcon={isSigningIn ? <CircularProgress size={18} color="inherit" /> : <FaGoogle size={18} />}
+          >
+            {isSigningIn ? t("auth.login.signingIn") : t("auth.login.googleCta")}
+          </Button>
+        </Stack>
+      </CenteredContentLayout>
+    </AppBackgroundContainer>
   );
 }

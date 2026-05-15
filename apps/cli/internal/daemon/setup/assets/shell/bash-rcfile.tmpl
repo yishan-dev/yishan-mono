@@ -16,6 +16,7 @@ fi
 [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
 
 {{.PathEnsureFunction}}
+{{.BrowserOpenShim}}
 hash -r 2>/dev/null || true
 
 # Re-assert managed bin path before each prompt because user hooks can mutate PATH.

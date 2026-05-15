@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { listAgentDetectionStatuses as listAgentDetectionStatusesCommand } from "../commands/agentCommands";
 import {
+  appendBrowserHistory as appendBrowserHistoryCommand,
   checkAgentGlobalConfigExternalDirectoryPermission as checkAgentGlobalConfigExternalDirectoryPermissionCommand,
   ensureAgentGlobalConfigExternalDirectoryPermission as ensureAgentGlobalConfigExternalDirectoryPermissionCommand,
   getDefaultWorktreeLocation as getDefaultWorktreeLocationCommand,
+  loadBrowserHistory as loadBrowserHistoryCommand,
   openLocalFolderDialog as openLocalFolderDialogCommand,
   toggleMainWindowMaximized as toggleMainWindowMaximizedCommand,
 } from "../commands/appCommands";
@@ -73,6 +75,8 @@ import {
   refreshFileTabFromDisk as refreshFileTabFromDiskCommand,
   renameTabsForEntryRename as renameTabsForEntryRenameCommand,
   renameTab as renameTabCommand,
+  setBrowserTabFaviconUrl as setBrowserTabFaviconUrlCommand,
+  setBrowserTabUrl as setBrowserTabUrlCommand,
   reorderTab as reorderTabCommand,
   setSelectedTab as setSelectedTabCommand,
   toggleTabPinned as toggleTabPinnedCommand,
@@ -135,6 +139,8 @@ export type Commands = {
   checkAgentGlobalConfigExternalDirectoryPermission: typeof checkAgentGlobalConfigExternalDirectoryPermissionCommand;
   ensureAgentGlobalConfigExternalDirectoryPermission: typeof ensureAgentGlobalConfigExternalDirectoryPermissionCommand;
   toggleMainWindowMaximized: typeof toggleMainWindowMaximizedCommand;
+  loadBrowserHistory: typeof loadBrowserHistoryCommand;
+  appendBrowserHistory: typeof appendBrowserHistoryCommand;
   ensureChatSession: typeof ensureChatSessionCommand;
   runChatPrompt: typeof runChatPromptCommand;
   closeAgentSession: typeof closeAgentSessionCommand;
@@ -212,6 +218,8 @@ export type Commands = {
   toggleTabPinned: typeof toggleTabPinnedCommand;
   reorderTab: typeof reorderTabCommand;
   renameTab: typeof renameTabCommand;
+  setBrowserTabFaviconUrl: typeof setBrowserTabFaviconUrlCommand;
+  setBrowserTabUrl: typeof setBrowserTabUrlCommand;
   renameTabsForEntryRename: typeof renameTabsForEntryRenameCommand;
   updateFileTabContent: typeof updateFileTabContentCommand;
   markFileTabSaved: typeof markFileTabSavedCommand;
@@ -245,6 +253,8 @@ export function useCommands(): Commands {
       checkAgentGlobalConfigExternalDirectoryPermission: checkAgentGlobalConfigExternalDirectoryPermissionCommand,
       ensureAgentGlobalConfigExternalDirectoryPermission: ensureAgentGlobalConfigExternalDirectoryPermissionCommand,
       toggleMainWindowMaximized: toggleMainWindowMaximizedCommand,
+      loadBrowserHistory: loadBrowserHistoryCommand,
+      appendBrowserHistory: appendBrowserHistoryCommand,
       ensureChatSession: ensureChatSessionCommand,
       runChatPrompt: runChatPromptCommand,
       closeAgentSession: closeAgentSessionCommand,
@@ -311,6 +321,8 @@ export function useCommands(): Commands {
       toggleTabPinned: toggleTabPinnedCommand,
       reorderTab: reorderTabCommand,
       renameTab: renameTabCommand,
+      setBrowserTabFaviconUrl: setBrowserTabFaviconUrlCommand,
+      setBrowserTabUrl: setBrowserTabUrlCommand,
       renameTabsForEntryRename: renameTabsForEntryRenameCommand,
       updateFileTabContent: updateFileTabContentCommand,
       markFileTabSaved: markFileTabSavedCommand,
