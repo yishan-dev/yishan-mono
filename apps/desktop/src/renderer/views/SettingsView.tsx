@@ -24,11 +24,12 @@ import { AccountSettingsView } from "./settings/AccountSettingsView";
 import { AgentSettingsView } from "./settings/AgentSettingsView";
 import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
+import { IntegrationSettingsView } from "./settings/IntegrationSettingsView";
 import { KeybindingsSettingsView } from "./settings/KeybindingsSettingsView";
+import { LanguageSettingsView } from "./settings/LanguageSettingsView";
 import { LinkSettingsView } from "./settings/LinkSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
-import { LanguageSettingsView } from "./settings/LanguageSettingsView";
 import {
   type NotificationSettingsFocusItemId,
   isNotificationSettingsFocusItemId,
@@ -98,6 +99,7 @@ export function SettingsView() {
       selectedTabParam === "agents" ||
       selectedTabParam === "appearance" ||
       selectedTabParam === "daemon" ||
+      selectedTabParam === "integrations" ||
       selectedTabParam === "keybindings" ||
       selectedTabParam === "language" ||
       selectedTabParam === "links" ||
@@ -165,6 +167,11 @@ export function SettingsView() {
         </Stack>
       ),
       daemon: <DaemonSettingsView />,
+      integrations: (
+        <SettingsErrorBoundary sectionLabel={t("settings.integrations.title")}>
+          <IntegrationSettingsView />
+        </SettingsErrorBoundary>
+      ),
       links: <LinkSettingsView />,
       terminal: <TerminalSettingsView />,
       keybindings: <KeybindingsSettingsView />,
@@ -177,7 +184,10 @@ export function SettingsView() {
     <SettingsPageLayout
       sidebar={
         <>
-          <Box className="electron-webkit-app-region-drag" sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}>
+          <Box
+            className="electron-webkit-app-region-drag"
+            sx={{ px: 1, mb: 0.5, display: "flex", alignItems: "center" }}
+          >
             {shouldReserveMacWindowControlsInset ? <Box sx={{ width: 72, flexShrink: 0 }} /> : null}
             <Box sx={{ flex: 1 }} />
             <Tooltip title={t("settings.back")} arrow>
@@ -197,92 +207,92 @@ export function SettingsView() {
             {t("settings.title")}
           </Typography>
 
-        <SearchInput
-          placeholder={t("settings.searchPlaceholder")}
-          value={searchQuery}
-          onChange={(value) => {
-            setSearchQuery(value);
-          }}
-        />
+          <SearchInput
+            placeholder={t("settings.searchPlaceholder")}
+            value={searchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+            }}
+          />
 
-        {normalizedSearchQuery ? (
-          <Box sx={{ mt: 1.5 }}>
-            <List disablePadding>
-              {searchResults.map((result) => {
-                const Icon = result.icon;
-                const isSelected =
-                  selectedTab === result.tab &&
-                  (result.focusItemId === undefined || focusedNotificationItemId === result.focusItemId);
-                return (
-                  <ListItemButton
-                    key={result.id}
-                    selected={isSelected}
-                    onClick={() => {
-                      if (result.focusItemId) {
-                        setSearchParams({
-                          tab: result.tab,
-                          focus: result.focusItemId,
-                        });
-                        return;
-                      }
-                      setSearchParams({ tab: result.tab });
-                    }}
-                    sx={{ borderRadius: 1, minHeight: 38 }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 28 }}>
-                      <Icon size={16} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={renderSidebarLabel(result.label)}
-                      secondary={
-                        <Typography variant="caption" color="text.secondary">
-                          {result.sectionLabel}
-                        </Typography>
-                      }
-                    />
-                  </ListItemButton>
-                );
-              })}
-            </List>
-            {searchResults.length === 0 ? (
-              <Typography variant="caption" color="text.secondary" sx={{ px: 1.25 }}>
-                {t("settings.searchNoResults")}
-              </Typography>
-            ) : null}
-          </Box>
-        ) : (
-          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-            {SETTINGS_NAV_SECTIONS.map((section) => (
-              <Box key={section.titleKey}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ px: 1, textTransform: "uppercase", letterSpacing: "0.08em" }}
-                >
-                  {t(section.titleKey)}
+          {normalizedSearchQuery ? (
+            <Box sx={{ mt: 1.5 }}>
+              <List disablePadding>
+                {searchResults.map((result) => {
+                  const Icon = result.icon;
+                  const isSelected =
+                    selectedTab === result.tab &&
+                    (result.focusItemId === undefined || focusedNotificationItemId === result.focusItemId);
+                  return (
+                    <ListItemButton
+                      key={result.id}
+                      selected={isSelected}
+                      onClick={() => {
+                        if (result.focusItemId) {
+                          setSearchParams({
+                            tab: result.tab,
+                            focus: result.focusItemId,
+                          });
+                          return;
+                        }
+                        setSearchParams({ tab: result.tab });
+                      }}
+                      sx={{ borderRadius: 1, minHeight: 38 }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <Icon size={16} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={renderSidebarLabel(result.label)}
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            {result.sectionLabel}
+                          </Typography>
+                        }
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+              {searchResults.length === 0 ? (
+                <Typography variant="caption" color="text.secondary" sx={{ px: 1.25 }}>
+                  {t("settings.searchNoResults")}
                 </Typography>
-                <List disablePadding sx={{ mt: 0.5 }}>
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <ListItemButton
-                        key={item.tab}
-                        selected={selectedTab === item.tab}
-                        onClick={() => setSearchParams({ tab: item.tab })}
-                        sx={{ borderRadius: 1, minHeight: 34 }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 28 }}>
-                          <Icon size={16} />
-                        </ListItemIcon>
-                        <ListItemText primary={renderSidebarLabel(t(item.labelKey))} />
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              </Box>
-            ))}
-          </Stack>
-        )}
+              ) : null}
+            </Box>
+          ) : (
+            <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+              {SETTINGS_NAV_SECTIONS.map((section) => (
+                <Box key={section.titleKey}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ px: 1, textTransform: "uppercase", letterSpacing: "0.08em" }}
+                  >
+                    {t(section.titleKey)}
+                  </Typography>
+                  <List disablePadding sx={{ mt: 0.5 }}>
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <ListItemButton
+                          key={item.tab}
+                          selected={selectedTab === item.tab}
+                          onClick={() => setSearchParams({ tab: item.tab })}
+                          sx={{ borderRadius: 1, minHeight: 34 }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                            <Icon size={16} />
+                          </ListItemIcon>
+                          <ListItemText primary={renderSidebarLabel(t(item.labelKey))} />
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                </Box>
+              ))}
+            </Stack>
+          )}
         </>
       }
     >

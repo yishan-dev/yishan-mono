@@ -168,6 +168,18 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			refresh = req.Refresh
 		}
 		return ListAgentCLIDetectionStatusesWithRefresh(refresh), nil
+	case MethodIntegrationGitHubStatus:
+		refresh := false
+		if len(params) > 0 {
+			var req struct {
+				Refresh bool `json:"refresh"`
+			}
+			if err := decodeParams(params, &req); err != nil {
+				return nil, err
+			}
+			refresh = req.Refresh
+		}
+		return CheckGitHubConnectionStatus(refresh), nil
 	case MethodFrontendEventsStream:
 		subscriptionID, events := h.events.Subscribe()
 		connState.AttachEventStream(events, func() {

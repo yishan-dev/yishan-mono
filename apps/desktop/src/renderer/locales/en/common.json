@@ -77,6 +77,7 @@
       "agents": "Agents",
       "appearance": "Appearance",
       "daemon": "Daemon",
+      "integrations": "Integrations",
       "keybindings": "Keyboard Shortcuts",
       "links": "Links",
       "notifications": "Notifications",
@@ -137,6 +138,25 @@
         "pi": "Pi",
         "copilot": "GitHub Copilot",
         "cursor": "Cursor"
+      }
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "View the connection status of external services.",
+      "loadError": "Failed to load integration statuses.",
+      "actions": {
+        "recheckAll": "Recheck All"
+      },
+      "status": {
+        "checking": "Checking...",
+        "connected": "Connected"
+      },
+      "github": {
+        "label": "GitHub",
+        "description": "GitHub CLI (gh) connection status",
+        "connectedAs": "Connected as {{username}}",
+        "notInstalled": "CLI not installed",
+        "notLoggedIn": "Not logged in"
       }
     },
     "appearance": {

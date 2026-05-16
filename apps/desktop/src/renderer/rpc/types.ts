@@ -91,6 +91,14 @@ export type DaemonRpcClient = {
   agent: {
     listDetectionStatuses: (input?: unknown) => Promise<unknown>;
   };
+  integration: {
+    githubStatus: (input?: { refresh?: boolean }) => Promise<{
+      installed: boolean;
+      loggedIn: boolean;
+      username?: string;
+      statusDetail: string;
+    }>;
+  };
   notification: {
     getNotificationPreferences: (input?: unknown) => Promise<NotificationPreferences>;
     updateNotificationPreferences: (input: unknown) => Promise<NotificationPreferences>;

@@ -1,4 +1,16 @@
-import { BiBell, BiChip, type BiCog, BiGitBranch, BiLinkExternal, BiPalette, BiSolidKeyboard, BiTerminal, BiUser, BiWorld } from "react-icons/bi";
+import {
+  BiBell,
+  BiChip,
+  type BiCog,
+  BiGitBranch,
+  BiLinkExternal,
+  BiPalette,
+  BiPlug,
+  BiSolidKeyboard,
+  BiTerminal,
+  BiUser,
+  BiWorld,
+} from "react-icons/bi";
 import { AGENT_SETTINGS_LABEL_KEY_BY_KIND, SUPPORTED_DESKTOP_AGENT_KINDS } from "../../helpers/agentSettings";
 import {
   NOTIFICATION_SETTINGS_SEARCH_ITEMS,
@@ -10,6 +22,7 @@ export type SettingsTab =
   | "agents"
   | "appearance"
   | "daemon"
+  | "integrations"
   | "keybindings"
   | "links"
   | "notifications"
@@ -44,6 +57,7 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
     titleKey: "settings.sections.app",
     items: [
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
+      { tab: "integrations", labelKey: "settings.items.integrations", icon: BiPlug },
       { tab: "links", labelKey: "settings.items.links", icon: BiLinkExternal },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
@@ -194,10 +208,24 @@ const KEYBINDINGS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
     icon: BiSolidKeyboard,
     labelKey: "keybindings.title",
     sectionLabelKey: "settings.items.keybindings",
+    keywordKeys: ["keybindings.subtitle", "keybindings.scope.global", "keybindings.scope.workspace"],
+  },
+];
+
+const INTEGRATION_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "integration-github",
+    tab: "integrations",
+    icon: BiPlug,
+    labelKey: "settings.integrations.title",
+    sectionLabelKey: "settings.items.integrations",
     keywordKeys: [
-      "keybindings.subtitle",
-      "keybindings.scope.global",
-      "keybindings.scope.workspace",
+      "settings.integrations.description",
+      "settings.integrations.github.label",
+      "settings.integrations.github.description",
+      "settings.integrations.status.connected",
+      "settings.integrations.github.notInstalled",
+      "settings.integrations.github.notLoggedIn",
     ],
   },
 ];
@@ -262,6 +290,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...ACCOUNT_SEARCH_ITEMS,
   ...AGENT_SEARCH_ITEMS,
   ...APPEARANCE_SEARCH_ITEMS,
+  ...INTEGRATION_SEARCH_ITEMS,
   ...LANGUAGE_SEARCH_ITEMS,
   ...LINKS_SEARCH_ITEMS,
   ...KEYBINDINGS_SEARCH_ITEMS,

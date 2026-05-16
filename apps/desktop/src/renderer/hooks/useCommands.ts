@@ -50,6 +50,7 @@ import {
   trackGitChanges as trackGitChangesCommand,
   unstageGitChanges as unstageGitChangesCommand,
 } from "../commands/gitCommands";
+import { checkGitHubConnectionStatus as checkGitHubConnectionStatusCommand } from "../commands/integrationCommands";
 import {
   getNotificationPreferences as getNotificationPreferencesCommand,
   playNotificationSound as playNotificationSoundCommand,
@@ -73,11 +74,11 @@ import {
   openTab as openTabCommand,
   refreshDiffTabContent as refreshDiffTabContentCommand,
   refreshFileTabFromDisk as refreshFileTabFromDiskCommand,
-  renameTabsForEntryRename as renameTabsForEntryRenameCommand,
   renameTab as renameTabCommand,
+  renameTabsForEntryRename as renameTabsForEntryRenameCommand,
+  reorderTab as reorderTabCommand,
   setBrowserTabFaviconUrl as setBrowserTabFaviconUrlCommand,
   setBrowserTabUrl as setBrowserTabUrlCommand,
-  reorderTab as reorderTabCommand,
   setSelectedTab as setSelectedTabCommand,
   toggleTabPinned as toggleTabPinnedCommand,
   updateFileTabContent as updateFileTabContentCommand,
@@ -120,6 +121,7 @@ export type Commands = {
   setSelectedRepoId: (repoId: string) => void;
   setSelectedWorkspaceId: (workspaceId: string) => void;
   listAgentDetectionStatuses: typeof listAgentDetectionStatusesCommand;
+  checkGitHubConnectionStatus: typeof checkGitHubConnectionStatusCommand;
   setDisplayRepoIds: typeof setDisplayRepoIdsCommand;
   setLastUsedExternalAppId: typeof setLastUsedExternalAppIdCommand;
   setLeftWidth: typeof setLeftPaneWidthCommand;
@@ -234,6 +236,7 @@ export function useCommands(): Commands {
       setSelectedRepoId: setSelectedRepo,
       setSelectedWorkspaceId: setSelectedWorkspace,
       listAgentDetectionStatuses: listAgentDetectionStatusesCommand,
+      checkGitHubConnectionStatus: checkGitHubConnectionStatusCommand,
       setDisplayRepoIds: setDisplayRepoIdsCommand,
       setLastUsedExternalAppId: setLastUsedExternalAppIdCommand,
       setLeftWidth: setLeftPaneWidthCommand,
