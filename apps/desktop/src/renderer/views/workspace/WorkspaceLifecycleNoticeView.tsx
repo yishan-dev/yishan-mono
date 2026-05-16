@@ -9,6 +9,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useDialogRegistration } from "../../hooks/useDialogRegistration";
 import { workspaceLifecycleNoticeStore } from "../../store/workspaceLifecycleNoticeStore";
 
 /** Renders in-app snackbar and detail dialog for lifecycle script warnings. */
@@ -18,6 +19,7 @@ export function WorkspaceLifecycleNoticeView() {
   const dismissActiveNotice = workspaceLifecycleNoticeStore((state) => state.dismissActiveNotice);
   const openActiveNoticeDetails = workspaceLifecycleNoticeStore((state) => state.openActiveNoticeDetails);
   const closeDetailNotice = workspaceLifecycleNoticeStore((state) => state.closeDetailNotice);
+  useDialogRegistration(Boolean(detailNotice));
 
   const activeScriptLabel = activeNotice?.kind === "lifecycle" && activeNotice.warning.scriptKind === "setup" ? "setup" : "post";
   const activeTitle = activeNotice?.kind === "error" ? activeNotice.title : `Workspace ${activeScriptLabel} script failed`;

@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { useDialogRegistration } from "../../../hooks/useDialogRegistration";
 
 type WorkspaceDeleteDialogViewProps = {
   open: boolean;
@@ -31,6 +32,7 @@ export function WorkspaceDeleteDialogView({
   onAllowRemoveBranchChange,
 }: WorkspaceDeleteDialogViewProps) {
   const { t } = useTranslation();
+  useDialogRegistration(open);
 
   return (
     <Dialog open={open} onClose={onCancel} fullWidth maxWidth="xs">

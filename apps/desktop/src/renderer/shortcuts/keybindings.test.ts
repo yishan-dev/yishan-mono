@@ -12,6 +12,7 @@ function createShortcutContext(input: Partial<ShortContext> = {}): ShortContext 
   return {
     pathname: "/",
     isWorkspaceRoute: true,
+    isPopupOpen: false,
     tabStoreState: {
       tabs: [{ id: "tab-1", workspaceId: "workspace-1", title: "Tab 1", pinned: false, kind: "session", data: {} }],
       selectedWorkspaceId: "workspace-1",

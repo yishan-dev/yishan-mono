@@ -16,6 +16,7 @@ export type SupportedKeyBinding = {
 export type ShortContext = {
   pathname: string;
   isWorkspaceRoute: boolean;
+  isPopupOpen: boolean;
   tabStoreState: TabStoreState;
   workspaceStoreState: WorkspaceStoreState;
   splitPaneStoreState: SplitPaneStoreState;

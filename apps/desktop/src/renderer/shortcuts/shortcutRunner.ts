@@ -92,6 +92,11 @@ export function processShortcuts(
       continue;
     }
 
+    if (compiledDefinition.definition.scope === "workspace" && context.isPopupOpen) {
+      event.preventDefault();
+      return;
+    }
+
     compiledDefinition.definition.run(context, event);
     return;
   }

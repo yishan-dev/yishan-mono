@@ -26,6 +26,7 @@ import {
   renderProjectIcon,
 } from "../../../components/projectIcons";
 import { useCommands } from "../../../hooks/useCommands";
+import { useDialogRegistration } from "../../../hooks/useDialogRegistration";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { useProjectConfigActions } from "./useProjectConfigActions";
 import { useProjectConfigFormState } from "./useProjectConfigFormState";
@@ -51,6 +52,7 @@ export function ProjectConfigDialogView({ open, repoId, onClose }: ProjectConfig
     trimmedRepoLocalPath,
     onClose,
   });
+  useDialogRegistration(open);
 
   return (
     <Dialog

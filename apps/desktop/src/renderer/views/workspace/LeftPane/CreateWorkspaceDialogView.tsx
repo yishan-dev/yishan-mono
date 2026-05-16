@@ -27,6 +27,7 @@ import {
 import { renderProjectIcon } from "../../../components/projectIcons";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { useCommands } from "../../../hooks/useCommands";
+import { useDialogRegistration } from "../../../hooks/useDialogRegistration";
 import { buildWorkspaceNavigationPath } from "../../../navigation/workspaceNavigation";
 import { gitBranchStore, resolveGitBranchPrefix } from "../../../store/gitBranchStore";
 import { workspaceStore } from "../../../store/workspaceStore";
@@ -146,6 +147,7 @@ export function CreateWorkspaceDialogView({
   const { createWorkspace, renameWorkspace, renameWorkspaceBranch, getGitAuthorName, listGitBranches } = useCommands();
   const prefixMode = gitBranchStore((state) => state.prefixMode);
   const customPrefix = gitBranchStore((state) => state.customPrefix);
+  useDialogRegistration(open);
   const isRenameMode = mode === "rename";
   const branchInputPlaceholder = isRenameMode
     ? t("workspace.rename.branchNameLabel")
