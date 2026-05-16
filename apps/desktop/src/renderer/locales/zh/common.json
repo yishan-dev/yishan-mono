@@ -481,7 +481,8 @@
       },
       "gitUrl": "Git 地址",
       "chooseFolder": "选择文件夹",
-      "create": "创建"
+      "create": "创建",
+      "notAGitRepo": "该文件夹不是一个 git 仓库，请选择一个有效的 git 仓库文件夹。"
     },
     "actions": {
       "addRepository": "添加项目",

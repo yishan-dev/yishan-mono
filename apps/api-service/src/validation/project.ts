@@ -24,7 +24,12 @@ export const createProjectBodySchema = z.object({
   repoUrl: nonEmptyStringSchema.optional(),
   nodeId: nonEmptyStringSchema.optional(),
   localPath: nonEmptyStringSchema.optional(),
-});
+}).refine(
+  (input) => !(input.localPath && input.sourceTypeHint === "unknown"),
+  {
+    message: "sourceTypeHint must be 'git' or 'git-local' when a local path is provided — the folder must be a git repository",
+  },
+);
 
 export const updateProjectBodySchema = z
   .object({

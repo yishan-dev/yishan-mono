@@ -512,7 +512,8 @@
       },
       "gitUrl": "Git URL",
       "chooseFolder": "Choose folder",
-      "create": "Create"
+      "create": "Create",
+      "notAGitRepo": "This folder is not a git repository. Please select a valid git repository."
     },
     "actions": {
       "addRepository": "Add project",

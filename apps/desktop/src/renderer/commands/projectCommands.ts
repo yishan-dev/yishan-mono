@@ -148,6 +148,11 @@ export async function createProject(input: {
     }
 
     const localRepositoryMetadata = await inspectLocalRepository(normalizedPath);
+    
+    if (!localRepositoryMetadata.isGitRepository) {
+      throw new Error("The selected folder is not a git repository. Please choose a valid git repository folder.");
+    }
+    
     inferredRemoteUrl = localRepositoryMetadata.remoteUrl || undefined;
     inferredSourceTypeHint = inferredRemoteUrl
       ? "git"

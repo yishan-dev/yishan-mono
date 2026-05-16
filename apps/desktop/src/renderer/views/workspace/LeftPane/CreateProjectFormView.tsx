@@ -69,6 +69,7 @@ export function CreateProjectFormView({
   const { t } = useTranslation();
   const { createProject, inspectLocalProjectSource, openLocalFolderDialog } = useCommands();
   const [repoDraft, setRepoDraft] = useState<RepoDraft>(defaultDraft);
+  const [pathError, setPathError] = useState<string | null>(null);
 
   const createProjectMutation = useMutation({
     mutationFn: async (input: CreateProjectInput) => {
@@ -83,7 +84,9 @@ export function CreateProjectFormView({
   const isCreating = createProjectMutation.isPending;
   const isCreateDisabled =
     repoDraft.name.trim().length === 0 ||
-    (repoDraft.source === "local" ? repoDraft.path.trim().length === 0 : repoDraft.gitUrl.trim().length === 0);
+    (repoDraft.source === "local"
+      ? repoDraft.path.trim().length === 0 || pathError !== null
+      : repoDraft.gitUrl.trim().length === 0);
 
   useEffect(() => {
     onBusyChange?.(isCreating);
@@ -93,6 +96,11 @@ export function CreateProjectFormView({
     const selectedPath = await openLocalFolderDialog(repoDraft.path.trim() || undefined);
     if (selectedPath) {
       const sourceInspection = await inspectLocalProjectSource(selectedPath);
+      if (sourceInspection.sourceTypeHint === "unknown") {
+        setPathError(t("project.form.notAGitRepo"));
+      } else {
+        setPathError(null);
+      }
       setRepoDraft((previous) => {
         const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(selectedPath);
         return {
@@ -152,7 +160,8 @@ export function CreateProjectFormView({
             startIcon={<LuFolder size={14} />}
             variant={repoDraft.source === "local" ? "contained" : "outlined"}
             disabled={isCreating}
-            onClick={() =>
+            onClick={() => {
+              setPathError(null);
               setRepoDraft((previous) => {
                 const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(previous.path);
                 return {
@@ -161,8 +170,8 @@ export function CreateProjectFormView({
                   name: nextName,
                   sourceTypeHint: previous.path ? previous.sourceTypeHint : undefined,
                 };
-              })
-            }
+              });
+            }}
           >
             {t("project.form.source.local")}
           </Button>
@@ -170,7 +179,8 @@ export function CreateProjectFormView({
             startIcon={<LuGlobe size={14} />}
             variant={repoDraft.source === "remote" ? "contained" : "outlined"}
             disabled={isCreating}
-            onClick={() =>
+            onClick={() => {
+              setPathError(null);
               setRepoDraft((previous) => {
                 const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(previous.gitUrl);
                 return {
@@ -179,8 +189,8 @@ export function CreateProjectFormView({
                   name: nextName,
                   sourceTypeHint: "git",
                 };
-              })
-            }
+              });
+            }}
           >
             {t("project.form.source.remote")}
           </Button>
@@ -193,9 +203,12 @@ export function CreateProjectFormView({
         <TextField
           autoFocus={autoFocus}
           size="small"
+          error={!!pathError}
+          helperText={pathError}
           value={repoDraft.source === "local" ? repoDraft.path : repoDraft.gitUrl}
           disabled={isCreating}
-          onChange={(event) =>
+          onChange={(event) => {
+            setPathError(null);
             setRepoDraft((previous) => {
               const nextLocation = event.target.value;
               const nextName = previous.nameEdited ? previous.name : deriveDefaultProjectName(nextLocation);
@@ -207,7 +220,7 @@ export function CreateProjectFormView({
                 sourceTypeHint: repoDraft.source === "remote" ? "git" : undefined,
               };
             })
-          }
+          }}
           fullWidth
           placeholder={repoDraft.source === "remote" ? "https://github.com/org/repo.git" : undefined}
           slotProps={
