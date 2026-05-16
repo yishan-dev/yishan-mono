@@ -238,6 +238,9 @@ export function attachTerminalRuntime(tabId: string, placeholder: HTMLElement): 
   // Mark as attached.
   transitionState(entry, "attached");
 
+  // Resume per-frame write batching for visual smoothness.
+  entry.writeQueue.setDetached(false);
+
   // Set up resize observer for the host element.
   setupResizeObserver(entry);
 
@@ -280,6 +283,10 @@ export function detachTerminalRuntime(tabId: string, placeholder: HTMLElement): 
   parkTerminalHost(entry);
 
   transitionState(entry, "detached");
+
+  // Switch to longer write batching interval to reduce main-thread contention
+  // with the visible terminal's per-frame rendering.
+  entry.writeQueue.setDetached(true);
 }
 
 /**

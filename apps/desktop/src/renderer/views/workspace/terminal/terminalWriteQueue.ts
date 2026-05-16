@@ -3,10 +3,15 @@ import type { Terminal } from "@xterm/xterm";
 const MAX_TERMINAL_LIVE_WRITE_QUEUE_BYTES = 1024 * 1024;
 const MAX_IMMEDIATE_TERMINAL_CHUNK_BYTES = 256;
 
+/** When detached, batch writes at this interval (ms) to reduce main-thread contention. */
+const DETACHED_WRITE_INTERVAL_MS = 200;
+
 export type TerminalWriteChunk = string | Uint8Array;
 
 export type TerminalWriteQueue = {
   enqueue: (chunk: TerminalWriteChunk) => void;
+  /** Toggle detached mode — uses longer batching interval when hidden, flushes immediately on reattach. */
+  setDetached: (detached: boolean) => void;
   dispose: () => void;
 };
 
@@ -15,18 +20,42 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
   let pendingBytes = 0;
   let disposed = false;
   let scheduledFrameId: number | null = null;
+  let detachedTimerId: ReturnType<typeof setTimeout> | null = null;
   let writeInFlight = false;
+  let detached = false;
   const chunks: TerminalWriteChunk[] = [];
 
+  const cancelScheduledFlush = (): void => {
+    if (scheduledFrameId !== null) {
+      window.cancelAnimationFrame(scheduledFrameId);
+      scheduledFrameId = null;
+    }
+    if (detachedTimerId !== null) {
+      clearTimeout(detachedTimerId);
+      detachedTimerId = null;
+    }
+  };
+
   const scheduleFlush = (): void => {
-    if (disposed || writeInFlight || scheduledFrameId !== null || chunks.length === 0) {
+    if (disposed || writeInFlight || chunks.length === 0) {
       return;
     }
 
-    scheduledFrameId = window.requestAnimationFrame(() => {
-      scheduledFrameId = null;
-      flushNextBatch();
-    });
+    cancelScheduledFlush();
+
+    if (detached) {
+      // Batched interval for parked terminals — accumulates more output per write
+      // to reduce main-thread contention with the visible terminal.
+      detachedTimerId = setTimeout(() => {
+        detachedTimerId = null;
+        flushNextBatch();
+      }, DETACHED_WRITE_INTERVAL_MS);
+    } else {
+      scheduledFrameId = window.requestAnimationFrame(() => {
+        scheduledFrameId = null;
+        flushNextBatch();
+      });
+    }
   };
 
   const writeChunk = (chunk: TerminalWriteChunk): void => {
@@ -45,6 +74,17 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
     const batch = takeTerminalWriteBatch(chunks);
     pendingBytes = Math.max(0, pendingBytes - getTerminalWriteChunkLength(batch));
     writeChunk(batch);
+  };
+
+  const flushAllRemaining = (): void => {
+    if (disposed || chunks.length === 0) {
+      return;
+    }
+    cancelScheduledFlush();
+    // Drain remaining chunks without waiting for next tick.
+    if (!writeInFlight) {
+      flushNextBatch();
+    }
   };
 
   const enqueue = (chunk: TerminalWriteChunk): void => {
@@ -76,12 +116,22 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
 
   return {
     enqueue,
+    setDetached: (value: boolean) => {
+      if (disposed || detached === value) {
+        return;
+      }
+      detached = value;
+
+      if (!detached) {
+        // Reattaching — drain any queued output immediately.
+        flushAllRemaining();
+      }
+      // If switching to detached, in-flight writes will complete;
+      // subsequent flushes use the longer interval.
+    },
     dispose: () => {
       disposed = true;
-      if (scheduledFrameId !== null) {
-        window.cancelAnimationFrame(scheduledFrameId);
-        scheduledFrameId = null;
-      }
+      cancelScheduledFlush();
       chunks.length = 0;
       pendingBytes = 0;
     },
