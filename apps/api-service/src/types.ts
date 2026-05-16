@@ -12,6 +12,8 @@ export type OAuthProfile = {
 export type ServiceConfig = {
   databaseUrl: string;
   appBaseUrl: string;
+  relayUrl?: string;
+  relayApiToken?: string;
   sessionSecret: string;
   sessionTtlDays: number;
   jwtAccessSecret: string;

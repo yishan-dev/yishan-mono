@@ -96,9 +96,16 @@ func (s *NodeSession) markDisconnected() {
 
 // SessionEvent represents a lifecycle event for a node session.
 type SessionEvent struct {
-	Type   string // "connected", "disconnected", "replaced"
-	NodeID string
-	UserID string
+	Type          string // "connected", "disconnected", "replaced"
+	NodeID        string
+	UserID        string
+	DaemonVersion string
+}
+
+type ConnectedSessionView struct {
+	NodeID        string  `json:"nodeId"`
+	UserID        string  `json:"userId"`
+	DaemonVersion *string `json:"daemonVersion,omitempty"`
 }
 
 // SessionEventHandler is a callback for session lifecycle events.
@@ -161,14 +168,14 @@ func (m *SessionManager) Register(conn *websocket.Conn, identity auth.NodeIdenti
 		log.Info().Str("nodeId", identity.NodeID).Msg("replacing existing connection")
 		existing.Close(4000, "replaced by new connection")
 		existing.markDisconnected()
-		m.emit(SessionEvent{Type: "replaced", NodeID: identity.NodeID, UserID: identity.UserID})
+		m.emit(SessionEvent{Type: "replaced", NodeID: identity.NodeID, UserID: identity.UserID, DaemonVersion: identity.DaemonVersion})
 	}
 
 	log.Info().
 		Str("nodeId", identity.NodeID).
 		Str("userId", identity.UserID).
 		Msg("node connected")
-	m.emit(SessionEvent{Type: "connected", NodeID: identity.NodeID, UserID: identity.UserID})
+	m.emit(SessionEvent{Type: "connected", NodeID: identity.NodeID, UserID: identity.UserID, DaemonVersion: identity.DaemonVersion})
 	return session
 }
 
@@ -188,7 +195,7 @@ func (m *SessionManager) Disconnect(nodeID string, code int, reason string) {
 		Int("code", code).
 		Str("reason", reason).
 		Msg("node disconnected")
-	m.emit(SessionEvent{Type: "disconnected", NodeID: nodeID, UserID: session.Identity.UserID})
+	m.emit(SessionEvent{Type: "disconnected", NodeID: nodeID, UserID: session.Identity.UserID, DaemonVersion: session.Identity.DaemonVersion})
 }
 
 // Get returns a session by node ID, or nil if not found.
@@ -217,6 +224,28 @@ func (m *SessionManager) ConnectedNodeIDs() []string {
 		}
 	}
 	return ids
+}
+
+// ConnectedSessions returns the connected node sessions with live identity metadata.
+func (m *SessionManager) ConnectedSessions() []ConnectedSessionView {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	sessions := make([]ConnectedSessionView, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		if s.State != StateConnected {
+			continue
+		}
+		view := ConnectedSessionView{
+			NodeID: s.Identity.NodeID,
+			UserID: s.Identity.UserID,
+		}
+		if s.Identity.DaemonVersion != "" {
+			version := s.Identity.DaemonVersion
+			view.DaemonVersion = &version
+		}
+		sessions = append(sessions, view)
+	}
+	return sessions
 }
 
 // ConnectedCount returns the number of currently connected nodes.

@@ -68,6 +68,8 @@ export function getServiceConfig(c: Context): ServiceConfig {
   return {
     databaseUrl: readHyperdriveConnectionString(c) ?? requireEnv(c, "DATABASE_URL"),
     appBaseUrl,
+    relayUrl: readEnv(c, "RELAY_URL"),
+    relayApiToken: readEnv(c, "RELAY_API_TOKEN"),
     sessionSecret: requireEnv(c, "SESSION_SECRET"),
     sessionTtlDays,
     jwtAccessSecret: requireEnv(c, "JWT_ACCESS_SECRET"),

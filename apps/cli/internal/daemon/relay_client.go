@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
+	"yishan/apps/cli/internal/buildinfo"
 	cliruntime "yishan/apps/cli/internal/runtime"
 )
 
@@ -24,13 +25,13 @@ const relayReconnectMaxDelay = 30 * time.Second
 
 // RelayStatus holds the current state of the relay connection, safe for concurrent reads.
 type RelayStatus struct {
-	mu            sync.RWMutex
-	enabled       bool
-	url           string
-	connected     bool
-	connectedAt   *time.Time
-	lastError     string
-	lastErrorAt   *time.Time
+	mu          sync.RWMutex
+	enabled     bool
+	url         string
+	connected   bool
+	connectedAt *time.Time
+	lastError   string
+	lastErrorAt *time.Time
 }
 
 // NewRelayStatus creates a RelayStatus with the given configuration.
@@ -118,24 +119,38 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string,
 			continue
 		}
 
+		endpointWithMetadata := appendRelayClientMetadata(endpoint)
 		headers := http.Header{}
 		headers.Set("Authorization", "Bearer "+relayToken)
-		conn, _, err := websocket.DefaultDialer.Dial(endpoint, headers)
+		conn, _, err := websocket.DefaultDialer.Dial(endpointWithMetadata, headers)
 		if err != nil {
-			log.Warn().Err(err).Str("relay_url", endpoint).Msg("relay websocket dial failed")
+			log.Warn().Err(err).Str("relay_url", endpointWithMetadata).Msg("relay websocket dial failed")
 			status.setDisconnected("dial failed: " + err.Error())
 			time.Sleep(delay)
 			delay = nextRelayDelay(delay)
 			continue
 		}
 
-		log.Info().Str("relay_url", endpoint).Str("nodeId", nodeID).Msg("relay websocket connected")
+		log.Info().Str("relay_url", endpointWithMetadata).Str("nodeId", nodeID).Str("daemonVersion", buildinfo.Version).Msg("relay websocket connected")
 		delay = relayReconnectInitialDelay
 		status.setConnected(time.Now().UTC())
 
 		runRelaySession(handler, nodeID, conn)
 		status.setDisconnected("session ended")
 	}
+}
+
+func appendRelayClientMetadata(endpoint string) string {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return endpoint
+	}
+	query := parsed.Query()
+	if version := strings.TrimSpace(buildinfo.Version); version != "" {
+		query.Set("version", version)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func runRelaySession(handler *JSONRPCHandler, nodeID string, conn *websocket.Conn) {

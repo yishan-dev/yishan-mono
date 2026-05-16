@@ -7,6 +7,7 @@ import {
   InvalidOrganizationMembersError,
   OrganizationManageMembersPermissionRequiredError,
   OrganizationMemberAlreadyExistsError,
+  OrganizationMembershipRequiredError,
   OrganizationMemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationOwnerRemovalNotAllowedError,
@@ -22,7 +23,7 @@ type CreateOrganizationInput = {
 
 type OrganizationMemberRole = "owner" | "admin" | "member";
 
-type OrganizationMemberView = {
+export type OrganizationMemberView = {
   userId: string;
   role: string;
   email: string;
@@ -40,6 +41,32 @@ type OrganizationView = {
 
 export class OrganizationService {
   constructor(private readonly db: AppDb) {}
+
+  async listOrganizationMembers(input: {
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<OrganizationMemberView[]> {
+    const actorRole = await this.getMembershipRole({
+      organizationId: input.organizationId,
+      userId: input.actorUserId
+    });
+
+    if (!actorRole) {
+      throw new OrganizationMembershipRequiredError();
+    }
+
+    return this.db
+      .select({
+        userId: organizationMembers.userId,
+        role: organizationMembers.role,
+        email: users.email,
+        name: users.name,
+        avatarUrl: users.avatarUrl
+      })
+      .from(organizationMembers)
+      .innerJoin(users, eq(users.id, organizationMembers.userId))
+      .where(eq(organizationMembers.organizationId, input.organizationId));
+  }
 
   async getMembershipRole(input: {
     organizationId: string;
