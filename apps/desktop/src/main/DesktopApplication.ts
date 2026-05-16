@@ -642,29 +642,55 @@ export class DesktopApplication {
           mainWindow.hide();
         }
       });
+    }
 
-      mainWindow.webContents.on("before-input-event", (event, input) => {
-        if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
-          return;
-        }
+    const handleOpenInExternalAppShortcut = (event: Electron.Event, input: Electron.Input) => {
+      if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
+        return;
+      }
 
-        const normalizedKey = input.key.trim().toLowerCase();
-        const isMacCmdO = process.platform === "darwin" && input.meta && !input.control;
-        const isNonMacCtrlO = process.platform !== "darwin" && input.control && !input.meta;
-        const isOpenShortcut = (isMacCmdO || isNonMacCtrlO) && !input.alt && !input.shift && normalizedKey === "o";
-        if (!isOpenShortcut) {
-          return;
-        }
+      const normalizedKey = input.key.trim().toLowerCase();
+      const isPrimaryModifier = process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta;
+      if (!isPrimaryModifier || input.alt) {
+        return;
+      }
 
+      if (!input.shift && normalizedKey === "o") {
         event.preventDefault();
         this.dispatchAction({ action: ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP });
-      });
-    }
+      }
+    };
+
+    const handleWebviewTabShortcuts = (event: Electron.Event, input: Electron.Input) => {
+      if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
+        return;
+      }
+
+      const normalizedKey = input.key.trim().toLowerCase();
+      const isPrimaryModifier = process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta;
+      if (!isPrimaryModifier || input.alt) {
+        return;
+      }
+
+      if (!input.shift && normalizedKey === "t") {
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.OPEN_TERMINAL_TAB });
+        return;
+      }
+
+      if (input.shift && normalizedKey === "b") {
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.OPEN_BROWSER_TAB });
+      }
+    };
+
+    mainWindow.webContents.on("before-input-event", handleOpenInExternalAppShortcut);
 
     // Intercept popup/new-window requests from <webview> guests (e.g. Cmd+Click,
     // target="_blank", window.open) and forward the URL to the renderer so it can
     // open the destination in a new in-app browser tab instead of a popup window.
     mainWindow.webContents.on("did-attach-webview", (_event, webviewContents) => {
+      webviewContents.on("before-input-event", handleWebviewTabShortcuts);
       webviewContents.setWindowOpenHandler((details) => {
         mainWindow.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
           method: "webviewOpenUrl",

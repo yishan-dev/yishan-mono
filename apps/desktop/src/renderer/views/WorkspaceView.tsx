@@ -82,6 +82,26 @@ function useWorkspaceAppActions(input: { cmd: WorkspaceViewCommands; navigate: R
         return;
       }
 
+      if (payload.action === ACTIONS.OPEN_TERMINAL_TAB) {
+        const workspaceId = workspaceStore.getState().selectedWorkspaceId;
+        if (!workspaceId) {
+          return;
+        }
+
+        cmd.openTab({ workspaceId, kind: "terminal", title: "Terminal" });
+        return;
+      }
+
+      if (payload.action === ACTIONS.OPEN_BROWSER_TAB) {
+        const workspaceId = workspaceStore.getState().selectedWorkspaceId;
+        if (!workspaceId) {
+          return;
+        }
+
+        cmd.openTab({ workspaceId, kind: "browser", url: "" });
+        return;
+      }
+
       if (payload.action === ACTIONS.TOGGLE_LEFT_PANE) {
         cmd.toggleLeftPaneVisibility();
         return;
