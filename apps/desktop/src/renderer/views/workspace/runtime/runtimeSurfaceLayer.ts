@@ -28,6 +28,7 @@ export function createFixedRuntimeLayer(rootTestId: string) {
     const runtimeRoot = getOrCreateRuntimeRoot();
     const existing = runtimeRoot.querySelector<HTMLDivElement>(`[data-testid="${rootTestId}"]`);
     if (existing) {
+      existing.style.zIndex = "1";
       rootHost = existing;
       return existing;
     }
@@ -40,7 +41,7 @@ export function createFixedRuntimeLayer(rootTestId: string) {
     host.style.width = "0";
     host.style.height = "0";
     host.style.pointerEvents = "none";
-    host.style.zIndex = "0";
+    host.style.zIndex = "1";
     runtimeRoot.appendChild(host);
     rootHost = host;
     return host;
