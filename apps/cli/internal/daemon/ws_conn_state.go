@@ -7,8 +7,6 @@ import (
 	"yishan/apps/cli/internal/workspace/terminal"
 )
 
-const maxTerminalPendingBytes = 64 * 1024
-
 type wsConnState struct {
 	conn                            *websocket.Conn
 	writeMu                         sync.Mutex
@@ -55,18 +53,6 @@ func (c *wsConnState) WriteBinary(data []byte) error {
 	return c.conn.WriteMessage(websocket.BinaryMessage, data)
 }
 
-// tryWriteBinary attempts a non-blocking binary write. Returns true if the
-// frame was sent; returns false if the write mutex is held by another
-// goroutine (backpressure — the caller should buffer and retry later).
-func (c *wsConnState) tryWriteBinary(data []byte) bool {
-	if !c.writeMu.TryLock() {
-		return false
-	}
-	err := c.conn.WriteMessage(websocket.BinaryMessage, data)
-	c.writeMu.Unlock()
-	return err == nil
-}
-
 func (c *wsConnState) Notify(method string, params any) error {
 	return c.WriteJSON(notification{JSONRPC: "2.0", Method: method, Params: params})
 }
@@ -105,47 +91,22 @@ func (c *wsConnState) AttachSubscription(sessionID string, subscriptionID uint64
 		copy(outputFramePrefix[1:], sid)
 		outputFramePrefix[1+len(sid)] = 0 // null terminator
 
-		// Per-session pending buffer: accumulates output chunks that couldn't be
-		// written immediately because the WebSocket write mutex was held by another
-		// terminal's goroutine. Coalesced into the next successful write to avoid
-		// cascading blockage when one terminal saturates the shared WebSocket.
-		var pending []byte
-
-		flushPending := func(rawChunk []byte) {
-			// Build the full payload: any pending bytes + the new chunk.
-			payloadLen := len(pending) + len(rawChunk)
-			if payloadLen == 0 {
-				return
-			}
-
-			frame := make([]byte, len(outputFramePrefix)+payloadLen)
-			copy(frame, outputFramePrefix)
-			writePos := len(outputFramePrefix)
-			if len(pending) > 0 {
-				copy(frame[writePos:], pending)
-				writePos += len(pending)
-			}
-			copy(frame[writePos:], rawChunk)
-
-			if c.tryWriteBinary(frame) {
-				pending = pending[:0]
-			} else {
-				// Mutex held — accumulate into pending buffer (capped).
-				avail := maxTerminalPendingBytes - len(pending)
-				if avail >= len(rawChunk) {
-					pending = append(pending, rawChunk...)
-				} else if avail > 0 {
-					pending = append(pending, rawChunk[:avail]...)
-				}
-			}
-		}
-
 		for event := range events {
 			switch event.Type {
 			case "output":
-				flushPending(event.RawChunk)
+				// Fast path: send PTY output as binary WebSocket frame.
+				// Frame format: [0x02] [sessionID + '\0'] [raw PTY bytes]
+				if len(event.RawChunk) > 0 {
+					frame := make([]byte, len(outputFramePrefix)+len(event.RawChunk))
+					copy(frame, outputFramePrefix)
+					copy(frame[len(outputFramePrefix):], event.RawChunk)
+					if err := c.WriteBinary(frame); err != nil {
+						c.DetachSubscription(sessionID)
+						return
+					}
+				}
 			case "exit":
-				// Exit events are infrequent and critical — use blocking write.
+				// Exit events remain as JSON-RPC — they are infrequent control messages.
 				if err := c.Notify("terminal.exit", map[string]any{
 					"sessionId": event.SessionID,
 					"exitCode":  event.ExitCode,

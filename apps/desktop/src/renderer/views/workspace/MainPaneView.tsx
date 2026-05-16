@@ -528,7 +528,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
             top: effectiveRect.top,
             width: effectiveRect.width,
             height: effectiveRect.height,
-            display: shouldShow ? "flex" : "none",
+            display: shouldShow && !isDraggingSplit ? "flex" : "none",
             flexDirection: "column" as const,
             pointerEvents: shouldShow && !isDraggingSplit ? "auto" : "none",
           }

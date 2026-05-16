@@ -99,7 +99,7 @@ const TERMINAL_OPTIONS = {
   fontSize: 13,
   lineHeight: 1.4,
   scrollback: 5_000,
-  smoothScrollDuration: 125,
+  smoothScrollDuration: 0,
   scrollSensitivity: 1,
   fastScrollSensitivity: 5,
   rescaleOverlappingGlyphs: true,
@@ -111,6 +111,7 @@ const TERMINAL_OPTIONS = {
 
 /** Resize debounce interval in milliseconds. */
 const RESIZE_DEBOUNCE_MS = 50;
+const MIN_HOST_SIZE_DELTA_PX = 1;
 
 // ─── Module State ──────────────────────────────────────────────────────────────
 
@@ -416,6 +417,8 @@ function setupResizeObserver(entry: TerminalRuntimeEntry): void {
   disconnectResizeObserver(entry);
 
   let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
+  let lastWidth = -1;
+  let lastHeight = -1;
   const observer = new ResizeObserver(() => {
     if (entry.state !== "attached") {
       return;
@@ -429,6 +432,21 @@ function setupResizeObserver(entry: TerminalRuntimeEntry): void {
       if (entry.state !== "attached") {
         return;
       }
+
+      const rect = entry.hostElement.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      if (
+        lastWidth >= 0 &&
+        lastHeight >= 0 &&
+        Math.abs(width - lastWidth) < MIN_HOST_SIZE_DELTA_PX &&
+        Math.abs(height - lastHeight) < MIN_HOST_SIZE_DELTA_PX
+      ) {
+        return;
+      }
+
+      lastWidth = width;
+      lastHeight = height;
       safeFitTerminal(entry);
       onTerminalResized?.(entry.tabId);
     }, RESIZE_DEBOUNCE_MS);

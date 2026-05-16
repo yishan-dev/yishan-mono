@@ -2,9 +2,7 @@ import type { Terminal } from "@xterm/xterm";
 
 const MAX_TERMINAL_LIVE_WRITE_QUEUE_BYTES = 1024 * 1024;
 const MAX_IMMEDIATE_TERMINAL_CHUNK_BYTES = 256;
-
-/** When detached, batch writes at this interval (ms) to reduce main-thread contention. */
-const DETACHED_WRITE_INTERVAL_MS = 200;
+const DETACHED_WRITE_INTERVAL_MS = 500;
 
 export type TerminalWriteChunk = string | Uint8Array;
 
@@ -19,20 +17,20 @@ export type TerminalWriteQueue = {
 export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue {
   let pendingBytes = 0;
   let disposed = false;
-  let scheduledFrameId: number | null = null;
-  let detachedTimerId: ReturnType<typeof setTimeout> | null = null;
+  let scheduledFlushTimerId: ReturnType<typeof setTimeout> | null = null;
+  let detachedFlushTimerId: ReturnType<typeof setTimeout> | null = null;
   let writeInFlight = false;
   let detached = false;
   const chunks: TerminalWriteChunk[] = [];
 
   const cancelScheduledFlush = (): void => {
-    if (scheduledFrameId !== null) {
-      window.cancelAnimationFrame(scheduledFrameId);
-      scheduledFrameId = null;
+    if (scheduledFlushTimerId !== null) {
+      clearTimeout(scheduledFlushTimerId);
+      scheduledFlushTimerId = null;
     }
-    if (detachedTimerId !== null) {
-      clearTimeout(detachedTimerId);
-      detachedTimerId = null;
+    if (detachedFlushTimerId !== null) {
+      clearTimeout(detachedFlushTimerId);
+      detachedFlushTimerId = null;
     }
   };
 
@@ -42,23 +40,25 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
     }
 
     if (detached) {
-      if (detachedTimerId !== null) {
+      if (detachedFlushTimerId !== null) {
         return; // already scheduled
       }
-      // Batched interval for parked terminals — accumulates more output per write
-      // to reduce main-thread contention with the visible terminal.
-      detachedTimerId = setTimeout(() => {
-        detachedTimerId = null;
+      // Detached: flush at a large interval to reduce main-thread pressure
+      // while still progressing terminal buffer state in the background.
+      detachedFlushTimerId = setTimeout(() => {
+        detachedFlushTimerId = null;
         flushNextBatch();
       }, DETACHED_WRITE_INTERVAL_MS);
+      return;
     } else {
-      if (scheduledFrameId !== null) {
+      if (scheduledFlushTimerId !== null) {
         return; // already scheduled
       }
-      scheduledFrameId = window.requestAnimationFrame(() => {
-        scheduledFrameId = null;
+      // Lower-latency attached flush: do not wait for next animation frame.
+      scheduledFlushTimerId = setTimeout(() => {
+        scheduledFlushTimerId = null;
         flushNextBatch();
-      });
+      }, 0);
     }
   };
 
@@ -96,7 +96,7 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
       return;
     }
 
-    if (!writeInFlight && chunks.length === 0 && isInteractiveTerminalChunk(chunk)) {
+    if (!detached && !writeInFlight && chunks.length === 0 && isInteractiveTerminalChunk(chunk)) {
       writeChunk(chunk);
       return;
     }
