@@ -56,6 +56,9 @@ export type TerminalRuntimeEntry = {
   resizeObserver: ResizeObserver | null;
   /** Whether the terminal session has exited (for close-on-reattach logic). */
   exited: boolean;
+  /** Last terminal dimensions sent to PTY resize handler. */
+  lastReportedCols: number;
+  lastReportedRows: number;
 };
 
 // ─── Resize Callback ───────────────────────────────────────────────────────────
@@ -198,6 +201,8 @@ export function ensureTerminalRuntime(tabId: string): TerminalRuntimeEntry {
     didRequestClose: false,
     resizeObserver: null,
     exited: false,
+    lastReportedCols: -1,
+    lastReportedRows: -1,
   };
 
   runtimesByTabId.set(tabId, entry);
@@ -248,11 +253,11 @@ export function attachTerminalRuntime(tabId: string, placeholder: HTMLElement): 
   // Set up resize observer for the host element.
   setupResizeObserver(entry);
 
-  // Perform one definitive fit on attach.
-  safeFitTerminal(entry);
+  // Perform one definitive fit on attach when host has non-zero area.
+  const didFitOnAttach = safeFitTerminal(entry);
 
   // Notify resize handler so PTY gets the new dimensions after fit.
-  onTerminalResized?.(tabId);
+  notifyTerminalResizeIfNeeded(entry, didFitOnAttach);
 
   // If this was a reattach from detached state, check for pending exit.
   if (wasDetached) {
@@ -447,8 +452,8 @@ function setupResizeObserver(entry: TerminalRuntimeEntry): void {
 
       lastWidth = width;
       lastHeight = height;
-      safeFitTerminal(entry);
-      onTerminalResized?.(entry.tabId);
+      const didFit = safeFitTerminal(entry);
+      notifyTerminalResizeIfNeeded(entry, didFit);
     }, RESIZE_DEBOUNCE_MS);
   });
 
@@ -461,16 +466,39 @@ function disconnectResizeObserver(entry: TerminalRuntimeEntry): void {
   entry.resizeObserver = null;
 }
 
-function safeFitTerminal(entry: TerminalRuntimeEntry): void {
+function safeFitTerminal(entry: TerminalRuntimeEntry): boolean {
   if (entry.state !== "attached" && entry.state !== "attaching") {
-    return;
+    return false;
+  }
+
+  const rect = entry.hostElement.getBoundingClientRect();
+  if (rect.width <= 1 || rect.height <= 1) {
+    return false;
   }
 
   try {
     entry.fitAddon.fit();
+    return true;
   } catch (error) {
     console.error("[TerminalRegistry] Failed to fit terminal", error);
+    return false;
   }
+}
+
+function notifyTerminalResizeIfNeeded(entry: TerminalRuntimeEntry, didFit: boolean): void {
+  if (!didFit) {
+    return;
+  }
+
+  const nextCols = entry.terminal.cols;
+  const nextRows = entry.terminal.rows;
+  if (entry.lastReportedCols === nextCols && entry.lastReportedRows === nextRows) {
+    return;
+  }
+
+  entry.lastReportedCols = nextCols;
+  entry.lastReportedRows = nextRows;
+  onTerminalResized?.(entry.tabId);
 }
 
 /** Reports one terminal async error without breaking render lifecycle. */
@@ -494,6 +522,14 @@ function ensureXtermViewportStyle(): void {
 
   const style = document.createElement("style");
   style.id = XTERM_VIEWPORT_STYLE_ID;
-  style.textContent = `[data-terminal-tab-id] .xterm-viewport { overflow-y: hidden !important; }`;
+  style.textContent = [
+    `[data-terminal-tab-id] .xterm-viewport {`,
+    `  overflow-y: scroll !important;`,
+    `  scrollbar-width: none !important;`,
+    `}`,
+    `[data-terminal-tab-id] .xterm-viewport::-webkit-scrollbar {`,
+    `  display: none !important;`,
+    `}`,
+  ].join("\n");
   document.head.appendChild(style);
 }
