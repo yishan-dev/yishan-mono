@@ -19,7 +19,6 @@ import {
 import {
   ensureTerminalRuntime,
   getTerminalRuntime,
-  isRuntimeVersionMatch,
   reportTerminalAsyncError,
   setTerminalDisposeHandler,
   setTerminalOutputSubscription,
@@ -78,8 +77,7 @@ export function initTerminalSessionLifecycle(tabId: string): void {
   setupTitleTracking(entry, tabId);
 
   // Kick off session resolution asynchronously.
-  const version = entry.version;
-  void resolveAndSubscribeSession(entry, tabId, version).catch((error) => {
+  void resolveAndSubscribeSession(entry, tabId).catch((error) => {
     reportTerminalAsyncError("init terminal session lifecycle", error);
   });
 }
@@ -188,7 +186,6 @@ function setupTitleTracking(entry: TerminalRuntimeEntry, tabId: string): void {
 async function resolveAndSubscribeSession(
   entry: TerminalRuntimeEntry,
   tabId: string,
-  version: number,
 ): Promise<void> {
   const orchestrator = new TerminalSessionOrchestrator({
     createTerminalSession,
@@ -204,8 +201,10 @@ async function resolveAndSubscribeSession(
     fitAddon: entry.fitAddon,
   });
 
-  // Guard: reject stale completions if runtime was disposed or recreated.
-  if (!isRuntimeVersionMatch(tabId, version)) {
+  // Guard: reject stale completions if runtime was disposed or recreated
+  // during the async call. Reference equality detects both disposal (null)
+  // and recreation (new object) without false positives from state transitions.
+  if (getTerminalRuntime(tabId) !== entry) {
     return;
   }
 
@@ -233,7 +232,7 @@ async function resolveAndSubscribeSession(
     sessionId: restored.sessionId,
     onData: (payload) => {
       // Guard against stale callbacks if runtime was disposed.
-      if (!isRuntimeVersionMatch(tabId, version)) {
+      if (getTerminalRuntime(tabId) !== entry) {
         return;
       }
 
@@ -277,7 +276,7 @@ async function resolveAndSubscribeSession(
   });
 
   // Guard: reject stale subscription if runtime was disposed during async subscribe.
-  if (!isRuntimeVersionMatch(tabId, version)) {
+  if (getTerminalRuntime(tabId) !== entry) {
     subscription.unsubscribe();
     return;
   }

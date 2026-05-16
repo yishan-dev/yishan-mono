@@ -391,15 +391,6 @@ export function updateTerminalReadIndex(tabId: string, nextIndex: number): void 
   }
 }
 
-/**
- * Checks if a runtime entry still exists and has the expected version,
- * rejecting stale async completions from disposed/recreated entries.
- */
-export function isRuntimeVersionMatch(tabId: string, version: number): boolean {
-  const entry = runtimesByTabId.get(tabId);
-  return entry?.version === version;
-}
-
 // ─── Internal Helpers ──────────────────────────────────────────────────────────
 
 function parkTerminalHost(entry: TerminalRuntimeEntry): void {
