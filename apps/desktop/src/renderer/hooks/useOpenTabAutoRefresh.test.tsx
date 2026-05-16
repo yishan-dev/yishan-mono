@@ -65,8 +65,8 @@ function createCommands() {
   };
 }
 
-async function flushRefreshDebounce() {
-  await vi.advanceTimersByTimeAsync(220);
+async function flushRefreshWork() {
+  await vi.runAllTimersAsync();
 }
 
 describe("useOpenTabAutoRefresh", () => {
@@ -100,7 +100,7 @@ describe("useOpenTabAutoRefresh", () => {
       source: "workspaceFilesChanged",
       payload: { workspaceWorktreePath: "/repo", changedRelativePaths: ["src/changed.ts", "src/dirty.ts"] },
     });
-    await flushRefreshDebounce();
+    await flushRefreshWork();
 
     expect(commands.readFile).toHaveBeenCalledTimes(1);
     expect(commands.readFile).toHaveBeenCalledWith({ workspaceWorktreePath: "/repo", relativePath: "src/changed.ts" });
@@ -127,7 +127,7 @@ describe("useOpenTabAutoRefresh", () => {
       source: "workspaceFilesChanged",
       payload: { workspaceWorktreePath: "/other", changedRelativePaths: ["src/changed.ts"] },
     });
-    await flushRefreshDebounce();
+    await flushRefreshWork();
 
     expect(commands.readFile).not.toHaveBeenCalled();
   });
@@ -152,7 +152,7 @@ describe("useOpenTabAutoRefresh", () => {
       source: "gitChanged",
       payload: { workspaceWorktreePath: "/repo" },
     });
-    await flushRefreshDebounce();
+    await flushRefreshWork();
 
     expect(commands.readFile).toHaveBeenCalledTimes(1);
     expect(commands.readDiff).toHaveBeenCalledWith({ workspaceWorktreePath: "/repo", relativePath: "src/changed.ts" });

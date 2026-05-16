@@ -34,8 +34,6 @@ type UseOpenTabAutoRefreshInput = {
   cmd: OpenTabAutoRefreshCommands;
 };
 
-const REFRESH_DEBOUNCE_MS = 220;
-
 function normalizeRelativePath(path: string): string {
   return path.replace(/^\.\/+/, "").replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
 }
@@ -68,7 +66,7 @@ function isFileNotFoundError(error: unknown): boolean {
   );
 }
 
-/** Keeps open file and diff tabs synced with on-disk changes using debounced backend file-watch events. */
+/** Keeps open file and diff tabs synced with backend file and git change events. */
 export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
   const { workspaceWorktreePath } = input;
   const tabsRef = useRef(input.tabs);
@@ -84,7 +82,6 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
     let disposed = false;
     let inFlight = false;
     let queued = false;
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingChangedRelativePaths: string[] | undefined;
     let shouldRefreshAllDiffTabs = false;
     const stopBackendEventPipeline = startBackendEventPipeline();
@@ -200,17 +197,11 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
         pendingChangedRelativePaths = [...pendingChangedRelativePaths, ...changedRelativePaths];
       }
 
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      debounceTimer = setTimeout(() => {
-        debounceTimer = null;
-        const nextChangedRelativePaths = pendingChangedRelativePaths;
-        const nextRefreshAllDiffTabs = shouldRefreshAllDiffTabs;
-        pendingChangedRelativePaths = undefined;
-        shouldRefreshAllDiffTabs = false;
-        void runRefresh(nextChangedRelativePaths, nextRefreshAllDiffTabs);
-      }, REFRESH_DEBOUNCE_MS);
+      const nextChangedRelativePaths = pendingChangedRelativePaths;
+      const nextRefreshAllDiffTabs = shouldRefreshAllDiffTabs;
+      pendingChangedRelativePaths = undefined;
+      shouldRefreshAllDiffTabs = false;
+      void runRefresh(nextChangedRelativePaths, nextRefreshAllDiffTabs);
     };
 
     const unsubscribeWorkspaceFilesChanged = subscribeBackendEvent("workspace.files.changed", (event) => {
@@ -234,9 +225,6 @@ export function useOpenTabAutoRefresh(input: UseOpenTabAutoRefreshInput) {
       stopBackendEventPipeline();
       unsubscribeWorkspaceFilesChanged();
       unsubscribeGitChanged();
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
     };
   }, [workspaceWorktreePath]);
 }
