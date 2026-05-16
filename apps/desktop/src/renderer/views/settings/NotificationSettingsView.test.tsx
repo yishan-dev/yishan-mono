@@ -622,8 +622,8 @@ describe("NotificationSettingsPanel", () => {
     });
 
     fireEvent.mouseDown(
-      screen.getByRole("combobox", {
-        name: "org.settings.notifications.events.runFinished org.settings.notifications.soundSelection",
+      await screen.findByRole("combobox", {
+        name: "org.settings.notifications.events.runFailed org.settings.notifications.soundSelection",
       }),
     );
     fireEvent.click(await screen.findByRole("option", { name: "org.settings.notifications.sounds.ping" }));
