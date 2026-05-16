@@ -678,6 +678,48 @@ describe("getShortcutDefinitions", () => {
     expect(selectTab).toHaveBeenCalledWith("workspace-1", "active-pane-1", "tab-2");
     expect(setSelectedTabId).toHaveBeenCalledWith("tab-2");
   });
+
+  it("selects tabs by the same pinned-first order shown in the active pane", () => {
+    const runtimeDefinitions = getShortcutDefinitions();
+    const selectByIndexDefinition = runtimeDefinitions.find((definition) => definition.id === "select-tab-by-index");
+    expect(selectByIndexDefinition).toBeTruthy();
+
+    const setSelectedTabId = vi.fn();
+    const getActivePane = vi.fn(() => ({
+      kind: "leaf" as const,
+      id: "active-pane-1",
+      tabIds: ["tab-2", "tab-1"],
+      selectedTabId: "tab-2",
+    }));
+    const selectTab = vi.fn();
+    const context = createShortcutContext({
+      commands: {
+        ...createShortcutContext().commands,
+        setSelectedTabId,
+      },
+      tabStoreState: {
+        ...createShortcutContext().tabStoreState,
+        getWorkspaceTabs: vi.fn<(workspaceId: string) => TabStoreState["tabs"]>(() => [
+          { id: "tab-1", workspaceId: "workspace-1", title: "Pinned", pinned: true, kind: "session", data: {} },
+          { id: "tab-2", workspaceId: "workspace-1", title: "Regular", pinned: false, kind: "session", data: {} },
+        ]),
+      },
+      splitPaneStoreState: {
+        ...createShortcutContext().splitPaneStoreState,
+        getActivePane,
+        selectTab,
+      },
+    });
+
+    selectByIndexDefinition?.run(context, {
+      key: "1",
+      target: document.body,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+
+    expect(selectTab).toHaveBeenCalledWith("workspace-1", "active-pane-1", "tab-1");
+    expect(setSelectedTabId).toHaveBeenCalledWith("tab-1");
+  });
   it("ignores file-tree delete shortcut when editable target is focused", () => {
     const runtimeDefinitions = getShortcutDefinitions();
     const deleteAction = runtimeDefinitions.find((definition) => definition.id === ACTIONS.FILE_DELETE);
