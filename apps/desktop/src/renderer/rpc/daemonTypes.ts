@@ -50,6 +50,8 @@ export type ApiNamespace =
   | "terminal"
   | "chat"
   | "agent"
+  | "cliTools"
+  | "integration"
   | "notification"
   | "events";
 

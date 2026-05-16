@@ -76,6 +76,7 @@
       "agents": "智能体",
       "appearance": "外观",
       "daemon": "守护进程",
+      "integrations": "集成",
       "keybindings": "键盘快捷键",
       "links": "链接",
       "notifications": "通知",
@@ -121,6 +122,33 @@
         "pi": "Pi",
         "copilot": "GitHub Copilot",
         "cursor": "Cursor"
+      }
+    },
+    "cliTools": {
+      "title": "CLI 工具",
+      "description": "管理用于智能体和集成的本地 CLI 工具。",
+      "loadError": "加载 CLI 工具状态失败。",
+      "actions": {
+        "rescanAll": "全部重新扫描"
+      }
+    },
+    "integrations": {
+      "title": "集成",
+      "description": "查看外部服务的连接状态。",
+      "loadError": "加载集成状态失败。",
+      "actions": {
+        "recheckAll": "全部重新检查"
+      },
+      "status": {
+        "checking": "检测中...",
+        "connected": "已连接"
+      },
+      "github": {
+        "label": "GitHub",
+        "description": "GitHub CLI (gh) 连接状态",
+        "connectedAs": "已连接为 {{username}}",
+        "notInstalled": "CLI 未安装",
+        "notLoggedIn": "未登录"
       }
     },
     "appearance": {

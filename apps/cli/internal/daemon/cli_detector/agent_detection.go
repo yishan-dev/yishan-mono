@@ -1,4 +1,4 @@
-package daemon
+package clidetector
 
 import (
 	"context"
@@ -72,6 +72,10 @@ func ListAgentCLIDetectionStatuses() []AgentCLIDetectionStatus {
 }
 
 func ListAgentCLIDetectionStatusesWithRefresh(forceRefresh bool) []AgentCLIDetectionStatus {
+	return listRawAgentCLIDetectionStatuses(forceRefresh)
+}
+
+func ListRawAgentCLIDetectionStatuses(forceRefresh bool) []AgentCLIDetectionStatus {
 	ttl := resolveAgentDetectionCacheTTL()
 	if !forceRefresh {
 		if statuses, ok := loadAnyCachedAgentDetectionStatuses(ttl); ok {
@@ -87,6 +91,10 @@ func ListAgentCLIDetectionStatusesWithRefresh(forceRefresh bool) []AgentCLIDetec
 		VersionTimeout: 2 * time.Second,
 	}
 	return ListAgentCLIDetectionStatusesWithRuntimeOptions(forceRefresh, options, ttl)
+}
+
+func listRawAgentCLIDetectionStatuses(forceRefresh bool) []AgentCLIDetectionStatus {
+	return ListRawAgentCLIDetectionStatuses(forceRefresh)
 }
 
 func ListAgentCLIDetectionStatusesWithRuntimeOptions(forceRefresh bool, options agentDetectionOptions, ttl time.Duration) []AgentCLIDetectionStatus {

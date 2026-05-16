@@ -17,6 +17,8 @@ const API_NAMESPACES = new Set<ApiNamespace>([
   "terminal",
   "chat",
   "agent",
+  "cliTools",
+  "integration",
   "notification",
   "events",
 ]);
@@ -355,6 +357,8 @@ export async function getDaemonClient(): Promise<DaemonRpcClient> {
         },
         chat: proxyClient.chat,
         agent: proxyClient.agent,
+        cliTools: proxyClient.cliTools,
+        integration: proxyClient.integration,
         notification: proxyClient.notification,
         events: proxyClient.events,
       };
