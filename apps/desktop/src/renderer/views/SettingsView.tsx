@@ -21,7 +21,7 @@ import { ThemePreferencePicker } from "../components/settings/ThemePreferencePic
 import { getRendererPlatform } from "../helpers/platform";
 import { useThemePreference } from "../hooks/useThemePreference";
 import { AccountSettingsView } from "./settings/AccountSettingsView";
-import { AgentSettingsView } from "./settings/AgentSettingsView";
+import { CLIToolsSettingsView } from "./settings/CLIToolsSettingsView";
 import { DaemonSettingsView } from "./settings/DaemonSettingsView";
 import { GitWorkspaceSettingsView } from "./settings/GitWorkspaceSettingsView";
 import { IntegrationSettingsView } from "./settings/IntegrationSettingsView";
@@ -149,7 +149,7 @@ export function SettingsView() {
       account: <AccountSettingsView />,
       agents: (
         <SettingsErrorBoundary sectionLabel={t("settings.agents.title")}>
-          <AgentSettingsView />
+          <CLIToolsSettingsView />
         </SettingsErrorBoundary>
       ),
       appearance: (

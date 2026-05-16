@@ -91,6 +91,21 @@ export type DaemonRpcClient = {
   agent: {
     listDetectionStatuses: (input?: unknown) => Promise<unknown>;
   };
+  cliTools: {
+    listStatuses: (input?: { refresh?: boolean }) => Promise<
+      Array<{
+        toolId: string;
+        category: string;
+        label: string;
+        installed: boolean;
+        version?: string;
+        authenticated?: boolean;
+        account?: string;
+        statusDetail: string;
+        supportsToggle?: boolean;
+      }>
+    >;
+  };
   integration: {
     githubStatus: (input?: { refresh?: boolean }) => Promise<{
       installed: boolean;

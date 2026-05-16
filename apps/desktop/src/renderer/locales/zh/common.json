@@ -124,6 +124,14 @@
         "cursor": "Cursor"
       }
     },
+    "cliTools": {
+      "title": "CLI 工具",
+      "description": "管理用于智能体和集成的本地 CLI 工具。",
+      "loadError": "加载 CLI 工具状态失败。",
+      "actions": {
+        "rescanAll": "全部重新扫描"
+      }
+    },
     "integrations": {
       "title": "集成",
       "description": "查看外部服务的连接状态。",

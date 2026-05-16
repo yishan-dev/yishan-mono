@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"yishan/apps/cli/internal/api"
+	clidetector "yishan/apps/cli/internal/daemon/cli_detector"
 	cliruntime "yishan/apps/cli/internal/runtime"
 	"yishan/apps/cli/internal/workspace"
 )
@@ -167,7 +168,19 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			}
 			refresh = req.Refresh
 		}
-		return ListAgentCLIDetectionStatusesWithRefresh(refresh), nil
+		return clidetector.ListAgentCLIDetectionStatusesWithRefresh(refresh), nil
+	case MethodCLIToolListStatuses:
+		refresh := false
+		if len(params) > 0 {
+			var req struct {
+				Refresh bool `json:"refresh"`
+			}
+			if err := decodeParams(params, &req); err != nil {
+				return nil, err
+			}
+			refresh = req.Refresh
+		}
+		return ListCLIToolDetectionStatusesWithRefresh(refresh), nil
 	case MethodIntegrationGitHubStatus:
 		refresh := false
 		if len(params) > 0 {
@@ -179,7 +192,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			}
 			refresh = req.Refresh
 		}
-		return CheckGitHubConnectionStatus(refresh), nil
+		return clidetector.CheckGitHubConnectionStatus(refresh), nil
 	case MethodFrontendEventsStream:
 		subscriptionID, events := h.events.Subscribe()
 		connState.AttachEventStream(events, func() {

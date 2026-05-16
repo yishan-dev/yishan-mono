@@ -1,4 +1,4 @@
-package daemon
+package clidetector
 
 import (
 	"context"
@@ -40,6 +40,10 @@ var (
 // the user is authenticated. Results are cached to avoid repeated subprocess
 // invocations.
 func CheckGitHubConnectionStatus(forceRefresh bool) GitHubConnectionStatus {
+	return checkGitHubConnectionStatusRaw(forceRefresh)
+}
+
+func CheckGitHubConnectionStatusRaw(forceRefresh bool) GitHubConnectionStatus {
 	ttl := resolveGhDetectionCacheTTL()
 
 	if !forceRefresh {
@@ -52,6 +56,10 @@ func CheckGitHubConnectionStatus(forceRefresh bool) GitHubConnectionStatus {
 	storeCachedGhDetectionStatus(ttl, status)
 
 	return status
+}
+
+func checkGitHubConnectionStatusRaw(forceRefresh bool) GitHubConnectionStatus {
+	return CheckGitHubConnectionStatusRaw(forceRefresh)
 }
 
 func resolveGhDetectionCacheTTL() time.Duration {

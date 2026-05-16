@@ -11,6 +11,7 @@ const (
 
 	MethodAgentListDetectionStatuses = "agent.listDetectionStatuses"
 	MethodIntegrationGitHubStatus    = "integration.githubStatus"
+	MethodCLIToolListStatuses        = "cliTools.listStatuses"
 	MethodFrontendEventsStream       = "events.frontendStream"
 	MethodAppPersistAuthTokens       = "app.persistAuthTokens"
 	MethodAppGetAccessToken          = "app.getAccessToken"

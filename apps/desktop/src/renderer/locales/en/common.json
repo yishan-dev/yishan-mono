@@ -140,6 +140,14 @@
         "cursor": "Cursor"
       }
     },
+    "cliTools": {
+      "title": "CLI Tools",
+      "description": "Manage local CLI tools used by agents and integrations.",
+      "loadError": "Failed to load CLI tool statuses.",
+      "actions": {
+        "rescanAll": "Rescan All"
+      }
+    },
     "integrations": {
       "title": "Integrations",
       "description": "View the connection status of external services.",

@@ -20,6 +20,7 @@ import {
   setChatCurrentModel as setChatCurrentModelCommand,
   updateChatMessage as updateChatMessageCommand,
 } from "../commands/chatCommands";
+import { listCLIToolStatuses as listCLIToolStatusesCommand } from "../commands/cliToolCommands";
 import {
   createFile as createFileCommand,
   createFolder as createFolderCommand,
@@ -121,6 +122,7 @@ export type Commands = {
   setSelectedRepoId: (repoId: string) => void;
   setSelectedWorkspaceId: (workspaceId: string) => void;
   listAgentDetectionStatuses: typeof listAgentDetectionStatusesCommand;
+  listCLIToolStatuses: typeof listCLIToolStatusesCommand;
   checkGitHubConnectionStatus: typeof checkGitHubConnectionStatusCommand;
   setDisplayRepoIds: typeof setDisplayRepoIdsCommand;
   setLastUsedExternalAppId: typeof setLastUsedExternalAppIdCommand;
@@ -236,6 +238,7 @@ export function useCommands(): Commands {
       setSelectedRepoId: setSelectedRepo,
       setSelectedWorkspaceId: setSelectedWorkspace,
       listAgentDetectionStatuses: listAgentDetectionStatusesCommand,
+      listCLIToolStatuses: listCLIToolStatusesCommand,
       checkGitHubConnectionStatus: checkGitHubConnectionStatusCommand,
       setDisplayRepoIds: setDisplayRepoIdsCommand,
       setLastUsedExternalAppId: setLastUsedExternalAppIdCommand,
