@@ -495,7 +495,11 @@ func (s *session) broadcast(event Event) {
 	for _, ch := range s.subs {
 		select {
 		case ch <- event:
-		default:
+		case <-time.After(time.Millisecond):
+			// Channel is saturated — the subscriber goroutine(s) are backed up
+			// behind a busy WebSocket write. Drop after a brief grace period
+			// to avoid blocking the PTY read loop while still giving slow
+			// subscribers a chance to catch up.
 		}
 	}
 }
