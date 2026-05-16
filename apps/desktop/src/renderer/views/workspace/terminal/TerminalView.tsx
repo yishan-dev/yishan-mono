@@ -164,6 +164,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
+          pointerEvents: "none",
         }}
       />
     </Box>

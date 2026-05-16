@@ -165,10 +165,12 @@ export function ensureTerminalRuntime(tabId: string): TerminalRuntimeEntry {
   hostElement.style.overflow = "hidden";
   hostElement.style.visibility = "hidden";
   hostElement.style.pointerEvents = "none";
+  hostElement.style.zIndex = "1";
+  hostElement.setAttribute("data-terminal-tab-id", tabId);
 
-  // Suppress xterm's internal viewport scrollbar to prevent double-scrollbar UX issues.
-  // This must be on the host element since xterm renders its viewport as a child.
-  hostElement.style.setProperty("--xterm-viewport-overflow", "hidden");
+  // Suppress xterm's internal viewport scrollbar to prevent double-scrollbar UX.
+  // Injected once globally using the data attribute as a selector.
+  ensureXtermViewportStyle();
 
   // Create xterm instance and open it into the host.
   const terminal = new Terminal(TERMINAL_OPTIONS);
@@ -464,4 +466,17 @@ function safeFitTerminal(entry: TerminalRuntimeEntry): void {
 /** Reports one terminal async error without breaking render lifecycle. */
 export function reportTerminalAsyncError(action: string, error: unknown): void {
   console.error(`[TerminalRegistry] Failed to ${action}`, error);
+}
+
+const XTERM_VIEWPORT_STYLE_ID = "yishan-xterm-viewport-style";
+
+function ensureXtermViewportStyle(): void {
+  if (document.getElementById(XTERM_VIEWPORT_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = XTERM_VIEWPORT_STYLE_ID;
+  style.textContent = `[data-terminal-tab-id] .xterm-viewport { overflow-y: hidden !important; }`;
+  document.head.appendChild(style);
 }
