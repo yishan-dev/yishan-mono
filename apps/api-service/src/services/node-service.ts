@@ -11,6 +11,7 @@ import {
 } from "@/errors";
 import { newId } from "@/lib/id";
 import type { OrganizationService } from "@/services/organization-service";
+import type { ServiceConfig } from "@/types";
 
 type NodeScope = "private" | "shared";
 
@@ -26,6 +27,7 @@ export type NodeView = {
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;
+  isOnline: boolean;
 };
 
 type CreateNodeInput = {
@@ -51,7 +53,38 @@ export class NodeService {
   constructor(
     private readonly db: AppDb,
     private readonly organizationService: OrganizationService,
+    private readonly config: ServiceConfig,
   ) {}
+
+  private async getConnectedNodeIds(): Promise<Set<string>> {
+    const relayUrl = this.config.relayUrl?.trim();
+    const relayApiToken = this.config.relayApiToken?.trim();
+
+    if (!relayUrl || !relayApiToken) {
+      return new Set();
+    }
+
+    try {
+      const response = await fetch(new URL("/api/v1/metrics", relayUrl), {
+        headers: {
+          Authorization: `Bearer ${relayApiToken}`
+        }
+      });
+
+      if (!response.ok) {
+        return new Set();
+      }
+
+      const body = (await response.json()) as { connectedNodes?: unknown };
+      if (!Array.isArray(body.connectedNodes)) {
+        return new Set();
+      }
+
+      return new Set(body.connectedNodes.filter((value): value is string => typeof value === "string"));
+    } catch {
+      return new Set();
+    }
+  }
 
   private normalizeMetadata(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -116,6 +149,7 @@ export class NodeService {
         canUse: true,
         metadata: this.normalizeMetadata(node.metadata),
         scope: node.scope,
+        isOnline: false,
       };
     });
   }
@@ -145,11 +179,14 @@ export class NodeService {
         ),
       );
 
+    const connectedNodeIds = await this.getConnectedNodeIds();
+
     return rows.map((row) => ({
       ...row,
       canUse: row.scope === "shared" || row.ownerUserId === input.actorUserId,
       metadata: this.normalizeMetadata(row.metadata),
       scope: row.scope,
+      isOnline: connectedNodeIds.has(row.id),
     }));
   }
 
@@ -210,6 +247,7 @@ export class NodeService {
       canUse: true,
       metadata: this.normalizeMetadata(node.metadata),
       scope: node.scope,
+      isOnline: false,
     };
   }
 

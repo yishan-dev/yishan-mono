@@ -15,8 +15,9 @@ import (
 
 // NodeIdentity represents the authenticated identity of a relay connection.
 type NodeIdentity struct {
-	UserID string
-	NodeID string
+	UserID        string
+	NodeID        string
+	DaemonVersion string
 }
 
 // Config holds JWT validation parameters.
@@ -50,7 +51,12 @@ func (a *Authenticator) Authenticate(r *http.Request) (*NodeIdentity, error) {
 		return nil, fmt.Errorf("missing bearer token")
 	}
 
-	return a.validateToken(tokenString)
+	identity, err := a.validateToken(tokenString)
+	if err != nil {
+		return nil, err
+	}
+	identity.DaemonVersion = strings.TrimSpace(r.URL.Query().Get("version"))
+	return identity, nil
 }
 
 func (a *Authenticator) validateToken(tokenString string) (*NodeIdentity, error) {

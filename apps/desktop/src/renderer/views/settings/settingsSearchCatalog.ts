@@ -2,6 +2,7 @@ import {
   BiBell,
   BiChip,
   type BiCog,
+  BiDesktop,
   BiGitBranch,
   BiLinkExternal,
   BiPalette,
@@ -25,6 +26,7 @@ export type SettingsTab =
   | "integrations"
   | "keybindings"
   | "links"
+  | "nodes"
   | "notifications"
   | "terminal"
   | "workspace";
@@ -59,6 +61,7 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
       { tab: "appearance", labelKey: "settings.items.appearance", icon: BiPalette },
       { tab: "integrations", labelKey: "settings.items.integrations", icon: BiPlug },
       { tab: "links", labelKey: "settings.items.links", icon: BiLinkExternal },
+      { tab: "nodes", labelKey: "settings.items.nodes", icon: BiDesktop },
       { tab: "notifications", labelKey: "settings.items.notifications", icon: BiBell },
       { tab: "terminal", labelKey: "settings.items.terminal", icon: BiTerminal },
       { tab: "keybindings", labelKey: "settings.items.keybindings", icon: BiSolidKeyboard },
@@ -201,6 +204,28 @@ const LINKS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   },
 ];
 
+const NODES_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
+  {
+    id: "nodes-list",
+    tab: "nodes",
+    icon: BiDesktop,
+    labelKey: "settings.nodes.title",
+    sectionLabelKey: "settings.items.nodes",
+    keywordKeys: [
+      "settings.nodes.description",
+      "settings.nodes.columns.name",
+      "settings.nodes.columns.type",
+      "settings.nodes.columns.version",
+      "settings.nodes.columns.owner",
+      "settings.nodes.columns.status",
+      "settings.nodes.types.private",
+      "settings.nodes.types.shared",
+      "settings.nodes.status.online",
+      "settings.nodes.status.offline",
+    ],
+  },
+];
+
 const KEYBINDINGS_SEARCH_ITEMS: SettingsSearchCatalogItem[] = [
   {
     id: "keybindings-list",
@@ -293,6 +318,7 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchCatalogItem[] = [
   ...INTEGRATION_SEARCH_ITEMS,
   ...LANGUAGE_SEARCH_ITEMS,
   ...LINKS_SEARCH_ITEMS,
+  ...NODES_SEARCH_ITEMS,
   ...KEYBINDINGS_SEARCH_ITEMS,
   ...DAEMON_SEARCH_ITEMS,
   ...GIT_WORKSPACE_SEARCH_ITEMS,

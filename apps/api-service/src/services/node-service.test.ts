@@ -55,6 +55,7 @@ function createMockDb() {
 
 // biome-ignore lint/suspicious/noExplicitAny: mock organization service for unit testing
 const stubOrganizationService = {} as any;
+const stubConfig = {} as any;
 
 describe("NodeService", () => {
   describe("registerNode (updateIfExists=true, default)", () => {
@@ -63,7 +64,7 @@ describe("NodeService", () => {
 
     beforeEach(() => {
       mock = createMockDb();
-      service = new NodeService(mock.db, stubOrganizationService);
+      service = new NodeService(mock.db, stubOrganizationService, stubConfig);
     });
 
     it("creates a new private node on first registration", async () => {
@@ -214,7 +215,7 @@ describe("NodeService", () => {
 
     beforeEach(() => {
       mock = createMockDb();
-      service = new NodeService(mock.db, stubOrganizationService);
+      service = new NodeService(mock.db, stubOrganizationService, stubConfig);
     });
 
     it("uses onConflictDoNothing instead of onConflictDoUpdate", async () => {

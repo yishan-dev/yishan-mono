@@ -28,7 +28,7 @@ export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppS
     user,
     auth: new AuthService(deps.db, deps.config, user),
     organization,
-    node: new NodeService(deps.db, organization),
+    node: new NodeService(deps.db, organization, deps.config),
     project: new ProjectService(deps.db, organization),
     scheduledJob: new ScheduledJobService(deps.db, organization),
     workspace: new WorkspaceService(deps.db, organization, workspaceProvisioner)

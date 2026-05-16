@@ -348,11 +348,12 @@ func (s *Server) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	queueMetrics := s.queue.GetMetrics()
 
 	metrics := map[string]any{
-		"uptime":         time.Since(s.startedAt).String(),
-		"connectedNodes": s.sessions.ConnectedNodeIDs(),
-		"connectedCount": s.sessions.ConnectedCount(),
-		"totalSessions":  s.sessions.TotalCount(),
-		"queue":          queueMetrics,
+		"uptime":            time.Since(s.startedAt).String(),
+		"connectedNodes":    s.sessions.ConnectedNodeIDs(),
+		"connectedSessions": s.sessions.ConnectedSessions(),
+		"connectedCount":    s.sessions.ConnectedCount(),
+		"totalSessions":     s.sessions.TotalCount(),
+		"queue":             queueMetrics,
 	}
 
 	writeJSON(w, http.StatusOK, metrics)

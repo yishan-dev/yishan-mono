@@ -3,6 +3,14 @@ export type OrganizationRecord = {
   name: string;
 };
 
+export type OrganizationMemberRecord = {
+  userId: string;
+  role: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
 export type ProjectRecord = {
   id: string;
   name: string;
@@ -52,4 +60,5 @@ export type NodeRecord = {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+  isOnline: boolean;
 };

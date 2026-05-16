@@ -68,8 +68,9 @@
     "searchPlaceholder": "搜索设置...",
     "searchNoResults": "没有匹配的设置项。",
     "sections": {
-      "personal": "个人",
-      "git": "Git"
+      "account": "账号",
+      "app": "应用",
+      "advanced": "高级"
     },
     "items": {
       "account": "账号",
@@ -79,9 +80,35 @@
       "integrations": "集成",
       "keybindings": "键盘快捷键",
       "links": "链接",
+      "nodes": "节点",
       "notifications": "通知",
       "terminal": "终端",
       "workspace": "工作区"
+    },
+    "nodes": {
+      "title": "节点",
+      "description": "查看组织中的节点，以及它们当前是否在线。",
+      "loadError": "加载组织节点失败。",
+      "empty": "当前组织没有可用节点。",
+      "columns": {
+        "name": "节点名称",
+        "type": "节点类型",
+        "version": "版本",
+        "owner": "所有者",
+        "status": "状态"
+      },
+      "types": {
+        "private": "私有",
+        "shared": "共享"
+      },
+      "status": {
+        "online": "在线",
+        "offline": "离线"
+      },
+      "values": {
+        "unknownOwner": "未知",
+        "unknownVersion": "未知"
+      }
     },
     "git": {
       "workspace": {

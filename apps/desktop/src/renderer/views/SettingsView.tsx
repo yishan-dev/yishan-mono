@@ -28,6 +28,7 @@ import { IntegrationSettingsView } from "./settings/IntegrationSettingsView";
 import { KeybindingsSettingsView } from "./settings/KeybindingsSettingsView";
 import { LanguageSettingsView } from "./settings/LanguageSettingsView";
 import { LinkSettingsView } from "./settings/LinkSettingsView";
+import { NodesSettingsView } from "./settings/NodesSettingsView";
 import { NotificationSettingsView } from "./settings/NotificationSettingsView";
 import { TerminalSettingsView } from "./settings/TerminalSettingsView";
 import {
@@ -103,6 +104,7 @@ export function SettingsView() {
       selectedTabParam === "keybindings" ||
       selectedTabParam === "language" ||
       selectedTabParam === "links" ||
+      selectedTabParam === "nodes" ||
       selectedTabParam === "notifications" ||
       selectedTabParam === "terminal" ||
       selectedTabParam === "workspace"
@@ -173,6 +175,7 @@ export function SettingsView() {
         </SettingsErrorBoundary>
       ),
       links: <LinkSettingsView />,
+      nodes: <NodesSettingsView />,
       terminal: <TerminalSettingsView />,
       keybindings: <KeybindingsSettingsView />,
       workspace: <GitWorkspaceSettingsView />,

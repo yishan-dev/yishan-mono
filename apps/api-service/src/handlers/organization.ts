@@ -29,6 +29,15 @@ export async function listOrganizationsHandler(c: AppContext) {
   return c.json({ organizations });
 }
 
+export async function listOrganizationMembersHandler(c: AppContext, params: OrganizationParamsInput) {
+  const actorUser = c.get("sessionUser");
+  const members = await c.get("services").organization.listOrganizationMembers({
+    organizationId: params.orgId,
+    actorUserId: actorUser.id
+  });
+  return c.json({ members });
+}
+
 export async function deleteOrganizationHandler(c: AppContext, params: OrganizationParamsInput) {
   const { orgId: organizationId } = params;
 

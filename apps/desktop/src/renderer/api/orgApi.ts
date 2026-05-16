@@ -1,5 +1,5 @@
 import { requestJson } from "./restClient";
-import type { OrganizationRecord } from "./types";
+import type { OrganizationMemberRecord, OrganizationRecord } from "./types";
 
 /** Lists organizations visible to the signed-in user. */
 export async function listOrganizations(): Promise<OrganizationRecord[]> {
@@ -15,4 +15,10 @@ export async function createOrganization(name: string): Promise<OrganizationReco
   });
 
   return response.organization;
+}
+
+/** Lists members for one organization visible to the signed-in user. */
+export async function listOrganizationMembers(orgId: string): Promise<OrganizationMemberRecord[]> {
+  const response = await requestJson<{ members: OrganizationMemberRecord[] }>(`/orgs/${orgId}/members`);
+  return response.members;
 }

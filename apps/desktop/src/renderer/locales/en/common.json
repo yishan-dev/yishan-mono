@@ -80,9 +80,35 @@
       "integrations": "Integrations",
       "keybindings": "Keyboard Shortcuts",
       "links": "Links",
+      "nodes": "Nodes",
       "notifications": "Notifications",
       "terminal": "Terminal",
       "workspace": "Workspace"
+    },
+    "nodes": {
+      "title": "Nodes",
+      "description": "Review the organization nodes available to your team and whether they are currently connected.",
+      "loadError": "Failed to load organization nodes.",
+      "empty": "No nodes are available for this organization.",
+      "columns": {
+        "name": "Node Name",
+        "type": "Node Type",
+        "version": "Version",
+        "owner": "Owner",
+        "status": "Status"
+      },
+      "types": {
+        "private": "Private",
+        "shared": "Shared"
+      },
+      "status": {
+        "online": "Online",
+        "offline": "Offline"
+      },
+      "values": {
+        "unknownOwner": "Unknown",
+        "unknownVersion": "Unknown"
+      }
     },
     "account": {
       "title": "Account profile",
