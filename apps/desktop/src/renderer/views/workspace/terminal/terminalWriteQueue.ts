@@ -41,9 +41,10 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
       return;
     }
 
-    cancelScheduledFlush();
-
     if (detached) {
+      if (detachedTimerId !== null) {
+        return; // already scheduled
+      }
       // Batched interval for parked terminals — accumulates more output per write
       // to reduce main-thread contention with the visible terminal.
       detachedTimerId = setTimeout(() => {
@@ -51,6 +52,9 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
         flushNextBatch();
       }, DETACHED_WRITE_INTERVAL_MS);
     } else {
+      if (scheduledFrameId !== null) {
+        return; // already scheduled
+      }
       scheduledFrameId = window.requestAnimationFrame(() => {
         scheduledFrameId = null;
         flushNextBatch();
