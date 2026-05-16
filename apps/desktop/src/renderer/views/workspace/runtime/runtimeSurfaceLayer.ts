@@ -20,8 +20,16 @@ export function createFixedRuntimeLayer(rootTestId: string) {
   const entries = new Map<string, RuntimeEntry>();
 
   const ensureRootHost = (): HTMLDivElement => {
-    if (rootHost) {
+    if (rootHost?.isConnected) {
       return rootHost;
+    }
+
+    // Recover from HMR: reuse existing DOM node instead of creating a duplicate.
+    const runtimeRoot = getOrCreateRuntimeRoot();
+    const existing = runtimeRoot.querySelector<HTMLDivElement>(`[data-testid="${rootTestId}"]`);
+    if (existing) {
+      rootHost = existing;
+      return existing;
     }
 
     const host = document.createElement("div");
@@ -33,7 +41,7 @@ export function createFixedRuntimeLayer(rootTestId: string) {
     host.style.height = "0";
     host.style.pointerEvents = "none";
     host.style.zIndex = "0";
-    getOrCreateRuntimeRoot().appendChild(host);
+    runtimeRoot.appendChild(host);
     rootHost = host;
     return host;
   };
