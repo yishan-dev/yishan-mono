@@ -2,11 +2,14 @@ import type { Terminal } from "@xterm/xterm";
 
 const MAX_TERMINAL_LIVE_WRITE_QUEUE_BYTES = 1024 * 1024;
 const MAX_IMMEDIATE_TERMINAL_CHUNK_BYTES = 256;
+const DETACHED_WRITE_INTERVAL_MS = 500;
 
 export type TerminalWriteChunk = string | Uint8Array;
 
 export type TerminalWriteQueue = {
   enqueue: (chunk: TerminalWriteChunk) => void;
+  /** Toggle detached mode — uses longer batching interval when hidden, flushes immediately on reattach. */
+  setDetached: (detached: boolean) => void;
   dispose: () => void;
 };
 
@@ -14,19 +17,49 @@ export type TerminalWriteQueue = {
 export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue {
   let pendingBytes = 0;
   let disposed = false;
-  let scheduledFrameId: number | null = null;
+  let scheduledFlushTimerId: ReturnType<typeof setTimeout> | null = null;
+  let detachedFlushTimerId: ReturnType<typeof setTimeout> | null = null;
   let writeInFlight = false;
+  let detached = false;
   const chunks: TerminalWriteChunk[] = [];
 
+  const cancelScheduledFlush = (): void => {
+    if (scheduledFlushTimerId !== null) {
+      clearTimeout(scheduledFlushTimerId);
+      scheduledFlushTimerId = null;
+    }
+    if (detachedFlushTimerId !== null) {
+      clearTimeout(detachedFlushTimerId);
+      detachedFlushTimerId = null;
+    }
+  };
+
   const scheduleFlush = (): void => {
-    if (disposed || writeInFlight || scheduledFrameId !== null || chunks.length === 0) {
+    if (disposed || writeInFlight || chunks.length === 0) {
       return;
     }
 
-    scheduledFrameId = window.requestAnimationFrame(() => {
-      scheduledFrameId = null;
-      flushNextBatch();
-    });
+    if (detached) {
+      if (detachedFlushTimerId !== null) {
+        return; // already scheduled
+      }
+      // Detached: flush at a large interval to reduce main-thread pressure
+      // while still progressing terminal buffer state in the background.
+      detachedFlushTimerId = setTimeout(() => {
+        detachedFlushTimerId = null;
+        flushNextBatch();
+      }, DETACHED_WRITE_INTERVAL_MS);
+      return;
+    } else {
+      if (scheduledFlushTimerId !== null) {
+        return; // already scheduled
+      }
+      // Lower-latency attached flush: do not wait for next animation frame.
+      scheduledFlushTimerId = setTimeout(() => {
+        scheduledFlushTimerId = null;
+        flushNextBatch();
+      }, 0);
+    }
   };
 
   const writeChunk = (chunk: TerminalWriteChunk): void => {
@@ -47,12 +80,23 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
     writeChunk(batch);
   };
 
+  const flushAllRemaining = (): void => {
+    if (disposed || chunks.length === 0) {
+      return;
+    }
+    cancelScheduledFlush();
+    // Drain remaining chunks without waiting for next tick.
+    if (!writeInFlight) {
+      flushNextBatch();
+    }
+  };
+
   const enqueue = (chunk: TerminalWriteChunk): void => {
     if (disposed) {
       return;
     }
 
-    if (!writeInFlight && chunks.length === 0 && isInteractiveTerminalChunk(chunk)) {
+    if (!detached && !writeInFlight && chunks.length === 0 && isInteractiveTerminalChunk(chunk)) {
       writeChunk(chunk);
       return;
     }
@@ -76,12 +120,22 @@ export function createTerminalWriteQueue(terminal: Terminal): TerminalWriteQueue
 
   return {
     enqueue,
+    setDetached: (value: boolean) => {
+      if (disposed || detached === value) {
+        return;
+      }
+      detached = value;
+
+      if (!detached) {
+        // Reattaching — drain any queued output immediately.
+        flushAllRemaining();
+      }
+      // If switching to detached, in-flight writes will complete;
+      // subsequent flushes use the longer interval.
+    },
     dispose: () => {
       disposed = true;
-      if (scheduledFrameId !== null) {
-        window.cancelAnimationFrame(scheduledFrameId);
-        scheduledFrameId = null;
-      }
+      cancelScheduledFlush();
       chunks.length = 0;
       pendingBytes = 0;
     },

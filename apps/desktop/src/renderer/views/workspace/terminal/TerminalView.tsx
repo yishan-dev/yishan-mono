@@ -1,100 +1,77 @@
 import { Box } from "@mui/material";
-import type { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
-import { Terminal } from "@xterm/xterm";
+import type { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { memo, useCallback, useEffect, useRef } from "react";
-import { useCommands } from "../../../hooks/useCommands";
-import { tabStore } from "../../../store/tabStore";
-import type { WorkspaceTab } from "../../../store/types";
-import { loadTerminalAddons } from "./terminalAddons";
-import {
-  shouldClearTerminalOutputShortcut,
-  shouldReleaseCommandWForTabCloseShortcut,
-} from "./terminalKeyboardUtils";
-import {
-  formatTerminalCommandTitle,
-  formatTerminalPathTitle,
-} from "./terminalTitleUtils";
+import { memo, useEffect, useRef } from "react";
 import { useTerminalSearchState } from "./useTerminalSearchState";
-import { useTerminalSessionLifecycle } from "./useTerminalSessionLifecycle";
 import { TerminalSearchPanel } from "./TerminalSearchPanel";
-import { createTerminalWriteQueue } from "./terminalWriteQueue";
-import type { TerminalWriteQueue } from "./terminalWriteQueue";
 import { useTerminalFileDrop } from "./useTerminalFileDrop";
-
-/** Resize debounce interval in milliseconds. */
-const RESIZE_DEBOUNCE_MS = 50;
+import {
+  attachTerminalRuntime,
+  detachTerminalRuntime,
+  ensureTerminalRuntime,
+  getTerminalRuntime,
+} from "./terminalRuntimeRegistry";
+import { initTerminalSessionLifecycle } from "./terminalSessionService";
 
 type TerminalViewProps = {
   tabId: string;
   focusRequestKey?: number;
 };
 
-/** Renders an xterm instance and binds it to a daemon-backed terminal session. */
+/**
+ * Thin React adapter for a registry-managed terminal runtime.
+ *
+ * This component does NOT own the xterm Terminal instance. Instead it:
+ * 1. Ensures a runtime entry exists in the registry (idempotent).
+ * 2. Attaches the runtime's host element to a visible placeholder on mount.
+ * 3. Detaches on unmount (terminal stays alive in offscreen parking area).
+ * 4. Manages UI-only concerns: search panel, drag/drop overlay, focus, keyboard shortcuts.
+ */
 export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey = 0 }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const terminalHostRef = useRef<HTMLDivElement | null>(null);
+  const placeholderRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const xtermRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const searchAddonRef = useRef<SearchAddon | null>(null);
-  const terminalWriteQueueRef = useRef<TerminalWriteQueue | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const outputSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
-  const readIndexRef = useRef(0);
-  const didRequestCloseRef = useRef(false);
-  const lastAppliedTitleRef = useRef<string>("");
-  const {
-    renameTab,
-    resizeTerminal,
-    writeTerminalInput,
-  } = useCommands();
 
-  /** Returns true when the user has manually renamed this terminal tab. */
-  const isUserRenamed = useCallback((): boolean => {
-    const tab = tabStore
-      .getState()
-      .tabs.find(
-        (candidate): candidate is Extract<WorkspaceTab, { kind: "terminal" }> =>
-          candidate.id === tabId && candidate.kind === "terminal",
-      );
-    return tab?.data.userRenamed === true;
+  // Stable refs that point into the registry entry — these survive remount.
+  const xtermRef = useRef<Terminal | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+
+  // Sync refs from registry on every render (cheap, no allocation).
+  const entry = getTerminalRuntime(tabId);
+  if (entry) {
+    xtermRef.current = entry.terminal;
+    searchAddonRef.current = entry.searchAddon;
+    sessionIdRef.current = entry.sessionId;
+  }
+
+  // ─── Attach/Detach Lifecycle ────────────────────────────────────────────────
+
+  useEffect(() => {
+    const placeholder = placeholderRef.current;
+    if (!placeholder) {
+      return;
+    }
+
+    // Ensure runtime exists and session lifecycle is initialized.
+    const runtime = ensureTerminalRuntime(tabId);
+    initTerminalSessionLifecycle(tabId);
+
+    // Sync refs after ensure (in case this is the first render).
+    xtermRef.current = runtime.terminal;
+    searchAddonRef.current = runtime.searchAddon;
+    sessionIdRef.current = runtime.sessionId;
+
+    // Attach the terminal host to overlay this placeholder.
+    attachTerminalRuntime(tabId, placeholder);
+
+    return () => {
+      detachTerminalRuntime(tabId, placeholder);
+    };
   }, [tabId]);
 
-  /** Applies one readable command-derived title to this terminal tab. */
-  const updateTerminalTabTitleFromCommand = useCallback(
-    (command: string): void => {
-      if (isUserRenamed()) {
-        return;
-      }
-      const title = formatTerminalCommandTitle(command);
-      if (!title || title === lastAppliedTitleRef.current) {
-        return;
-      }
-
-      lastAppliedTitleRef.current = title;
-      renameTab(tabId, title);
-    },
-    [renameTab, tabId, isUserRenamed],
-  );
-
-  /** Applies one readable current-directory title to this terminal tab. */
-  const updateTerminalTabTitleFromPath = useCallback(
-    (path: string | undefined): void => {
-      if (isUserRenamed()) {
-        return;
-      }
-      const title = formatTerminalPathTitle(path);
-      if (!title || title === lastAppliedTitleRef.current) {
-        return;
-      }
-
-      lastAppliedTitleRef.current = title;
-      renameTab(tabId, title);
-    },
-    [renameTab, tabId, isUserRenamed],
-  );
+  // ─── Search ─────────────────────────────────────────────────────────────────
 
   const searchState = useTerminalSearchState({
     terminalHostRef: containerRef,
@@ -111,152 +88,15 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
     closeSearchPanel,
   } = searchState;
 
+  // ─── File Drop ──────────────────────────────────────────────────────────────
+
   const { isFileDragOver } = useTerminalFileDrop({
     containerRef,
     xtermRef,
     sessionIdRef,
   });
 
-  useEffect(() => {
-    const host = terminalHostRef.current;
-    if (!host) {
-      return;
-    }
-    let disposed = false;
-
-    const terminal = new Terminal({
-      cursorBlink: true,
-      convertEol: true,
-      allowProposedApi: true,
-      fontFamily: '"MesloLGS NF", "JetBrains Mono", "SF Mono", Menlo, monospace',
-      fontSize: 13,
-      lineHeight: 1.4,
-      scrollback: 5_000,
-      smoothScrollDuration: 125,
-      scrollSensitivity: 1,
-      fastScrollSensitivity: 5,
-      rescaleOverlappingGlyphs: true,
-      theme: {
-        background: "#292e36",
-        foreground: "#e7ebf0",
-      },
-    });
-    terminal.open(host);
-    const { fitAddon, searchAddon } = loadTerminalAddons(terminal);
-    safeFitTerminalToHost(terminal, fitAddon);
-
-    xtermRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-    searchAddonRef.current = searchAddon;
-    terminalWriteQueueRef.current = createTerminalWriteQueue(terminal);
-
-    terminal.attachCustomKeyEventHandler((event) => {
-      if (shouldReleaseCommandWForTabCloseShortcut(event)) {
-        return false;
-      }
-
-      if (shouldClearTerminalOutputShortcut(event)) {
-        if (event.type === "keydown") {
-          terminal.clear();
-        }
-        return false;
-      }
-
-      if (!(event.shiftKey && event.key === "Enter")) {
-        return true;
-      }
-
-      if (event.type !== "keydown") {
-        return false;
-      }
-
-      if (!sessionIdRef.current) {
-        return false;
-      }
-
-      terminal.paste("\n");
-      return false;
-    });
-
-    const titleDisposable = terminal.onTitleChange((title) => {
-      updateTerminalTabTitleFromCommand(title);
-    });
-
-    const writeDisposable = terminal.onData((data) => {
-      const sessionId = sessionIdRef.current;
-      if (!sessionId) {
-        return;
-      }
-
-      // Send input to PTY immediately — this is the latency-critical path.
-      void writeTerminalInput({ sessionId, data }).catch((error) => {
-        reportTerminalAsyncError("write terminal input", error);
-      });
-    });
-
-    let resizeTimerId: ReturnType<typeof setTimeout> | null = null;
-    const resizeObserver = new ResizeObserver(() => {
-      if (disposed) {
-        return;
-      }
-
-      if (resizeTimerId !== null) {
-        clearTimeout(resizeTimerId);
-      }
-      resizeTimerId = setTimeout(() => {
-        resizeTimerId = null;
-        if (disposed) {
-          return;
-        }
-
-        safeFitTerminalToHost(terminal, fitAddon);
-        const sessionId = sessionIdRef.current;
-        if (!sessionId) {
-          return;
-        }
-
-        void resizeTerminal({ sessionId, cols: terminal.cols, rows: terminal.rows }).catch((error) => {
-          reportTerminalAsyncError("resize terminal", error);
-        });
-      }, RESIZE_DEBOUNCE_MS);
-    });
-    // Observe the terminal host element directly — this is the element xterm
-    // renders into and is the correct measurement target for FitAddon.
-    resizeObserver.observe(host);
-
-    return () => {
-      disposed = true;
-      titleDisposable.dispose();
-      writeDisposable.dispose();
-      outputSubscriptionRef.current?.unsubscribe();
-      outputSubscriptionRef.current = null;
-      if (resizeTimerId !== null) {
-        clearTimeout(resizeTimerId);
-      }
-      resizeObserver.disconnect();
-      terminal.dispose();
-      xtermRef.current = null;
-      fitAddonRef.current = null;
-      searchAddonRef.current = null;
-      terminalWriteQueueRef.current?.dispose();
-      terminalWriteQueueRef.current = null;
-    };
-  }, [resizeTerminal, updateTerminalTabTitleFromCommand, writeTerminalInput]);
-
-  useTerminalSessionLifecycle({
-    tabId,
-    xtermRef,
-    fitAddonRef,
-    sessionIdRef,
-    outputSubscriptionRef,
-    readIndexRef,
-    didRequestCloseRef,
-    terminalWriteQueueRef,
-    updateTerminalTabTitleFromCommand,
-    updateTerminalTabTitleFromPath,
-    isTerminalAttached,
-    reportTerminalAsyncError,
-  });
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <Box
@@ -319,43 +159,14 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
         />
        ) : null}
       <Box
-        ref={terminalHostRef}
+        ref={placeholderRef}
         sx={{
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
-          "& .xterm-viewport": {
-            overflowY: "hidden",
-          },
+          pointerEvents: "none",
         }}
       />
     </Box>
   );
 });
-
-/** Reports one terminal async error without breaking render lifecycle. */
-function reportTerminalAsyncError(action: string, error: unknown): void {
-  console.error(`[TerminalView] Failed to ${action}`, error);
-}
-
-/** Fits one attached xterm instance to its host without throwing during teardown races. */
-function safeFitTerminalToHost(terminal: Terminal, fitAddon: FitAddon): void {
-  if (!isTerminalAttached(terminal)) {
-    return;
-  }
-
-  try {
-    fitAddon.fit();
-  } catch (error) {
-    reportTerminalAsyncError("fit terminal", error);
-  }
-}
-
-/** Returns true when one xterm instance is still attached to one DOM element. */
-function isTerminalAttached(terminal: Terminal): boolean {
-  if (!("element" in terminal)) {
-    return true;
-  }
-
-  return Boolean(terminal.element);
-}

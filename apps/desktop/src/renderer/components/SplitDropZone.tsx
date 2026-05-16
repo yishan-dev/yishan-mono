@@ -42,7 +42,7 @@ function resolveRegion(event: DragEvent, element: HTMLElement): SplitDropRegion 
   const x = (event.clientX - rect.left) / rect.width;
   const y = (event.clientY - rect.top) / rect.height;
 
-  const edgeThreshold = 0.25;
+  const edgeThreshold = 0.3;
 
   if (x < edgeThreshold) return "left";
   if (x > 1 - edgeThreshold) return "right";

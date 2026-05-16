@@ -31,6 +31,7 @@ import { BrowserView } from "./browser/BrowserView";
 import { removeWebviewsForClosedTabs } from "./browser/webviewRegistry";
 import { getOrCreateRuntimeRoot } from "./runtime/runtimeRoot";
 import { TerminalView } from "./terminal/TerminalView";
+import { disposeTerminalRuntimesForClosedTabs } from "./terminal/terminalRuntimeRegistry";
 
 function FaviconIcon({ url, size }: { url?: string; size: number }) {
   const [failed, setFailed] = useState(false);
@@ -489,8 +490,13 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
       }
 
       if (tab.kind === "terminal") {
+        // Only mount TerminalView for the selected tab. The registry preserves
+        // xterm state across unmount/remount — no data loss on tab switch.
+        if (!isSelected) {
+          return null;
+        }
         return (
-          <Box key={tab.id} sx={{ display: isSelected ? "flex" : "none", flexDirection: "column", height: "100%" }}>
+          <Box key={tab.id} sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
             <TerminalView tabId={tab.id} focusRequestKey={shouldFocusContent ? focusContentRequestKey : 0} />
           </Box>
         );
@@ -522,7 +528,7 @@ function WorkspaceSplitPane({ workspaceId, isActive, workspaceTabs }: WorkspaceS
             top: effectiveRect.top,
             width: effectiveRect.width,
             height: effectiveRect.height,
-            display: shouldShow ? "flex" : "none",
+            display: shouldShow && !isDraggingSplit ? "flex" : "none",
             flexDirection: "column" as const,
             pointerEvents: shouldShow && !isDraggingSplit ? "auto" : "none",
           }
@@ -706,6 +712,9 @@ export function MainPaneView() {
   useEffect(() => {
     const browserTabIds = new Set(tabs.filter((tab) => tab.kind === "browser").map((tab) => tab.id));
     removeWebviewsForClosedTabs(browserTabIds);
+
+    const terminalTabIds = new Set(tabs.filter((tab) => tab.kind === "terminal").map((tab) => tab.id));
+    disposeTerminalRuntimesForClosedTabs(terminalTabIds);
   }, [tabs]);
 
   // Group tabs by workspace to know which workspaces have content
