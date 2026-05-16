@@ -14,6 +14,8 @@ const DAEMON_HEALTH_RETRY_COUNT = 24;
 const DAEMON_HEALTH_RETRY_DELAY_MS = 50;
 const DAEMON_PRECHECK_HEALTH_RETRY_COUNT = 1;
 const DAEMON_PRECHECK_HEALTH_RETRY_DELAY_MS = 20;
+/** Dev mode uses go run . which compiles from source — need longer timeout for cold build cache. */
+const DEV_DAEMON_HEALTH_RETRY_COUNT = 200;
 const CLI_COMMAND_TIMEOUT_MS = 30_000;
 const DEV_DAEMON_STOP_TIMEOUT_MS = 5_000;
 const CLI_COMMAND_TERM_GRACE_MS = 1_000;
@@ -422,7 +424,7 @@ export class DaemonManager {
       }
     });
 
-    await Promise.race([this.waitForHealthy(), exitBeforeHealthy]);
+    await Promise.race([this.waitForHealthy({ retryCount: DEV_DAEMON_HEALTH_RETRY_COUNT }), exitBeforeHealthy]);
   }
 
   private async stopDevForegroundDaemon(): Promise<boolean> {
