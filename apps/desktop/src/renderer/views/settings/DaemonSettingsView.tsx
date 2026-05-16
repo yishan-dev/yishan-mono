@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useDialogRegistration } from "../../hooks/useDialogRegistration";
 import type { DaemonInfoResult } from "../../../main/ipc";
 import { closeTerminalSession } from "../../commands/terminalCommands";
 import { CenteredSpinner } from "../../components/CenteredSpinner";
@@ -39,6 +40,7 @@ export function DaemonSettingsView() {
   const [restartSuccessOpen, setRestartSuccessOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [quitOnExit, setQuitOnExit] = useState(false);
+  useDialogRegistration(isConfirmOpen);
   const [isLoadingQuitOnExit, setIsLoadingQuitOnExit] = useState(true);
   const [isSavingQuitOnExit, setIsSavingQuitOnExit] = useState(false);
   const latestLoadIdRef = useRef(0);

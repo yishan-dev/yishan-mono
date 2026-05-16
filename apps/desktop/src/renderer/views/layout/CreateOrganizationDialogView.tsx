@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createOrganization, listOrganizations } from "../../api";
 import { loadWorkspaceFromBackend } from "../../commands/projectCommands";
+import { useDialogRegistration } from "../../hooks/useDialogRegistration";
 import { sessionStore } from "../../store/sessionStore";
 
 type CreateOrganizationDialogViewProps = {
@@ -16,6 +17,7 @@ export function CreateOrganizationDialogView({ open, onClose }: CreateOrganizati
   const [organizationName, setOrganizationName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  useDialogRegistration(open);
 
   const resetAndClose = () => {
     if (isCreating) {

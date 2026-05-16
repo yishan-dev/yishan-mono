@@ -1,7 +1,7 @@
 import { Box } from "@mui/material";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ACTIONS } from "../../shared/contracts/actions";
 import { SYSTEM_FILE_MANAGER_APP_ID } from "../../shared/contracts/externalApps";
 import { SplitPaneLayout } from "../components/SplitPaneLayout";
@@ -12,6 +12,7 @@ import { WorkspacePaneVisibilityProvider, useWorkspacePaneVisibility } from "../
 import { parseWorkspaceSessionNavigationPath } from "../navigation/workspaceNavigation";
 import { isEditableActiveElement } from "../shortcuts/editableTarget";
 import { layoutStore } from "../store/layoutStore";
+import { popupStore } from "../store/popupStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
 import { CreateProjectDialogView } from "./workspace/LeftPane/CreateProjectDialogView";
@@ -36,9 +37,20 @@ type WorkspaceViewCommands = ReturnType<typeof useCommands>;
 /** Subscribes global app actions and routes them to workspace-level commands. */
 function useWorkspaceAppActions(input: { cmd: WorkspaceViewCommands; navigate: ReturnType<typeof useNavigate> }) {
   const { cmd, navigate } = input;
+  const location = useLocation();
+  const isWorkspaceRouteRef = useRef(location.pathname === "/");
+  isWorkspaceRouteRef.current = location.pathname === "/";
 
   useEffect(() => {
     return subscribeAppActionEvent((payload) => {
+      if (payload.action !== ACTIONS.NAVIGATE && popupStore.getState().isPopupOpen) {
+        return;
+      }
+
+      if (payload.action !== ACTIONS.NAVIGATE && !isWorkspaceRouteRef.current) {
+        return;
+      }
+
       if (payload.action === ACTIONS.NAVIGATE) {
         const targetPath = payload.path.trim();
         if (!targetPath) {

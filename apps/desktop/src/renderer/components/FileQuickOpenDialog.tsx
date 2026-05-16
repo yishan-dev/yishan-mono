@@ -2,6 +2,7 @@ import { Box, Dialog, DialogContent, InputAdornment, TextField, Typography } fro
 import { type KeyboardEvent as ReactKeyboardEvent, useRef } from "react";
 import { BiSearch } from "react-icons/bi";
 import type { FileSearchResult } from "../search/fileSearch";
+import { useDialogRegistration } from "../hooks/useDialogRegistration";
 import { getFileTreeIcon } from "./fileTreeIcons";
 
 type FileQuickOpenDialogProps = {
@@ -109,6 +110,7 @@ export function FileQuickOpenDialog({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;
+  useDialogRegistration(open);
 
   return (
     <Dialog

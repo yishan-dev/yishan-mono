@@ -1,5 +1,6 @@
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
+import { useDialogRegistration } from "../../../hooks/useDialogRegistration";
 
 type ProjectDeleteDialogViewProps = {
   open: boolean;
@@ -18,6 +19,7 @@ export function ProjectDeleteDialogView({
   onConfirm,
 }: ProjectDeleteDialogViewProps) {
   const { t } = useTranslation();
+  useDialogRegistration(open);
 
   return (
     <Dialog open={open} onClose={isDeleting ? undefined : onCancel} fullWidth maxWidth="xs" disableEscapeKeyDown={isDeleting}>

@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogTitle } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useDialogRegistration } from "../../../hooks/useDialogRegistration";
 import { CreateProjectFormView } from "./CreateProjectFormView";
 
 type CreateProjectDialogViewProps = {
@@ -11,6 +12,7 @@ type CreateProjectDialogViewProps = {
 export function CreateProjectDialogView({ open, onClose }: CreateProjectDialogViewProps) {
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
+  useDialogRegistration(open);
 
   const handleClose = () => {
     if (isCreating) {
