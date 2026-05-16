@@ -126,15 +126,7 @@ export function buildApplicationMenuTemplate(input: ConfigureApplicationMenuInpu
     },
     {
       label: "File",
-      submenu: [
-        {
-          label: "Close Tab",
-          accelerator: "CmdOrCtrl+W",
-          click: () => {
-            input.dispatchAction?.({ action: ACTIONS.CLOSE_TAB }, { focusApp: true });
-          },
-        },
-      ],
+      submenu: [],
     },
     {
       label: "Edit",

@@ -642,29 +642,54 @@ export class DesktopApplication {
           mainWindow.hide();
         }
       });
+    }
 
-      mainWindow.webContents.on("before-input-event", (event, input) => {
-        if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
-          return;
-        }
+    // Keep shortcut behavior centralized in renderer actions while ensuring
+    // shortcuts still fire when focus is inside a <webview> guest. Keyboard
+    // events from webview content do not reliably reach renderer window
+    // listeners, so intercept in main and dispatch one app action back.
+    const handleAppShortcut = (event: Electron.Event, input: Electron.Input) => {
+      if (input.type !== "keyDown" && input.type !== "rawKeyDown") {
+        return;
+      }
 
-        const normalizedKey = input.key.trim().toLowerCase();
-        const isMacCmdO = process.platform === "darwin" && input.meta && !input.control;
-        const isNonMacCtrlO = process.platform !== "darwin" && input.control && !input.meta;
-        const isOpenShortcut = (isMacCmdO || isNonMacCtrlO) && !input.alt && !input.shift && normalizedKey === "o";
-        if (!isOpenShortcut) {
-          return;
-        }
+      const normalizedKey = input.key.trim().toLowerCase();
+      const isPrimaryModifier = process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta;
+      if (!isPrimaryModifier || input.alt) {
+        return;
+      }
 
+      if (!input.shift && normalizedKey === "o") {
         event.preventDefault();
         this.dispatchAction({ action: ACTIONS.WORKSPACE_OPEN_SELECTED_IN_EXTERNAL_APP });
-      });
-    }
+        return;
+      }
+
+      if (!input.shift && normalizedKey === "w") {
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.CLOSE_TAB }, { focusApp: true });
+        return;
+      }
+
+      if (!input.shift && normalizedKey === "t") {
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.OPEN_TERMINAL_TAB });
+        return;
+      }
+
+      if (input.shift && normalizedKey === "b") {
+        event.preventDefault();
+        this.dispatchAction({ action: ACTIONS.OPEN_BROWSER_TAB });
+      }
+    };
+
+    mainWindow.webContents.on("before-input-event", handleAppShortcut);
 
     // Intercept popup/new-window requests from <webview> guests (e.g. Cmd+Click,
     // target="_blank", window.open) and forward the URL to the renderer so it can
     // open the destination in a new in-app browser tab instead of a popup window.
     mainWindow.webContents.on("did-attach-webview", (_event, webviewContents) => {
+      webviewContents.on("before-input-event", handleAppShortcut);
       webviewContents.setWindowOpenHandler((details) => {
         mainWindow.webContents.send(DESKTOP_RPC_IPC_CHANNELS.event, {
           method: "webviewOpenUrl",
