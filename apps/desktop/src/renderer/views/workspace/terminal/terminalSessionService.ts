@@ -132,6 +132,12 @@ export function handleReattach(tabId: string): void {
   }
 }
 
+/** Test-only helper: clears module singleton state between unit tests. */
+export function __resetTerminalSessionServiceForTests(): void {
+  initializedTabs.clear();
+  lastAppliedTitleByTabId.clear();
+}
+
 // ─── Internal Helpers ──────────────────────────────────────────────────────────
 
 function setupKeyboardShortcuts(entry: TerminalRuntimeEntry): void {

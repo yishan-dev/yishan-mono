@@ -478,6 +478,13 @@ export function reportTerminalAsyncError(action: string, error: unknown): void {
   console.error(`[TerminalRegistry] Failed to ${action}`, error);
 }
 
+/** Test-only helper: clears all runtime entries between unit tests. */
+export function __resetTerminalRuntimeRegistryForTests(): void {
+  for (const tabId of Array.from(runtimesByTabId.keys())) {
+    disposeTerminalRuntime(tabId);
+  }
+}
+
 const XTERM_VIEWPORT_STYLE_ID = "yishan-xterm-viewport-style";
 
 function ensureXtermViewportStyle(): void {

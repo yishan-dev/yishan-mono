@@ -3,6 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TerminalView } from "./TerminalView";
+import { __resetTerminalRuntimeRegistryForTests } from "./terminalRuntimeRegistry";
+import { __resetTerminalSessionServiceForTests } from "./terminalSessionService";
 
 type TerminalOutputEvent =
   | { type: "output"; sessionId: string; chunk: string | Uint8Array; nextIndex: number }
@@ -144,6 +146,20 @@ vi.mock("../../../store/tabStore", () => ({
   tabStore: mocked.tabStore,
 }));
 
+vi.mock("../../../commands/tabCommands", () => ({
+  closeTab: mocked.closeTab,
+  renameTab: mocked.renameTab,
+}));
+
+vi.mock("../../../commands/terminalCommands", () => ({
+  createTerminalSession: mocked.createTerminalSession,
+  listTerminalSessions: mocked.listTerminalSessions,
+  readTerminalOutput: mocked.readTerminalOutput,
+  resizeTerminal: mocked.resizeTerminal,
+  subscribeTerminalOutput: mocked.subscribeTerminalOutput,
+  writeTerminalInput: mocked.writeTerminalInput,
+}));
+
 vi.mock("../../../hooks/useCommands", () => ({
   useCommands: () => ({
     closeTab: mocked.closeTab,
@@ -219,6 +235,8 @@ vi.mock("./terminalAddons", () => ({
 
 afterEach(() => {
   cleanup();
+  __resetTerminalRuntimeRegistryForTests();
+  __resetTerminalSessionServiceForTests();
   vi.unstubAllGlobals();
   mocked.setTerminalCustomKeyEventHandler(undefined);
   mocked.clearTerminalDataHandlers();
@@ -748,7 +766,7 @@ describe("TerminalView", () => {
 
     render(<TerminalView tabId="terminal-tab-1" />);
     await waitFor(() => {
-      expect(errorSpy).toHaveBeenCalledWith("[TerminalView] Failed to attach terminal session", attachError);
+      expect(errorSpy).toHaveBeenCalledWith("[TerminalRegistry] Failed to init terminal session lifecycle", attachError);
     });
 
     errorSpy.mockRestore();
