@@ -101,6 +101,11 @@ type gitTargetBranchParams struct {
 	TargetBranch string `json:"targetBranch"`
 }
 
+type gitBranchPullRequestParams struct {
+	WorkspaceID string `json:"workspaceId"`
+	Branch      string `json:"branch"`
+}
+
 type gitCommitDiffParams struct {
 	WorkspaceID string `json:"workspaceId"`
 	CommitHash  string `json:"commitHash"`

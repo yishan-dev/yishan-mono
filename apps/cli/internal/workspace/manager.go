@@ -303,6 +303,14 @@ func (m *Manager) GitBranchStatus(ctx context.Context, workspaceID string) (GitB
 	return m.gits.BranchStatus(ctx, ws.Path)
 }
 
+func (m *Manager) GitBranchPullRequest(ctx context.Context, workspaceID string, branch string) (GitBranchPullRequestStatus, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+	return m.gits.BranchPullRequest(ctx, ws.Path, branch)
+}
+
 func (m *Manager) GitListCommitsToTarget(ctx context.Context, workspaceID string, targetBranch string) (GitCommitComparison, error) {
 	ws, err := m.getWorkspace(workspaceID)
 	if err != nil {
