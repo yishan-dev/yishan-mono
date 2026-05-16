@@ -94,7 +94,7 @@ export function CLIToolsSettingsView() {
   const isStatusPending = isLoading || isRefreshing;
 
   return (
-    <Box>
+    <Box data-testid="agent-settings-panel">
       <SettingsSectionHeader
         title={t("settings.agents.title")}
         description={t("settings.agents.description")}
