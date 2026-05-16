@@ -172,14 +172,15 @@ export function ensureTerminalRuntime(tabId: string): TerminalRuntimeEntry {
   // Injected once globally using the data attribute as a selector.
   ensureXtermViewportStyle();
 
-  // Create xterm instance and open it into the host.
+  // Register in the runtime layer FIRST so the host is in the DOM tree
+  // before xterm initializes its canvas and WebGL renderer.
+  runtimeLayer.register(tabId, hostElement);
+
+  // Create xterm instance and open it into the host (now connected to DOM).
   const terminal = new Terminal(TERMINAL_OPTIONS);
   terminal.open(hostElement);
   const { fitAddon, searchAddon } = loadTerminalAddons(terminal);
   const writeQueue = createTerminalWriteQueue(terminal);
-
-  // Register in the runtime layer (appends to body-level root).
-  runtimeLayer.register(tabId, hostElement);
 
   const entry: TerminalRuntimeEntry = {
     tabId,
