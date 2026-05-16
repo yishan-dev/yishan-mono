@@ -177,6 +177,75 @@ func TestGitServiceValidation(t *testing.T) {
 	}
 }
 
+func TestGitServiceBranchPullRequest(t *testing.T) {
+	root := t.TempDir()
+	initGitRepo(t, root)
+	svc := NewGitService()
+
+	ghBinDir := t.TempDir()
+	ghBinPath := filepath.Join(ghBinDir, "gh")
+	ghScript := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"pr\" ] && [ \"$2\" = \"list\" ]; then\n" +
+		"  printf '[{\"number\":123,\"title\":\"Test PR\",\"url\":\"https://github.com/acme/repo/pull/123\",\"state\":\"OPEN\",\"isDraft\":false,\"headRefName\":\"feature/alpha\",\"baseRefName\":\"main\",\"headRefOid\":\"abc123\"}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"pr\" ] && [ \"$2\" = \"checks\" ]; then\n" +
+		"  printf '[{\"name\":\"CI\",\"workflow\":\"build\",\"state\":\"SUCCESS\",\"description\":\"All good\",\"link\":\"https://ci.example.com/run/1\"}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"repos/{owner}/{repo}\" ]; then\n" +
+		"  printf '{\"nameWithOwner\":\"acme/repo\"}'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"repos/acme/repo/deployments\" ]; then\n" +
+		"  printf '[{\"id\":99,\"environment\":\"production\",\"description\":\"Deploy\",\"original_payload\":\"{}\",\"created_at\":\"2026-01-01T00:00:00Z\",\"updated_at\":\"2026-01-01T00:01:00Z\"}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"repos/acme/repo/deployments/99/statuses\" ]; then\n" +
+		"  printf '[{\"state\":\"success\",\"environment_url\":\"https://prod.example.com\",\"description\":\"Live\"}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 1\n"
+	if err := os.WriteFile(ghBinPath, []byte(ghScript), 0o755); err != nil {
+		t.Fatalf("write fake gh: %v", err)
+	}
+
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", ghBinDir+string(os.PathListSeparator)+oldPath)
+
+	status, err := svc.BranchPullRequest(context.Background(), root, "feature/alpha")
+	if err != nil {
+		t.Fatalf("BranchPullRequest: %v", err)
+	}
+	if !status.Found || status.Number != 123 {
+		t.Fatalf("unexpected branch PR status: %+v", status)
+	}
+	if status.URL != "https://github.com/acme/repo/pull/123" {
+		t.Fatalf("unexpected PR URL: %q", status.URL)
+	}
+	if len(status.Checks) != 1 || status.Checks[0].State != "SUCCESS" {
+		t.Fatalf("unexpected checks: %+v", status.Checks)
+	}
+	if len(status.Deployments) != 1 || status.Deployments[0].State != "success" {
+		t.Fatalf("unexpected deployments: %+v", status.Deployments)
+	}
+
+	emptyScript := "#!/bin/sh\n" +
+		"printf '[]'\n" +
+		"exit 0\n"
+	if err := os.WriteFile(ghBinPath, []byte(emptyScript), 0o755); err != nil {
+		t.Fatalf("rewrite fake gh: %v", err)
+	}
+
+	none, err := svc.BranchPullRequest(context.Background(), root, "feature/no-pr")
+	if err != nil {
+		t.Fatalf("BranchPullRequest without PR: %v", err)
+	}
+	if none.Found {
+		t.Fatalf("expected no PR for branch, got %+v", none)
+	}
+}
+
 func TestGitServiceListChangesRenameScenarios(t *testing.T) {
 	root := t.TempDir()
 	initGitRepo(t, root)

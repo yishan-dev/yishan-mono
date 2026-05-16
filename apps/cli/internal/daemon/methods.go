@@ -36,6 +36,7 @@ const (
 	MethodGitRevert            = "git.revert"
 	MethodGitCommit            = "git.commit"
 	MethodGitBranchStatus      = "git.branchStatus"
+	MethodGitBranchPullRequest = "git.branchPullRequest"
 	MethodGitCommitsToTarget   = "git.commitsToTarget"
 	MethodGitBranchDiffSummary = "git.branchDiffSummary"
 	MethodGitCommitDiff        = "git.commitDiff"

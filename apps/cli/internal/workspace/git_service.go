@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +16,7 @@ import (
 
 const fetchTimeout = 15 * time.Second
 const branchCacheTTL = 30 * time.Second
+const branchPullRequestCacheTTL = 30 * time.Second
 
 type GitStatusResponse struct {
 	Branch string   `json:"branch"`
@@ -37,6 +40,39 @@ type GitChangesBySection struct {
 type GitBranchStatus struct {
 	HasUpstream bool `json:"hasUpstream"`
 	AheadCount  int  `json:"aheadCount"`
+}
+
+type GitBranchPullRequestStatus struct {
+	Found       bool                       `json:"found"`
+	Branch      string                     `json:"branch"`
+	Number      int                        `json:"number,omitempty"`
+	Title       string                     `json:"title,omitempty"`
+	URL         string                     `json:"url,omitempty"`
+	State       string                     `json:"state,omitempty"`
+	IsDraft     bool                       `json:"isDraft,omitempty"`
+	HeadRefName string                     `json:"headRefName,omitempty"`
+	BaseRefName string                     `json:"baseRefName,omitempty"`
+	Checks      []GitPullRequestCheck      `json:"checks,omitempty"`
+	Deployments []GitPullRequestDeployment `json:"deployments,omitempty"`
+}
+
+type GitPullRequestCheck struct {
+	Name        string `json:"name"`
+	Workflow    string `json:"workflow,omitempty"`
+	State       string `json:"state"`
+	Description string `json:"description,omitempty"`
+	URL         string `json:"url,omitempty"`
+}
+
+type GitPullRequestDeployment struct {
+	ID              int64  `json:"id"`
+	Environment     string `json:"environment,omitempty"`
+	State           string `json:"state,omitempty"`
+	Description     string `json:"description,omitempty"`
+	EnvironmentURL  string `json:"environmentUrl,omitempty"`
+	CreatedAt       string `json:"createdAt,omitempty"`
+	UpdatedAt       string `json:"updatedAt,omitempty"`
+	OriginalPayload string `json:"originalPayload,omitempty"`
 }
 
 type GitCommit struct {
@@ -68,10 +104,10 @@ type GitDiffContent struct {
 }
 
 type GitBranchList struct {
-	CurrentBranch string   `json:"currentBranch"`
-	Branches      []string `json:"branches"`
-	LocalBranches []string `json:"localBranches,omitempty"`
-	RemoteBranches []string `json:"remoteBranches,omitempty"`
+	CurrentBranch    string   `json:"currentBranch"`
+	Branches         []string `json:"branches"`
+	LocalBranches    []string `json:"localBranches,omitempty"`
+	RemoteBranches   []string `json:"remoteBranches,omitempty"`
 	WorktreeBranches []string `json:"worktreeBranches,omitempty"`
 }
 
@@ -86,13 +122,20 @@ type branchCacheEntry struct {
 	at   time.Time
 }
 
+type branchPullRequestCacheEntry struct {
+	data GitBranchPullRequestStatus
+	at   time.Time
+}
+
 type GitService struct {
-	branchCache map[string]branchCacheEntry
+	branchCache            map[string]branchCacheEntry
+	branchPullRequestCache map[string]branchPullRequestCacheEntry
 }
 
 func NewGitService() *GitService {
 	return &GitService{
-		branchCache: make(map[string]branchCacheEntry),
+		branchCache:            make(map[string]branchCacheEntry),
+		branchPullRequestCache: make(map[string]branchPullRequestCacheEntry),
 	}
 }
 
@@ -420,6 +463,188 @@ func (s *GitService) BranchStatus(ctx context.Context, root string) (GitBranchSt
 	return GitBranchStatus{HasUpstream: hasUpstream, AheadCount: ahead}, nil
 }
 
+func (s *GitService) BranchPullRequest(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
+	branchName := strings.TrimSpace(branch)
+	if branchName == "" {
+		return GitBranchPullRequestStatus{}, NewRPCError(-32602, "branch is required")
+	}
+
+	cacheKey := root + "\n" + branchName
+	if entry, ok := s.branchPullRequestCache[cacheKey]; ok && time.Since(entry.at) < branchPullRequestCacheTTL {
+		return entry.data, nil
+	}
+
+	out, err := ghCommand(ctx, root,
+		"pr", "list",
+		"--head", branchName,
+		"--state", "all",
+		"--limit", "1",
+		"--json", "number,title,url,state,isDraft,headRefName,baseRefName,headRefOid",
+	)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+
+	type ghPullRequest struct {
+		Number      int    `json:"number"`
+		Title       string `json:"title"`
+		URL         string `json:"url"`
+		State       string `json:"state"`
+		IsDraft     bool   `json:"isDraft"`
+		HeadRefName string `json:"headRefName"`
+		BaseRefName string `json:"baseRefName"`
+		HeadRefOID  string `json:"headRefOid"`
+	}
+
+	prs := make([]ghPullRequest, 0)
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		return GitBranchPullRequestStatus{}, NewRPCError(-32010, "failed to parse gh pr list output")
+	}
+
+	if len(prs) == 0 {
+		status := GitBranchPullRequestStatus{Found: false, Branch: branchName}
+		s.branchPullRequestCache[cacheKey] = branchPullRequestCacheEntry{data: status, at: time.Now()}
+		return status, nil
+	}
+
+	pr := prs[0]
+	checks, err := getPullRequestChecks(ctx, root, pr.Number)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+
+	deployments, err := getPullRequestDeployments(ctx, root, pr.HeadRefOID)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+
+	status := GitBranchPullRequestStatus{
+		Found:       true,
+		Branch:      branchName,
+		Number:      pr.Number,
+		Title:       pr.Title,
+		URL:         pr.URL,
+		State:       pr.State,
+		IsDraft:     pr.IsDraft,
+		HeadRefName: pr.HeadRefName,
+		BaseRefName: pr.BaseRefName,
+		Checks:      checks,
+		Deployments: deployments,
+	}
+
+	s.branchPullRequestCache[cacheKey] = branchPullRequestCacheEntry{data: status, at: time.Now()}
+	return status, nil
+}
+
+func getPullRequestChecks(ctx context.Context, root string, prNumber int) ([]GitPullRequestCheck, error) {
+	type ghCheck struct {
+		Name        string `json:"name"`
+		Workflow    string `json:"workflow"`
+		State       string `json:"state"`
+		Description string `json:"description"`
+		Link        string `json:"link"`
+	}
+
+	checks := make([]ghCheck, 0)
+	if err := ghJSON(ctx, root, &checks,
+		"pr", "checks", fmt.Sprintf("%d", prNumber),
+		"--required=false",
+		"--json", "name,workflow,state,description,link",
+	); err != nil {
+		return nil, err
+	}
+
+	result := make([]GitPullRequestCheck, 0, len(checks))
+	for _, check := range checks {
+		result = append(result, GitPullRequestCheck{
+			Name:        check.Name,
+			Workflow:    check.Workflow,
+			State:       check.State,
+			Description: check.Description,
+			URL:         check.Link,
+		})
+	}
+	return result, nil
+}
+
+func getPullRequestDeployments(ctx context.Context, root string, headRefOID string) ([]GitPullRequestDeployment, error) {
+	if strings.TrimSpace(headRefOID) == "" {
+		return []GitPullRequestDeployment{}, nil
+	}
+
+	type ghRepo struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	}
+	repo := ghRepo{}
+	if err := ghJSON(ctx, root, &repo, "api", "repos/{owner}/{repo}"); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(repo.NameWithOwner) == "" {
+		return []GitPullRequestDeployment{}, nil
+	}
+
+	type ghDeployment struct {
+		ID              int64  `json:"id"`
+		Environment     string `json:"environment"`
+		Description     string `json:"description"`
+		OriginalPayload string `json:"original_payload"`
+		CreatedAt       string `json:"created_at"`
+		UpdatedAt       string `json:"updated_at"`
+	}
+
+	deployments := make([]ghDeployment, 0)
+	if err := ghJSON(ctx, root, &deployments,
+		"api",
+		fmt.Sprintf("repos/%s/deployments", repo.NameWithOwner),
+		"-f", "sha="+headRefOID,
+		"-f", "per_page=20",
+	); err != nil {
+		return nil, err
+	}
+
+	result := make([]GitPullRequestDeployment, 0, len(deployments))
+	for _, deployment := range deployments {
+		status, envURL, statusDescription, err := getDeploymentStatus(ctx, root, repo.NameWithOwner, deployment.ID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, GitPullRequestDeployment{
+			ID:              deployment.ID,
+			Environment:     deployment.Environment,
+			State:           status,
+			Description:     coalesceNonEmpty(statusDescription, deployment.Description),
+			EnvironmentURL:  envURL,
+			CreatedAt:       deployment.CreatedAt,
+			UpdatedAt:       deployment.UpdatedAt,
+			OriginalPayload: deployment.OriginalPayload,
+		})
+	}
+
+	return result, nil
+}
+
+func getDeploymentStatus(ctx context.Context, root string, repo string, deploymentID int64) (state string, environmentURL string, description string, err error) {
+	type ghDeploymentStatus struct {
+		State          string `json:"state"`
+		EnvironmentURL string `json:"environment_url"`
+		Description    string `json:"description"`
+	}
+
+	statuses := make([]ghDeploymentStatus, 0)
+	err = ghJSON(ctx, root, &statuses,
+		"api",
+		fmt.Sprintf("repos/%s/deployments/%d/statuses", repo, deploymentID),
+		"-f", "per_page=1",
+	)
+	if err != nil {
+		return "", "", "", err
+	}
+	if len(statuses) == 0 {
+		return "", "", "", nil
+	}
+	return statuses[0].State, statuses[0].EnvironmentURL, statuses[0].Description, nil
+}
+
 func (s *GitService) ListCommitsToTarget(ctx context.Context, root string, targetBranch string) (GitCommitComparison, error) {
 	if strings.TrimSpace(targetBranch) == "" {
 		return GitCommitComparison{}, NewRPCError(-32602, "targetBranch is required")
@@ -543,7 +768,8 @@ func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchLi
 	return list, nil
 }
 
-func (s *GitService) listBranchesFromGit(ctx context.Context, root string) (GitBranchList, error) {	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
+func (s *GitService) listBranchesFromGit(ctx context.Context, root string) (GitBranchList, error) {
+	out, err := gitCommand(ctx, root, "branch", "--all", "--no-color")
 	if err != nil {
 		return GitBranchList{}, err
 	}
@@ -605,10 +831,10 @@ func (s *GitService) listBranchesFromGit(ctx context.Context, root string) (GitB
 		localBranches = append([]string{current}, localBranches...)
 	}
 	return GitBranchList{
-		CurrentBranch: current,
-		Branches: branches,
-		LocalBranches: localBranches,
-		RemoteBranches: remoteBranches,
+		CurrentBranch:    current,
+		Branches:         branches,
+		LocalBranches:    localBranches,
+		RemoteBranches:   remoteBranches,
 		WorktreeBranches: worktreeBranches,
 	}, nil
 }
@@ -835,6 +1061,40 @@ func gitCommandCombined(ctx context.Context, cwd string, args ...string) (string
 		return "", NewRPCError(-32010, strings.TrimSpace(string(out)))
 	}
 	return string(out), nil
+}
+
+func ghCommand(ctx context.Context, cwd string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	cmd.Dir = cwd
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", NewRPCError(-32010, "GitHub CLI (gh) is not installed")
+		}
+		return "", NewRPCError(-32010, strings.TrimSpace(string(out)))
+	}
+	return string(out), nil
+}
+
+func ghJSON(ctx context.Context, cwd string, target any, args ...string) error {
+	out, err := ghCommand(ctx, cwd, args...)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal([]byte(out), target); err != nil {
+		return NewRPCError(-32010, "failed to parse gh output")
+	}
+	return nil
+}
+
+func coalesceNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func splitNonEmptyLines(input string) []string {

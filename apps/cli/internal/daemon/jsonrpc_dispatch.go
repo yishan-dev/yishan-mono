@@ -355,6 +355,12 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			return nil, err
 		}
 		return h.manager.GitBranchStatus(ctx, req.WorkspaceID)
+	case MethodGitBranchPullRequest:
+		var req gitBranchPullRequestParams
+		if err := decodeParams(params, &req); err != nil {
+			return nil, err
+		}
+		return h.manager.GitBranchPullRequest(ctx, req.WorkspaceID, req.Branch)
 	case MethodGitCommitsToTarget:
 		var req gitTargetBranchParams
 		if err := decodeParams(params, &req); err != nil {
