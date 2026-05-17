@@ -574,7 +574,7 @@
   "files": {
     "files": "文件",
     "all": "全部文件",
-    "changes": "变更 {{count}}",
+    "changes": "变更",
     "checks": "检查",
     "actions": {
       "createFile": "创建文件",
