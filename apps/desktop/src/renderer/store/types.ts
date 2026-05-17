@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { ExternalAppId } from "../../shared/contracts/externalApps";
-import type { ProjectRecord, WorkspaceRecord } from "../api/types";
+import type { ProjectRecord, WorkspaceRecord, WorkspacePullRequestSummary } from "../api/types";
 import type { DesktopAgentKind } from "../helpers/agentSettings";
 import type { DaemonWorkspacePullRequest } from "../rpc/daemonTypes";
 
@@ -186,6 +186,7 @@ export type WorkspaceStoreState = {
   projects: WorkspaceProjectRecord[];
   workspaces: RepoWorkspaceItem[];
   pullRequestByWorkspaceId: Record<string, DaemonWorkspacePullRequest | undefined>;
+  latestPullRequestByWorkspaceId: Record<string, WorkspacePullRequestSummary | undefined>;
   gitChangesCountByWorkspaceId: Record<string, number>;
   gitChangeTotalsByWorkspaceId: Record<string, WorkspaceGitChangeTotals>;
   gitRefreshVersionByWorktreePath: Record<string, number>;

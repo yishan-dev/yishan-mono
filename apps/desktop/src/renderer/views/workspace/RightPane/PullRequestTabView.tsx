@@ -1,24 +1,18 @@
 import { Box, Chip, Divider, LinearProgress, Link, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { LuArrowRight, LuGitBranch, LuGitPullRequest } from "react-icons/lu";
+import { LuArrowRight, LuGitBranch } from "react-icons/lu";
 import { openLink } from "../../../commands/appCommands";
 import type { WorkspacePullRequestRecord } from "../../../api/types";
 import type { DaemonWorkspacePullRequest } from "../../../rpc/daemonTypes";
+import { PullRequestIcon, pullRequestStateColor } from "../../../components/PullRequestIcon";
 import { useWorkspacePullRequestState } from "./useWorkspacePullRequestState";
 
-function prStateColor(state: WorkspacePullRequestRecord["state"] | string, isDraft?: boolean): string {
-  if (state === "merged") return "#9333ea";
-  if (state === "closed") return "#dc2626";
-  if (isDraft) return "#71717a";
-  return "#16a34a";
-}
-
-function livePrStatusColor(pr: DaemonWorkspacePullRequest): string {
+function livePrStatus(pr: DaemonWorkspacePullRequest): string {
   const s = (pr.status ?? "").toLowerCase();
-  if (pr.complete || s === "merged") return "#9333ea";
-  if (pr.isDraft || s === "draft") return "#71717a";
-  if (s === "closed") return "#dc2626";
-  return "#16a34a";
+  if (pr.complete || s === "merged") return "merged";
+  if (pr.isDraft || s === "draft") return "draft";
+  if (s === "closed") return "closed";
+  return "open";
 }
 
 function BranchBadge({ name }: { name: string }) {
@@ -54,12 +48,12 @@ function BranchBadge({ name }: { name: string }) {
 
 function HistoricalPullRequestRow({ pr }: { pr: WorkspacePullRequestRecord }) {
   const { t } = useTranslation();
-  const color = prStateColor(pr.state, (pr.metadata as Record<string, unknown> | null)?.isDraft as boolean | undefined);
+  const isDraft = (pr.metadata as Record<string, unknown> | null)?.isDraft as boolean | undefined;
 
   return (
     <Stack spacing={0.5}>
       <Stack direction="row" spacing={1} alignItems="center">
-        <LuGitPullRequest size={15} color={color} />
+        <PullRequestIcon state={pr.state} isDraft={isDraft} size={15} />
         <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>
           #{pr.prId}{pr.title ? ` ${pr.title}` : ""}
         </Typography>
@@ -135,7 +129,7 @@ export function PullRequestTabView({ active = true }: { active?: boolean }) {
           <>
             <Stack spacing={0.75}>
               <Stack direction="row" spacing={1} alignItems="center">
-                <LuGitPullRequest size={18} color={livePrStatusColor(pullRequest)} />
+                <PullRequestIcon state={livePrStatus(pullRequest)} size={18} />
                 <Typography variant="subtitle1" noWrap>
                   #{pullRequest.number}
                   {pullRequest.title ? ` ${pullRequest.title}` : ""}

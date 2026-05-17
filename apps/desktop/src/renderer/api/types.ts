@@ -30,8 +30,16 @@ export type ProjectRecord = {
 };
 
 export type WorkspacePullRequestSummary = {
+  id: string;
   prId: string;
+  title: string | null;
+  url: string | null;
+  branch: string | null;
+  baseBranch: string | null;
   state: "open" | "closed" | "merged";
+  metadata: Record<string, unknown> | null;
+  detectedAt: string;
+  resolvedAt: string | null;
 };
 
 export type WorkspaceRecord = {

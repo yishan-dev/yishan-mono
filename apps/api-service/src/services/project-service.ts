@@ -1,7 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import type { AppDb } from "@/db/client";
-import { nodes, projects, workspaces } from "@/db/schema";
+import { nodes, projects, workspacePullRequests, workspaces } from "@/db/schema";
+import type { WorkspacePullRequestState } from "@/db/schema";
 import {
   OrganizationMembershipRequiredError,
   ProjectNotFoundError,
@@ -44,6 +45,18 @@ export type ProjectWithWorkspacesView = ProjectView & {
     status: "active" | "closed";
     branch: string | null;
     localPath: string;
+    latestPullRequest: {
+      id: string;
+      prId: string;
+      title: string | null;
+      url: string | null;
+      branch: string | null;
+      baseBranch: string | null;
+      state: WorkspacePullRequestState;
+      metadata: unknown;
+      detectedAt: Date;
+      resolvedAt: Date | null;
+    } | null;
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -158,7 +171,7 @@ export class ProjectService {
           })
           .returning();
 
-        createdWorkspaces.push(...insertedWorkspaces);
+        createdWorkspaces.push({ ...insertedWorkspaces[0]!, latestPullRequest: null });
       }
 
       return {
@@ -205,10 +218,57 @@ export class ProjectService {
         )
       );
 
+    if (workspaceRows.length === 0) {
+      return rows.map((row) => ({ ...row, workspaces: [] }));
+    }
+
+    const workspaceIds = workspaceRows.map((w) => w.id);
+    const prRows = await this.db
+      .selectDistinctOn([workspacePullRequests.workspaceId], {
+        id: workspacePullRequests.id,
+        workspaceId: workspacePullRequests.workspaceId,
+        prId: workspacePullRequests.prId,
+        title: workspacePullRequests.title,
+        url: workspacePullRequests.url,
+        branch: workspacePullRequests.branch,
+        baseBranch: workspacePullRequests.baseBranch,
+        state: workspacePullRequests.state,
+        metadata: workspacePullRequests.metadata,
+        detectedAt: workspacePullRequests.detectedAt,
+        resolvedAt: workspacePullRequests.resolvedAt
+      })
+      .from(workspacePullRequests)
+      .where(
+        and(
+          eq(workspacePullRequests.organizationId, input.organizationId),
+          inArray(workspacePullRequests.workspaceId, workspaceIds)
+        )
+      )
+      .orderBy(workspacePullRequests.workspaceId, desc(workspacePullRequests.detectedAt));
+
+    const latestPrByWorkspaceId = new Map(prRows.map((pr) => [pr.workspaceId, pr]));
+
     const workspacesByProjectId = new Map<string, ProjectWithWorkspacesView["workspaces"]>();
     for (const workspace of workspaceRows) {
       const existing = workspacesByProjectId.get(workspace.projectId) ?? [];
-      existing.push(workspace);
+      const pr = latestPrByWorkspaceId.get(workspace.id) ?? null;
+      existing.push({
+        ...workspace,
+        latestPullRequest: pr
+          ? {
+              id: pr.id,
+              prId: pr.prId,
+              title: pr.title,
+              url: pr.url,
+              branch: pr.branch,
+              baseBranch: pr.baseBranch,
+              state: pr.state as WorkspacePullRequestState,
+              metadata: pr.metadata,
+              detectedAt: pr.detectedAt,
+              resolvedAt: pr.resolvedAt
+            }
+          : null
+      });
       workspacesByProjectId.set(workspace.projectId, existing);
     }
 

@@ -104,7 +104,7 @@ func (m *Manager) CreateWorkspaceWithProgress(ctx context.Context, req CreateReq
 		return Workspace{}, err
 	}
 
-	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath}
+	ws := Workspace{ID: strings.TrimSpace(req.ID), Path: worktreePath, OrgID: req.OrganizationID, ProjectID: req.ProjectID}
 	steps := []createProgressStep{
 		{
 			ID:      "worktree",

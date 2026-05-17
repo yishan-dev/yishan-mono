@@ -546,13 +546,11 @@ func (s *GitService) branchPullRequest(ctx context.Context, root string, branch 
 		if err != nil {
 			return GitBranchPullRequestStatus{}, err
 		}
-
 		deployments, err = getPullRequestDeployments(ctx, root, pr.HeadRefOID)
 		if err != nil {
 			return GitBranchPullRequestStatus{}, err
 		}
 	}
-
 	status := GitBranchPullRequestStatus{
 		Found:          true,
 		Branch:         branchName,

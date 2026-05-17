@@ -73,6 +73,8 @@ export async function ensureVisibleWorkspacesOpen(mergedWorkspaceIds?: ReadonlyS
       await client.workspace.open({
         workspaceId: workspace.id,
         workspaceWorktreePath: worktreePath,
+        orgId: workspace.organizationId,
+        projectId: workspace.projectId,
         prAlreadyMerged: mergedWorkspaceIds?.has(workspace.id) ?? false,
       });
       openPaths.add(worktreePath);

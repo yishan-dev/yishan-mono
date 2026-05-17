@@ -13,6 +13,8 @@ import (
 type Workspace struct {
 	ID              string                `json:"id"`
 	Path            string                `json:"path"`
+	OrgID           string                `json:"-"`
+	ProjectID       string                `json:"-"`
 	SetupHookResult *HookResult           `json:"setupHookResult,omitempty"`
 	PullRequest     *WorkspacePullRequest `json:"pullRequest,omitempty"`
 }
@@ -51,9 +53,11 @@ func NewManager() *Manager {
 }
 
 type OpenRequest struct {
-	ID               string `json:"id"`
-	Path             string `json:"path"`
-	PRAlreadyMerged  bool   `json:"prAlreadyMerged,omitempty"`
+	ID              string `json:"id"`
+	Path            string `json:"path"`
+	OrgID           string `json:"orgId,omitempty"`
+	ProjectID       string `json:"projectId,omitempty"`
+	PRAlreadyMerged bool   `json:"prAlreadyMerged,omitempty"`
 }
 
 type CloseRequest struct {
@@ -83,7 +87,7 @@ func (m *Manager) Open(req OpenRequest) (Workspace, error) {
 		return Workspace{}, NewRPCError(-32602, "workspace path must be a directory")
 	}
 
-	ws := Workspace{ID: req.ID, Path: absPath}
+	ws := Workspace{ID: req.ID, Path: absPath, OrgID: req.OrgID, ProjectID: req.ProjectID}
 
 	ensureGitExclude(absPath, contextLinkName)
 

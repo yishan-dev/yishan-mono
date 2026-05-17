@@ -13,6 +13,7 @@ type ProjectStoreSlice = Pick<
   | "projects"
   | "workspaces"
   | "pullRequestByWorkspaceId"
+  | "latestPullRequestByWorkspaceId"
   | "gitChangesCountByWorkspaceId"
   | "gitChangeTotalsByWorkspaceId"
   | "selectedProjectId"
@@ -238,6 +239,15 @@ export function applyHydratedStateFromApiData(
     { ...(state.pullRequestByWorkspaceId ?? {}) },
     nextWorkspaceIdSet,
   );
+
+  // Populate latestPullRequest from the api-service workspace list.
+  const nextLatestPrByWorkspaceId: WorkspaceStoreState["latestPullRequestByWorkspaceId"] = {};
+  for (const workspace of workspacesFromApi) {
+    if (workspace.latestPullRequest) {
+      nextLatestPrByWorkspaceId[workspace.id] = workspace.latestPullRequest;
+    }
+  }
+  state.latestPullRequestByWorkspaceId = nextLatestPrByWorkspaceId;
 }
 
 /** Normalizes create-repo input and returns empty strings when invalid. */

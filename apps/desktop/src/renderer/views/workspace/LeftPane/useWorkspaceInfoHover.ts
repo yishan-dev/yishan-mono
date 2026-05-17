@@ -103,6 +103,7 @@ export function useWorkspaceInfoHover({
 
   const hoveredWorkspace = workspaces.find((workspace) => workspace.id === hoveredWorkspaceId);
   const hoveredWorkspacePullRequest = workspaceStore((state) => state.pullRequestByWorkspaceId?.[hoveredWorkspaceId]);
+  const hoveredWorkspaceLatestPullRequest = workspaceStore((state) => state.latestPullRequestByWorkspaceId?.[hoveredWorkspaceId]);
   const isHoveredWorkspacePrimary = Boolean(
     hoveredWorkspace &&
       (hoveredWorkspace.kind === "local" || displayWorkspaceIdByProjectId[hoveredWorkspace.repoId] === hoveredWorkspace.id),
@@ -114,6 +115,7 @@ export function useWorkspaceInfoHover({
     hoveredWorkspace,
     hoveredWorkspaceCurrentBranch,
     hoveredWorkspacePullRequest,
+    hoveredWorkspaceLatestPullRequest,
     isHoveredWorkspacePrimary,
     isWorkspaceInfoOpen,
     handleWorkspaceInfoMouseEnter,

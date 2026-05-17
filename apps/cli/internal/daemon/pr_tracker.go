@@ -2,12 +2,15 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	cliruntime "yishan/apps/cli/internal/runtime"
+	"yishan/apps/cli/internal/api"
 	"yishan/apps/cli/internal/workspace"
 )
 
@@ -53,14 +56,42 @@ func (t *workspacePRTracker) EnsureTracked(worktreePath string) {
 		return
 	}
 
+	ws, ok := t.manager.FindWorkspaceByPath(worktreePath)
+	if !ok {
+		return
+	}
+
 	t.mu.Lock()
 	if !t.started {
 		t.started = true
 		go t.pollLoop()
 	}
+	t.active[ws.ID] = true
 	t.mu.Unlock()
 
 	go t.RefreshWorkspaceByPath(worktreePath)
+}
+
+// EnsureTrackedSkipInitialRefresh registers the workspace for future PR polling
+// without firing an immediate GitHub API call. Use this when the latest PR state
+// is already known (e.g. already merged) but polling should resume for new PRs.
+func (t *workspacePRTracker) EnsureTrackedSkipInitialRefresh(worktreePath string) {
+	if strings.TrimSpace(worktreePath) == "" {
+		return
+	}
+
+	ws, ok := t.manager.FindWorkspaceByPath(worktreePath)
+	if !ok {
+		return
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !t.started {
+		t.started = true
+		go t.pollLoop()
+	}
+	t.active[ws.ID] = true
 }
 
 func (t *workspacePRTracker) StopTracking(workspaceID string) {
@@ -75,6 +106,15 @@ func (t *workspacePRTracker) RefreshWorkspaceByPath(worktreePath string) {
 		log.Warn().Str("path", worktreePath).Msg("workspace PR refresh skipped because workspace path is not open")
 		return
 	}
+
+	t.mu.Lock()
+	tracked := t.active[ws.ID]
+	t.mu.Unlock()
+	if !tracked {
+		log.Debug().Str("workspaceId", ws.ID).Str("path", ws.Path).Msg("workspace PR refresh skipped because workspace is no longer active")
+		return
+	}
+
 	if !t.beginRefresh(ws.ID) {
 		log.Debug().Str("workspaceId", ws.ID).Str("path", ws.Path).Msg("workspace PR refresh skipped because another refresh is already running")
 		return
@@ -137,7 +177,7 @@ func (t *workspacePRTracker) refreshWorkspace(ws workspace.Workspace) error {
 	branch = strings.TrimSpace(branch)
 	log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Str("branch", branch).Msg("workspace PR refresh resolved branch")
 	if branch == "" || branch == "HEAD" {
-		t.setWorkspacePullRequest(ws.ID, nil, false)
+		t.setWorkspacePullRequest(ws.ID, nil, true)
 		log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Msg("workspace PR refresh cleared PR because branch is empty or detached")
 		return nil
 	}
@@ -148,7 +188,7 @@ func (t *workspacePRTracker) refreshWorkspace(ws workspace.Workspace) error {
 		return err
 	}
 	if !pr.Found {
-		t.setWorkspacePullRequest(ws.ID, nil, false)
+		t.setWorkspacePullRequest(ws.ID, nil, true)
 		log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Str("branch", branch).Msg("workspace PR refresh found no pull request")
 		return nil
 	}
@@ -205,9 +245,16 @@ func (t *workspacePRTracker) setWorkspacePullRequest(workspaceID string, pr *wor
 	defer t.mu.Unlock()
 	if keepActive {
 		t.active[workspaceID] = true
-		return
+	} else {
+		delete(t.active, workspaceID)
 	}
-	delete(t.active, workspaceID)
+
+	// Persist snapshot to api-service whenever PR state changes to a notable state.
+	// - merged/closed: always persist (terminal or cancelled states)
+	// - open/draft/review: persist so the api-service latestPullRequest stays current
+	if pr != nil {
+		go t.persistPullRequest(workspaceID, pr)
+	}
 }
 
 func normalizeWorkspacePullRequestStatus(pr workspace.GitBranchPullRequestStatus) string {
@@ -228,4 +275,89 @@ func normalizeWorkspacePullRequestStatus(pr workspace.GitBranchPullRequestStatus
 		return "closed"
 	}
 	return strings.ToLower(state)
+}
+
+// persistPullRequest writes a PR snapshot to the api-service.
+// Called in a goroutine; failures are logged and do not affect local state.
+func (t *workspacePRTracker) persistPullRequest(workspaceID string, pr *workspace.WorkspacePullRequest) {
+	if !cliruntime.APIConfigured() {
+		return
+	}
+
+	ws, err := t.manager.GetWorkspace(workspaceID)
+	if err != nil {
+		log.Warn().Err(err).Str("workspaceId", workspaceID).Msg("pr persist: workspace not found")
+		return
+	}
+	if ws.OrgID == "" || ws.ProjectID == "" {
+		log.Debug().Str("workspaceId", workspaceID).Msg("pr persist: skipped — orgId or projectId not set on workspace")
+		return
+	}
+
+	// Map daemon status to api-service state.
+	state := pr.Status
+	if state == "draft" || state == "review" {
+		state = "open"
+	}
+	if state != "open" && state != "closed" && state != "merged" {
+		state = "open"
+	}
+
+	resolvedAt := ""
+	if state == "merged" || state == "closed" {
+		resolvedAt = nowRFC3339Nano()
+	}
+
+	metadata := map[string]any{
+		"isDraft":        pr.IsDraft,
+		"reviewDecision": pr.ReviewDecision,
+	}
+	if len(pr.Checks) > 0 {
+		checks := make([]map[string]any, 0, len(pr.Checks))
+		for _, c := range pr.Checks {
+			checks = append(checks, map[string]any{
+				"name":        c.Name,
+				"workflow":    c.Workflow,
+				"state":       c.State,
+				"description": c.Description,
+				"url":         c.URL,
+			})
+		}
+		metadata["checks"] = checks
+	}
+	if len(pr.Deployments) > 0 {
+		deployments := make([]map[string]any, 0, len(pr.Deployments))
+		for _, d := range pr.Deployments {
+			deployments = append(deployments, map[string]any{
+				"id":             d.ID,
+				"environment":    d.Environment,
+				"state":          d.State,
+				"description":    d.Description,
+				"environmentUrl": d.EnvironmentURL,
+			})
+		}
+		metadata["deployments"] = deployments
+	}
+
+	input := api.UpsertWorkspacePullRequestInput{
+		PrID:       fmt.Sprintf("%d", pr.Number),
+		Title:      pr.Title,
+		URL:        pr.URL,
+		Branch:     pr.Branch,
+		BaseBranch: pr.BaseBranch,
+		State:      state,
+		Metadata:   metadata,
+		DetectedAt: pr.UpdatedAt,
+		ResolvedAt: resolvedAt,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_ = ctx // resty client manages its own timeout
+
+	if _, err := cliruntime.APIClient().UpsertWorkspacePullRequest(ws.OrgID, ws.ProjectID, workspaceID, input); err != nil {
+		log.Warn().Err(err).Str("workspaceId", workspaceID).Str("prId", input.PrID).Str("state", state).Msg("pr persist: failed to upsert to api-service")
+		return
+	}
+	log.Info().Str("workspaceId", workspaceID).Str("prId", input.PrID).Str("state", state).Msg("pr persist: upserted to api-service")
 }

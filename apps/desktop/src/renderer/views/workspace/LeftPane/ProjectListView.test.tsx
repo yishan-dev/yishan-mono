@@ -45,6 +45,7 @@ const mocked = vi.hoisted(() => {
       displayProjectIds: string[];
       lastUsedExternalAppId?: string;
       pullRequestByWorkspaceId: Record<string, unknown>;
+      latestPullRequestByWorkspaceId: Record<string, unknown>;
       gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
       setSelectedRepoId: (repoId: string) => void;
       setSelectedWorkspaceId: (workspaceId: string) => void;
@@ -66,6 +67,7 @@ const mocked = vi.hoisted(() => {
       displayProjectIds: [],
       lastUsedExternalAppId: undefined,
       pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       setSelectedRepoId,
       setSelectedWorkspaceId,
@@ -240,6 +242,7 @@ function renderRepoList(
       displayProjectIds: ["repo-1"],
       lastUsedExternalAppId,
       pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {
       "workspace-1": { additions: 12, deletions: 4 },
     },
@@ -388,6 +391,8 @@ describe("ProjectListView", () => {
       selectedWorkspaceId: "workspace-local-1",
       displayProjectIds: ["repo-1"],
       lastUsedExternalAppId: undefined,
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {
         "workspace-local-1": { additions: 2, deletions: 1 },
       },

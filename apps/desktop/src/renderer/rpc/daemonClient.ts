@@ -496,6 +496,8 @@ export class DaemonClient {
       await this.invoke("open", {
         id: workspaceId,
         path: workspaceWorktreePath,
+        ...(input.orgId ? { orgId: input.orgId } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
         ...(input.prAlreadyMerged ? { prAlreadyMerged: true } : {}),
       }),
     );
