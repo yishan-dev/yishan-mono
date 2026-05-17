@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"yishan/apps/cli/internal/workspace/shellenv"
 )
 
 const fetchTimeout = 15 * time.Second
@@ -1149,6 +1151,7 @@ func gitCommandCombined(ctx context.Context, cwd string, args ...string) (string
 func ghCommand(ctx context.Context, cwd string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "gh", args...)
 	cmd.Dir = cwd
+	cmd.Env = shellenv.EnsurePathHasExistingDirectories(os.Environ(), shellenv.CommonUserBinDirectories())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
