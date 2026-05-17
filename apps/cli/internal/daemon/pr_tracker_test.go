@@ -13,10 +13,11 @@ import (
 func TestWorkspacePRTracker_BindsActivePullRequest(t *testing.T) {
 	manager, ws := openTrackedWorkspace(t)
 	tracker := newWorkspacePRTracker(manager, nil)
+	tracker.active[ws.ID] = true
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}
-	tracker.prResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
+	tracker.detailResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
 		return workspace.GitBranchPullRequestStatus{
 			Found:          true,
 			Number:         42,
@@ -53,7 +54,7 @@ func TestWorkspacePRTracker_StopsTrackingMergedPullRequest(t *testing.T) {
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}
-	tracker.prResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
+	tracker.detailResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
 		return workspace.GitBranchPullRequestStatus{
 			Found:       true,
 			Number:      99,
@@ -90,7 +91,7 @@ func TestWorkspacePRTracker_ClearsMissingPullRequest(t *testing.T) {
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}
-	tracker.prResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
+	tracker.detailResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
 		return workspace.GitBranchPullRequestStatus{Found: false}, nil
 	}
 
@@ -103,21 +104,23 @@ func TestWorkspacePRTracker_ClearsMissingPullRequest(t *testing.T) {
 	if updated.PullRequest != nil {
 		t.Fatalf("expected pull request to be cleared, got %+v", updated.PullRequest)
 	}
-	if tracker.active[ws.ID] {
-		t.Fatalf("expected workspace %q to be removed from active set", ws.ID)
+	// When no PR is found the workspace stays active so future PRs can be detected.
+	if !tracker.active[ws.ID] {
+		t.Fatalf("expected workspace %q to remain active when no PR found", ws.ID)
 	}
 }
 
 func TestWorkspacePRTracker_SkipsOverlappingRefreshes(t *testing.T) {
 	manager, ws := openTrackedWorkspace(t)
 	tracker := newWorkspacePRTracker(manager, nil)
+	tracker.active[ws.ID] = true
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}
 	var resolverCalls atomic.Int32
 	started := make(chan struct{}, 1)
 	release := make(chan struct{})
-	tracker.prResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
+	tracker.detailResolver = func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error) {
 		resolverCalls.Add(1)
 		started <- struct{}{}
 		<-release
