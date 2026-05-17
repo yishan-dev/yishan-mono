@@ -581,7 +581,40 @@ func (s *GitService) branchPullRequest(ctx context.Context, root string, branch 
 }
 
 func getPullRequestChecks(ctx context.Context, root string, prNumber int, headRefOID string) ([]GitPullRequestCheck, error) {
-	_ = headRefOID // reserved for future use
+	// Use the GitHub REST API to get check runs with correct html_url links.
+	// gh pr checks --json only provides marketplace/app links, not check run URLs.
+	if strings.TrimSpace(headRefOID) != "" {
+		type ghCheckRun struct {
+			Name       string `json:"name"`
+			Status     string `json:"status"`
+			Conclusion string `json:"conclusion"`
+			HTMLURL    string `json:"html_url"`
+		}
+		type ghCheckRunsResponse struct {
+			CheckRuns []ghCheckRun `json:"check_runs"`
+		}
+
+		var resp ghCheckRunsResponse
+		if err := ghJSON(ctx, root, &resp,
+			"api", fmt.Sprintf("repos/{owner}/{repo}/commits/%s/check-runs", headRefOID),
+		); err == nil && len(resp.CheckRuns) > 0 {
+			result := make([]GitPullRequestCheck, 0, len(resp.CheckRuns))
+			for _, run := range resp.CheckRuns {
+				state := run.Conclusion
+				if state == "" {
+					state = run.Status
+				}
+				result = append(result, GitPullRequestCheck{
+					Name:  run.Name,
+					State: strings.ToUpper(state),
+					URL:   run.HTMLURL,
+				})
+			}
+			return result, nil
+		}
+	}
+
+	// Fall back to gh pr checks if headRefOID is empty or API call failed.
 	type ghCheck struct {
 		Name        string `json:"name"`
 		Workflow    string `json:"workflow"`
