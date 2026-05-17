@@ -23,6 +23,9 @@ const relayMethodJobRun = "job.run"
 const relayReconnectInitialDelay = 2 * time.Second
 const relayReconnectMaxDelay = 30 * time.Second
 
+// relayTokenEarlyRefreshWindow refreshes the token this long before it expires.
+const relayTokenEarlyRefreshWindow = 60 * time.Second
+
 // RelayStatus holds the current state of the relay connection, safe for concurrent reads.
 type RelayStatus struct {
 	mu          sync.RWMutex
@@ -100,6 +103,9 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string,
 		return
 	}
 
+	var cachedToken string
+	var cachedTokenExpiry time.Time
+
 	delay := relayReconnectInitialDelay
 	for {
 		if !cliruntime.APIConfigured() {
@@ -110,18 +116,25 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string,
 			continue
 		}
 
-		relayToken, err := mintRelayToken(nodeID)
-		if err != nil {
-			log.Warn().Err(err).Str("nodeId", nodeID).Msg("relay token mint failed")
-			status.setDisconnected("token mint failed: " + err.Error())
-			time.Sleep(delay)
-			delay = nextRelayDelay(delay)
-			continue
+		// Reuse the cached token if it is still valid; only mint a new one
+		// when the token is missing or about to expire.
+		now := time.Now()
+		if cachedToken == "" || now.After(cachedTokenExpiry.Add(-relayTokenEarlyRefreshWindow)) {
+			token, expiry, err := mintRelayToken(nodeID)
+			if err != nil {
+				log.Warn().Err(err).Str("nodeId", nodeID).Msg("relay token mint failed")
+				status.setDisconnected("token mint failed: " + err.Error())
+				time.Sleep(delay)
+				delay = nextRelayDelay(delay)
+				continue
+			}
+			cachedToken = token
+			cachedTokenExpiry = expiry
 		}
 
 		endpointWithMetadata := appendRelayClientMetadata(endpoint)
 		headers := http.Header{}
-		headers.Set("Authorization", "Bearer "+relayToken)
+		headers.Set("Authorization", "Bearer "+cachedToken)
 		conn, _, err := websocket.DefaultDialer.Dial(endpointWithMetadata, headers)
 		if err != nil {
 			log.Warn().Err(err).Str("relay_url", endpointWithMetadata).Msg("relay websocket dial failed")
@@ -133,6 +146,9 @@ func runRelayClientLoop(handler *JSONRPCHandler, nodeID string, relayURL string,
 
 		log.Info().Str("relay_url", endpointWithMetadata).Str("nodeId", nodeID).Str("daemonVersion", buildinfo.Version).Msg("relay websocket connected")
 		delay = relayReconnectInitialDelay
+		// Invalidate the cached token after a successful session ends so the
+		// next reconnect always gets a fresh token.
+		cachedToken = ""
 		status.setConnected(time.Now().UTC())
 
 		runRelaySession(handler, nodeID, conn)
@@ -240,16 +256,26 @@ func handleRelayMessage(connState *wsConnState, nodeID string, payload []byte) b
 	}
 }
 
-func mintRelayToken(nodeID string) (string, error) {
+func mintRelayToken(nodeID string) (string, time.Time, error) {
 	client := cliruntime.APIClient()
 	resp, err := client.RelayToken(nodeID)
 	if err != nil {
-		return "", fmt.Errorf("request relay token: %w", err)
+		return "", time.Time{}, fmt.Errorf("request relay token: %w", err)
 	}
 	if strings.TrimSpace(resp.Token) == "" {
-		return "", fmt.Errorf("empty relay token in response")
+		return "", time.Time{}, fmt.Errorf("empty relay token in response")
 	}
-	return resp.Token, nil
+	expiry := time.Time{}
+	if resp.ExpiresAt != "" {
+		if t, err := time.Parse(time.RFC3339, resp.ExpiresAt); err == nil {
+			expiry = t
+		}
+	}
+	// If no expiry was returned, treat it as valid for 5 minutes.
+	if expiry.IsZero() {
+		expiry = time.Now().Add(5 * time.Minute)
+	}
+	return resp.Token, expiry, nil
 }
 
 func nextRelayDelay(current time.Duration) time.Duration {
