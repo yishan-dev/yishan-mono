@@ -80,6 +80,27 @@ export type DaemonWorkspacePullRequest = {
   isDraft?: boolean;
   complete?: boolean;
   updatedAt?: string;
+  checks?: DaemonWorkspacePullRequestCheck[];
+  deployments?: DaemonWorkspacePullRequestDeployment[];
+};
+
+export type DaemonWorkspacePullRequestCheck = {
+  name: string;
+  workflow?: string;
+  state: string;
+  description?: string;
+  url?: string;
+};
+
+export type DaemonWorkspacePullRequestDeployment = {
+  id: number;
+  environment?: string;
+  state?: string;
+  description?: string;
+  environmentUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  originalPayload?: string;
 };
 
 export type WorkspaceCreateInput = {

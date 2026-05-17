@@ -12,7 +12,7 @@ import (
 
 func TestWorkspacePRTracker_BindsActivePullRequest(t *testing.T) {
 	manager, ws := openTrackedWorkspace(t)
-	tracker := newWorkspacePRTracker(manager)
+	tracker := newWorkspacePRTracker(manager, nil)
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}
@@ -48,7 +48,7 @@ func TestWorkspacePRTracker_BindsActivePullRequest(t *testing.T) {
 
 func TestWorkspacePRTracker_StopsTrackingMergedPullRequest(t *testing.T) {
 	manager, ws := openTrackedWorkspace(t)
-	tracker := newWorkspacePRTracker(manager)
+	tracker := newWorkspacePRTracker(manager, nil)
 	tracker.active[ws.ID] = true
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
@@ -85,7 +85,7 @@ func TestWorkspacePRTracker_ClearsMissingPullRequest(t *testing.T) {
 	if err := manager.SetWorkspacePullRequest(ws.ID, &workspace.WorkspacePullRequest{Number: 1, Status: "open"}); err != nil {
 		t.Fatalf("SetWorkspacePullRequest: %v", err)
 	}
-	tracker := newWorkspacePRTracker(manager)
+	tracker := newWorkspacePRTracker(manager, nil)
 	tracker.active[ws.ID] = true
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
@@ -110,7 +110,7 @@ func TestWorkspacePRTracker_ClearsMissingPullRequest(t *testing.T) {
 
 func TestWorkspacePRTracker_SkipsOverlappingRefreshes(t *testing.T) {
 	manager, ws := openTrackedWorkspace(t)
-	tracker := newWorkspacePRTracker(manager)
+	tracker := newWorkspacePRTracker(manager, nil)
 	tracker.branchResolver = func(context.Context, string) (string, error) {
 		return "feature/test", nil
 	}

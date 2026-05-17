@@ -20,6 +20,7 @@ type NotificationEventPayload = RpcFrontendMessagePayload<"notificationEvent">;
 type ObserverStatusPayload = NonNullable<NotificationEventPayload["observerStatus"]>;
 type NotificationSoundPayload = NonNullable<NotificationEventPayload["soundToPlay"]>;
 type WorkspaceCreateProgressPayload = RpcFrontendMessagePayload<"workspaceCreateProgress">;
+type WorkspacePullRequestUpdatedPayload = RpcFrontendMessagePayload<"workspacePullRequestUpdated">;
 type AgentSessionLifecycleStatus = "running" | "waiting_input";
 
 type BackendEventStoreBindingsDependencies = {
@@ -30,6 +31,7 @@ type BackendEventStoreBindingsDependencies = {
   ) => () => void;
   subscribeInAppNotification: (listener: (payload: NotificationEventPayload) => void) => () => void;
   subscribeWorkspaceCreateProgress?: (listener: (payload: WorkspaceCreateProgressPayload) => void) => () => void;
+  subscribeWorkspacePullRequestUpdated?: (listener: (payload: WorkspacePullRequestUpdatedPayload) => void) => () => void;
   subscribeOpenBrowserUrl?: (listener: (payload: { url: string; workspaceId: string }) => void) => () => void;
   listWorkspaceWorktreePaths?: () => string[];
   incrementFileTreeRefreshVersion: (workspaceWorktreePath?: string, changedRelativePaths?: string[]) => void;
@@ -37,6 +39,7 @@ type BackendEventStoreBindingsDependencies = {
   setWorkspaceAgentStatusByWorkspaceId: (statusByWorkspaceId: Record<string, WorkspaceAgentStatus>) => void;
   recordWorkspaceUnreadNotification: (workspaceId: string, tone: WorkspaceUnreadTone) => void;
   applyWorkspaceCreateProgressEvent?: (payload: WorkspaceCreateProgressPayload) => void;
+  setWorkspacePullRequest?: (workspaceId: string, pullRequest: WorkspacePullRequestUpdatedPayload["pullRequest"]) => void;
   openBrowserTab?: (payload: { url: string; workspaceId: string }) => void;
   dispatchSystemNotification: (input: { title: string; body?: string }) => Promise<void>;
   playNotificationSound: (input: NotificationSoundPayload) => Promise<void>;
@@ -75,6 +78,15 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
       listener(event.payload);
     });
   },
+  subscribeWorkspacePullRequestUpdated: (listener) => {
+    return subscribeBackendEvent("workspace.pull_request.updated", (event) => {
+      if (event.source !== "workspacePullRequestUpdated") {
+        return;
+      }
+
+      listener(event.payload);
+    });
+  },
   subscribeOpenBrowserUrl: (listener) => {
     return subscribeBackendEvent("open.browser.url", (event) => {
       if (event.source !== "openBrowserUrl") {
@@ -103,6 +115,9 @@ const DEFAULT_BACKEND_EVENT_STORE_BINDINGS_DEPENDENCIES: BackendEventStoreBindin
   },
   applyWorkspaceCreateProgressEvent: (payload) => {
     workspaceCreateProgressStore.getState().applyWorkspaceCreateProgressEvent(payload);
+  },
+  setWorkspacePullRequest: (workspaceId, pullRequest) => {
+    workspaceStore.getState().setWorkspacePullRequest(workspaceId, pullRequest);
   },
   openBrowserTab: (payload) => {
     tabStore.getState().openTab({ kind: "browser", workspaceId: payload.workspaceId, url: payload.url });
@@ -431,6 +446,9 @@ export function createBackendEventStoreBindings(
     const unsubscribeWorkspaceCreateProgress = dependencies.subscribeWorkspaceCreateProgress?.((payload) => {
       dependencies.applyWorkspaceCreateProgressEvent?.(payload);
     }) ?? (() => {});
+    const unsubscribeWorkspacePullRequestUpdated = dependencies.subscribeWorkspacePullRequestUpdated?.((payload) => {
+      dependencies.setWorkspacePullRequest?.(payload.workspaceId, payload.pullRequest);
+    }) ?? (() => {});
     const unsubscribeOpenBrowserUrl = dependencies.subscribeOpenBrowserUrl?.((payload) => {
       dependencies.openBrowserTab?.(payload);
     }) ?? (() => {});
@@ -441,6 +459,7 @@ export function createBackendEventStoreBindings(
       unsubscribeWorkspaceFilesChanged();
       unsubscribeInAppNotification();
       unsubscribeWorkspaceCreateProgress();
+      unsubscribeWorkspacePullRequestUpdated();
       unsubscribeOpenBrowserUrl();
       lifecycleBySessionKey.clear();
     };

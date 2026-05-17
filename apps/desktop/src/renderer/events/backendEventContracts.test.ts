@@ -38,6 +38,7 @@ describe("BACKEND_EVENT_NAME_BY_SOURCE", () => {
       gitChanged: "git.changed",
       workspaceFilesChanged: "workspace.files.changed",
       workspaceCreateProgress: "workspace.create.progress",
+      workspacePullRequestUpdated: "workspace.pull_request.updated",
       openBrowserUrl: "open.browser.url",
     });
   });
@@ -199,6 +200,28 @@ describe("normalizeBackendEvent", () => {
 
     expect(normalized.name).toBe("workspace.create.progress");
     expect(normalized.source).toBe("workspaceCreateProgress");
+  });
+
+  it("normalizes workspace pull request updated events", () => {
+    const normalized = assertNormalized(
+      normalizeBackendEvent(
+        createEnvelope({
+          method: "workspacePullRequestUpdated",
+          payload: {
+            workspaceId: "workspace-1",
+            workspaceWorktreePath: "/tmp/worktree",
+            pullRequest: {
+              number: 42,
+              title: "Test PR",
+              status: "open",
+            },
+          },
+        }),
+      ),
+    );
+
+    expect(normalized.name).toBe("workspace.pull_request.updated");
+    expect(normalized.source).toBe("workspacePullRequestUpdated");
   });
 
   it("normalizes app actions", () => {

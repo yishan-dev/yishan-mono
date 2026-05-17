@@ -4,6 +4,7 @@ type WorkspaceStoreSlice = Pick<
   WorkspaceStoreState,
   | "projects"
   | "workspaces"
+  | "pullRequestByWorkspaceId"
   | "selectedProjectId"
   | "selectedWorkspaceId"
   | "gitChangesCountByWorkspaceId"
@@ -82,8 +83,9 @@ export function applyDeletedWorkspaceState(
     state.workspaces.splice(removedIndex, 1);
   }
 
-  delete state.gitChangesCountByWorkspaceId[input.workspaceId];
-  delete state.gitChangeTotalsByWorkspaceId[input.workspaceId];
+	delete state.gitChangesCountByWorkspaceId[input.workspaceId];
+	delete state.gitChangeTotalsByWorkspaceId[input.workspaceId];
+	delete state.pullRequestByWorkspaceId[input.workspaceId];
 
   if (!state.projects.some((project) => project.id === state.selectedProjectId)) {
     state.selectedProjectId = state.projects[0]?.id ?? "";

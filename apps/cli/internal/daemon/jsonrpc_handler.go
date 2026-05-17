@@ -29,7 +29,7 @@ type JSONRPCHandler struct {
 
 func NewJSONRPCHandler(manager *workspace.Manager, nodeID string, logFilePath string) *JSONRPCHandler {
 	events := newEventHub()
-	prTracker := newWorkspacePRTracker(manager)
+	prTracker := newWorkspacePRTracker(manager, events.Publish)
 	return &JSONRPCHandler{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool { return true },

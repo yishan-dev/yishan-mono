@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inspectGitRepository } from "../../../commands/gitCommands";
-import { getDaemonClient } from "../../../rpc/rpcTransport";
-import type { DaemonWorkspacePullRequest } from "../../../rpc/daemonTypes";
+import { workspaceStore } from "../../../store/workspaceStore";
 import type { RepoWorkspaceItem } from "../../../store/types";
 
 type UseWorkspaceInfoHoverInput = {
@@ -19,7 +18,6 @@ export function useWorkspaceInfoHover({
   const [workspaceInfoAnchorEl, setWorkspaceInfoAnchorEl] = useState<HTMLElement | null>(null);
   const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState("");
   const [hoveredWorkspaceCurrentBranch, setHoveredWorkspaceCurrentBranch] = useState("");
-  const [hoveredWorkspacePullRequest, setHoveredWorkspacePullRequest] = useState<DaemonWorkspacePullRequest | undefined>();
   const workspaceInfoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearWorkspaceInfoCloseTimer = useCallback(() => {
@@ -36,7 +34,6 @@ export function useWorkspaceInfoHover({
     workspaceInfoCloseTimerRef.current = setTimeout(() => {
       setHoveredWorkspaceId("");
       setHoveredWorkspaceCurrentBranch("");
-      setHoveredWorkspacePullRequest(undefined);
       setWorkspaceInfoAnchorEl(null);
       workspaceInfoCloseTimerRef.current = null;
     }, closeDelayMs);
@@ -78,7 +75,6 @@ export function useWorkspaceInfoHover({
   useEffect(() => {
     if (!hoveredWorkspaceId) {
       setHoveredWorkspaceCurrentBranch("");
-      setHoveredWorkspacePullRequest(undefined);
       return;
     }
 
@@ -86,24 +82,19 @@ export function useWorkspaceInfoHover({
     const worktreePath = workspace?.worktreePath?.trim();
     if (!worktreePath) {
       setHoveredWorkspaceCurrentBranch("");
-      setHoveredWorkspacePullRequest(undefined);
       return;
     }
 
     let cancelled = false;
-    Promise.allSettled([inspectGitRepository({ path: worktreePath }), getDaemonClient().then((client) => client.workspace.list())])
-      .then(([inspectResult, daemonWorkspacesResult]) => {
+    inspectGitRepository({ path: worktreePath }).then((result) => {
         if (!cancelled) {
-          setHoveredWorkspaceCurrentBranch(
-            inspectResult.status === "fulfilled" ? inspectResult.value.currentBranch || "" : "",
-          );
-          setHoveredWorkspacePullRequest(
-            daemonWorkspacesResult.status === "fulfilled"
-              ? daemonWorkspacesResult.value.find((daemonWorkspace) => daemonWorkspace.path === worktreePath)?.pullRequest
-              : undefined,
-          );
+          setHoveredWorkspaceCurrentBranch(result.currentBranch || "");
         }
-      })
+      }).catch(() => {
+        if (!cancelled) {
+          setHoveredWorkspaceCurrentBranch("");
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -111,6 +102,7 @@ export function useWorkspaceInfoHover({
   }, [hoveredWorkspaceId, workspaces]);
 
   const hoveredWorkspace = workspaces.find((workspace) => workspace.id === hoveredWorkspaceId);
+  const hoveredWorkspacePullRequest = workspaceStore((state) => state.pullRequestByWorkspaceId?.[hoveredWorkspaceId]);
   const isHoveredWorkspacePrimary = Boolean(
     hoveredWorkspace &&
       (hoveredWorkspace.kind === "local" || displayWorkspaceIdByProjectId[hoveredWorkspace.repoId] === hoveredWorkspace.id),

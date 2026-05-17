@@ -66,6 +66,7 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -110,6 +111,7 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -154,6 +156,7 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -175,6 +178,7 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",

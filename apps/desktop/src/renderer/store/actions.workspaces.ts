@@ -4,6 +4,7 @@ import {
   applyRenamedWorkspaceBranchState,
   applyRenamedWorkspaceState,
 } from "../helpers/workspaceHelpers";
+import type { DaemonWorkspacePullRequest } from "../rpc/daemonTypes";
 import type { WorkspaceStoreActions, WorkspaceStoreGetState, WorkspaceStoreSetState } from "./types";
 
 type WorkspaceActions = Pick<
@@ -14,6 +15,7 @@ type WorkspaceActions = Pick<
   | "renameWorkspaceBranch"
   | "setWorkspaceGitChangesCount"
   | "setWorkspaceGitChangeTotals"
+  | "setWorkspacePullRequest"
   | "incrementGitRefreshVersion"
 >;
 
@@ -113,6 +115,15 @@ export function createWorkspaceActions(set: WorkspaceStoreSetState, _get: Worksp
           additions: Math.max(0, totals.additions),
           deletions: Math.max(0, totals.deletions),
         };
+      });
+    },
+    setWorkspacePullRequest: (workspaceId, pullRequest?: DaemonWorkspacePullRequest) => {
+      if (!workspaceId) {
+        return;
+      }
+
+      set((state) => {
+        state.pullRequestByWorkspaceId[workspaceId] = pullRequest;
       });
     },
     incrementGitRefreshVersion: (workspaceWorktreePath) => {

@@ -12,6 +12,7 @@ type ProjectStoreSlice = Pick<
   WorkspaceStoreState,
   | "projects"
   | "workspaces"
+  | "pullRequestByWorkspaceId"
   | "gitChangesCountByWorkspaceId"
   | "gitChangeTotalsByWorkspaceId"
   | "selectedProjectId"
@@ -231,6 +232,10 @@ export function applyHydratedStateFromApiData(
   );
   state.gitChangeTotalsByWorkspaceId = filterWorkspaceScopedRecord(
     { ...(state.gitChangeTotalsByWorkspaceId ?? {}) },
+    nextWorkspaceIdSet,
+  );
+  state.pullRequestByWorkspaceId = filterWorkspaceScopedRecord(
+    { ...(state.pullRequestByWorkspaceId ?? {}) },
     nextWorkspaceIdSet,
   );
 }

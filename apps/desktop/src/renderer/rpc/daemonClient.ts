@@ -1238,5 +1238,47 @@ function readDaemonWorkspacePullRequest(value: unknown): Rpc.DaemonWorkspacePull
     isDraft: readOptionalBoolean(record.isDraft) ?? undefined,
     complete: readOptionalBoolean(record.complete) ?? undefined,
     updatedAt: readOptionalString(record.updatedAt),
+    checks: Array.isArray(record.checks)
+      ? record.checks.map((item) => readDaemonWorkspacePullRequestCheck(item)).filter((item) => item !== undefined)
+      : undefined,
+    deployments: Array.isArray(record.deployments)
+      ? record.deployments.map((item) => readDaemonWorkspacePullRequestDeployment(item)).filter((item) => item !== undefined)
+      : undefined,
+  };
+}
+
+function readDaemonWorkspacePullRequestCheck(value: unknown): Rpc.DaemonWorkspacePullRequestCheck | undefined {
+  const record = asRecord(value);
+  const name = readOptionalString(record?.name);
+  const state = readOptionalString(record?.state);
+  if (!record || !name || !state) {
+    return undefined;
+  }
+
+  return {
+    name,
+    workflow: readOptionalString(record.workflow),
+    state,
+    description: readOptionalString(record.description),
+    url: readOptionalString(record.url),
+  };
+}
+
+function readDaemonWorkspacePullRequestDeployment(value: unknown): Rpc.DaemonWorkspacePullRequestDeployment | undefined {
+  const record = asRecord(value);
+  const id = typeof record?.id === "number" ? record.id : null;
+  if (!record || !id || !Number.isFinite(id)) {
+    return undefined;
+  }
+
+  return {
+    id,
+    environment: readOptionalString(record.environment),
+    state: readOptionalString(record.state),
+    description: readOptionalString(record.description),
+    environmentUrl: readOptionalString(record.environmentUrl),
+    createdAt: readOptionalString(record.createdAt),
+    updatedAt: readOptionalString(record.updatedAt),
+    originalPayload: readOptionalString(record.originalPayload),
   };
 }

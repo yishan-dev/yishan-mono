@@ -4,6 +4,20 @@ import { LuGitBranch, LuGitPullRequest } from "react-icons/lu";
 import type { DaemonWorkspacePullRequest } from "../../../rpc/daemonTypes";
 import type { RepoWorkspaceItem } from "../../../store/types";
 
+function pullRequestStatusColor(pr: DaemonWorkspacePullRequest): string {
+  const s = (pr.status ?? "").toLowerCase();
+  if (pr.complete || s === "merged") {
+    return "#9333ea";
+  }
+  if (pr.isDraft || s === "draft") {
+    return "#71717a";
+  }
+  if (s === "closed") {
+    return "#dc2626";
+  }
+  return "#16a34a";
+}
+
 type WorkspaceInfoPopperViewProps = {
   open: boolean;
   anchorEl: HTMLElement | null;
@@ -34,7 +48,6 @@ export function WorkspaceInfoPopperView({
   const shouldShowSourceBranch = !isPrimaryWorkspace && Boolean(sourceBranch);
   const sourceBranchValue = sourceBranch || unavailableLabel;
   const showSourceBranch = shouldShowSourceBranch && sourceBranchValue !== displayBranch;
-  const pullRequestStatus = pullRequest?.status?.trim() || pullRequest?.githubState?.trim() || unavailableLabel;
 
   return (
     <Popper
@@ -96,23 +109,17 @@ export function WorkspaceInfoPopperView({
             </Stack>
           ) : null}
           {pullRequest ? (
-            <Stack spacing={0.5}>
+            <Stack spacing={0.25} sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ textTransform: "uppercase", letterSpacing: 0.4, color: "text.primary", lineHeight: 1.2 }}>
+                {t("workspace.pr.tab")}
+              </Typography>
               <Stack direction="row" spacing={0.5} alignItems="center">
-                <LuGitPullRequest size={14} />
-                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-                  <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.4, color: "success.main" }}>
-                    PR:
-                  </Box>{" "}
+                <LuGitPullRequest size={14} color={pullRequestStatusColor(pullRequest)} />
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }} noWrap>
                   #{pullRequest.number}
                   {pullRequest.title ? ` ${pullRequest.title}` : ""}
                 </Typography>
               </Stack>
-              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, pl: 2.4 }}>
-                <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.4, color: "info.main" }}>
-                  Status:
-                </Box>{" "}
-                {pullRequestStatus}
-              </Typography>
             </Stack>
           ) : null}
         </Stack>

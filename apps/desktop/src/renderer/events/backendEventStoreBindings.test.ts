@@ -97,6 +97,28 @@ function createDaemonConnectionStatusHarness() {
   };
 }
 
+function createWorkspacePullRequestUpdatedHarness() {
+  let listener: ((payload: RpcFrontendMessagePayload<"workspacePullRequestUpdated">) => void) | null = null;
+  const unsubscribe = vi.fn();
+  const subscribeWorkspacePullRequestUpdated = vi.fn(
+    (nextListener: (payload: RpcFrontendMessagePayload<"workspacePullRequestUpdated">) => void) => {
+      listener = nextListener;
+      return () => {
+        unsubscribe();
+        listener = null;
+      };
+    },
+  );
+
+  return {
+    subscribeWorkspacePullRequestUpdated,
+    unsubscribe,
+    emit(payload: RpcFrontendMessagePayload<"workspacePullRequestUpdated">) {
+      listener?.(payload);
+    },
+  };
+}
+
 describe("createBackendEventStoreBindings", () => {
   it("subscribes once and forwards git changed events to store action", () => {
     const harness = createGitChangedHarness();
@@ -248,6 +270,45 @@ describe("createBackendEventStoreBindings", () => {
     expect(incrementFileTreeRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1", ["src/test.md"]);
     expect(incrementGitRefreshVersion).toHaveBeenCalledTimes(1);
     expect(incrementGitRefreshVersion).toHaveBeenCalledWith("/tmp/repo/.worktrees/task-1");
+
+    stopBindings();
+  });
+
+  it("stores workspace pull request updates", () => {
+    const gitHarness = createGitChangedHarness();
+    const workspaceFilesHarness = createWorkspaceFilesChangedHarness();
+    const inAppNotificationHarness = createInAppNotificationHarness();
+    const prHarness = createWorkspacePullRequestUpdatedHarness();
+    const incrementFileTreeRefreshVersion = vi.fn();
+    const incrementGitRefreshVersion = vi.fn();
+    const setWorkspaceAgentStatusByWorkspaceId = vi.fn();
+    const recordWorkspaceUnreadNotification = vi.fn();
+    const setWorkspacePullRequest = vi.fn();
+    const dispatchSystemNotification = vi.fn(async () => undefined);
+    const playNotificationSound = vi.fn(async () => undefined);
+
+    const startBindings = createBackendEventStoreBindings({
+      subscribeGitChanged: gitHarness.subscribeGitChanged,
+      subscribeWorkspaceFilesChanged: workspaceFilesHarness.subscribeWorkspaceFilesChanged,
+      subscribeInAppNotification: inAppNotificationHarness.subscribeInAppNotification,
+      subscribeWorkspacePullRequestUpdated: prHarness.subscribeWorkspacePullRequestUpdated,
+      incrementFileTreeRefreshVersion,
+      incrementGitRefreshVersion,
+      setWorkspaceAgentStatusByWorkspaceId,
+      recordWorkspaceUnreadNotification,
+      setWorkspacePullRequest,
+      dispatchSystemNotification,
+      playNotificationSound,
+    });
+
+    const stopBindings = startBindings();
+    prHarness.emit({
+      workspaceId: "workspace-1",
+      workspaceWorktreePath: "/tmp/repo",
+      pullRequest: { number: 42, title: "PR" },
+    });
+
+    expect(setWorkspacePullRequest).toHaveBeenCalledWith("workspace-1", { number: 42, title: "PR" });
 
     stopBindings();
   });

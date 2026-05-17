@@ -17,6 +17,7 @@ type TestState = {
   }>;
   selectedProjectId: string;
   selectedWorkspaceId: string;
+  pullRequestByWorkspaceId: Record<string, unknown>;
   gitChangesCountByWorkspaceId: Record<string, number>;
   gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
   gitRefreshVersionByWorktreePath: Record<string, number>;
@@ -46,6 +47,7 @@ function createHarness() {
     ],
     selectedProjectId: "repo-1",
     selectedWorkspaceId: "workspace-1",
+    pullRequestByWorkspaceId: {},
     gitChangesCountByWorkspaceId: {},
     gitChangeTotalsByWorkspaceId: {},
     gitRefreshVersionByWorktreePath: {},
@@ -134,6 +136,13 @@ describe("createWorkspaceActions", () => {
     harness.actions.setWorkspaceGitChangesCount("workspace-1", 5);
 
     expect(harness.getState().gitChangesCountByWorkspaceId["workspace-1"]).toBe(5);
+  });
+
+  it("stores workspace pull request snapshots", () => {
+    const harness = createHarness();
+    harness.actions.setWorkspacePullRequest("workspace-1", { number: 42, title: "PR" } as never);
+
+    expect(harness.getState().pullRequestByWorkspaceId["workspace-1"]).toEqual({ number: 42, title: "PR" });
   });
 
   it("stores workspace git change totals", () => {

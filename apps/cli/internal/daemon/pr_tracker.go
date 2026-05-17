@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -18,15 +19,17 @@ type workspacePRTracker struct {
 	active         map[string]bool
 	inFlight       map[string]bool
 	started        bool
+	publish        func(frontendEvent)
 	branchResolver func(context.Context, string) (string, error)
 	prResolver     func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error)
 }
 
-func newWorkspacePRTracker(manager *workspace.Manager) *workspacePRTracker {
+func newWorkspacePRTracker(manager *workspace.Manager, publish func(frontendEvent)) *workspacePRTracker {
 	tracker := &workspacePRTracker{
 		manager:  manager,
 		active:   make(map[string]bool),
 		inFlight: make(map[string]bool),
+		publish:  publish,
 	}
 	tracker.branchResolver = func(ctx context.Context, root string) (string, error) {
 		ws, ok := manager.FindWorkspaceByPath(root)
@@ -180,8 +183,22 @@ func (t *workspacePRTracker) refreshWorkspace(ws workspace.Workspace) error {
 }
 
 func (t *workspacePRTracker) setWorkspacePullRequest(workspaceID string, pr *workspace.WorkspacePullRequest, keepActive bool) {
+	previousWorkspace, previousErr := t.manager.GetWorkspace(workspaceID)
+	previousPullRequest := previousWorkspace.PullRequest
 	if err := t.manager.SetWorkspacePullRequest(workspaceID, pr); err != nil {
 		return
+	}
+	if previousErr == nil && !reflect.DeepEqual(previousPullRequest, pr) {
+		if currentWorkspace, err := t.manager.GetWorkspace(workspaceID); err == nil && t.publish != nil {
+			t.publish(frontendEvent{
+				Topic: "workspacePullRequestUpdated",
+				Payload: map[string]any{
+					"workspaceId":           currentWorkspace.ID,
+					"workspaceWorktreePath": currentWorkspace.Path,
+					"pullRequest":           pr,
+				},
+			})
+		}
 	}
 
 	t.mu.Lock()

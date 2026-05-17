@@ -1,7 +1,7 @@
 import { Badge, Box, IconButton, ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LuFolderTree, LuGitBranch, LuPanelRight } from "react-icons/lu";
+import { LuFolderTree, LuGitBranch, LuGitPullRequest, LuPanelRight } from "react-icons/lu";
 import { PaneHeader } from "../../../components/PaneHeader";
 import { getRendererPlatform } from "../../../helpers/platform";
 import { getShortcutDisplayLabelById } from "../../../shortcuts/shortcutDisplay";
@@ -9,6 +9,7 @@ import { workspacePaneStore } from "../../../store/workspacePaneStore";
 import { workspaceStore } from "../../../store/workspaceStore";
 import { ChangesTabView } from "./ChangesTabView";
 import { FileManagerView } from "./FileManagerView";
+import { PullRequestTabView } from "./PullRequestTabView";
 
 export type RightPaneViewProps = {
   onToggleRightPane?: () => void;
@@ -33,7 +34,7 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
       })
     : t("layout.toggleRightSidebar");
 
-  const activeTab = activeRightPaneTab === "changes" ? "changes" : "files";
+  const activeTab = activeRightPaneTab === "changes" ? "changes" : activeRightPaneTab === "pr" ? "pr" : "files";
 
   return (
     <Box
@@ -53,7 +54,7 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
           <ToggleButtonGroup
             value={activeTab}
             exclusive
-            onChange={(_, nextTab: "files" | "changes" | null) => {
+            onChange={(_, nextTab: "files" | "changes" | "pr" | null) => {
               if (nextTab) {
                 setRightPaneTab(nextTab);
               }
@@ -126,6 +127,16 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
                 </Box>
               </Tooltip>
             </ToggleButton>
+            <ToggleButton value="pr" disableRipple aria-label={t("workspace.pr.tab")}>
+              <Tooltip title={t("workspace.pr.tab")} arrow>
+                <Box
+                  component="span"
+                  sx={{ width: 16, height: 16, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <LuGitPullRequest size={15} />
+                </Box>
+              </Tooltip>
+            </ToggleButton>
           </ToggleButtonGroup>
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }} />
@@ -170,6 +181,17 @@ export function RightPaneView({ onToggleRightPane }: RightPaneViewProps = {}) {
         }}
       >
         <ChangesTabView />
+      </Box>
+      <Box
+        sx={{
+          display: activeTab === "pr" ? "flex" : "none",
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        <PullRequestTabView active={activeTab === "pr"} />
       </Box>
     </Box>
   );

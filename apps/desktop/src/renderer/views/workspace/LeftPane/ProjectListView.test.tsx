@@ -5,7 +5,6 @@ import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within }
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OPEN_CREATE_WORKSPACE_DIALOG_EVENT } from "../../../commands/workspaceCommands";
 import { inspectGitRepository } from "../../../commands/gitCommands";
-import { getDaemonClient } from "../../../rpc/rpcTransport";
 import { ProjectListView } from "./ProjectListView";
 
 const mocked = vi.hoisted(() => {
@@ -45,6 +44,7 @@ const mocked = vi.hoisted(() => {
       selectedWorkspaceId: string;
       displayProjectIds: string[];
       lastUsedExternalAppId?: string;
+      pullRequestByWorkspaceId: Record<string, unknown>;
       gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
       setSelectedRepoId: (repoId: string) => void;
       setSelectedWorkspaceId: (workspaceId: string) => void;
@@ -65,6 +65,7 @@ const mocked = vi.hoisted(() => {
       selectedWorkspaceId: "",
       displayProjectIds: [],
       lastUsedExternalAppId: undefined,
+      pullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       setSelectedRepoId,
       setSelectedWorkspaceId,
@@ -181,19 +182,6 @@ vi.mock("../../../commands/gitCommands", () => ({
   inspectGitRepository: vi.fn(() => Promise.resolve({ isGitRepository: true, currentBranch: "feature/live-branch" })),
 }));
 
-vi.mock("../../../rpc/rpcTransport", () => ({
-  getDaemonClient: vi.fn(async () => ({
-    workspace: {
-      list: vi.fn(async () => [
-        {
-          id: "workspace-1",
-          path: "/tmp/worktrees/workspace-1",
-        },
-      ]),
-    },
-  })),
-}));
-
 vi.mock("../../../helpers/platform", () => ({
   getRendererPlatform: () => mocked.rendererPlatform,
 }));
@@ -249,9 +237,10 @@ function renderRepoList(
     ],
     selectedProjectId: "repo-1",
     selectedWorkspaceId,
-    displayProjectIds: ["repo-1"],
-    lastUsedExternalAppId,
-    gitChangeTotalsByWorkspaceId: {
+      displayProjectIds: ["repo-1"],
+      lastUsedExternalAppId,
+      pullRequestByWorkspaceId: {},
+      gitChangeTotalsByWorkspaceId: {
       "workspace-1": { additions: 12, deletions: 4 },
     },
     setSelectedRepoId: mocked.setSelectedRepoId,
@@ -739,22 +728,15 @@ describe("ProjectListView", () => {
 
   it("shows pull request info in workspace popover when one exists", async () => {
     vi.useFakeTimers();
-    vi.mocked(getDaemonClient).mockResolvedValueOnce({
-      workspace: {
-        list: vi.fn(async () => [
-          {
-            id: "workspace-1",
-            path: "/tmp/worktrees/workspace-1",
-            pullRequest: {
-              number: 42,
-              title: "Add PR tracking",
-              status: "review",
-            },
-          },
-        ]),
+    const view = renderRepoList();
+    mocked.stateRef.current.pullRequestByWorkspaceId = {
+      "workspace-1": {
+        number: 42,
+        title: "Add PR tracking",
+        status: "review",
       },
-    } as never);
-    renderRepoList();
+    };
+    view.rerender(<ProjectListView />);
 
     fireEvent.mouseEnter(screen.getByTestId("workspace-row-workspace-1"));
     await act(async () => {
@@ -762,8 +744,8 @@ describe("ProjectListView", () => {
     });
 
     const infoPopper = screen.getByTestId("workspace-info-popper");
-    expect(infoPopper.textContent).toContain("PR: #42 Add PR tracking");
-    expect(infoPopper.textContent).toContain("Status: review");
+    expect(infoPopper.textContent).toContain("workspace.pr.tab");
+    expect(infoPopper.textContent).toContain("#42 Add PR tracking");
     vi.useRealTimers();
   });
 
@@ -832,6 +814,7 @@ describe("ProjectListView", () => {
       selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
       displayProjectIds: ["repo-1"],
+      pullRequestByWorkspaceId: {},
     };
     renderProjectListView();
 
@@ -877,6 +860,7 @@ describe("ProjectListView", () => {
       selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
       displayProjectIds: ["repo-1"],
+      pullRequestByWorkspaceId: {},
     };
     renderProjectListView();
 
