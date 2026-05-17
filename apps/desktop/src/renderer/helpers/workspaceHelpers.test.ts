@@ -45,6 +45,7 @@ describe("workspaceHelpers", () => {
       ],
       selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
+      pullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
     };

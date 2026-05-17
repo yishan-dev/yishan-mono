@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { inspectGitRepository } from "../../../commands/gitCommands";
+import { workspaceStore } from "../../../store/workspaceStore";
 import type { RepoWorkspaceItem } from "../../../store/types";
 
 type UseWorkspaceInfoHoverInput = {
@@ -85,13 +86,11 @@ export function useWorkspaceInfoHover({
     }
 
     let cancelled = false;
-    inspectGitRepository({ path: worktreePath })
-      .then((result) => {
+    inspectGitRepository({ path: worktreePath }).then((result) => {
         if (!cancelled) {
           setHoveredWorkspaceCurrentBranch(result.currentBranch || "");
         }
-      })
-      .catch(() => {
+      }).catch(() => {
         if (!cancelled) {
           setHoveredWorkspaceCurrentBranch("");
         }
@@ -103,6 +102,8 @@ export function useWorkspaceInfoHover({
   }, [hoveredWorkspaceId, workspaces]);
 
   const hoveredWorkspace = workspaces.find((workspace) => workspace.id === hoveredWorkspaceId);
+  const hoveredWorkspacePullRequest = workspaceStore((state) => state.pullRequestByWorkspaceId?.[hoveredWorkspaceId]);
+  const hoveredWorkspaceLatestPullRequest = workspaceStore((state) => state.latestPullRequestByWorkspaceId?.[hoveredWorkspaceId]);
   const isHoveredWorkspacePrimary = Boolean(
     hoveredWorkspace &&
       (hoveredWorkspace.kind === "local" || displayWorkspaceIdByProjectId[hoveredWorkspace.repoId] === hoveredWorkspace.id),
@@ -113,6 +114,8 @@ export function useWorkspaceInfoHover({
     workspaceInfoAnchorEl,
     hoveredWorkspace,
     hoveredWorkspaceCurrentBranch,
+    hoveredWorkspacePullRequest,
+    hoveredWorkspaceLatestPullRequest,
     isHoveredWorkspacePrimary,
     isWorkspaceInfoOpen,
     handleWorkspaceInfoMouseEnter,

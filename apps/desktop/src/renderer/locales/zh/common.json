@@ -436,6 +436,17 @@
       "sourceBranch": "来源",
       "path": "路径",
       "unavailable": "不可用"
+    },
+    "pr": {
+      "tab": "PR",
+      "empty": "当前工作区未关联拉取请求。",
+      "open": "打开",
+      "viewDetails": "查看详情",
+      "checks": "检查",
+      "noChecks": "暂无检查信息。",
+      "deployments": "部署",
+      "noDeployments": "暂无部署信息。",
+      "history": "历史记录"
     }
   },
   "repo": {
@@ -563,7 +574,7 @@
   "files": {
     "files": "文件",
     "all": "全部文件",
-    "changes": "变更 {{count}}",
+    "changes": "变更",
     "checks": "检查",
     "actions": {
       "createFile": "创建文件",

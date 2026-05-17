@@ -26,6 +26,9 @@ const mocked = vi.hoisted(() => {
   };
 
   const workspaceStore = vi.fn((selector: (state: typeof stateRef.current) => unknown) => selector(stateRef.current));
+  Object.assign(workspaceStore, {
+    getState: () => stateRef.current,
+  });
 
   return {
     setDisplayProjectIds,

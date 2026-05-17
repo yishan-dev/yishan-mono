@@ -19,6 +19,7 @@ import {
 } from "../store/workspaceLifecycleNoticeStore";
 import { type WorkspaceRightPaneTab, workspacePaneStore } from "../store/workspacePaneStore";
 import { workspaceStore } from "../store/workspaceStore";
+import { ensureVisibleWorkspacesOpen } from "./daemonWorkspaceSync";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 type CreateWorkspaceInput = {
@@ -496,6 +497,7 @@ export async function refreshWorkspaceGitChanges(workspaceId: string, workspaceW
 /** Stores visible repo ids for left-pane filtering state. */
 export function setDisplayRepoIds(repoIds: string[]) {
   readWorkspaceStoreState().setDisplayProjectIds(repoIds);
+  void ensureVisibleWorkspacesOpen();
 }
 
 /** Stores last used external app id for quick-open actions. */

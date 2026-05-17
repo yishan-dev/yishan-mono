@@ -91,7 +91,7 @@ export const TerminalView = memo(function TerminalView({ tabId, focusRequestKey 
   // ─── File Drop ──────────────────────────────────────────────────────────────
 
   const { isFileDragOver } = useTerminalFileDrop({
-    containerRef,
+    tabId,
     xtermRef,
     sessionIdRef,
   });

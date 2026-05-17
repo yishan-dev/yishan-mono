@@ -29,6 +29,10 @@ const fileManagerMountTracker = vi.fn();
 const fileManagerUnmountTracker = vi.fn();
 const changesMountTracker = vi.fn();
 const changesUnmountTracker = vi.fn();
+const prTabState = {
+  pullRequest: undefined as unknown,
+  isLoading: false,
+};
 
 function asEntries(paths: string[]) {
   return paths.map((path) => ({ path, isIgnored: false }));
@@ -129,6 +133,14 @@ vi.mock("./ChangesTabView", () => {
   };
 });
 
+vi.mock("./PullRequestTabView", () => ({
+  PullRequestTabView: () => <div data-testid="mock-pr-tab" />,
+}));
+
+vi.mock("./useWorkspacePullRequestState", () => ({
+  useWorkspacePullRequestState: () => prTabState,
+}));
+
 vi.mock("../../../store/workspaceStore", () => ({
   workspaceStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
@@ -157,6 +169,7 @@ vi.mock("react-i18next", () => ({
       const translations: Record<string, string> = {
         "files.files": "Files",
         "files.changes": `Changes ${params?.count ?? 0}`,
+        "workspace.pr.tab": "PR",
         "files.actions.createFile": "Create File",
         "files.actions.createFolder": "Create Folder",
         "files.actions.rename": "Rename",
@@ -218,6 +231,8 @@ describe("RightPaneView delete flow", () => {
     fileManagerUnmountTracker.mockReset();
     changesMountTracker.mockReset();
     changesUnmountTracker.mockReset();
+    prTabState.pullRequest = undefined;
+    prTabState.isLoading = false;
     workspacePaneStore.setState({ rightPaneTab: "files", fileSearchRequestKey: 0 });
   });
 
@@ -410,6 +425,23 @@ describe("RightPaneView delete flow", () => {
     render(<RightPaneView />);
 
     expect(screen.queryByRole("button", { name: "Checks" })).toBeNull();
+  });
+
+  it("renders a PR tab", async () => {
+    render(<RightPaneView />);
+
+    const prButton = await screen.findByRole("button", { name: "PR" });
+    expect(prButton).toBeTruthy();
+  });
+
+  it("activates the PR pane from store state", async () => {
+    render(<RightPaneView />);
+
+    workspacePaneStore.getState().setRightPaneTab("pr");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "PR" }).getAttribute("aria-pressed")).toBe("true");
+    });
+    expect(screen.getByTestId("mock-pr-tab")).toBeTruthy();
   });
 
   it("opens quick-open search when file-search request key increments without switching tabs", async () => {

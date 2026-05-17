@@ -26,7 +26,9 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err != nil {
 			return nil, err
 		}
+		log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Bool("prAlreadyMerged", req.PRAlreadyMerged).Msg("daemon workspace opened")
 		h.watchers.Watch(ws.Path)
+		h.prTracker.EnsureTracked(ws.Path)
 		return ws, nil
 	case MethodList:
 		return h.manager.List(), nil
@@ -69,6 +71,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 					warnings = append(warnings, hookResultToWarning("setup", req.SetupHook, created.SetupHookResult, h.logFilePath))
 				}
 				h.watchers.Watch(created.Path)
+				h.prTracker.EnsureTracked(created.Path)
 				reportProgress(workspace.CreateProgressEvent{
 					WorkspaceID: created.ID,
 					StepID:      "complete",
@@ -86,6 +89,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 			}
 		}
 		h.watchers.Watch(created.Path)
+		h.prTracker.EnsureTracked(created.Path)
 		reportProgress(workspace.CreateProgressEvent{
 			WorkspaceID: created.ID,
 			StepID:      "complete",
@@ -128,6 +132,7 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		}
 		if wsErr == nil {
 			h.watchers.Unwatch(ws.Path)
+			h.prTracker.StopTracking(ws.ID)
 		}
 		if req.ProjectID != "" {
 			if err := closeRemoteWorkspace(ctx, WorkspaceClose{

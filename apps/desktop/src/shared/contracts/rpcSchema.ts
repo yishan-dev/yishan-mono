@@ -55,6 +55,40 @@ export type RpcSchema = {
         message?: string;
         createdAt: string;
       };
+      workspacePullRequestUpdated: {
+        workspaceId: string;
+        workspaceWorktreePath: string;
+        pullRequest?: {
+          number: number;
+          title?: string;
+          url?: string;
+          branch?: string;
+          baseBranch?: string;
+          githubState?: string;
+          status?: string;
+          reviewDecision?: string;
+          isDraft?: boolean;
+          complete?: boolean;
+          updatedAt?: string;
+          checks?: Array<{
+            name: string;
+            workflow?: string;
+            state: string;
+            description?: string;
+            url?: string;
+          }>;
+          deployments?: Array<{
+            id: number;
+            environment?: string;
+            state?: string;
+            description?: string;
+            environmentUrl?: string;
+            createdAt?: string;
+            updatedAt?: string;
+            originalPayload?: string;
+          }>;
+        };
+      };
       openBrowserUrl: {
         url: string;
         workspaceId: string;

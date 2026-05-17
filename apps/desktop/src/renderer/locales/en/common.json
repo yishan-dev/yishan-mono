@@ -466,6 +466,17 @@
       "sourceBranch": "Source",
       "path": "Path",
       "unavailable": "Unavailable"
+    },
+    "pr": {
+      "tab": "PR",
+      "empty": "No pull request is associated with this workspace.",
+      "open": "Open",
+      "viewDetails": "View details",
+      "checks": "Checks",
+      "noChecks": "No checks available.",
+      "deployments": "Deployments",
+      "noDeployments": "No deployments available.",
+      "history": "History"
     }
   },
   "repo": {
@@ -593,7 +604,7 @@
   "files": {
     "files": "Files",
     "all": "All files",
-    "changes": "Changes {{count}}",
+    "changes": "Changes",
     "checks": "Checks",
     "actions": {
       "createFile": "Create File",

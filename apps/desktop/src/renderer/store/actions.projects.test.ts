@@ -39,6 +39,7 @@ type TestState = {
   displayProjectIds: string[];
   fileTreeRefreshVersion: number;
   fileTreeChangedRelativePathsByWorktreePath: Record<string, string[]>;
+  pullRequestByWorkspaceId: Record<string, unknown>;
   gitChangesCountByWorkspaceId: Record<string, number>;
   gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
 };
@@ -110,6 +111,7 @@ function createHarness(overrides?: Partial<TestState>) {
     displayProjectIds: ["repo-1", "repo-2"],
     fileTreeRefreshVersion: 0,
     fileTreeChangedRelativePathsByWorktreePath: {},
+    pullRequestByWorkspaceId: {},
     gitChangesCountByWorkspaceId: {
       "workspace-1": 3,
       "workspace-2": 4,
@@ -200,6 +202,7 @@ describe("createWorkspaceRepoActions", () => {
     expect(state.gitChangeTotalsByWorkspaceId).toEqual({
       "workspace-2": { additions: 9, deletions: 4 },
     });
+    expect(state.pullRequestByWorkspaceId).toEqual({});
   });
 
   it("hydrates state from backend snapshot", () => {

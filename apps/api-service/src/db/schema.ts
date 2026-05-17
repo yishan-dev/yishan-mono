@@ -14,6 +14,7 @@ export type NodeScope = "private" | "shared";
 export type ProjectSourceType = "git" | "git-local" | "unknown";
 export type WorkspaceKind = "primary" | "worktree";
 export type WorkspaceStatus = "active" | "closed";
+export type WorkspacePullRequestState = "open" | "closed" | "merged";
 export type ScheduledJobStatus = "active" | "paused" | "disabled";
 export type ScheduledAgentKind = "opencode" | "codex" | "claude" | "gemini" | "pi" | "copilot" | "cursor";
 export type ScheduledJobRunStatus = "pending" | "running" | "succeeded" | "failed" | "skipped_offline";
@@ -217,6 +218,36 @@ export const workspaces = pgTable(
   ]
 );
 
+export const workspacePullRequests = pgTable(
+  "workspace_pull_requests",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    prId: text("pr_id").notNull(),
+    title: text("title"),
+    url: text("url"),
+    branch: text("branch"),
+    baseBranch: text("base_branch"),
+    state: text("state").$type<WorkspacePullRequestState>().notNull(),
+    metadata: jsonb("metadata"),
+    detectedAt: timestamp("detected_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => [
+    uniqueIndex("workspace_pull_requests_workspace_id_pr_id_uq").on(table.workspaceId, table.prId),
+    index("workspace_pull_requests_workspace_id_idx").on(table.workspaceId),
+    index("workspace_pull_requests_organization_id_idx").on(table.organizationId),
+    index("workspace_pull_requests_state_idx").on(table.state)
+  ]
+);
+
 export const scheduledJobs = pgTable(
   "scheduled_jobs",
   {
@@ -322,6 +353,9 @@ export type NewProject = InferInsertModel<typeof projects>;
 
 export type Workspace = InferSelectModel<typeof workspaces>;
 export type NewWorkspace = InferInsertModel<typeof workspaces>;
+
+export type WorkspacePullRequest = InferSelectModel<typeof workspacePullRequests>;
+export type NewWorkspacePullRequest = InferInsertModel<typeof workspacePullRequests>;
 
 export type ScheduledJob = InferSelectModel<typeof scheduledJobs>;
 export type NewScheduledJob = InferInsertModel<typeof scheduledJobs>;

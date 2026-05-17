@@ -66,6 +66,8 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -110,6 +112,8 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -154,6 +158,8 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -175,6 +181,8 @@ describe("projectHelpers", () => {
     const initialState = {
       projects: [],
       workspaces: [],
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangesCountByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       selectedProjectId: "",
@@ -217,6 +225,7 @@ describe("projectHelpers", () => {
           branch: "main",
           sourceBranch: "main",
           localPath: "/tmp/repo-1",
+          latestPullRequest: null,
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z",
         },

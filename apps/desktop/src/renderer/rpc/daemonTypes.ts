@@ -65,6 +65,42 @@ export type ProcedureSubscriptionOptions = {
 export type DaemonWorkspace = {
   id: string;
   path: string;
+  pullRequest?: DaemonWorkspacePullRequest;
+};
+
+export type DaemonWorkspacePullRequest = {
+  number: number;
+  title?: string;
+  url?: string;
+  branch?: string;
+  baseBranch?: string;
+  githubState?: string;
+  status?: string;
+  reviewDecision?: string;
+  isDraft?: boolean;
+  complete?: boolean;
+  updatedAt?: string;
+  checks?: DaemonWorkspacePullRequestCheck[];
+  deployments?: DaemonWorkspacePullRequestDeployment[];
+};
+
+export type DaemonWorkspacePullRequestCheck = {
+  name: string;
+  workflow?: string;
+  state: string;
+  description?: string;
+  url?: string;
+};
+
+export type DaemonWorkspacePullRequestDeployment = {
+  id: number;
+  environment?: string;
+  state?: string;
+  description?: string;
+  environmentUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  originalPayload?: string;
 };
 
 export type WorkspaceCreateInput = {
@@ -78,6 +114,15 @@ export type WorkspaceCreateInput = {
   targetBranch?: string;
   contextEnabled?: boolean;
   setupHook?: string;
+};
+
+export type WorkspaceOpenInput = {
+  workspaceId: string;
+  workspaceWorktreePath: string;
+  orgId?: string;
+  projectId?: string;
+  /** When true the daemon skips PR polling — the latest PR is already merged. */
+  prAlreadyMerged?: boolean;
 };
 
 export type PersistAuthTokensInput = {

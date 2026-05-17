@@ -85,6 +85,7 @@ export class DaemonClient {
 
   readonly workspace = {
     list: this.listWorkspaces.bind(this),
+    open: this.openWorkspace.bind(this),
     createWorkspace: this.createWorkspace.bind(this),
     close: this.closeWorkspace.bind(this),
     syncContextLink: this.syncContextLink.bind(this),
@@ -477,10 +478,41 @@ export class DaemonClient {
       workspaces.push({
         id,
         path: normalizeWorktreePath(path),
+        pullRequest: readDaemonWorkspacePullRequest(record.pullRequest),
       });
     }
 
     return workspaces;
+  }
+
+  private async openWorkspace(input: Rpc.WorkspaceOpenInput): Promise<Rpc.DaemonWorkspace> {
+    const workspaceId = input.workspaceId.trim();
+    const workspaceWorktreePath = normalizeWorktreePath(input.workspaceWorktreePath);
+    if (!workspaceId || !workspaceWorktreePath) {
+      throw new Error("workspaceId and workspaceWorktreePath are required");
+    }
+
+    const record = asRecord(
+      await this.invoke("open", {
+        id: workspaceId,
+        path: workspaceWorktreePath,
+        ...(input.orgId ? { orgId: input.orgId } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+        ...(input.prAlreadyMerged ? { prAlreadyMerged: true } : {}),
+      }),
+    );
+    if (!record) {
+      throw new Error("daemon workspace open returned invalid response");
+    }
+
+    const id = readOptionalString(record.id) || workspaceId;
+    const path = normalizeWorktreePath(readOptionalString(record.path) || workspaceWorktreePath);
+    this.workspaceIdByWorktreePath.set(path, id);
+    return {
+      id,
+      path,
+      pullRequest: readDaemonWorkspacePullRequest(record.pullRequest),
+    };
   }
 
   private async ensureWorkspaceIdByWorktreePath(worktreePath: string, preferredWorkspaceId?: string): Promise<string> {
@@ -1184,4 +1216,72 @@ export class DaemonClient {
     this.socket?.close();
     this.socket = null;
   }
+}
+
+function readDaemonWorkspacePullRequest(value: unknown): Rpc.DaemonWorkspacePullRequest | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const numberValue = typeof record.number === "number" ? record.number : null;
+  if (!numberValue || !Number.isFinite(numberValue)) {
+    return undefined;
+  }
+
+  return {
+    number: numberValue,
+    title: readOptionalString(record.title),
+    url: readOptionalString(record.url),
+    branch: readOptionalString(record.branch),
+    baseBranch: readOptionalString(record.baseBranch),
+    githubState: readOptionalString(record.githubState),
+    status: readOptionalString(record.status),
+    reviewDecision: readOptionalString(record.reviewDecision),
+    isDraft: readOptionalBoolean(record.isDraft) ?? undefined,
+    complete: readOptionalBoolean(record.complete) ?? undefined,
+    updatedAt: readOptionalString(record.updatedAt),
+    checks: Array.isArray(record.checks)
+      ? record.checks.map((item) => readDaemonWorkspacePullRequestCheck(item)).filter((item) => item !== undefined)
+      : undefined,
+    deployments: Array.isArray(record.deployments)
+      ? record.deployments.map((item) => readDaemonWorkspacePullRequestDeployment(item)).filter((item) => item !== undefined)
+      : undefined,
+  };
+}
+
+function readDaemonWorkspacePullRequestCheck(value: unknown): Rpc.DaemonWorkspacePullRequestCheck | undefined {
+  const record = asRecord(value);
+  const name = readOptionalString(record?.name);
+  const state = readOptionalString(record?.state);
+  if (!record || !name || !state) {
+    return undefined;
+  }
+
+  return {
+    name,
+    workflow: readOptionalString(record.workflow),
+    state,
+    description: readOptionalString(record.description),
+    url: readOptionalString(record.url),
+  };
+}
+
+function readDaemonWorkspacePullRequestDeployment(value: unknown): Rpc.DaemonWorkspacePullRequestDeployment | undefined {
+  const record = asRecord(value);
+  const id = typeof record?.id === "number" ? record.id : null;
+  if (!record || !id || !Number.isFinite(id)) {
+    return undefined;
+  }
+
+  return {
+    id,
+    environment: readOptionalString(record.environment),
+    state: readOptionalString(record.state),
+    description: readOptionalString(record.description),
+    environmentUrl: readOptionalString(record.environmentUrl),
+    createdAt: readOptionalString(record.createdAt),
+    updatedAt: readOptionalString(record.updatedAt),
+    originalPayload: readOptionalString(record.originalPayload),
+  };
 }

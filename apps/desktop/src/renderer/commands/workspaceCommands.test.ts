@@ -27,6 +27,7 @@ import {
 const rpcMocks = vi.hoisted(() => ({
   createWorkspace: vi.fn(),
   list: vi.fn(),
+  openWorkspace: vi.fn(),
   closeWorkspace: vi.fn(),
   listGitChanges: vi.fn(),
   getBranchDiffSummary: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock("../rpc/rpcTransport", () => ({
     workspace: {
       createWorkspace: rpcMocks.createWorkspace,
       list: rpcMocks.list,
+      open: rpcMocks.openWorkspace,
       close: rpcMocks.closeWorkspace,
     },
   })),
@@ -155,6 +157,36 @@ describe("workspaceCommands", () => {
       expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(2);
     }, { timeout: 3_500 });
     expect(rpcMocks.enqueueWorkspaceLifecycleWarnings).not.toHaveBeenCalled();
+  });
+
+  it("opens visible workspaces in daemon when display repo ids change", async () => {
+    workspaceStore.setState({
+      workspaces: [
+        {
+          id: "workspace-1",
+          repoId: "repo-1",
+          projectId: "repo-1",
+          name: "Workspace 1",
+          title: "Workspace 1",
+          sourceBranch: "main",
+          branch: "feature-a",
+          summaryId: "summary-1",
+          worktreePath: "/tmp/workspaces/workspace-1",
+        },
+      ],
+    });
+    rpcMocks.list.mockResolvedValueOnce([]);
+
+    setDisplayRepoIds(["repo-1"]);
+    await vi.waitFor(() => {
+      expect(rpcMocks.openWorkspace).toHaveBeenCalledWith({
+        workspaceId: "workspace-1",
+        workspaceWorktreePath: "/tmp/workspaces/workspace-1",
+        orgId: undefined,
+        projectId: "repo-1",
+        prAlreadyMerged: false,
+      });
+    });
   });
 
   it("shows system notification when create returns lifecycle script warning", async () => {

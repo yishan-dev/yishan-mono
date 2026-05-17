@@ -9,6 +9,7 @@ const FRONTEND_MESSAGE_KEYS = [
   "gitChanged",
   "workspaceFilesChanged",
   "workspaceCreateProgress",
+  "workspacePullRequestUpdated",
   "openBrowserUrl",
 ] as const satisfies readonly RpcFrontendMessageKey[];
 
@@ -21,6 +22,7 @@ export type BackendEventName =
   | "git.changed"
   | "workspace.files.changed"
   | "workspace.create.progress"
+  | "workspace.pull_request.updated"
   | "open.browser.url";
 
 export type NormalizedBackendEvent =
@@ -55,6 +57,11 @@ export type NormalizedBackendEvent =
       payload: RpcFrontendMessagePayload<"workspaceCreateProgress">;
     }
   | {
+      source: "workspacePullRequestUpdated";
+      name: "workspace.pull_request.updated";
+      payload: RpcFrontendMessagePayload<"workspacePullRequestUpdated">;
+    }
+  | {
       source: "openBrowserUrl";
       name: "open.browser.url";
       payload: RpcFrontendMessagePayload<"openBrowserUrl">;
@@ -70,6 +77,7 @@ export const BACKEND_EVENT_NAME_BY_SOURCE = {
   gitChanged: "git.changed",
   workspaceFilesChanged: "workspace.files.changed",
   workspaceCreateProgress: "workspace.create.progress",
+  workspacePullRequestUpdated: "workspace.pull_request.updated",
   openBrowserUrl: "open.browser.url",
 } as const satisfies Record<RpcFrontendMessageKey, BackendEventName>;
 
@@ -283,6 +291,18 @@ export function normalizeBackendEvent(envelope: DesktopRpcEventEnvelope): Normal
       source: "workspaceCreateProgress",
       name: BACKEND_EVENT_NAME_BY_SOURCE.workspaceCreateProgress,
       payload: payload as RpcFrontendMessagePayload<"workspaceCreateProgress">,
+    };
+  }
+
+  if (envelope.method === "workspacePullRequestUpdated") {
+    if (typeof payload.workspaceId !== "string" || typeof payload.workspaceWorktreePath !== "string") {
+      return null;
+    }
+
+    return {
+      source: "workspacePullRequestUpdated",
+      name: BACKEND_EVENT_NAME_BY_SOURCE.workspacePullRequestUpdated,
+      payload: payload as RpcFrontendMessagePayload<"workspacePullRequestUpdated">,
     };
   }
 

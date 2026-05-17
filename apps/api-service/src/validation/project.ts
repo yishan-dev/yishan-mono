@@ -65,6 +65,24 @@ export const closeWorkspaceBodySchema = z.object({
   localPath: nonEmptyStringSchema,
 });
 
+export const workspacePullRequestParamsSchema = z.object({
+  orgId: nonEmptyStringSchema,
+  projectId: nonEmptyStringSchema,
+  workspaceId: nonEmptyStringSchema,
+});
+
+export const upsertWorkspacePullRequestBodySchema = z.object({
+  prId: nonEmptyStringSchema,
+  title: z.string().optional(),
+  url: z.string().optional(),
+  branch: z.string().optional(),
+  baseBranch: z.string().optional(),
+  state: z.enum(["open", "closed", "merged"]),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  detectedAt: z.string().datetime(),
+  resolvedAt: z.string().datetime().optional(),
+});
+
 export type OrganizationProjectParamsInput = z.infer<typeof organizationProjectParamsSchema>;
 export type OrganizationProjectListQueryInput = z.infer<typeof organizationProjectListQuerySchema>;
 export type ProjectWorkspaceParamsInput = z.infer<typeof projectWorkspaceParamsSchema>;
@@ -73,3 +91,5 @@ export type UpdateProjectBodyInput = z.infer<typeof updateProjectBodySchema>;
 export type ProjectIdentityParamsInput = z.infer<typeof projectIdentityParamsSchema>;
 export type CreateWorkspaceBodyInput = z.infer<typeof createWorkspaceBodySchema>;
 export type CloseWorkspaceBodyInput = z.infer<typeof closeWorkspaceBodySchema>;
+export type WorkspacePullRequestParamsInput = z.infer<typeof workspacePullRequestParamsSchema>;
+export type UpsertWorkspacePullRequestBodyInput = z.infer<typeof upsertWorkspacePullRequestBodySchema>;

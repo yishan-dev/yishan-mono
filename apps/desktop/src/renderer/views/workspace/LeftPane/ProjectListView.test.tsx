@@ -44,6 +44,8 @@ const mocked = vi.hoisted(() => {
       selectedWorkspaceId: string;
       displayProjectIds: string[];
       lastUsedExternalAppId?: string;
+      pullRequestByWorkspaceId: Record<string, unknown>;
+      latestPullRequestByWorkspaceId: Record<string, unknown>;
       gitChangeTotalsByWorkspaceId: Record<string, { additions: number; deletions: number }>;
       setSelectedRepoId: (repoId: string) => void;
       setSelectedWorkspaceId: (workspaceId: string) => void;
@@ -64,6 +66,8 @@ const mocked = vi.hoisted(() => {
       selectedWorkspaceId: "",
       displayProjectIds: [],
       lastUsedExternalAppId: undefined,
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {},
       setSelectedRepoId,
       setSelectedWorkspaceId,
@@ -235,9 +239,11 @@ function renderRepoList(
     ],
     selectedProjectId: "repo-1",
     selectedWorkspaceId,
-    displayProjectIds: ["repo-1"],
-    lastUsedExternalAppId,
-    gitChangeTotalsByWorkspaceId: {
+      displayProjectIds: ["repo-1"],
+      lastUsedExternalAppId,
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
+      gitChangeTotalsByWorkspaceId: {
       "workspace-1": { additions: 12, deletions: 4 },
     },
     setSelectedRepoId: mocked.setSelectedRepoId,
@@ -385,6 +391,8 @@ describe("ProjectListView", () => {
       selectedWorkspaceId: "workspace-local-1",
       displayProjectIds: ["repo-1"],
       lastUsedExternalAppId: undefined,
+      pullRequestByWorkspaceId: {},
+      latestPullRequestByWorkspaceId: {},
       gitChangeTotalsByWorkspaceId: {
         "workspace-local-1": { additions: 2, deletions: 1 },
       },
@@ -723,6 +731,29 @@ describe("ProjectListView", () => {
     vi.useRealTimers();
   });
 
+  it("shows pull request info in workspace popover when one exists", async () => {
+    vi.useFakeTimers();
+    const view = renderRepoList();
+    mocked.stateRef.current.pullRequestByWorkspaceId = {
+      "workspace-1": {
+        number: 42,
+        title: "Add PR tracking",
+        status: "review",
+      },
+    };
+    view.rerender(<ProjectListView />);
+
+    fireEvent.mouseEnter(screen.getByTestId("workspace-row-workspace-1"));
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    const infoPopper = screen.getByTestId("workspace-info-popper");
+    expect(infoPopper.textContent).toContain("workspace.pr.tab");
+    expect(infoPopper.textContent).toContain("#42 Add PR tracking");
+    vi.useRealTimers();
+  });
+
   it("keeps workspace info popover open when cursor moves into it", async () => {
     vi.useFakeTimers();
     renderRepoList();
@@ -788,6 +819,7 @@ describe("ProjectListView", () => {
       selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
       displayProjectIds: ["repo-1"],
+      pullRequestByWorkspaceId: {},
     };
     renderProjectListView();
 
@@ -833,6 +865,7 @@ describe("ProjectListView", () => {
       selectedProjectId: "repo-1",
       selectedWorkspaceId: "workspace-1",
       displayProjectIds: ["repo-1"],
+      pullRequestByWorkspaceId: {},
     };
     renderProjectListView();
 

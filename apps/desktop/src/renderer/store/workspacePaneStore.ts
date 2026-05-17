@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
-export type WorkspaceRightPaneTab = "files" | "changes";
+export type WorkspaceRightPaneTab = "files" | "changes" | "pr";
 
 type WorkspacePaneStoreState = {
   rightPaneTab: WorkspaceRightPaneTab;
