@@ -56,12 +56,14 @@ export class NodeService {
     private readonly config: ServiceConfig,
   ) {}
 
-  private async getConnectedNodeIds(): Promise<Set<string>> {
+  private async getConnectedNodeSessions(): Promise<Map<string, string>> {
     const relayUrl = this.config.relayUrl?.trim();
     const relayApiToken = this.config.relayApiToken?.trim();
 
+    const result = new Map<string, string>();
+
     if (!relayUrl || !relayApiToken) {
-      return new Set();
+      return result;
     }
 
     try {
@@ -72,17 +74,40 @@ export class NodeService {
       });
 
       if (!response.ok) {
-        return new Set();
+        return result;
       }
 
-      const body = (await response.json()) as { connectedNodes?: unknown };
-      if (!Array.isArray(body.connectedNodes)) {
-        return new Set();
+      const body = (await response.json()) as { connectedSessions?: unknown; connectedNodes?: unknown };
+
+      // Prefer the richer connectedSessions view when available.
+      if (Array.isArray(body.connectedSessions)) {
+        for (const s of body.connectedSessions) {
+          if (s && typeof s === "object" && typeof (s as any).nodeId === "string") {
+            const nodeId = (s as any).nodeId as string;
+            const daemonVersion = typeof (s as any).daemonVersion === "string" ? ((s as any).daemonVersion as string) : "";
+            if (daemonVersion) {
+              result.set(nodeId, daemonVersion);
+            } else {
+              // Mark as online with empty version so callers can still detect online state.
+              result.set(nodeId, "");
+            }
+          }
+        }
+        return result;
       }
 
-      return new Set(body.connectedNodes.filter((value): value is string => typeof value === "string"));
+      // Fallback: older relay metrics only provided connectedNodes (ids)
+      if (Array.isArray(body.connectedNodes)) {
+        for (const val of body.connectedNodes) {
+          if (typeof val === "string") {
+            result.set(val, "");
+          }
+        }
+      }
+
+      return result;
     } catch {
-      return new Set();
+      return result;
     }
   }
 
@@ -179,15 +204,27 @@ export class NodeService {
         ),
       );
 
-    const connectedNodeIds = await this.getConnectedNodeIds();
+    const connectedNodeDaemonVersions = await this.getConnectedNodeSessions();
 
-    return rows.map((row) => ({
-      ...row,
-      canUse: row.scope === "shared" || row.ownerUserId === input.actorUserId,
-      metadata: this.normalizeMetadata(row.metadata),
-      scope: row.scope,
-      isOnline: connectedNodeIds.has(row.id),
-    }));
+    return rows.map((row) => {
+      const isOnline = connectedNodeDaemonVersions.has(row.id);
+      const liveDaemonVersion = isOnline ? (connectedNodeDaemonVersions.get(row.id) ?? "") : "";
+      const baseMetadata = this.normalizeMetadata(row.metadata) ?? {};
+
+      // For online nodes, prefer the live daemon version reported by the relay session
+      // over the potentially stale version stored in the DB metadata.
+      if (isOnline && liveDaemonVersion) {
+        baseMetadata["version"] = liveDaemonVersion;
+      }
+
+      return {
+        ...row,
+        canUse: row.scope === "shared" || row.ownerUserId === input.actorUserId,
+        scope: row.scope,
+        isOnline,
+        metadata: Object.keys(baseMetadata).length === 0 ? null : baseMetadata,
+      };
+    });
   }
 
   async registerNode(input: RegisterNodeInput): Promise<NodeView> {
