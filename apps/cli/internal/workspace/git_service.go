@@ -475,6 +475,13 @@ func (s *GitService) BranchPullRequestLite(ctx context.Context, root string, bra
 	return s.branchPullRequest(ctx, root, branch, false, false)
 }
 
+// BranchPullRequestWithDetails returns the PR for the given branch including
+// checks and deployments. The PR list lookup respects the 30-second cache to
+// throttle gh CLI calls, but checks are always fetched fresh.
+func (s *GitService) BranchPullRequestWithDetails(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
+	return s.branchPullRequest(ctx, root, branch, false, true)
+}
+
 func (s *GitService) RefreshBranchPullRequest(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
 	return s.branchPullRequest(ctx, root, branch, true, true)
 }
@@ -542,7 +549,7 @@ func (s *GitService) branchPullRequest(ctx context.Context, root string, branch 
 	checks := []GitPullRequestCheck{}
 	deployments := []GitPullRequestDeployment{}
 	if includeDetails {
-		checks, err = getPullRequestChecks(ctx, root, pr.Number)
+		checks, err = getPullRequestChecks(ctx, root, pr.Number, pr.HeadRefOID)
 		if err != nil {
 			return GitBranchPullRequestStatus{}, err
 		}
@@ -573,7 +580,8 @@ func (s *GitService) branchPullRequest(ctx context.Context, root string, branch 
 	return status, nil
 }
 
-func getPullRequestChecks(ctx context.Context, root string, prNumber int) ([]GitPullRequestCheck, error) {
+func getPullRequestChecks(ctx context.Context, root string, prNumber int, headRefOID string) ([]GitPullRequestCheck, error) {
+	_ = headRefOID // reserved for future use
 	type ghCheck struct {
 		Name        string `json:"name"`
 		Workflow    string `json:"workflow"`

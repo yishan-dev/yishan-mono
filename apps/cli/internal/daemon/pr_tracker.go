@@ -25,6 +25,7 @@ type workspacePRTracker struct {
 	publish        func(frontendEvent)
 	branchResolver func(context.Context, string) (string, error)
 	prResolver     func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error)
+	detailResolver func(context.Context, string, string) (workspace.GitBranchPullRequestStatus, error)
 }
 
 func newWorkspacePRTracker(manager *workspace.Manager, publish func(frontendEvent)) *workspacePRTracker {
@@ -47,6 +48,13 @@ func newWorkspacePRTracker(manager *workspace.Manager, publish func(frontendEven
 			return workspace.GitBranchPullRequestStatus{}, workspace.NewRPCError(-32004, "workspace not found")
 		}
 		return manager.GitBranchPullRequestLite(ctx, ws.ID, branch)
+	}
+	tracker.detailResolver = func(ctx context.Context, root string, branch string) (workspace.GitBranchPullRequestStatus, error) {
+		ws, ok := manager.FindWorkspaceByPath(root)
+		if !ok {
+			return workspace.GitBranchPullRequestStatus{}, workspace.NewRPCError(-32004, "workspace not found")
+		}
+		return manager.GitBranchPullRequestWithDetails(ctx, ws.ID, branch)
 	}
 	return tracker
 }
@@ -182,7 +190,7 @@ func (t *workspacePRTracker) refreshWorkspace(ws workspace.Workspace) error {
 		return nil
 	}
 
-	pr, err := t.prResolver(ctx, ws.Path, branch)
+	pr, err := t.detailResolver(ctx, ws.Path, branch)
 	if err != nil {
 		log.Warn().Err(err).Str("workspaceId", ws.ID).Str("path", ws.Path).Str("branch", branch).Msg("workspace PR refresh failed to resolve pull request")
 		return err
@@ -249,12 +257,31 @@ func (t *workspacePRTracker) setWorkspacePullRequest(workspaceID string, pr *wor
 		delete(t.active, workspaceID)
 	}
 
-	// Persist snapshot to api-service whenever PR state changes to a notable state.
-	// - merged/closed: always persist (terminal or cancelled states)
-	// - open/draft/review: persist so the api-service latestPullRequest stays current
-	if pr != nil {
+	// Persist to api-service only when meaningful PR fields changed (excluding
+	// UpdatedAt which is set on every refresh and would always differ).
+	if pr != nil && previousErr == nil && prMeaningfullyChanged(previousPullRequest, pr) {
 		go t.persistPullRequest(workspaceID, pr)
 	}
+}
+
+// prMeaningfullyChanged returns true when the PR fields that matter for
+// persistence have changed, ignoring UpdatedAt which is always refreshed.
+func prMeaningfullyChanged(prev, next *workspace.WorkspacePullRequest) bool {
+	if prev == nil {
+		return true
+	}
+	return prev.Number != next.Number ||
+		prev.Title != next.Title ||
+		prev.URL != next.URL ||
+		prev.Branch != next.Branch ||
+		prev.BaseBranch != next.BaseBranch ||
+		prev.GitHubState != next.GitHubState ||
+		prev.Status != next.Status ||
+		prev.ReviewDecision != next.ReviewDecision ||
+		prev.IsDraft != next.IsDraft ||
+		prev.Complete != next.Complete ||
+		!reflect.DeepEqual(prev.Checks, next.Checks) ||
+		!reflect.DeepEqual(prev.Deployments, next.Deployments)
 }
 
 func normalizeWorkspacePullRequestStatus(pr workspace.GitBranchPullRequestStatus) string {

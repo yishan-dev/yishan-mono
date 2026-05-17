@@ -381,6 +381,14 @@ func (m *Manager) GitBranchPullRequestLite(ctx context.Context, workspaceID stri
 	return m.gits.BranchPullRequestLite(ctx, ws.Path, branch)
 }
 
+func (m *Manager) GitBranchPullRequestWithDetails(ctx context.Context, workspaceID string, branch string) (GitBranchPullRequestStatus, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+	return m.gits.BranchPullRequestWithDetails(ctx, ws.Path, branch)
+}
+
 func (m *Manager) GitCurrentBranch(ctx context.Context, workspaceID string) (string, error) {
 	ws, err := m.getWorkspace(workspaceID)
 	if err != nil {

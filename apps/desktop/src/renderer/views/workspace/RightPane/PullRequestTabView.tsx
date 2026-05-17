@@ -1,10 +1,10 @@
 import { Box, Chip, Divider, LinearProgress, Link, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { LuArrowRight, LuGitBranch } from "react-icons/lu";
+import { LuArrowRight, LuCheck, LuCircleDashed, LuGitBranch, LuX } from "react-icons/lu";
 import { openLink } from "../../../commands/appCommands";
 import type { WorkspacePullRequestRecord } from "../../../api/types";
 import type { DaemonWorkspacePullRequest } from "../../../rpc/daemonTypes";
-import { PullRequestIcon, pullRequestStateColor } from "../../../components/PullRequestIcon";
+import { PullRequestIcon } from "../../../components/PullRequestIcon";
 import { useWorkspacePullRequestState } from "./useWorkspacePullRequestState";
 
 function livePrStatus(pr: DaemonWorkspacePullRequest): string {
@@ -13,6 +13,18 @@ function livePrStatus(pr: DaemonWorkspacePullRequest): string {
   if (pr.isDraft || s === "draft") return "draft";
   if (s === "closed") return "closed";
   return "open";
+}
+
+function CheckStateIcon({ state }: { state: string }) {
+  const s = state.toUpperCase();
+  if (s === "SUCCESS") {
+    return <LuCheck size={14} color="#16a34a" />;
+  }
+  if (s === "FAILURE" || s === "TIMED_OUT" || s === "CANCELLED" || s === "ACTION_REQUIRED") {
+    return <LuX size={14} color="#dc2626" />;
+  }
+  // PENDING, QUEUED, IN_PROGRESS, STALE, NEUTRAL, SKIPPED, EXPECTED
+  return <LuCircleDashed size={14} color="#71717a" />;
 }
 
 function BranchBadge({ name }: { name: string }) {
@@ -156,83 +168,85 @@ export function PullRequestTabView({ active = true }: { active?: boolean }) {
               ) : null}
             </Stack>
 
-            <Divider />
-
-            <Stack spacing={1}>
-              <Typography variant="subtitle2">{t("workspace.pr.checks")}</Typography>
-              {checks.length === 0 ? (
-                <Typography variant="body2" sx={{ color: "#999" }}>
-                  {t("workspace.pr.noChecks")}
-                </Typography>
-              ) : (
-                checks.map((check) => (
+            {checks.length > 0 ? (
+              <Stack spacing={1}>
+                <Typography variant="subtitle2">{t("workspace.pr.checks")}</Typography>
+                {                checks.map((check) => (
                   <Stack key={`${check.workflow ?? ""}:${check.name}`} direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={check.state} variant="outlined" />
+                    <Box sx={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+                      <CheckStateIcon state={check.state} />
+                    </Box>
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" noWrap>
-                        {check.workflow ? `${check.workflow} / ${check.name}` : check.name}
-                      </Typography>
+                      {check.url ? (
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          variant="body2"
+                          onClick={() => void openLink({ url: check.url ?? "" })}
+                          sx={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            color: "text.primary",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {check.workflow ? `${check.workflow} / ${check.name}` : check.name}
+                        </Link>
+                      ) : (
+                        <Typography variant="body2" noWrap>
+                          {check.workflow ? `${check.workflow} / ${check.name}` : check.name}
+                        </Typography>
+                      )}
                       {check.description ? (
                         <Typography variant="caption" color="text.secondary" noWrap>
                           {check.description}
                         </Typography>
                       ) : null}
                     </Box>
-                    {check.url ? (
-                      <Link
-                        component="button"
-                        type="button"
-                        underline="hover"
-                        variant="caption"
-                        onClick={() => void openLink({ url: check.url ?? "" })}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        {t("workspace.pr.open")}
-                      </Link>
-                    ) : null}
                   </Stack>
-                ))
-              )}
-            </Stack>
+                ))}
+              </Stack>
+            ) : null}
 
-            <Divider />
-
-            <Stack spacing={1}>
-              <Typography variant="subtitle2">{t("workspace.pr.deployments")}</Typography>
-              {deployments.length === 0 ? (
-                <Typography variant="body2" sx={{ color: "#999" }}>
-                  {t("workspace.pr.noDeployments")}
-                </Typography>
-              ) : (
-                deployments.map((deployment) => (
-                  <Stack key={deployment.id} direction="row" spacing={1} alignItems="center">
-                    <Chip size="small" label={deployment.state || t("workspace.info.unavailable")} variant="outlined" />
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" noWrap>
-                        {deployment.environment || t("workspace.info.unavailable")}
-                      </Typography>
-                      {deployment.description ? (
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {deployment.description}
+            {deployments.length > 0 ? (
+              <>
+                <Divider />
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2">{t("workspace.pr.deployments")}</Typography>
+                  {deployments.map((deployment) => (
+                    <Stack key={deployment.id} direction="row" spacing={1} alignItems="center">
+                      <Chip size="small" label={deployment.state || t("workspace.info.unavailable")} variant="outlined" />
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" noWrap>
+                          {deployment.environment || t("workspace.info.unavailable")}
                         </Typography>
+                        {deployment.description ? (
+                          <Typography variant="caption" color="text.secondary" noWrap>
+                            {deployment.description}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                      {deployment.environmentUrl ? (
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          variant="caption"
+                          onClick={() => void openLink({ url: deployment.environmentUrl ?? "" })}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          {t("workspace.pr.open")}
+                        </Link>
                       ) : null}
-                    </Box>
-                    {deployment.environmentUrl ? (
-                      <Link
-                        component="button"
-                        type="button"
-                        underline="hover"
-                        variant="caption"
-                        onClick={() => void openLink({ url: deployment.environmentUrl ?? "" })}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        {t("workspace.pr.open")}
-                      </Link>
-                    ) : null}
-                  </Stack>
-                ))
-              )}
-            </Stack>
+                    </Stack>
+                  ))}
+                </Stack>
+              </>
+            ) : null}
           </>
         ) : null}
 
