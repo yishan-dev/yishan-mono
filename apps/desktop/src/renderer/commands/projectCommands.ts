@@ -6,6 +6,7 @@ import { getDaemonClient } from "../rpc/rpcTransport";
 import { sessionStore } from "../store/sessionStore";
 import { tabStore } from "../store/tabStore";
 import { workspaceStore } from "../store/workspaceStore";
+import { ensureVisibleWorkspacesOpen } from "./daemonWorkspaceSync";
 import { syncTabStoreWithWorkspace } from "./workspaceTabSync";
 
 async function inspectLocalRepository(path: string): Promise<{
@@ -93,6 +94,7 @@ export async function loadWorkspaceFromBackend(): Promise<void> {
     }
 
     workspaceStore.getState().load(selectedOrganization.id, projects, workspaces);
+    await ensureVisibleWorkspacesOpen();
     syncTabStoreWithWorkspace(previousWorkspaces);
   } catch (error) {
     console.error("Failed to load workspace snapshot", error);

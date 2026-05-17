@@ -35,6 +35,8 @@ vi.mock("../api", () => ({
 
 const rpcMocks = vi.hoisted(() => ({
   gitInspect: vi.fn(),
+  workspaceList: vi.fn(async () => []),
+  workspaceOpen: vi.fn(),
   workspaceSyncContextLink: vi.fn(async () => ({ updated: [], skipped: [], errors: {} })),
 }));
 
@@ -44,6 +46,8 @@ vi.mock("../rpc/rpcTransport", () => ({
       inspect: rpcMocks.gitInspect,
     },
     workspace: {
+      list: rpcMocks.workspaceList,
+      open: rpcMocks.workspaceOpen,
       syncContextLink: rpcMocks.workspaceSyncContextLink,
     },
   })),
@@ -111,6 +115,54 @@ describe("projectCommands", () => {
     expect(hydrate.mock.calls[0]?.[2]).toEqual([]);
     expect(retainWorkspaceTabs).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkspaceId).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens visible hydrated workspaces in daemon", async () => {
+    sessionStore.setState({
+      organizations: [{ id: "org-1", name: "Org 1" }],
+      selectedOrganizationId: "org-1",
+      loaded: true,
+    });
+    workspaceStore.setState({
+      displayProjectIds: ["project-1"],
+    });
+    apiMocks.listProjects.mockResolvedValueOnce([
+      {
+        id: "project-1",
+        name: "Project 1",
+        sourceType: "git",
+        repoProvider: "github",
+        repoUrl: "https://github.com/test/project-1.git",
+        repoKey: "project-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        createdByUserId: "user-1",
+        workspaces: [
+          {
+            id: "workspace-1",
+            organizationId: "org-1",
+            projectId: "project-1",
+            userId: "user-1",
+            nodeId: "node-1",
+            kind: "worktree",
+            status: "active",
+            branch: "feature-a",
+            sourceBranch: "main",
+            localPath: "/tmp/workspaces/project-1/feature-a",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ]);
+
+    await loadWorkspaceFromBackend();
+
+    expect(rpcMocks.workspaceList).toHaveBeenCalledTimes(1);
+    expect(rpcMocks.workspaceOpen).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      workspaceWorktreePath: "/tmp/workspaces/project-1/feature-a",
+    });
   });
 
   it("creates backend project and then appends store state", async () => {

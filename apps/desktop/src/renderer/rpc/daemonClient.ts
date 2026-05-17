@@ -85,6 +85,7 @@ export class DaemonClient {
 
   readonly workspace = {
     list: this.listWorkspaces.bind(this),
+    open: this.openWorkspace.bind(this),
     createWorkspace: this.createWorkspace.bind(this),
     close: this.closeWorkspace.bind(this),
     syncContextLink: this.syncContextLink.bind(this),
@@ -477,10 +478,38 @@ export class DaemonClient {
       workspaces.push({
         id,
         path: normalizeWorktreePath(path),
+        pullRequest: readDaemonWorkspacePullRequest(record.pullRequest),
       });
     }
 
     return workspaces;
+  }
+
+  private async openWorkspace(input: Rpc.WorkspaceOpenInput): Promise<Rpc.DaemonWorkspace> {
+    const workspaceId = input.workspaceId.trim();
+    const workspaceWorktreePath = normalizeWorktreePath(input.workspaceWorktreePath);
+    if (!workspaceId || !workspaceWorktreePath) {
+      throw new Error("workspaceId and workspaceWorktreePath are required");
+    }
+
+    const record = asRecord(
+      await this.invoke("open", {
+        id: workspaceId,
+        path: workspaceWorktreePath,
+      }),
+    );
+    if (!record) {
+      throw new Error("daemon workspace open returned invalid response");
+    }
+
+    const id = readOptionalString(record.id) || workspaceId;
+    const path = normalizeWorktreePath(readOptionalString(record.path) || workspaceWorktreePath);
+    this.workspaceIdByWorktreePath.set(path, id);
+    return {
+      id,
+      path,
+      pullRequest: readDaemonWorkspacePullRequest(record.pullRequest),
+    };
   }
 
   private async ensureWorkspaceIdByWorktreePath(worktreePath: string, preferredWorkspaceId?: string): Promise<string> {
@@ -1184,4 +1213,30 @@ export class DaemonClient {
     this.socket?.close();
     this.socket = null;
   }
+}
+
+function readDaemonWorkspacePullRequest(value: unknown): Rpc.DaemonWorkspacePullRequest | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const numberValue = typeof record.number === "number" ? record.number : null;
+  if (!numberValue || !Number.isFinite(numberValue)) {
+    return undefined;
+  }
+
+  return {
+    number: numberValue,
+    title: readOptionalString(record.title),
+    url: readOptionalString(record.url),
+    branch: readOptionalString(record.branch),
+    baseBranch: readOptionalString(record.baseBranch),
+    githubState: readOptionalString(record.githubState),
+    status: readOptionalString(record.status),
+    reviewDecision: readOptionalString(record.reviewDecision),
+    isDraft: readOptionalBoolean(record.isDraft) ?? undefined,
+    complete: readOptionalBoolean(record.complete) ?? undefined,
+    updatedAt: readOptionalString(record.updatedAt),
+  };
 }

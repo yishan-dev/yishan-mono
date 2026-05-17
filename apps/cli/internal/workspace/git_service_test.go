@@ -186,7 +186,7 @@ func TestGitServiceBranchPullRequest(t *testing.T) {
 	ghBinPath := filepath.Join(ghBinDir, "gh")
 	ghScript := "#!/bin/sh\n" +
 		"if [ \"$1\" = \"pr\" ] && [ \"$2\" = \"list\" ]; then\n" +
-		"  printf '[{\"number\":123,\"title\":\"Test PR\",\"url\":\"https://github.com/acme/repo/pull/123\",\"state\":\"OPEN\",\"isDraft\":false,\"headRefName\":\"feature/alpha\",\"baseRefName\":\"main\",\"headRefOid\":\"abc123\"}]'\n" +
+		"  printf '[{\"number\":123,\"title\":\"Test PR\",\"url\":\"https://github.com/acme/repo/pull/123\",\"state\":\"OPEN\",\"reviewDecision\":\"REVIEW_REQUIRED\",\"isDraft\":false,\"mergedAt\":null,\"headRefName\":\"feature/alpha\",\"baseRefName\":\"main\",\"headRefOid\":\"abc123\"}]'\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		"if [ \"$1\" = \"pr\" ] && [ \"$2\" = \"checks\" ]; then\n" +
@@ -222,6 +222,9 @@ func TestGitServiceBranchPullRequest(t *testing.T) {
 	}
 	if status.URL != "https://github.com/acme/repo/pull/123" {
 		t.Fatalf("unexpected PR URL: %q", status.URL)
+	}
+	if status.ReviewDecision != "REVIEW_REQUIRED" {
+		t.Fatalf("unexpected review decision: %q", status.ReviewDecision)
 	}
 	if len(status.Checks) != 1 || status.Checks[0].State != "SUCCESS" {
 		t.Fatalf("unexpected checks: %+v", status.Checks)

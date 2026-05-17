@@ -139,7 +139,7 @@ func TestWorktreeWatcher_DetectsGitChangesInResolvedDir(t *testing.T) {
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	subID, events := hub.Subscribe()
@@ -187,7 +187,7 @@ func TestWorktreeWatcher_DetectsGitChangesInStandardRepo(t *testing.T) {
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	subID, events := hub.Subscribe()
@@ -212,6 +212,43 @@ func TestWorktreeWatcher_DetectsGitChangesInStandardRepo(t *testing.T) {
 	}
 }
 
+func TestWorktreeWatcher_InvokesGitChangedCallback(t *testing.T) {
+	root := evalSymlinks(t, t.TempDir())
+	gitDir := filepath.Join(root, ".git")
+	if err := os.MkdirAll(gitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "index"), []byte("fake-index"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	callbackPaths := make(chan string, 1)
+	hub := newEventHub()
+	watchers := newWorkspaceWatchers(hub, func(worktreePath string) {
+		callbackPaths <- worktreePath
+	})
+	defer watchers.Close()
+
+	watchers.Watch(root)
+	time.Sleep(100 * time.Millisecond)
+
+	if err := os.WriteFile(filepath.Join(gitDir, "index"), []byte("updated-index"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case got := <-callbackPaths:
+		if got != root {
+			t.Fatalf("expected callback for %q, got %q", root, got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for git callback")
+	}
+}
+
 func TestWorktreeWatcher_DetectsFileChangesInWorktree(t *testing.T) {
 	root := evalSymlinks(t, t.TempDir())
 
@@ -222,7 +259,7 @@ func TestWorktreeWatcher_DetectsFileChangesInWorktree(t *testing.T) {
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	subID, events := hub.Subscribe()
@@ -258,7 +295,7 @@ func TestWorktreeWatcher_DetectsFileChangesInSubdirectory(t *testing.T) {
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	subID, events := hub.Subscribe()
@@ -307,7 +344,7 @@ func TestWorktreeWatcher_WatchesNewDirectoriesAndCleansDeletedDirectoryWatches(t
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	subID, events := hub.Subscribe()
@@ -373,7 +410,7 @@ func TestWorktreeWatcher_ExcludesCommonLargeDirectories(t *testing.T) {
 	}
 
 	hub := newEventHub()
-	watchers := newWorkspaceWatchers(hub)
+	watchers := newWorkspaceWatchers(hub, nil)
 	defer watchers.Close()
 
 	watchers.Watch(root)

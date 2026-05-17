@@ -1,6 +1,7 @@
 import { Box, Paper, Popper, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { LuGitBranch } from "react-icons/lu";
+import { LuGitBranch, LuGitPullRequest } from "react-icons/lu";
+import type { DaemonWorkspacePullRequest } from "../../../rpc/daemonTypes";
 import type { RepoWorkspaceItem } from "../../../store/types";
 
 type WorkspaceInfoPopperViewProps = {
@@ -10,6 +11,7 @@ type WorkspaceInfoPopperViewProps = {
   isPrimaryWorkspace: boolean;
   /** Live current branch read from the workspace path via the daemon. */
   currentBranch?: string;
+  pullRequest?: DaemonWorkspacePullRequest;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 };
@@ -21,6 +23,7 @@ export function WorkspaceInfoPopperView({
   workspace,
   isPrimaryWorkspace,
   currentBranch,
+  pullRequest,
   onMouseEnter,
   onMouseLeave,
 }: WorkspaceInfoPopperViewProps) {
@@ -31,6 +34,7 @@ export function WorkspaceInfoPopperView({
   const shouldShowSourceBranch = !isPrimaryWorkspace && Boolean(sourceBranch);
   const sourceBranchValue = sourceBranch || unavailableLabel;
   const showSourceBranch = shouldShowSourceBranch && sourceBranchValue !== displayBranch;
+  const pullRequestStatus = pullRequest?.status?.trim() || pullRequest?.githubState?.trim() || unavailableLabel;
 
   return (
     <Popper
@@ -88,6 +92,26 @@ export function WorkspaceInfoPopperView({
                   {t("workspace.info.sourceBranch")}:
                 </Box>{" "}
                 {sourceBranchValue}
+              </Typography>
+            </Stack>
+          ) : null}
+          {pullRequest ? (
+            <Stack spacing={0.5}>
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <LuGitPullRequest size={14} />
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                  <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.4, color: "success.main" }}>
+                    PR:
+                  </Box>{" "}
+                  #{pullRequest.number}
+                  {pullRequest.title ? ` ${pullRequest.title}` : ""}
+                </Typography>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, pl: 2.4 }}>
+                <Box component="span" sx={{ textTransform: "uppercase", letterSpacing: 0.4, color: "info.main" }}>
+                  Status:
+                </Box>{" "}
+                {pullRequestStatus}
               </Typography>
             </Stack>
           ) : null}

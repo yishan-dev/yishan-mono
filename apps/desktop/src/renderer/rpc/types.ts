@@ -23,7 +23,8 @@ export type DaemonRpcClient = {
     reloadAuthConfig: (input?: unknown) => Promise<Rpc.ReloadAuthConfigOutput>;
   };
   workspace: {
-    list: (input?: unknown) => Promise<unknown>;
+    list: (input?: unknown) => Promise<Rpc.DaemonWorkspace[]>;
+    open: (input: Rpc.WorkspaceOpenInput) => Promise<Rpc.DaemonWorkspace>;
     createWorkspace: (input: Rpc.WorkspaceCreateInput) => Promise<Rpc.WorkspaceCreateResponse>;
     close: (input: Rpc.WorkspaceCloseExecutionInput) => Promise<Rpc.WorkspaceCloseExecutionResponse | undefined>;
     syncContextLink: (input: Rpc.WorkspaceSyncContextLinkInput) => Promise<Rpc.WorkspaceSyncContextLinkResponse>;

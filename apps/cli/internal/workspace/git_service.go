@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,17 +44,19 @@ type GitBranchStatus struct {
 }
 
 type GitBranchPullRequestStatus struct {
-	Found       bool                       `json:"found"`
-	Branch      string                     `json:"branch"`
-	Number      int                        `json:"number,omitempty"`
-	Title       string                     `json:"title,omitempty"`
-	URL         string                     `json:"url,omitempty"`
-	State       string                     `json:"state,omitempty"`
-	IsDraft     bool                       `json:"isDraft,omitempty"`
-	HeadRefName string                     `json:"headRefName,omitempty"`
-	BaseRefName string                     `json:"baseRefName,omitempty"`
-	Checks      []GitPullRequestCheck      `json:"checks,omitempty"`
-	Deployments []GitPullRequestDeployment `json:"deployments,omitempty"`
+	Found          bool                       `json:"found"`
+	Branch         string                     `json:"branch"`
+	Number         int                        `json:"number,omitempty"`
+	Title          string                     `json:"title,omitempty"`
+	URL            string                     `json:"url,omitempty"`
+	State          string                     `json:"state,omitempty"`
+	ReviewDecision string                     `json:"reviewDecision,omitempty"`
+	IsDraft        bool                       `json:"isDraft,omitempty"`
+	MergedAt       string                     `json:"mergedAt,omitempty"`
+	HeadRefName    string                     `json:"headRefName,omitempty"`
+	BaseRefName    string                     `json:"baseRefName,omitempty"`
+	Checks         []GitPullRequestCheck      `json:"checks,omitempty"`
+	Deployments    []GitPullRequestDeployment `json:"deployments,omitempty"`
 }
 
 type GitPullRequestCheck struct {
@@ -128,6 +131,7 @@ type branchPullRequestCacheEntry struct {
 }
 
 type GitService struct {
+	mu                     sync.RWMutex
 	branchCache            map[string]branchCacheEntry
 	branchPullRequestCache map[string]branchPullRequestCacheEntry
 }
@@ -464,14 +468,37 @@ func (s *GitService) BranchStatus(ctx context.Context, root string) (GitBranchSt
 }
 
 func (s *GitService) BranchPullRequest(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
+	return s.branchPullRequest(ctx, root, branch, false, true)
+}
+
+func (s *GitService) BranchPullRequestLite(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
+	return s.branchPullRequest(ctx, root, branch, false, false)
+}
+
+func (s *GitService) RefreshBranchPullRequest(ctx context.Context, root string, branch string) (GitBranchPullRequestStatus, error) {
+	return s.branchPullRequest(ctx, root, branch, true, true)
+}
+
+func (s *GitService) branchPullRequest(ctx context.Context, root string, branch string, refresh bool, includeDetails bool) (GitBranchPullRequestStatus, error) {
 	branchName := strings.TrimSpace(branch)
 	if branchName == "" {
 		return GitBranchPullRequestStatus{}, NewRPCError(-32602, "branch is required")
 	}
 
 	cacheKey := root + "\n" + branchName
-	if entry, ok := s.branchPullRequestCache[cacheKey]; ok && time.Since(entry.at) < branchPullRequestCacheTTL {
-		return entry.data, nil
+	if !refresh {
+		s.mu.RLock()
+		entry, ok := s.branchPullRequestCache[cacheKey]
+		s.mu.RUnlock()
+		if ok && time.Since(entry.at) < branchPullRequestCacheTTL {
+			return entry.data, nil
+		}
+	}
+
+	if refresh {
+		s.mu.Lock()
+		delete(s.branchPullRequestCache, cacheKey)
+		s.mu.Unlock()
 	}
 
 	out, err := ghCommand(ctx, root,
@@ -479,21 +506,23 @@ func (s *GitService) BranchPullRequest(ctx context.Context, root string, branch 
 		"--head", branchName,
 		"--state", "all",
 		"--limit", "1",
-		"--json", "number,title,url,state,isDraft,headRefName,baseRefName,headRefOid",
+		"--json", "number,title,url,state,reviewDecision,isDraft,mergedAt,headRefName,baseRefName,headRefOid",
 	)
 	if err != nil {
 		return GitBranchPullRequestStatus{}, err
 	}
 
 	type ghPullRequest struct {
-		Number      int    `json:"number"`
-		Title       string `json:"title"`
-		URL         string `json:"url"`
-		State       string `json:"state"`
-		IsDraft     bool   `json:"isDraft"`
-		HeadRefName string `json:"headRefName"`
-		BaseRefName string `json:"baseRefName"`
-		HeadRefOID  string `json:"headRefOid"`
+		Number         int    `json:"number"`
+		Title          string `json:"title"`
+		URL            string `json:"url"`
+		State          string `json:"state"`
+		ReviewDecision string `json:"reviewDecision"`
+		IsDraft        bool   `json:"isDraft"`
+		MergedAt       string `json:"mergedAt"`
+		HeadRefName    string `json:"headRefName"`
+		BaseRefName    string `json:"baseRefName"`
+		HeadRefOID     string `json:"headRefOid"`
 	}
 
 	prs := make([]ghPullRequest, 0)
@@ -503,36 +532,46 @@ func (s *GitService) BranchPullRequest(ctx context.Context, root string, branch 
 
 	if len(prs) == 0 {
 		status := GitBranchPullRequestStatus{Found: false, Branch: branchName}
+		s.mu.Lock()
 		s.branchPullRequestCache[cacheKey] = branchPullRequestCacheEntry{data: status, at: time.Now()}
+		s.mu.Unlock()
 		return status, nil
 	}
 
 	pr := prs[0]
-	checks, err := getPullRequestChecks(ctx, root, pr.Number)
-	if err != nil {
-		return GitBranchPullRequestStatus{}, err
-	}
+	checks := []GitPullRequestCheck{}
+	deployments := []GitPullRequestDeployment{}
+	if includeDetails {
+		checks, err = getPullRequestChecks(ctx, root, pr.Number)
+		if err != nil {
+			return GitBranchPullRequestStatus{}, err
+		}
 
-	deployments, err := getPullRequestDeployments(ctx, root, pr.HeadRefOID)
-	if err != nil {
-		return GitBranchPullRequestStatus{}, err
+		deployments, err = getPullRequestDeployments(ctx, root, pr.HeadRefOID)
+		if err != nil {
+			return GitBranchPullRequestStatus{}, err
+		}
 	}
 
 	status := GitBranchPullRequestStatus{
-		Found:       true,
-		Branch:      branchName,
-		Number:      pr.Number,
-		Title:       pr.Title,
-		URL:         pr.URL,
-		State:       pr.State,
-		IsDraft:     pr.IsDraft,
-		HeadRefName: pr.HeadRefName,
-		BaseRefName: pr.BaseRefName,
-		Checks:      checks,
-		Deployments: deployments,
+		Found:          true,
+		Branch:         branchName,
+		Number:         pr.Number,
+		Title:          pr.Title,
+		URL:            pr.URL,
+		State:          pr.State,
+		ReviewDecision: pr.ReviewDecision,
+		IsDraft:        pr.IsDraft,
+		MergedAt:       pr.MergedAt,
+		HeadRefName:    pr.HeadRefName,
+		BaseRefName:    pr.BaseRefName,
+		Checks:         checks,
+		Deployments:    deployments,
 	}
 
+	s.mu.Lock()
 	s.branchPullRequestCache[cacheKey] = branchPullRequestCacheEntry{data: status, at: time.Now()}
+	s.mu.Unlock()
 	return status, nil
 }
 
@@ -751,7 +790,10 @@ func (s *GitService) ReadBranchComparisonDiff(ctx context.Context, root string, 
 }
 
 func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchList, error) {
-	if entry, ok := s.branchCache[root]; ok && time.Since(entry.at) < branchCacheTTL {
+	s.mu.RLock()
+	entry, ok := s.branchCache[root]
+	s.mu.RUnlock()
+	if ok && time.Since(entry.at) < branchCacheTTL {
 		return entry.data, nil
 	}
 
@@ -764,7 +806,9 @@ func (s *GitService) ListBranches(ctx context.Context, root string) (GitBranchLi
 		return GitBranchList{}, err
 	}
 
+	s.mu.Lock()
 	s.branchCache[root] = branchCacheEntry{data: list, at: time.Now()}
+	s.mu.Unlock()
 	return list, nil
 }
 

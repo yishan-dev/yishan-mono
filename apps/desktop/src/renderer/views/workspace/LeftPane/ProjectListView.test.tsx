@@ -5,6 +5,7 @@ import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within }
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OPEN_CREATE_WORKSPACE_DIALOG_EVENT } from "../../../commands/workspaceCommands";
 import { inspectGitRepository } from "../../../commands/gitCommands";
+import { getDaemonClient } from "../../../rpc/rpcTransport";
 import { ProjectListView } from "./ProjectListView";
 
 const mocked = vi.hoisted(() => {
@@ -178,6 +179,19 @@ vi.mock("../../../commands/fileCommands", () => ({
 
 vi.mock("../../../commands/gitCommands", () => ({
   inspectGitRepository: vi.fn(() => Promise.resolve({ isGitRepository: true, currentBranch: "feature/live-branch" })),
+}));
+
+vi.mock("../../../rpc/rpcTransport", () => ({
+  getDaemonClient: vi.fn(async () => ({
+    workspace: {
+      list: vi.fn(async () => [
+        {
+          id: "workspace-1",
+          path: "/tmp/worktrees/workspace-1",
+        },
+      ]),
+    },
+  })),
 }));
 
 vi.mock("../../../helpers/platform", () => ({
@@ -720,6 +734,36 @@ describe("ProjectListView", () => {
     });
 
     expect(screen.queryByTestId("workspace-info-popper")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("shows pull request info in workspace popover when one exists", async () => {
+    vi.useFakeTimers();
+    vi.mocked(getDaemonClient).mockResolvedValueOnce({
+      workspace: {
+        list: vi.fn(async () => [
+          {
+            id: "workspace-1",
+            path: "/tmp/worktrees/workspace-1",
+            pullRequest: {
+              number: 42,
+              title: "Add PR tracking",
+              status: "review",
+            },
+          },
+        ]),
+      },
+    } as never);
+    renderRepoList();
+
+    fireEvent.mouseEnter(screen.getByTestId("workspace-row-workspace-1"));
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    const infoPopper = screen.getByTestId("workspace-info-popper");
+    expect(infoPopper.textContent).toContain("PR: #42 Add PR tracking");
+    expect(infoPopper.textContent).toContain("Status: review");
     vi.useRealTimers();
   });
 

@@ -29,18 +29,21 @@ type worktreeWatcher struct {
 	gitTimer       *time.Timer
 	changedPaths   []string
 	done           chan struct{}
+	onGitChanged   func(worktreePath string)
 }
 
 type workspaceWatchers struct {
-	mu      sync.Mutex
-	entries map[string]*worktreeWatcher
-	events  *eventHub
+	mu           sync.Mutex
+	entries      map[string]*worktreeWatcher
+	events       *eventHub
+	onGitChanged func(worktreePath string)
 }
 
-func newWorkspaceWatchers(events *eventHub) *workspaceWatchers {
+func newWorkspaceWatchers(events *eventHub, onGitChanged func(worktreePath string)) *workspaceWatchers {
 	return &workspaceWatchers{
-		entries: make(map[string]*worktreeWatcher),
-		events:  events,
+		entries:      make(map[string]*worktreeWatcher),
+		events:       events,
+		onGitChanged: onGitChanged,
 	}
 }
 
@@ -112,6 +115,7 @@ func (ws *workspaceWatchers) Watch(worktreePath string) {
 		watchedDirs:    make(map[string]bool),
 		events:         ws.events,
 		done:           make(chan struct{}),
+		onGitChanged:   ws.onGitChanged,
 	}
 
 	if err := entry.addWorkspaceRecursive(worktreePath); err != nil {
@@ -395,6 +399,9 @@ func (w *worktreeWatcher) scheduleGitEmit() {
 				"workspaceWorktreePath": w.path,
 			},
 		})
+		if w.onGitChanged != nil {
+			go w.onGitChanged(w.path)
+		}
 	})
 }
 

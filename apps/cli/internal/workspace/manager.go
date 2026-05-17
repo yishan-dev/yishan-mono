@@ -11,9 +11,26 @@ import (
 )
 
 type Workspace struct {
-	ID              string      `json:"id"`
-	Path            string      `json:"path"`
-	SetupHookResult *HookResult `json:"setupHookResult,omitempty"`
+	ID              string                `json:"id"`
+	Path            string                `json:"path"`
+	SetupHookResult *HookResult           `json:"setupHookResult,omitempty"`
+	PullRequest     *WorkspacePullRequest `json:"pullRequest,omitempty"`
+}
+
+type WorkspacePullRequest struct {
+	Number         int                        `json:"number"`
+	Title          string                     `json:"title,omitempty"`
+	URL            string                     `json:"url,omitempty"`
+	Branch         string                     `json:"branch,omitempty"`
+	BaseBranch     string                     `json:"baseBranch,omitempty"`
+	GitHubState    string                     `json:"githubState,omitempty"`
+	Status         string                     `json:"status,omitempty"`
+	ReviewDecision string                     `json:"reviewDecision,omitempty"`
+	IsDraft        bool                       `json:"isDraft,omitempty"`
+	Complete       bool                       `json:"complete,omitempty"`
+	UpdatedAt      string                     `json:"updatedAt,omitempty"`
+	Checks         []GitPullRequestCheck      `json:"checks,omitempty"`
+	Deployments    []GitPullRequestDeployment `json:"deployments,omitempty"`
 }
 
 type Manager struct {
@@ -171,6 +188,38 @@ func (m *Manager) GetWorkspace(id string) (Workspace, error) {
 	return m.getWorkspace(id)
 }
 
+func (m *Manager) FindWorkspaceByPath(path string) (Workspace, bool) {
+	resolvedPath, err := filepath.Abs(path)
+	if err != nil {
+		return Workspace{}, false
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, ws := range m.workspaces {
+		if ws.Path == resolvedPath {
+			return ws, true
+		}
+	}
+
+	return Workspace{}, false
+}
+
+func (m *Manager) SetWorkspacePullRequest(workspaceID string, pr *WorkspacePullRequest) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	ws, ok := m.workspaces[workspaceID]
+	if !ok {
+		return NewRPCError(-32004, "workspace not found")
+	}
+
+	ws.PullRequest = pr
+	m.workspaces[workspaceID] = ws
+	return nil
+}
+
 func (m *Manager) TerminalStart(ctx context.Context, req TerminalStartRequest) (TerminalStartResponse, error) {
 	ws, err := m.getWorkspace(req.WorkspaceID)
 	if err != nil {
@@ -309,6 +358,30 @@ func (m *Manager) GitBranchPullRequest(ctx context.Context, workspaceID string, 
 		return GitBranchPullRequestStatus{}, err
 	}
 	return m.gits.BranchPullRequest(ctx, ws.Path, branch)
+}
+
+func (m *Manager) RefreshGitBranchPullRequest(ctx context.Context, workspaceID string, branch string) (GitBranchPullRequestStatus, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+	return m.gits.RefreshBranchPullRequest(ctx, ws.Path, branch)
+}
+
+func (m *Manager) GitBranchPullRequestLite(ctx context.Context, workspaceID string, branch string) (GitBranchPullRequestStatus, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return GitBranchPullRequestStatus{}, err
+	}
+	return m.gits.BranchPullRequestLite(ctx, ws.Path, branch)
+}
+
+func (m *Manager) GitCurrentBranch(ctx context.Context, workspaceID string) (string, error) {
+	ws, err := m.getWorkspace(workspaceID)
+	if err != nil {
+		return "", err
+	}
+	return m.gits.CurrentBranch(ctx, ws.Path)
 }
 
 func (m *Manager) GitListCommitsToTarget(ctx context.Context, workspaceID string, targetBranch string) (GitCommitComparison, error) {

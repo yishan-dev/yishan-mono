@@ -65,6 +65,21 @@ export type ProcedureSubscriptionOptions = {
 export type DaemonWorkspace = {
   id: string;
   path: string;
+  pullRequest?: DaemonWorkspacePullRequest;
+};
+
+export type DaemonWorkspacePullRequest = {
+  number: number;
+  title?: string;
+  url?: string;
+  branch?: string;
+  baseBranch?: string;
+  githubState?: string;
+  status?: string;
+  reviewDecision?: string;
+  isDraft?: boolean;
+  complete?: boolean;
+  updatedAt?: string;
 };
 
 export type WorkspaceCreateInput = {
@@ -78,6 +93,11 @@ export type WorkspaceCreateInput = {
   targetBranch?: string;
   contextEnabled?: boolean;
   setupHook?: string;
+};
+
+export type WorkspaceOpenInput = {
+  workspaceId: string;
+  workspaceWorktreePath: string;
 };
 
 export type PersistAuthTokensInput = {

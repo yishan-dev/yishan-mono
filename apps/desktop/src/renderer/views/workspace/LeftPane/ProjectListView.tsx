@@ -240,6 +240,7 @@ export function ProjectListView() {
     workspaceInfoAnchorEl,
     hoveredWorkspace,
     hoveredWorkspaceCurrentBranch,
+    hoveredWorkspacePullRequest,
     isHoveredWorkspacePrimary,
     isWorkspaceInfoOpen,
     handleWorkspaceInfoMouseEnter,
@@ -680,6 +681,7 @@ export function ProjectListView() {
         workspace={hoveredWorkspace}
         isPrimaryWorkspace={isHoveredWorkspacePrimary}
         currentBranch={hoveredWorkspaceCurrentBranch}
+        pullRequest={hoveredWorkspacePullRequest}
         onMouseEnter={handleWorkspaceInfoPopoverMouseEnter}
         onMouseLeave={handleWorkspaceInfoPopoverMouseLeave}
       />
