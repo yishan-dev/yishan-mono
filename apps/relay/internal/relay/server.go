@@ -23,8 +23,16 @@ type Server struct {
 	apiToken      string
 	upgrader      websocket.Upgrader
 	startedAt     time.Time
+	metricsTTL    time.Duration
+	metricsMu     sync.RWMutex
+	metricsCache  *metricsSnapshot
 	clientMu      sync.RWMutex
 	clientsByNode map[string]map[*clientConn]struct{}
+}
+
+type metricsSnapshot struct {
+	expiresAt time.Time
+	payload   map[string]any
 }
 
 type clientConn struct {
@@ -46,11 +54,13 @@ func NewServer(sessions *SessionManager, authenticator *auth.Authenticator, queu
 			WriteBufferSize: 4096,
 		},
 		startedAt:     time.Now(),
+		metricsTTL:    5 * time.Second,
 		clientsByNode: make(map[string]map[*clientConn]struct{}),
 	}
 
 	// Wire session events to the job queue for reconnect/disconnect handling.
 	sessions.OnEvent(func(event SessionEvent) {
+		s.invalidateMetricsCache()
 		switch event.Type {
 		case "disconnected", "replaced":
 			queue.HandleNodeDisconnect(event.NodeID)
@@ -345,9 +355,25 @@ func (s *Server) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queueMetrics := s.queue.GetMetrics()
+	metrics := s.getMetricsSnapshot()
 
-	metrics := map[string]any{
+	writeJSON(w, http.StatusOK, metrics)
+}
+
+func (s *Server) getMetricsSnapshot() map[string]any {
+	now := time.Now()
+
+	s.metricsMu.RLock()
+	cache := s.metricsCache
+	if cache != nil && now.Before(cache.expiresAt) {
+		payload := cache.payload
+		s.metricsMu.RUnlock()
+		return payload
+	}
+	s.metricsMu.RUnlock()
+
+	queueMetrics := s.queue.GetMetrics()
+	payload := map[string]any{
 		"uptime":            time.Since(s.startedAt).String(),
 		"connectedNodes":    s.sessions.ConnectedNodeIDs(),
 		"connectedSessions": s.sessions.ConnectedSessions(),
@@ -356,7 +382,20 @@ func (s *Server) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		"queue":             queueMetrics,
 	}
 
-	writeJSON(w, http.StatusOK, metrics)
+	s.metricsMu.Lock()
+	s.metricsCache = &metricsSnapshot{
+		expiresAt: now.Add(s.metricsTTL),
+		payload:   payload,
+	}
+	s.metricsMu.Unlock()
+
+	return payload
+}
+
+func (s *Server) invalidateMetricsCache() {
+	s.metricsMu.Lock()
+	s.metricsCache = nil
+	s.metricsMu.Unlock()
 }
 
 func (s *Server) authorizeAPIRequest(w http.ResponseWriter, r *http.Request) bool {
