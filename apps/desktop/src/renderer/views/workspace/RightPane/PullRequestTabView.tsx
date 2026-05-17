@@ -110,7 +110,7 @@ export function PullRequestTabView({ active = true }: { active?: boolean }) {
   const checks = pullRequest?.checks ?? [];
   const deployments = pullRequest?.deployments ?? [];
   const livePrId = pullRequest?.number != null ? String(pullRequest.number) : null;
-  const pastPullRequests = historicalPullRequests.filter((pr) => pr.prId !== livePrId);
+  const pastPullRequests = (historicalPullRequests ?? []).filter((pr) => pr.prId !== livePrId);
   const hasHistory = pastPullRequests.length > 0;
   const isEmpty = !hasLivePr && !hasHistory;
 

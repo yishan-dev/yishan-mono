@@ -182,6 +182,9 @@ describe("workspaceCommands", () => {
       expect(rpcMocks.openWorkspace).toHaveBeenCalledWith({
         workspaceId: "workspace-1",
         workspaceWorktreePath: "/tmp/workspaces/workspace-1",
+        orgId: undefined,
+        projectId: "repo-1",
+        prAlreadyMerged: false,
       });
     });
   });

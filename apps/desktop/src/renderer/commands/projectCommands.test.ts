@@ -149,6 +149,7 @@ describe("projectCommands", () => {
             branch: "feature-a",
             sourceBranch: "main",
             localPath: "/tmp/workspaces/project-1/feature-a",
+            latestPullRequest: null,
             createdAt: "2026-01-01T00:00:00.000Z",
             updatedAt: "2026-01-01T00:00:00.000Z",
           },
@@ -162,6 +163,9 @@ describe("projectCommands", () => {
     expect(rpcMocks.workspaceOpen).toHaveBeenCalledWith({
       workspaceId: "workspace-1",
       workspaceWorktreePath: "/tmp/workspaces/project-1/feature-a",
+      orgId: "org-1",
+      projectId: "project-1",
+      prAlreadyMerged: false,
     });
   });
 
