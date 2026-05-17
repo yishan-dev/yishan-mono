@@ -2,6 +2,7 @@ import { listOrganizationNodes } from "./nodeApi";
 import { createOrganization, listOrganizationMembers, listOrganizations } from "./orgApi";
 import { createProject, deleteProject, listProjects, updateProject } from "./projectApi";
 import { createProjectWorkspace, listProjectWorkspaces } from "./workspaceApi";
+import { listWorkspacePullRequests, upsertWorkspacePullRequest } from "./workspacePullRequestApi";
 
 export const api = {
   org: {
@@ -21,6 +22,10 @@ export const api = {
   workspace: {
     listByProject: listProjectWorkspaces,
     createForProject: createProjectWorkspace,
+  },
+  workspacePullRequest: {
+    list: listWorkspacePullRequests,
+    upsert: upsertWorkspacePullRequest,
   },
 };
 

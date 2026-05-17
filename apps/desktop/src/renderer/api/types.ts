@@ -29,6 +29,11 @@ export type ProjectRecord = {
   updatedAt: string;
 };
 
+export type WorkspacePullRequestSummary = {
+  prId: string;
+  state: "open" | "closed" | "merged";
+};
+
 export type WorkspaceRecord = {
   id: string;
   organizationId: string;
@@ -40,6 +45,24 @@ export type WorkspaceRecord = {
   branch: string | null;
   sourceBranch: string | null;
   localPath: string;
+  latestPullRequest: WorkspacePullRequestSummary | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkspacePullRequestRecord = {
+  id: string;
+  workspaceId: string;
+  organizationId: string;
+  prId: string;
+  title: string | null;
+  url: string | null;
+  branch: string | null;
+  baseBranch: string | null;
+  state: "open" | "closed" | "merged";
+  metadata: Record<string, unknown> | null;
+  detectedAt: string;
+  resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

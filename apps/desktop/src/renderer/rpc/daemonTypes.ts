@@ -119,6 +119,8 @@ export type WorkspaceCreateInput = {
 export type WorkspaceOpenInput = {
   workspaceId: string;
   workspaceWorktreePath: string;
+  /** When true the daemon skips PR polling — the latest PR is already merged. */
+  prAlreadyMerged?: boolean;
 };
 
 export type PersistAuthTokensInput = {

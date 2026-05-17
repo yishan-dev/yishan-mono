@@ -51,8 +51,9 @@ func NewManager() *Manager {
 }
 
 type OpenRequest struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID               string `json:"id"`
+	Path             string `json:"path"`
+	PRAlreadyMerged  bool   `json:"prAlreadyMerged,omitempty"`
 }
 
 type CloseRequest struct {

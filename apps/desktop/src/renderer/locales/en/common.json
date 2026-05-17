@@ -475,7 +475,8 @@
       "checks": "Checks",
       "noChecks": "No checks available.",
       "deployments": "Deployments",
-      "noDeployments": "No deployments available."
+      "noDeployments": "No deployments available.",
+      "history": "History"
     }
   },
   "repo": {

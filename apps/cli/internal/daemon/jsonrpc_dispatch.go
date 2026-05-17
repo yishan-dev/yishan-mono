@@ -26,9 +26,11 @@ func (h *JSONRPCHandler) dispatch(ctx context.Context, connState *wsConnState, m
 		if err != nil {
 			return nil, err
 		}
-		log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Msg("daemon workspace opened")
+		log.Info().Str("workspaceId", ws.ID).Str("path", ws.Path).Bool("prAlreadyMerged", req.PRAlreadyMerged).Msg("daemon workspace opened")
 		h.watchers.Watch(ws.Path)
-		h.prTracker.EnsureTracked(ws.Path)
+		if !req.PRAlreadyMerged {
+			h.prTracker.EnsureTracked(ws.Path)
+		}
 		return ws, nil
 	case MethodList:
 		return h.manager.List(), nil

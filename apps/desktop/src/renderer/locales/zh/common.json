@@ -445,7 +445,8 @@
       "checks": "检查",
       "noChecks": "暂无检查信息。",
       "deployments": "部署",
-      "noDeployments": "暂无部署信息。"
+      "noDeployments": "暂无部署信息。",
+      "history": "历史记录"
     }
   },
   "repo": {

@@ -94,7 +94,13 @@ export async function loadWorkspaceFromBackend(): Promise<void> {
     }
 
     workspaceStore.getState().load(selectedOrganization.id, projects, workspaces);
-    await ensureVisibleWorkspacesOpen();
+
+    const mergedWorkspaceIds = new Set(
+      workspaces
+        .filter((w) => w.latestPullRequest?.state === "merged")
+        .map((w) => w.id),
+    );
+    await ensureVisibleWorkspacesOpen(mergedWorkspaceIds);
     syncTabStoreWithWorkspace(previousWorkspaces);
   } catch (error) {
     console.error("Failed to load workspace snapshot", error);

@@ -15,8 +15,13 @@ function resolveVisibleWorkspaceTargets() {
   });
 }
 
-/** Ensures all currently visible workspaces are registered in the daemon. */
-export async function ensureVisibleWorkspacesOpen(): Promise<void> {
+/**
+ * Ensures all currently visible workspaces are registered in the daemon.
+ *
+ * @param mergedWorkspaceIds - Set of workspace IDs whose latest PR is already
+ *   merged. The daemon will skip PR polling for these workspaces.
+ */
+export async function ensureVisibleWorkspacesOpen(mergedWorkspaceIds?: ReadonlySet<string>): Promise<void> {
   const targets = resolveVisibleWorkspaceTargets();
   if (targets.length === 0) {
     if (import.meta.env.DEV) {
@@ -62,11 +67,13 @@ export async function ensureVisibleWorkspacesOpen(): Promise<void> {
         console.debug("[daemonWorkspaceSync] opening workspace in daemon", {
           workspaceId: workspace.id,
           worktreePath,
+          prAlreadyMerged: mergedWorkspaceIds?.has(workspace.id) ?? false,
         });
       }
       await client.workspace.open({
         workspaceId: workspace.id,
         workspaceWorktreePath: worktreePath,
+        prAlreadyMerged: mergedWorkspaceIds?.has(workspace.id) ?? false,
       });
       openPaths.add(worktreePath);
     }),
