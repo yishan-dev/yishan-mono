@@ -1,7 +1,7 @@
-import type { WorkspaceView } from "@/services/workspace-service";
+import type { Workspace } from "@/db/schema";
 
 export type WorkspaceProvisionRequest = {
-  workspace: WorkspaceView;
+  workspace: Workspace;
   actorUserId: string;
 };
 

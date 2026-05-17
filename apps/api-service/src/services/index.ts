@@ -7,6 +7,7 @@ import { ProjectService } from "@/services/project-service";
 import { ScheduledJobService } from "@/services/scheduled-job-service";
 import { UserService } from "@/services/user-service";
 import { NoopWorkspaceProvisioner } from "@/services/workspace-provisioner";
+import { WorkspacePullRequestService } from "@/services/workspace-pull-request-service";
 import { WorkspaceService } from "@/services/workspace-service";
 
 export type AppServices = {
@@ -17,6 +18,7 @@ export type AppServices = {
   project: ProjectService;
   scheduledJob: ScheduledJobService;
   workspace: WorkspaceService;
+  workspacePullRequest: WorkspacePullRequestService;
 };
 
 export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppServices {
@@ -31,6 +33,7 @@ export function createServices(deps: { db: AppDb; config: ServiceConfig }): AppS
     node: new NodeService(deps.db, organization, deps.config),
     project: new ProjectService(deps.db, organization),
     scheduledJob: new ScheduledJobService(deps.db, organization),
-    workspace: new WorkspaceService(deps.db, organization, workspaceProvisioner)
+    workspace: new WorkspaceService(deps.db, organization, workspaceProvisioner),
+    workspacePullRequest: new WorkspacePullRequestService(deps.db, organization)
   };
 }

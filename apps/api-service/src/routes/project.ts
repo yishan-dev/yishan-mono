@@ -11,6 +11,7 @@ import type { AppEnv } from "@/hono";
 import { requireOrganizationMemberFromParam } from "@/middlewares/organization-access";
 import { scheduledJobRouter } from "@/routes/project-scheduled-job";
 import { workspaceRouter } from "@/routes/project-workspace";
+import { workspacePullRequestRouter } from "@/routes/workspace-pull-request";
 
 import { validationErrorResponse } from "@/validation/error-response";
 import {
@@ -55,4 +56,5 @@ router.put(
 
 projectRouter.route("/orgs/:orgId/projects", router);
 projectRouter.route("/orgs/:orgId/projects/:projectId/workspaces", workspaceRouter);
+projectRouter.route("/orgs/:orgId/projects/:projectId/workspaces/:workspaceId/pull-requests", workspacePullRequestRouter);
 projectRouter.route("/orgs/:orgId/scheduled-jobs", scheduledJobRouter);

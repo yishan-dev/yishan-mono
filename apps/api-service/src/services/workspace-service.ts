@@ -1,7 +1,8 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { AppDb } from "@/db/client";
-import { nodes, organizationMembers, projects, workspaces } from "@/db/schema";
+import { nodes, organizationMembers, projects, workspacePullRequests, workspaces } from "@/db/schema";
+import type { WorkspacePullRequestState } from "@/db/schema";
 import {
   OrganizationMembershipRequiredError,
   ProjectNotFoundError,
@@ -17,6 +18,19 @@ import type { WorkspaceProvisioner } from "@/services/workspace-provisioner";
 
 type WorkspaceKind = "primary" | "worktree";
 
+export type WorkspacePullRequestSummary = {
+  id: string;
+  prId: string;
+  title: string | null;
+  url: string | null;
+  branch: string | null;
+  baseBranch: string | null;
+  state: WorkspacePullRequestState;
+  metadata: unknown;
+  detectedAt: Date;
+  resolvedAt: Date | null;
+};
+
 export type WorkspaceView = {
   id: string;
   organizationId: string;
@@ -28,6 +42,7 @@ export type WorkspaceView = {
   branch: string | null;
   sourceBranch: string | null;
   localPath: string;
+  latestPullRequest: WorkspacePullRequestSummary | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -62,7 +77,7 @@ export class WorkspaceService {
   ) {}
 
   async createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceView> {
-    const workspace = await this.db.transaction(async (tx) => {
+    const workspaceRow = await this.db.transaction(async (tx) => {
       const role = await this.organizationService.getMembershipRole({
         organizationId: input.organizationId,
         userId: input.actorUserId
@@ -172,11 +187,11 @@ export class WorkspaceService {
     });
 
     await this.workspaceProvisioner.enqueueWorkspaceProvision({
-      workspace,
+      workspace: workspaceRow,
       actorUserId: input.actorUserId
     });
 
-    return workspace;
+    return { ...workspaceRow, latestPullRequest: null };
   }
 
   async listWorkspaces(input: {
@@ -205,7 +220,57 @@ export class WorkspaceService {
         )
       );
 
-    return rows;
+    if (rows.length === 0) {
+      return [];
+    }
+
+    // Fetch the latest PR for each workspace in one query, then group by workspaceId.
+    const workspaceIds = rows.map((w) => w.id);
+    const prRows = await this.db
+      .selectDistinctOn([workspacePullRequests.workspaceId], {
+        id: workspacePullRequests.id,
+        workspaceId: workspacePullRequests.workspaceId,
+        prId: workspacePullRequests.prId,
+        title: workspacePullRequests.title,
+        url: workspacePullRequests.url,
+        branch: workspacePullRequests.branch,
+        baseBranch: workspacePullRequests.baseBranch,
+        state: workspacePullRequests.state,
+        metadata: workspacePullRequests.metadata,
+        detectedAt: workspacePullRequests.detectedAt,
+        resolvedAt: workspacePullRequests.resolvedAt
+      })
+      .from(workspacePullRequests)
+      .where(
+        and(
+          eq(workspacePullRequests.organizationId, input.organizationId),
+          inArray(workspacePullRequests.workspaceId, workspaceIds)
+        )
+      )
+      .orderBy(workspacePullRequests.workspaceId, desc(workspacePullRequests.detectedAt));
+
+    const latestPrByWorkspaceId = new Map(prRows.map((pr) => [pr.workspaceId, pr]));
+
+    return rows.map((workspace) => {
+      const pr = latestPrByWorkspaceId.get(workspace.id) ?? null;
+      return {
+        ...workspace,
+        latestPullRequest: pr
+          ? {
+              id: pr.id,
+              prId: pr.prId,
+              title: pr.title,
+              url: pr.url,
+              branch: pr.branch,
+              baseBranch: pr.baseBranch,
+              state: pr.state as WorkspacePullRequestState,
+              metadata: pr.metadata,
+              detectedAt: pr.detectedAt,
+              resolvedAt: pr.resolvedAt
+            }
+          : null
+      };
+    });
   }
 
   async closeWorkspace(input: CloseWorkspaceInput): Promise<WorkspaceView> {
@@ -253,6 +318,6 @@ export class WorkspaceService {
       });
     }
 
-    return workspace;
+    return { ...workspace, latestPullRequest: null };
   }
 }
